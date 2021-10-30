@@ -1,6 +1,8 @@
 lockfileVersion: 5.3
 
 specifiers:
+  '@radix-ui/colors': ^0.1.7
+  '@stitches/react': ^1.2.5
   eslint: 7.32.0
   eslint-config-next: 12.0.1
   next: 12.0.1
@@ -8,6 +10,8 @@ specifiers:
   react-dom: 17.0.2
 
 dependencies:
+  '@radix-ui/colors': 0.1.7
+  '@stitches/react': 1.2.5_react@17.0.2
   next: 12.0.1_react-dom@17.0.2+react@17.0.2
   react: 17.0.2
   react-dom: 17.0.2_react@17.0.2
@@ -309,9 +313,21 @@ packages:
       fastq: 1.13.0
     dev: true
 
+  /@radix-ui/colors/0.1.7:
+    resolution: {integrity: sha512-E6+ZPQ+FFn1/NZ4c/KRvZTu9KjC/MXrbJNETYs1HKe96gyxQivPu65FkhOsRnPigvJ0YJ9ZxYGxayqDNmaC1cQ==}
+    dev: false
+
   /@rushstack/eslint-patch/1.0.9:
     resolution: {integrity: sha512-yk9Xj/3bUxyz3azMXW8qigLqXWEr2R0h9G7PVnnmjNQdlZLN+aESqCTnVN7ubtYUIQfW32/v8+AXsbpL1ryI1A==}
     dev: true
+
+  /@stitches/react/1.2.5_react@17.0.2:
+    resolution: {integrity: sha512-95Wwjp5cvoYQjg616OBiHZM1PnIF51pnFQIgSPxPzS/xXBrer9sNO1tfpVfLYfOifvuotse2IFNbypJ92BXzvg==}
+    peerDependencies:
+      react: '>= 16.3.0'
+    dependencies:
+      react: 17.0.2
+    dev: false
 
   /@types/json5/0.0.29:
     resolution: {integrity: sha1-7ihweulOEdK4J7y+UnC86n8+ce4=}
