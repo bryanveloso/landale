@@ -22,3 +22,10 @@ export const {
 } = createStitches({})
 
 export const normalize: Record<string, any>[] = []
+
+export const globalStyles = globalCss({
+  body: {
+    fontFamily: 'InterVariant, sans-serif',
+    margin: 0
+  }
+})

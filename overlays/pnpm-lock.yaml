@@ -1,6 +1,7 @@
 lockfileVersion: 5.3
 
 specifiers:
+  '@fontsource/inter': ^4.5.1
   '@radix-ui/colors': ^0.1.7
   '@radix-ui/react-aspect-ratio': ^0.1.1
   '@stitches/react': ^1.2.5
@@ -16,6 +17,7 @@ specifiers:
   typescript: ^4.4.4
 
 dependencies:
+  '@fontsource/inter': 4.5.1
   '@radix-ui/colors': 0.1.7
   '@radix-ui/react-aspect-ratio': 0.1.1_react@17.0.2
   '@stitches/react': 1.2.5_react@17.0.2
@@ -110,6 +112,10 @@ packages:
     transitivePeerDependencies:
       - supports-color
     dev: true
+
+  /@fontsource/inter/4.5.1:
+    resolution: {integrity: sha512-mvtOvXNNVLlF1p/UbLgLrmz2RCOl6Ow+TqyiK10SosoLKX7edsXYiHFHb7XIZdjII6F2sJVPPsJXWhBnbXT2DQ==}
+    dev: false
 
   /@hapi/accept/5.0.2:
     resolution: {integrity: sha512-CmzBx/bXUR8451fnZRuZAJRlzgm0Jgu5dltTX/bszmR2lheb9BpyN47Q1RbaGTsvFzn0PXAEs+lXDKfshccYZw==}

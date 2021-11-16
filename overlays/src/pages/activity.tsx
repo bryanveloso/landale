@@ -7,7 +7,7 @@ export default function Activity() {
   return (
     <Screen>
       <Box css={{ width: '640px', gridColumn: 2, gridRow: 4 }}>
-        <Widescreen ratio={21 / 9}></Widescreen>
+        <Widescreen ratio={16 / 9}></Widescreen>
       </Box>
     </Screen>
   )

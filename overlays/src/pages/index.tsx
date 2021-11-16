@@ -1,4 +1,5 @@
 import Head from 'next/head'
+import Link from 'next/link'
 import Image from 'next/image'
 import styles from '../styles/Home.module.css'
 
@@ -11,7 +12,10 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className={styles.main}></main>
+      <main className={styles.main}>
+        <Link href="/activity">Activity</Link>
+        <Link href="/outro">Outro</Link>
+      </main>
 
       <footer className={styles.footer}>
         <a
