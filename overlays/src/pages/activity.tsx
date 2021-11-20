@@ -1,14 +1,16 @@
 import { AspectRatio } from '@radix-ui/react-aspect-ratio'
-import { Box } from '../components/box'
 import { Screen } from '../components/screen'
+import { Window } from '../components/window'
 import { styled } from '../stitches.config'
 
 export default function Activity() {
   return (
     <Screen>
-      <Box css={{ width: '640px', gridColumn: 2, gridRow: 4 }}>
-        <Widescreen ratio={16 / 9}></Widescreen>
-      </Box>
+      <Window size="content-972p" css={{ margin: 54 }} />
+      <Window
+        size="secondary-434p"
+        css={{ right: 54, top: 323, background: '#1F2027' }}
+      />
     </Screen>
   )
 }
