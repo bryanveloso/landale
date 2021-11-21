@@ -1,38 +1,50 @@
 import Image from 'next/image'
-import { m } from 'framer-motion'
+import { motion } from 'framer-motion'
 
-import { Screen } from '../components/screen'
+import { Box } from '../components/box'
 import { styled } from '../stitches.config'
 
 import outroHero from '../../public/outro-hero.png'
 
 export default function Outro() {
   return (
-    <Screen padded>
+    <Box
+      css={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: 'calc(100% - 108px)',
+        padding: 54
+      }}
+    >
       <Logo>
-        <Image layout="fixed" src={outroHero} width={817} height={156} />
+        <Image
+          layout="fixed"
+          src={outroHero}
+          width={184}
+          height={156}
+          priority
+        />
       </Logo>
       <Copyright
         initial={{ opacity: 0 }}
         animate={{ opacity: 1, transition: { delay: 1 } }}
       >
-        &copy; MMXXI
+        &copy; Avalonstar Incorporated MMXXI. All Rights Reserved.
       </Copyright>
-    </Screen>
+    </Box>
   )
 }
 
 const Logo = styled('div', {
-  gridColumn: '1 / -1',
-  gridRow: '9',
-  textAlign: 'center'
+  display: 'flex',
+  height: '100%',
+  justifyContent: 'center',
+  alignItems: 'center'
 })
 
-const Copyright = styled(m.div, {
-  gridColumn: '1 / -1',
-  gridRow: '19',
-
+const Copyright = styled(motion.div, {
   color: '#FFF8CC',
   fontWeight: 800,
-  textAlign: 'center'
+  textAlign: 'center',
+  textTransform: 'uppercase'
 })
