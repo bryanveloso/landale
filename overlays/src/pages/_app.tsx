@@ -3,6 +3,8 @@ import Layout from '../components/layout'
 
 import { globalStyles } from '../stitches.config'
 
+import '../styles/loader.css'
+
 function MyApp({ Component, pageProps }) {
   globalStyles()
   return (
