@@ -1,20 +1,15 @@
-import { AspectRatio } from '@radix-ui/react-aspect-ratio'
 import { Screen } from '../components/screen'
+import { TitleBar } from '../components/title-bar'
 import { Window } from '../components/window'
-import { styled } from '../stitches.config'
 
-export default function Activity() {
+const Activity = () => {
   return (
     <Screen>
-      <Window size="content-972p" css={{ margin: 54 }} />
-      <Window
-        size="secondary-434p"
-        css={{ right: 54, top: 323, background: '#1F2027' }}
-      />
+      <Window size="secondary-434p" css={{ right: 54, top: 323, zIndex: 1 }}>
+        <TitleBar style="translucent" controls="active" />
+      </Window>
     </Screen>
   )
 }
 
-const Widescreen = styled(AspectRatio, {
-  background: 'AliceBlue'
-})
+export default Activity

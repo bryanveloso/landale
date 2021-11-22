@@ -5,8 +5,19 @@ export const Window = styled('div', {
   position: 'absolute',
 
   // Chrome.
-  borderRadius: 9,
-  background: 'transparent',
+  '&::after': {
+    content: '',
+    position: 'absolute',
+    top: 0,
+    width: '100%',
+    height: '100%',
+
+    background: 'transparent',
+    borderRadius: 9,
+    boxShadow:
+      'inset 0 0 0 2px rgba(255, 255, 255, .23), 0 0 0 2px rgba(0, 0, 0, 0.89), 0 24px 64px 4px rgba(0, 0, 0, 0.67)',
+    zIndex: 1000
+  },
 
   variants: {
     size: {
@@ -18,17 +29,10 @@ export const Window = styled('div', {
         height: 434,
         width: 360
       }
-    },
-    shadow: {
-      osx: {
-        boxShadow:
-          'inset 0 0 0 2px rgba(255, 255, 255, .34), 0 0 0 2px rgba(0, 0, 0, 0.8), 0 22px 70px 4px rgba(0, 0, 0, 0.56)'
-      }
     }
   },
 
   defaultVariants: {
-    size: 'content-972p',
-    shadow: 'osx'
+    size: 'content-972p'
   }
 })
