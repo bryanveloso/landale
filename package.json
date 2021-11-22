@@ -1,0 +1,22 @@
+{
+  "name": "landale",
+  "version": "0.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bryanveloso/landale.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/bryanveloso/landale/issues"
+  },
+  "homepage": "https://github.com/bryanveloso/landale#readme",
+  "devDependencies": {
+    "electron": "^16.0.1"
+  }
+}
