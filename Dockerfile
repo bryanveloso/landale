@@ -2,14 +2,14 @@
 FROM node:14 AS deps
 RUN npm install -g pnpm
 WORKDIR /app
-COPY /overlays/pnpm-lock.yaml ./
+COPY pnpm-lock.yaml ./
 RUN pnpm fetch
 
 # Rebuild source code only when needed.
 FROM node:14 AS builder
 RUN npm install -g pnpm
 WORKDIR /app
-COPY /overlays/ .
+COPY /renderer/ .
 COPY --from=deps /app/node_modules ./node_modules
 RUN pnpm install -r --offline
 RUN pnpm build

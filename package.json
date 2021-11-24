@@ -1,27 +1,49 @@
 {
   "name": "landale",
-  "version": "0.0.0",
-  "main": "main.js",
+  "productName": "Landale",
+  "main": "main/index.js",
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
-    "lint": "eslint -c .eslintrc --ext .ts ./src",
-    "start": "npm run build && electron ./dist/main.js"
+    "clean": "rimraf dist main renderer/out renderer/.next",
+    "dev": "npm run build-electron && electron .",
+    "build-renderer": "next build renderer && next export renderer",
+    "build-electron": "tsc -p electron",
+    "build": "npm run build-renderer && npm run build-electron",
+    "pack-app": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "type-check": "tsc"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bryanveloso/landale.git"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Bryan Veloso",
   "bugs": {
     "url": "https://github.com/bryanveloso/landale/issues"
   },
   "homepage": "https://github.com/bryanveloso/landale#readme",
   "devDependencies": {
-    "electron": "^16.0.1"
+    "@fontsource/inter": "^4.5.1",
+    "@radix-ui/colors": "^0.1.7",
+    "@radix-ui/react-aspect-ratio": "^0.1.1",
+    "@stitches/react": "^1.2.5",
+    "@swc/cli": "^0.1.51",
+    "@swc/core": "^1.2.108",
+    "@swc/core-linux-musl": "^1.2.42",
+    "@types/node": "^14.14.6",
+    "@types/react": "^17.0.33",
+    "@types/react-dom": "^16.9.9",
+    "electron": "^16.0.1",
+    "electron-builder": "^22.14.5",
+    "eslint": "7.32.0",
+    "eslint-config-next": "12.0.1",
+    "framer-motion": "^5.3.0",
+    "next": "12.0.4",
+    "rimraf": "^3.0.0",
+    "typescript": "^4.4.4"
   },
   "dependencies": {
-    "next": "^12.0.4"
+    "electron-next": "^3.1.5",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
   }
 }

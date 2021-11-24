@@ -1,5 +1,5 @@
-import { TitleBar } from '~/components/title-bar'
-import { Window } from '~/components/window'
+import { TitleBar } from 'components/title-bar'
+import { Window } from 'components/window'
 
 const Camera = () => {
   return (
