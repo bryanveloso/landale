@@ -1,10 +1,9 @@
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 
-import { Box } from '../components/box'
-import { styled } from '../stitches.config'
-
-import avalonSTAR from '../../public/avalonstar.png'
+import { Box } from '@landale/components/box'
+import avalonSTAR from '@landale/public/avalonstar.png'
+import { styled } from '@landale/stitches.config'
 
 export default function Intro() {
   return (

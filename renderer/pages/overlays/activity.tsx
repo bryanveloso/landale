@@ -1,6 +1,6 @@
-import { Screen } from '../components/screen'
-import { TitleBar } from '../components/title-bar'
-import { Window } from '../components/window'
+import { Screen } from '@landale/components/screen'
+import { TitleBar } from '@landale/components/title-bar'
+import { Window } from '@landale/components/window'
 
 const Activity = () => {
   return (
