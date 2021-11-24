@@ -1,10 +1,9 @@
 import { motion } from 'framer-motion'
 import Image from 'next/image'
 
-import { Box } from '../components/box'
-import { styled } from '../stitches.config'
-
-import outroHero from '../../public/outro-hero.png'
+import { Box } from '@landale/components/box'
+import outroHero from '@landale/public/outro-hero.png'
+import { styled } from '@landale/stitches.config'
 
 export default function Outro() {
   return (
