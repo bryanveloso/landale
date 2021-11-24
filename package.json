@@ -3,8 +3,10 @@
   "version": "0.0.0",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "watch": "tsc -w",
+    "lint": "eslint -c .eslintrc --ext .ts ./src",
+    "start": "npm run build && electron ./dist/main.js"
   },
   "repository": {
     "type": "git",
@@ -18,5 +20,8 @@
   "homepage": "https://github.com/bryanveloso/landale#readme",
   "devDependencies": {
     "electron": "^16.0.1"
+  },
+  "dependencies": {
+    "next": "^12.0.4"
   }
 }
