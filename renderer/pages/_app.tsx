@@ -1,17 +1,20 @@
 import '@fontsource/inter/variable-full.css'
-import Layout from '../components/layout'
 
 import { globalStyles } from '../stitches.config'
 
 import '../styles/loader.css'
 
 function MyApp({ Component, pageProps }) {
+  const getLayout =
+    Component.getLayout ??
+    ((page: NextPageWithLayout) => {
+      page
+    })
+
+  // Set our global styles.
   globalStyles()
-  return (
-    <Layout>
-      <Component {...pageProps} />
-    </Layout>
-  )
+
+  return <Component {...pageProps} />
 }
 
 export default MyApp
