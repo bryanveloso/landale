@@ -11,7 +11,7 @@ export default function Intro() {
       css={{
         display: 'flex',
         flexDirection: 'column',
-        height: 'calc(100% - 108px)',
+        height: '100vh',
         padding: 54
       }}
     >
@@ -21,6 +21,7 @@ export default function Intro() {
           src={avalonSTAR}
           width={112}
           height={112}
+          alt="avalonSTAR"
           priority
         />
       </Logo>

@@ -11,7 +11,7 @@ export default function Outro() {
       css={{
         display: 'flex',
         flexDirection: 'column',
-        height: 'calc(100% - 108px)',
+        height: '100vh',
         padding: 54
       }}
     >
@@ -21,6 +21,7 @@ export default function Outro() {
           src={outroHero}
           width={184}
           height={156}
+          alt="avalonSTAR"
           priority
         />
       </Logo>
@@ -44,6 +45,7 @@ const Logo = styled('div', {
 const Copyright = styled(motion.div, {
   color: '#FFF8CC',
   fontWeight: 800,
+  fontSize: 20,
   textAlign: 'center',
   textTransform: 'uppercase'
 })
