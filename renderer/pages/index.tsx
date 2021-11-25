@@ -1,18 +1,29 @@
 import Head from 'next/head'
-import Link from 'next/link'
-import Image from 'next/image'
+import { GetServerSideProps, InferGetServerSidePropsType, NextPage } from 'next'
 
-export default function Home() {
-  return (
-    <div>
-      <Head>
-        <title>Landale</title>
-      </Head>
+const Home: NextPage<InferGetServerSidePropsType<typeof getServerSideProps>> =
+  ({ host }) => {
+    return (
+      <div>
+        <Head>
+          <title>Landale</title>
+        </Head>
 
-      <main>
-        <Link href="/activity">Activity</Link>
-        <Link href="/outro">Outro</Link>
-      </main>
-    </div>
-  )
+        <main>
+          <h1>Overlay Listing</h1>
+          <input value={`${host}/activity`} readOnly />
+          <input value={`${host}/outro`} readOnly />
+        </main>
+      </div>
+    )
+  }
+
+export default Home
+
+export const getServerSideProps: GetServerSideProps = async context => {
+  const host = context.req.headers.host
+
+  return {
+    props: { host }
+  }
 }
