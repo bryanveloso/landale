@@ -16,11 +16,14 @@ importers:
       '@types/react-dom': ^16.9.9
       electron: ^16.0.1
       electron-builder: ^22.14.5
+      electron-devtools-installer: ^3.2.0
+      electron-is-dev: ^2.0.0
       electron-next: ^3.1.5
       eslint: 7.32.0
       eslint-config-next: 12.0.1
       framer-motion: ^5.3.0
       next: 12.0.4
+      next-themes: ^0.0.15
       react: ^17.0.2
       react-dom: ^17.0.2
       rimraf: ^3.0.0
@@ -42,10 +45,13 @@ importers:
       '@types/react-dom': 16.9.14
       electron: 16.0.1
       electron-builder: 22.14.5
+      electron-devtools-installer: 3.2.0
+      electron-is-dev: 2.0.0
       eslint: 7.32.0
       eslint-config-next: 12.0.1_97474a4dbadaeb5c2c29b7d438fbde20
       framer-motion: 5.3.1_react-dom@17.0.2+react@17.0.2
       next: 12.0.4_react-dom@17.0.2+react@17.0.2
+      next-themes: 0.0.15_f195614718841b3c14a81ac95268ce58
       rimraf: 3.0.2
       typescript: 4.5.2
 
@@ -1932,9 +1938,17 @@ packages:
       - supports-color
     dev: true
 
+  /electron-devtools-installer/3.2.0:
+    resolution: {integrity: sha512-t3UczsYugm4OAbqvdImMCImIMVdFzJAHgbwHpkl5jmfu1izVgUcP/mnrPqJIpEeCK1uZGpt+yHgWEN+9EwoYhQ==}
+    dependencies:
+      rimraf: 3.0.2
+      semver: 7.3.5
+      tslib: 2.3.1
+      unzip-crx-3: 0.2.0
+    dev: true
+
   /electron-is-dev/2.0.0:
     resolution: {integrity: sha512-3X99K852Yoqu9AcW50qz3ibYBWY79/pBhlMCab8ToEWS48R0T9tyxRiQhwylE7zQdXrMnx2JKqUJyMPmt5FBqA==}
-    dev: false
 
   /electron-next/3.1.5:
     resolution: {integrity: sha512-W/+iLrSJC0uCeUPanOeDfeNMp1dNCUNI/WP6Rna1cbPrYvJJF2HkpznvomFd8TPBA+XFEQXPZBYHXd4sr+YQEg==}
@@ -2852,6 +2866,10 @@ packages:
     dependencies:
       queue: 6.0.2
 
+  /immediate/3.0.6:
+    resolution: {integrity: sha1-nbHb0Pr43m++D13V5Wu2BigN5ps=}
+    dev: true
+
   /import-fresh/3.3.0:
     resolution: {integrity: sha512-veYYhQa+D1QBKznvhUHxb8faxlrwUnxseDAbAp457E0wLNio2bOSKnjYDhMj+YiAq61xrMGhQk9iXVk5FzgQMw==}
     engines: {node: '>=6'}
@@ -3181,6 +3199,15 @@ packages:
       object.assign: 4.1.2
     dev: true
 
+  /jszip/3.7.1:
+    resolution: {integrity: sha512-ghL0tz1XG9ZEmRMcEN2vt7xabrDdqHHeykgARpmZ0BiIctWxM47Vt63ZO2dnp4QYt/xJVLLy5Zv1l/xRdh2byg==}
+    dependencies:
+      lie: 3.3.0
+      pako: 1.0.11
+      readable-stream: 2.3.7
+      set-immediate-shim: 1.0.1
+    dev: true
+
   /keyv/3.1.0:
     resolution: {integrity: sha512-9ykJ/46SN/9KPM/sichzQ7OvXyGDYKGTaDlKMGCAlg2UK8KRy4jb0d8sFc+0Tt0YYnThq8X2RZgCg74RPxgcVA==}
     dependencies:
@@ -3214,6 +3241,12 @@ packages:
     dependencies:
       prelude-ls: 1.2.1
       type-check: 0.4.0
+    dev: true
+
+  /lie/3.3.0:
+    resolution: {integrity: sha512-UaiMJzeWRlEujzAuw5LokY1L5ecNQYZKfmyZ9L7wDHb/p5etKaxXhohBcrw0EYby+G/NA52vRSN4N39dxHAIwQ==}
+    dependencies:
+      immediate: 3.0.6
     dev: true
 
   /loader-utils/1.2.3:
@@ -3379,6 +3412,18 @@ packages:
 
   /natural-compare/1.4.0:
     resolution: {integrity: sha1-Sr6/7tdUHywnrPspvbvRXI1bpPc=}
+    dev: true
+
+  /next-themes/0.0.15_f195614718841b3c14a81ac95268ce58:
+    resolution: {integrity: sha512-LTmtqYi03c4gMTJmWwVK9XkHL7h0/+XrtR970Ujvtu3s0kZNeJN24aJsi4rkZOI8i19+qq6f8j+8Duwy5jqcrQ==}
+    peerDependencies:
+      next: '*'
+      react: '*'
+      react-dom: '*'
+    dependencies:
+      next: 12.0.4_react-dom@17.0.2+react@17.0.2
+      react: 17.0.2
+      react-dom: 17.0.2_react@17.0.2
     dev: true
 
   /next/12.0.2_react-dom@17.0.2+react@17.0.2:
@@ -4177,6 +4222,11 @@ packages:
     dev: true
     optional: true
 
+  /set-immediate-shim/1.0.1:
+    resolution: {integrity: sha1-SysbJ+uAip+NzEgaWOXlb1mfP2E=}
+    engines: {node: '>=0.10.0'}
+    dev: true
+
   /setimmediate/1.0.5:
     resolution: {integrity: sha1-KQy7Iy4waULX1+qbg3Mqt4VvgoU=}
 
@@ -4630,6 +4680,14 @@ packages:
     resolution: {integrity: sha1-sr9O6FFKrmFltIF4KdIbLvSZBOw=}
     engines: {node: '>= 0.8'}
 
+  /unzip-crx-3/0.2.0:
+    resolution: {integrity: sha512-0+JiUq/z7faJ6oifVB5nSwt589v1KCduqIJupNVDoWSXZtWDmjDGO3RAEOvwJ07w90aoXoP4enKsR7ecMrJtWQ==}
+    dependencies:
+      jszip: 3.7.1
+      mkdirp: 0.5.5
+      yaku: 0.16.7
+    dev: true
+
   /update-notifier/5.1.0:
     resolution: {integrity: sha512-ItnICHbeMh9GqUy31hFPrD1kcuZ3rpxDZbf4KUDavXwS0bW5m7SLbDQpGX3UYr072cbrF5hFUs3r5tUsPwjfHw==}
     engines: {node: '>=10'}
@@ -4807,6 +4865,10 @@ packages:
   /y18n/5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
     engines: {node: '>=10'}
+    dev: true
+
+  /yaku/0.16.7:
+    resolution: {integrity: sha1-HRlceKqbW/hHnIlblQT9TwhHmE4=}
     dev: true
 
   /yallist/4.0.0:

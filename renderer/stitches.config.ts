@@ -1,3 +1,14 @@
+import {
+  slate,
+  blue,
+  red,
+  green,
+  slateDark,
+  blueDark,
+  redDark,
+  greenDark
+} from '@radix-ui/colors'
+
 import { createStitches } from '@stitches/react'
 
 import type * as Stitches from '@stitches/react'
@@ -15,12 +26,30 @@ export const {
 } = createStitches({
   theme: {
     colors: {
+      // App Colors
+      ...slate,
+      ...blue,
+      ...red,
+      ...green,
+
+      // Semantic Colors
       controlClose: '#DA7169',
       controlMinimize: '#EABE6A',
       controlMaximize: '#7DBF67'
     }
   }
 })
+
+export const darkTheme = createTheme('dark', {
+  colors: {
+    ...slateDark,
+    ...blueDark,
+    ...redDark,
+    ...greenDark
+  }
+})
+
+export const modes = [darkTheme, 'light']
 
 export type CSS = Stitches.CSS<typeof config>
 
@@ -44,5 +73,8 @@ export const globalStyles = globalCss(...normalize, {
   body: {
     fontFamily: 'system-ui',
     margin: 0
+  },
+  '#__next': {
+    height: '100%'
   }
 })

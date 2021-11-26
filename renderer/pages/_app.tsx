@@ -1,6 +1,9 @@
 import '@fontsource/inter/variable-full.css'
 
-import { globalStyles } from '../stitches.config'
+import { NextPageWithLayout } from 'next'
+import { ThemeProvider } from 'next-themes'
+
+import { globalStyles, modes } from '../stitches.config'
 
 import '../styles/loader.css'
 
@@ -14,7 +17,11 @@ function MyApp({ Component, pageProps }) {
   // Set our global styles.
   globalStyles()
 
-  return <Component {...pageProps} />
+  return (
+    <ThemeProvider enableSystem themes={modes} attribute="class">
+      {getLayout(<Component {...pageProps} />)}
+    </ThemeProvider>
+  )
 }
 
 export default MyApp
