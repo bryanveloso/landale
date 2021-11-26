@@ -6,13 +6,15 @@ import { Grid } from '@landale/components/grid'
 const Layout = ({ children }) => (
   <Grid
     css={{
-      background: '$slate1',
+      background: '$backgroundSecondary',
       position: 'relative',
       gridTemplateColumns: '200px 1fr',
       height: '100%'
     }}
   >
-    <Box css={{ background: '$slate2' }}>.</Box>
+    <Box css={{ background: '$backgroundPrimary' }}>
+      <Box css={{ height: 38, '-webkit-app-region': 'drag' }} />
+    </Box>
     <Box>{children}</Box>
   </Grid>
 )

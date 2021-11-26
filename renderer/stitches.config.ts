@@ -26,13 +26,17 @@ export const {
 } = createStitches({
   theme: {
     colors: {
-      // App Colors
+      // APP: Colors
       ...slate,
       ...blue,
       ...red,
       ...green,
 
-      // Semantic Colors
+      // APP: Semantic Colors,
+      backgroundPrimary: '$slate1',
+      backgroundSecondary: '$slate2',
+
+      // OVERLAY: Semantic Colors
       controlClose: '#DA7169',
       controlMinimize: '#EABE6A',
       controlMaximize: '#7DBF67'
@@ -55,7 +59,10 @@ export type CSS = Stitches.CSS<typeof config>
 
 export const normalize: Record<string, CSS>[] = [
   {
-    ':where(*, *::before, *::after)': { boxSizing: 'border-box' },
+    ':where(*, *::before, *::after)': {
+      boxSizing: 'border-box',
+      '-webkit-font-smoothing': 'antialiased'
+    },
     ':where(*)': { margin: 0 },
     ':where(html, body)': { height: '100%' },
     ':where(body)': { lineHeight: 1.5 },
