@@ -20,7 +20,7 @@ const Bar = styled('div', {
   // Box Model.
   display: 'flex',
   gap: '8px',
-  width: 'calc(100% - 40px)',
+  width: '100%',
   minHeight: '52px',
   padding: '0 20px',
   alignItems: 'center',
@@ -69,10 +69,12 @@ export const TitleBar = React.forwardRef<
   React.ElementRef<typeof Bar>,
   TitleBarProps
 >(({ children, ...props }, forwardedRef) => (
-  <Bar {...props}>
+  <Bar {...props} ref={forwardedRef}>
     <Circle />
     <Circle />
     <Circle />
     <Title>{children}</Title>
   </Bar>
 ))
+
+TitleBar.displayName = 'TitleBar'
