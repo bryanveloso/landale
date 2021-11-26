@@ -21,9 +21,13 @@ export const Window = styled('div', {
 
   variants: {
     size: {
-      'content-972p': {
+      '972p-full': {
         height: 972,
         width: 1728
+      },
+      '972p-half': {
+        height: 972,
+        width: 880
       },
       'secondary-434p': {
         height: 434,

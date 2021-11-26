@@ -1,4 +1,3 @@
-import { Screen } from '@landale/components/screen'
 import { TitleBar } from '@landale/components/title-bar'
 import { Window } from '@landale/components/window'
 import { getLayout } from '@landale/layouts/for-overlay'
