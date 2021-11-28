@@ -14,8 +14,8 @@ const Layout = ({ children }) => (
       height: '100%'
     }}
   >
-    <Box css={{ gridColumn: 1, gridRow: 1 }} />
-    <Box css={{ gridColumn: 2, gridRow: 1 }}>
+    <Box css={{ gridColumn: 1, gridRow: 1, '-webkit-app-region': 'drag' }} />
+    <Box css={{ gridColumn: 2, gridRow: 1, '-webkit-app-region': 'drag' }}>
       <StatusBar />
     </Box>
     <Box>
