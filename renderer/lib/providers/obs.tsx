@@ -1,5 +1,5 @@
 import OBSWebSocket from 'obs-websocket-js'
-import { createContext, useEffect, useState, FC } from 'react'
+import { createContext, useContext, useEffect, useState, FC } from 'react'
 
 type ContextTypes = {
   isOBSConnected: boolean
@@ -46,3 +46,5 @@ export const OBSProvider: FC = ({ children }) => {
     </OBSContext.Provider>
   )
 }
+
+export const useOBS = () => useContext(OBSContext)
