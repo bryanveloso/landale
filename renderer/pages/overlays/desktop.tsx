@@ -1,6 +1,6 @@
 import Image from 'next/image'
 
-import { styled } from '~/stitches.config'
+import { styled } from '@landale/stitches.config'
 
 import avalonSTAR from '../../public/avalonstar.png'
 
