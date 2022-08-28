@@ -1,4 +1,4 @@
-import OBSWebSocket from 'obs-websocket-js'
+import OBSWebSocket, { EventSubscription } from 'obs-websocket-js'
 import { createContext, useContext, useEffect, useState, FC } from 'react'
 
 type ContextTypes = {
@@ -13,7 +13,7 @@ export const OBSProvider: FC = ({ children }) => {
   useEffect(() => {
     const obs = new OBSWebSocket()
     const connect = async () => {
-      await obs.connect({ address: 'localhost:4444', password: '' })
+      await obs.connect('ws://localhost:4455', 'yEbNMh47kzPYFf8h')
       console.log(`[obs-websocket] Success! Connected & authenticated.`)
       setIsOBSConnected(true)
     }
@@ -25,14 +25,8 @@ export const OBSProvider: FC = ({ children }) => {
     }
 
     // Register listeners.
-    obs.on('SwitchScenes', data => {
+    obs.on('CurrentProgramSceneChanged', data => {
       console.log(`[obs-websocket] New Active Scene: ${data['scene-name']}`)
-    })
-
-    // Register error handlers.
-    obs.on('error', err => {
-      setIsOBSConnected(false)
-      console.error('socket error:', err)
     })
 
     return () => {
