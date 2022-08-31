@@ -9,6 +9,9 @@ import { join } from 'path'
 import isDev from 'electron-is-dev'
 import prepareNext from 'electron-next'
 
+// ...
+require(join(__dirname, 'server'))
+
 const url = 'http://localhost:8008/'
 console.log('Electron will open', url)
 
