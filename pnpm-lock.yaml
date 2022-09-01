@@ -13,11 +13,13 @@ importers:
       '@swc/core-linux-musl': ^1.2.42
       '@twurple/api': ^5.2.2
       '@twurple/auth': ^5.2.2
+      '@twurple/eventsub': ^5.2.3
       '@twurple/eventsub-ngrok': ^5.2.3
       '@types/express': ^4.17.13
       '@types/node': ^14.18.26
       '@types/react': ^17.0.48
       '@types/react-dom': ^16.9.16
+      dotenv: ^16.0.2
       electron: ^20.1.0
       electron-builder: ^22.14.13
       electron-devtools-installer: ^3.2.0
@@ -37,7 +39,9 @@ importers:
     dependencies:
       '@twurple/api': 5.2.2_@twurple+auth@5.2.2
       '@twurple/auth': 5.2.2
+      '@twurple/eventsub': 5.2.3_@twurple+api@5.2.2
       '@twurple/eventsub-ngrok': 5.2.3_6hepbfvm5xpj42urygkrg232ju
+      dotenv: 16.0.2
       electron-next: 3.1.5
       express: 4.18.1
       obs-websocket-js: 4.0.3
@@ -2709,6 +2713,11 @@ packages:
   /dotenv-expand/5.1.0:
     resolution: {integrity: sha512-YXQl1DSa4/PQyRfgrv6aoNjhasp/p4qs9FjJ4q4cQk+8m4r6k4ZSiEyytKG8f8W9gi8WsQtIObNmKd+tMzNTmA==}
     dev: true
+
+  /dotenv/16.0.2:
+    resolution: {integrity: sha512-JvpYKUmzQhYoIFgK2MOnF3bciIZoItIIoryihy0rIA+H4Jy0FmgyKYAHCTN98P5ybGSJcIFbh6QKeJdtZd1qhA==}
+    engines: {node: '>=12'}
+    dev: false
 
   /dotenv/9.0.2:
     resolution: {integrity: sha512-I9OvvrHp4pIARv4+x9iuewrWycX6CcZtoAu1XrzPxc5UygMJXJZYmBsynku8IkrJwgypE5DGNjDPmPRhDCptUg==}

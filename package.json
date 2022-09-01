@@ -48,7 +48,9 @@
   "dependencies": {
     "@twurple/api": "^5.2.2",
     "@twurple/auth": "^5.2.2",
+    "@twurple/eventsub": "^5.2.3",
     "@twurple/eventsub-ngrok": "^5.2.3",
+    "dotenv": "^16.0.2",
     "electron-next": "^3.1.5",
     "express": "^4.18.1",
     "obs-websocket-js": "^4.0.3",
