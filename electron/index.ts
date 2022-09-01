@@ -10,7 +10,7 @@ import isDev from 'electron-is-dev'
 import prepareNext from 'electron-next'
 
 // ...
-require(join(__dirname, 'server'))
+require(join(__dirname, 'backend'))
 
 const url = 'http://localhost:8008/'
 console.log('Electron will open', url)
