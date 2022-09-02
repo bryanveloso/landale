@@ -49,6 +49,7 @@
   "dependencies": {
     "@twurple/api": "^5.2.2",
     "@twurple/auth": "^5.2.2",
+    "@twurple/common": "^5.2.3",
     "@twurple/eventsub": "^5.2.3",
     "@twurple/eventsub-ngrok": "^5.2.3",
     "dotenv": "^16.0.2",

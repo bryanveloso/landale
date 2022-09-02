@@ -12,6 +12,7 @@ io.on('connection', (socket: socketio.Socket) => {
 })
 
 export const broadcast = (message: string, content?: any) => {
+  console.log('broadcasting', message)
   io.local.emit(message, content)
 }
 
