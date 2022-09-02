@@ -30,7 +30,7 @@ export const OBSProvider: FC = ({ children }) => {
     })
 
     return () => {
-      obs.disconnect()
+      // obs.disconnect()
     }
   }, [])
 
