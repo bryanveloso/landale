@@ -1,3 +1,4 @@
+import { followEvent } from './follow'
 import { subscriptionEvent } from './subscription'
 
-export const events = [subscriptionEvent]
+export const events = [followEvent, subscriptionEvent]
