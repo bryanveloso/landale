@@ -1,9 +1,12 @@
 import eventHandler from './event-handler'
-import socketHandler from './socket-handler'
+import io from './websockets'
 import 'dotenv/config'
+
+const { PORT } = process.env
 
 //
 eventHandler()
 
 //
-socketHandler()
+const wsPort = parseInt(PORT || '80')
+io.listen(wsPort)
