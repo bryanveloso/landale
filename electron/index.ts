@@ -1,3 +1,4 @@
+import { join } from 'path'
 import {
   app,
   ipcMain,
@@ -5,9 +6,10 @@ import {
   BrowserWindow,
   IpcMainEvent
 } from 'electron'
-import { join } from 'path'
-import isDev from 'electron-is-dev'
 import prepareNext from 'electron-next'
+
+// ...
+require(join(__dirname, 'backend'))
 
 const url = 'http://localhost:8008/'
 console.log('Electron will open', url)
@@ -31,14 +33,8 @@ const createWindow = async () => {
   window.loadURL(url)
 }
 
-app.on('ready', () => {
-  installDevExtensions(isDev)
-    .then(() => {
-      createWindow()
-    })
-    .catch(err => {
-      console.error('Error while loading devtools extensions', err)
-    })
+app.whenReady().then(() => {
+  createWindow()
 })
 
 app.on('activate', () => {
@@ -50,25 +46,6 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
-
-const installDevExtensions = async (isDev_: boolean) => {
-  if (!isDev_) {
-    return []
-  }
-  const installer = await import('electron-devtools-installer')
-
-  const extensions = ['REACT_DEVELOPER_TOOLS', 'REDUX_DEVTOOLS'] as const
-  const forceDownload = Boolean(process.env.UPGRADE_EXTENSIONS)
-
-  return Promise.all(
-    extensions.map(name =>
-      installer.default(installer[name], {
-        forceDownload,
-        loadExtensionOptions: { allowFileAccess: true }
-      })
-    )
-  )
-}
 
 ipcMain.on('message', (event: IpcMainEvent, message: any) => {
   console.log(message)
