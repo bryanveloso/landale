@@ -1,0 +1,20 @@
+{
+  "name": "@landale/electron",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^20.1.1",
+    "electron-builder": "^23.3.3",
+    "electron-devtools-installer": "^3.2.0",
+    "electron-is-dev": "^2.0.0",
+    "electron-next": "^3.1.5",
+    "typescript": "^4.8.2"
+  }
+}
