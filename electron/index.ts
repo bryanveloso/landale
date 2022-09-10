@@ -8,9 +8,6 @@ import {
 } from 'electron'
 import prepareNext from 'electron-next'
 
-// ...
-require(join(__dirname, 'backend'))
-
 const url = 'http://localhost:8008/'
 console.log('Electron will open', url)
 

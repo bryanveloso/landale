@@ -30,7 +30,6 @@
     "@swc/cli": "^0.1.57",
     "@swc/core": "^1.2.242",
     "@swc/core-linux-musl": "^1.2.42",
-    "@types/express": "^4.17.13",
     "@types/node": "^18.7.13",
     "@types/react": "^18.0.17",
     "@types/react-dom": "^18.0.6",
@@ -47,18 +46,12 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
-    "@twurple/api": "^5.2.2",
-    "@twurple/auth": "^5.2.2",
-    "@twurple/common": "^5.2.3",
-    "@twurple/eventsub": "^5.2.3",
-    "@twurple/eventsub-ngrok": "^5.2.3",
     "dotenv": "^16.0.2",
     "electron-next": "^3.1.5",
-    "express": "^4.18.1",
     "obs-websocket-js": "^5.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "socket.io": "^4.5.1"
+    "socket.io-client": "^4.5.2"
   },
   "build": {
     "appId": "com.landale.app"
