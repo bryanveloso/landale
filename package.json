@@ -4,11 +4,10 @@
   "main": "main/index.js",
   "scripts": {
     "clean": "rimraf dist main renderer/out renderer/.next",
-    "dev": "npm run build-backend && npm run build-electron && electron .",
-    "build-backend": "tsc -p backend",
+    "dev": "npm run build-electron && electron .",
     "build-renderer": "next build renderer && next export renderer",
     "build-electron": "tsc -p electron",
-    "build": "npm run build-backend && npm run build-renderer && npm run build-electron",
+    "build": "npm run build-renderer && npm run build-electron",
     "pack-app": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder",
     "type-check": "tsc"
@@ -48,10 +47,11 @@
   "dependencies": {
     "dotenv": "^16.0.2",
     "electron-next": "^3.1.5",
+    "isomorphic-ws": "^5.0.0",
     "obs-websocket-js": "^5.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "socket.io-client": "^4.5.2"
+    "ws": "^8.8.1"
   },
   "build": {
     "appId": "com.landale.app"

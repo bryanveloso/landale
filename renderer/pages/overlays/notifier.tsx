@@ -1,36 +1,38 @@
-import { useEffect, useState } from 'react'
-import io, { Socket } from 'socket.io-client'
+import WebSocket from 'isomorphic-ws'
+import { useEffect, useRef, useState } from 'react'
 
 import { Screen } from '@landale/components/screen'
 import { getLayout } from '@landale/layouts/for-overlay'
 
-let socket: Socket = io('http://localhost:3000')
-
 export default function Notifier() {
-  const [isConnected, setIsConnected] = useState(socket.connected)
-  const [lastPong, setLastPong] = useState(null)
+  const ws = useRef(null)
+  const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
-    socket.on('connect', () => {
-      setIsConnected(true)
-      console.log(`connected`)
-    })
+    ws.current = new WebSocket('ws://localhost:3000')
 
-    socket.on('disconnect', () => {
-      setIsConnected(false)
+    ws.current.onopen = () => {
+      console.log(`connected`)
+      setIsConnected(true)
+    }
+
+    ws.current.onclose = () => {
       console.log(`disconnected`)
-    })
+      setIsConnected(false)
+    }
 
     return () => {
-      socket.off('connect')
-      socket.off('disconnect')
-      socket.off('pong')
+      ws.current.close()
     }
   }, [])
 
-  const sendPing = () => {
-    socket.emit('ping')
-  }
+  useEffect(() => {
+    if (!ws.current) return
+
+    ws.current.onmessage = (e: any) => {
+      console.log(e)
+    }
+  })
 
   return (
     <div>
