@@ -47,11 +47,10 @@
   "dependencies": {
     "dotenv": "^16.0.2",
     "electron-next": "^3.1.5",
-    "isomorphic-ws": "^5.0.0",
     "obs-websocket-js": "^5.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "ws": "^8.8.1"
+    "socket.io-client": "^4.5.2"
   },
   "build": {
     "appId": "com.landale.app"
