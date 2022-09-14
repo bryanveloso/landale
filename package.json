@@ -3,6 +3,7 @@
   "productName": "Landale",
   "main": "main/index.js",
   "scripts": {
+    "dev:next": "ts-node server.ts",
     "clean": "rimraf dist main renderer/out renderer/.next",
     "dev": "npm run build-electron && electron .",
     "build-renderer": "next build renderer && next export renderer",
@@ -48,12 +49,14 @@
     "typescript": "^4.8.3"
   },
   "dependencies": {
+    "@next/env": "^12.3.0",
     "dotenv": "^16.0.2",
     "electron-next": "^3.1.5",
     "obs-websocket-js": "^5.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "socket.io-client": "^4.5.2"
+    "socket.io-client": "^4.5.2",
+    "ts-node": "^10.9.1"
   },
   "build": {
     "appId": "com.landale.app"
