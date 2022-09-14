@@ -1,9 +1,10 @@
+import { useObs } from '@landale/hooks'
+
 import { Box } from '../box'
-import { useOBS } from '../../lib/providers/obs'
 import { styled } from '../../stitches.config'
 
 export const StatusBar = () => {
-  const { isOBSConnected } = useOBS()
+  const { connected } = useObs()
 
   return (
     <Box
@@ -17,7 +18,7 @@ export const StatusBar = () => {
         fontWeight: 'bold'
       }}
     >
-      <Status connected={isOBSConnected} /> OBS Studio
+      <Status connected={connected} /> OBS Studio
     </Box>
   )
 }
