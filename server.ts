@@ -4,6 +4,8 @@ import { loadEnvConfig } from '@next/env'
 import { parse } from 'url'
 
 import { CustomServer, CustomServerResponse } from './lib'
+import SocketController from './lib/socket.controller'
+import ObsController from './lib/obs.controller'
 
 loadEnvConfig('./', process.env.NODE_ENV !== 'production')
 
@@ -33,6 +35,12 @@ const init = async () => {
   await app.prepare()
   server = createServer(listener as RequestListener) as CustomServer
   server.listen(port, () => console.log(`Ready on ${url}`))
+
+  const socketController = new SocketController(server)
+  const obsController = new ObsController(socketController)
+
+  server.socket = socketController
+  server.obs = obsController
 }
 
 init()

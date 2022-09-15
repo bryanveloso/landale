@@ -16,7 +16,7 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@landale/*": ["*"]
+      "@landale/*": ["/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "server.ts"],

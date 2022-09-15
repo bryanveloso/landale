@@ -1,7 +1,13 @@
 import { IncomingMessage, Server as NetServer, ServerResponse } from 'http'
 import { NextApiResponse } from 'next'
 
-export type CustomServer = NetServer & {}
+import SocketController from './socket.controller'
+import ObsController from './obs.controller'
+
+export type CustomServer = NetServer & {
+  socket: SocketController
+  obs: ObsController
+}
 
 export type CustomServerResponse = ServerResponse & {
   server?: CustomServer
