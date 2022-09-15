@@ -3,10 +3,12 @@ import { NextApiResponse } from 'next'
 
 import SocketController from './socket.controller'
 import ObsController from './obs.controller'
+import TwitchController from './twitch.controller'
 
 export type CustomServer = NetServer & {
   socket: SocketController
   obs: ObsController
+  twitch: TwitchController
 }
 
 export type CustomServerResponse = ServerResponse & {

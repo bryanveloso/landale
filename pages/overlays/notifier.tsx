@@ -1,20 +1,37 @@
-import { useEffect, useRef, useState } from 'react'
+import hash from 'object-hash'
+import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
 
-import { useSocket } from '@landale/hooks/use-socket'
-import { getLayout } from '@landale/layouts/for-overlay'
-import { useSocketEvent } from '@landale/hooks/use-socket-event'
+import { useQueue } from 'hooks/use-queue'
+import { TwitchEvent } from 'lib/twitch.controller'
 
-export default function Notifier() {
-  const { socket, connected } = useSocket()
-  useSocketEvent(socket, 'notification', e => {
-    console.log(e)
+const MAX_NOTIFICATIONS = 2
+const NOTIFICATION_DURATION = 3
+const NOTIFICATION_PANEL_HEIGHT = MAX_NOTIFICATIONS * 100 + 65
+
+export default function Notifier({}: InferGetServerSidePropsType<
+  typeof getServerSideProps
+>) {
+  const [_, setNotifications, notifications, previous] = useQueue({
+    count: MAX_NOTIFICATIONS,
+    timeout: NOTIFICATION_DURATION * 1000
   })
 
-  return (
-    <div>
-      <p>Connected: {'' + connected}</p>
-    </div>
+  const notificationsWithPrevious = [previous, ...(notifications || [])].filter(
+    notification => !!notification
   )
+
+  const handleTwitchEvent = (twitchEvent: TwitchEvent) => {
+    const key = hash(twitchEvent)
+    const event = { ...twitchEvent, key }
+
+    if (event.type !== 'channel.update') {
+      setNotifications(n => [...n, event])
+    }
+  }
 }
 
-Notifier.getLayout = getLayout
+export const getServerSideProps: GetServerSideProps = async context => {
+  return {
+    props: {}
+  }
+}

@@ -1,4 +1,5 @@
 import { createServer, IncomingMessage, RequestListener } from 'http'
+import httpProxy from 'http-proxy'
 import next from 'next'
 import { loadEnvConfig } from '@next/env'
 import { parse } from 'url'
@@ -6,6 +7,7 @@ import { parse } from 'url'
 import { CustomServer, CustomServerResponse } from './lib'
 import SocketController from './lib/socket.controller'
 import ObsController from './lib/obs.controller'
+import TwitchController from './lib/twitch.controller'
 
 loadEnvConfig('./', process.env.NODE_ENV !== 'production')
 
@@ -32,15 +34,21 @@ const listener = async (req: IncomingMessage, res: CustomServerResponse) => {
 }
 
 const init = async () => {
+  httpProxy
+    .createProxyServer({ target: `${url}/api/twitch`, ignorePath: true })
+    .listen(8000)
+
   await app.prepare()
   server = createServer(listener as RequestListener) as CustomServer
   server.listen(port, () => console.log(`Ready on ${url}`))
 
   const socketController = new SocketController(server)
   const obsController = new ObsController(socketController)
+  const twitchController = new TwitchController(server, obsController)
 
   server.socket = socketController
   server.obs = obsController
+  server.twitch = twitchController
 }
 
 init()
