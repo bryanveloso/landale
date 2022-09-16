@@ -8,8 +8,9 @@ import { CustomServer, CustomServerResponse } from './lib'
 import SocketController from './lib/socket.controller'
 import ObsController from './lib/obs.controller'
 import TwitchController from './lib/twitch.controller'
+import { logger } from './logger'
 
-loadEnvConfig('./', process.env.NODE_ENV !== 'production')
+loadEnvConfig('./', process.env.NODE_ENV !== 'production', logger)
 
 const dev = process.env.NODE_ENV !== 'production'
 const hostname = 'localhost'
@@ -27,7 +28,7 @@ const listener = async (req: IncomingMessage, res: CustomServerResponse) => {
     const parsedUrl = parse(req.url as string, true)
     await handle(req, res, parsedUrl)
   } catch (err) {
-    console.error(`Error occured handling`, req.url, err)
+    logger.error(`Error occured handling`, req.url, err)
     res.statusCode = 500
     res.end('internal server error')
   }
@@ -40,7 +41,7 @@ const init = async () => {
 
   await app.prepare()
   server = createServer(listener as RequestListener) as CustomServer
-  server.listen(port, () => console.log(`Ready on ${url}`))
+  server.listen(port, () => logger.info(`Ready on ${url}`))
 
   const socketController = new SocketController(server)
   const obsController = new ObsController(socketController)
