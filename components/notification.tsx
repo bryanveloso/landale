@@ -1,9 +1,9 @@
 import { FC } from 'react'
 
-import { TwitchChannelSubscribeEvent } from '../lib'
+import { TwitchChannelSubscriptionEvent } from '../lib'
 
 export interface SubscriptionNotificationProps {
-  event: TwitchChannelSubscribeEvent
+  event: TwitchChannelSubscriptionEvent
 }
 export const SubscriptionNotification: FC<SubscriptionNotificationProps> = ({
   event
@@ -11,7 +11,7 @@ export const SubscriptionNotification: FC<SubscriptionNotificationProps> = ({
   return <div></div>
 }
 
-export type NotifiableTwitchEvent = TwitchChannelSubscribeEvent
+export type NotifiableTwitchEvent = TwitchChannelSubscriptionEvent
 
 export interface NotificationProps extends React.ComponentProps<'div'> {
   notification: NotifiableTwitchEvent

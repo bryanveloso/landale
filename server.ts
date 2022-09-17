@@ -1,6 +1,7 @@
 import { createServer, IncomingMessage, RequestListener } from 'http'
 import httpProxy from 'http-proxy'
 import next from 'next'
+import ngrok from 'ngrok'
 import { loadEnvConfig } from '@next/env'
 import { parse } from 'url'
 
@@ -41,7 +42,15 @@ const init = async () => {
 
   await app.prepare()
   server = createServer(listener as RequestListener) as CustomServer
-  server.listen(port, () => logger.info(`Ready on ${url}`))
+  server.listen(port, async () => {
+    logger.info(`Ready on ${url}`)
+
+    await ngrok.connect({
+      addr: 8009,
+      authtoken: process.env.NGROK_AUTH_TOKEN,
+      hostname: process.env.NGROK_HOSTNAME
+    })
+  })
 
   const socketController = new SocketController(server)
   const obsController = new ObsController(socketController)

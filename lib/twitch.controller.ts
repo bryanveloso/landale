@@ -34,50 +34,62 @@ export interface TwitchEventBase {
 }
 
 export type TwitchChannelCheerEvent = TwitchEventBase & {
+  type: 'channel.cheer'
   event: EventSubChannelCheerEvent
 }
 
 export type TwitchChannelFollowEvent = TwitchEventBase & {
+  type: 'channel.follow'
   event: EventSubChannelFollowEvent
 }
 
 export type TwitchChannelHypeTrainBeginEvent = TwitchEventBase & {
+  type: 'channel.hype_train.begin'
   event: EventSubChannelHypeTrainBeginEvent
 }
 
 export type TwitchChannelHypeTrainEndEvent = TwitchEventBase & {
+  type: 'channel.hype_train.end'
   event: EventSubChannelHypeTrainEndEvent
 }
 
 export type TwitchChannelHypeTrainProgressEvent = TwitchEventBase & {
+  type: 'channel.hype_train.progress'
   event: EventSubChannelHypeTrainProgressEvent
 }
 
 export type TwitchChannelRaidEvent = TwitchEventBase & {
+  type: 'channel.raid'
   event: EventSubChannelRaidEvent
 }
 
 export type TwitchChannelSubscriptionEvent = TwitchEventBase & {
+  type: 'channel.subscribe'
   event: EventSubChannelSubscriptionEvent
 }
 
 export type TwitchChannelSubscriptionGiftEvent = TwitchEventBase & {
+  type: 'channel.subscription.gift'
   event: EventSubChannelSubscriptionGiftEvent
 }
 
 export type TwitchChannelSubscriptionMessageEvent = TwitchEventBase & {
+  type: 'channel.subscription.message'
   event: EventSubChannelSubscriptionMessageEvent
 }
 
 export type TwitchChannelUpdateEvent = TwitchEventBase & {
+  type: 'channel.update'
   event: EventSubChannelUpdateEvent
 }
 
 export type TwitchStreamOfflineEvent = TwitchEventBase & {
+  type: 'stream.offline'
   event: EventSubStreamOfflineEvent
 }
 
 export type TwitchStreamOnlineEvent = TwitchEventBase & {
+  type: 'stream.online'
   event: EventSubStreamOnlineEvent
 }
 
@@ -134,6 +146,7 @@ export default class TwitchController extends EventEmitter {
   setup = async () => {
     this.setupApiClient()
     await this.setupEventSub()
+    await this.setupChatBot()
   }
 
   setupApiClient = () => {
@@ -148,13 +161,14 @@ export default class TwitchController extends EventEmitter {
       token,
       clientId: this.clientId
     })
+    console.log(subscriptions)
     const eventTypes: [TwitchEventType, object?][] = [
       ['channel.cheer'],
       ['channel.follow'],
       ['channel.hype_train.begin'],
       ['channel.hype_train.end'],
       ['channel.hype_train.progress'],
-      ['channel.raid'],
+      ['channel.raid', { to_broadcaster_user_id: this.userId }],
       ['channel.subscribe'],
       ['channel.subscription.gift'],
       ['channel.subscription.message'],
@@ -188,7 +202,6 @@ export default class TwitchController extends EventEmitter {
         callback: this.callback,
         condition: condition ?? { broadcaster_user_id: this.userId }
       })
-      logger.info(`Subscription created for ${eventType}`)
     }
   }
 
@@ -223,20 +236,6 @@ export default class TwitchController extends EventEmitter {
         })
       }
     )
-  }
-
-  handleEvent = async (event: TwitchEvent) => {
-    switch (event.subscription.type) {
-      case 'stream.offline':
-        this.emit('offline')
-        break
-      case 'stream.online':
-        this.emit('online')
-        break
-
-      default:
-        break
-    }
   }
 
   getToken = async () => {

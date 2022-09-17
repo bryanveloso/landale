@@ -21,7 +21,7 @@ export default class ObsController extends EventEmitter {
     const response = await this.obs.call('GetCurrentProgramScene')
     this.currentScene = response.currentProgramSceneName as Scene
 
-    await this.refreshBrowserSource('[🌎] Notifier')
+    // await this.refreshBrowserSource('[🌎] Notifier')
   }
 
   constructor(socketController: SocketController) {
