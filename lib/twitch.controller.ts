@@ -2,7 +2,7 @@ import { promises as fs, readFileSync } from 'fs'
 import { EventEmitter } from 'stream'
 import { ApiClient, HelixEventSubSubscription } from '@twurple/api'
 import { RefreshingAuthProvider } from '@twurple/auth'
-import { ChatClient } from '@twurple/chat'
+import { ChatClient, PrivateMessage } from '@twurple/chat'
 import type {
   EventSubChannelCheerEvent,
   EventSubChannelFollowEvent,
@@ -203,6 +203,39 @@ export default class TwitchController extends EventEmitter {
       await this.chatClient.connect()
     } catch (error) {
       logger.error(error)
+    }
+
+    this.chatClient.onMessage(
+      async (
+        channel: string,
+        user: string,
+        message: string,
+        msg: PrivateMessage
+      ) => {
+        this.emit('new-chat-message', { channel, user, message })
+
+        this.server.socket.emit('twitch-chat-event', {
+          channel,
+          user,
+          message,
+          broadcaster: msg.userInfo.isBroadcaster,
+          moderator: msg.userInfo.isMod
+        })
+      }
+    )
+  }
+
+  handleEvent = async (event: TwitchEvent) => {
+    switch (event.subscription.type) {
+      case 'stream.offline':
+        this.emit('offline')
+        break
+      case 'stream.online':
+        this.emit('online')
+        break
+
+      default:
+        break
     }
   }
 
