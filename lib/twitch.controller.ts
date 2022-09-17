@@ -2,13 +2,25 @@ import { promises as fs, readFileSync } from 'fs'
 import { EventEmitter } from 'stream'
 import { ApiClient, HelixEventSubSubscription } from '@twurple/api'
 import { RefreshingAuthProvider } from '@twurple/auth'
-import {
+import { ChatClient } from '@twurple/chat'
+import type {
+  EventSubChannelCheerEvent,
+  EventSubChannelFollowEvent,
+  EventSubChannelHypeTrainBeginEvent,
+  EventSubChannelHypeTrainEndEvent,
+  EventSubChannelHypeTrainProgressEvent,
+  EventSubChannelRaidEvent,
   EventSubChannelSubscriptionEvent,
-  EventSubChannelUpdateEvent
+  EventSubChannelSubscriptionGiftEvent,
+  EventSubChannelSubscriptionMessageEvent,
+  EventSubChannelUpdateEvent,
+  EventSubStreamOfflineEvent,
+  EventSubStreamOnlineEvent
 } from '@twurple/eventsub'
 
 import { CustomServer } from './server'
 import ObsController from './obs.controller'
+import { logger } from 'logger'
 
 export interface TwitchEventBase {
   key: string
@@ -21,42 +33,94 @@ export interface TwitchEventBase {
   }
 }
 
-export type TwitchChannelSubscribeEvent = TwitchEventBase & {
-  type: 'channel.subscribe'
+export type TwitchChannelCheerEvent = TwitchEventBase & {
+  event: EventSubChannelCheerEvent
+}
+
+export type TwitchChannelFollowEvent = TwitchEventBase & {
+  event: EventSubChannelFollowEvent
+}
+
+export type TwitchChannelHypeTrainBeginEvent = TwitchEventBase & {
+  event: EventSubChannelHypeTrainBeginEvent
+}
+
+export type TwitchChannelHypeTrainEndEvent = TwitchEventBase & {
+  event: EventSubChannelHypeTrainEndEvent
+}
+
+export type TwitchChannelHypeTrainProgressEvent = TwitchEventBase & {
+  event: EventSubChannelHypeTrainProgressEvent
+}
+
+export type TwitchChannelRaidEvent = TwitchEventBase & {
+  event: EventSubChannelRaidEvent
+}
+
+export type TwitchChannelSubscriptionEvent = TwitchEventBase & {
   event: EventSubChannelSubscriptionEvent
 }
 
+export type TwitchChannelSubscriptionGiftEvent = TwitchEventBase & {
+  event: EventSubChannelSubscriptionGiftEvent
+}
+
+export type TwitchChannelSubscriptionMessageEvent = TwitchEventBase & {
+  event: EventSubChannelSubscriptionMessageEvent
+}
+
 export type TwitchChannelUpdateEvent = TwitchEventBase & {
-  type: 'channel.update'
   event: EventSubChannelUpdateEvent
 }
 
+export type TwitchStreamOfflineEvent = TwitchEventBase & {
+  event: EventSubStreamOfflineEvent
+}
+
+export type TwitchStreamOnlineEvent = TwitchEventBase & {
+  event: EventSubStreamOnlineEvent
+}
+
 export type TwitchEventType =
-  | 'channel.follow'
-  | 'channel.subscribe'
-  | 'channel.update'
   | 'channel.cheer'
+  | 'channel.follow'
+  | 'channel.hype_train.begin'
+  | 'channel.hype_train.end'
+  | 'channel.hype_train.progress'
+  | 'channel.raid'
+  | 'channel.subscribe'
   | 'channel.subscription.gift'
   | 'channel.subscription.message'
-  | 'channel.raid'
-  | 'channel.hype_train.begin'
-  | 'channel.hype_train.progress'
-  | 'channel.hype_train.end'
-  | 'stream.online'
+  | 'channel.update'
   | 'stream.offline'
+  | 'stream.online'
 
-export type TwitchEvent = TwitchChannelSubscribeEvent | TwitchChannelUpdateEvent
+export type TwitchEvent =
+  | TwitchChannelCheerEvent
+  | TwitchChannelFollowEvent
+  | TwitchChannelHypeTrainBeginEvent
+  | TwitchChannelHypeTrainEndEvent
+  | TwitchChannelHypeTrainProgressEvent
+  | TwitchChannelRaidEvent
+  | TwitchChannelSubscriptionEvent
+  | TwitchChannelSubscriptionGiftEvent
+  | TwitchChannelSubscriptionMessageEvent
+  | TwitchChannelUpdateEvent
+  | TwitchStreamOfflineEvent
+  | TwitchStreamOnlineEvent
 
 export default class TwitchController extends EventEmitter {
   private server: CustomServer
   private obs: ObsController
   private apiClient?: ApiClient
+  private callback = process.env.TWITCH_CALLBACK_URL as string
   private clientId = process.env.TWITCH_CLIENT_ID as string
   private clientSecret = process.env.TWITCH_CLIENT_SECRET as string
-  private webhookSecret = process.env.TWITCH_WEBHOOK_SECRET as string
-  private callback = process.env.TWITCH_CALLBACK_URL as string
+  private eventsubSecret = process.env.TWITCH_EVENTSUB_SECRET as string
   private userId = process.env.TWITCH_USER_ID as string
   username = process.env.TWITCH_USERNAME as string
+
+  chatClient?: ChatClient
 
   constructor(server: CustomServer, obs: ObsController) {
     super()
@@ -79,6 +143,7 @@ export default class TwitchController extends EventEmitter {
 
   setupEventSub = async () => {
     const token = await this.getToken()
+
     const subscriptions = await listSubscriptions({
       token,
       clientId: this.clientId
@@ -86,7 +151,16 @@ export default class TwitchController extends EventEmitter {
     const eventTypes: [TwitchEventType, object?][] = [
       ['channel.cheer'],
       ['channel.follow'],
-      ['channel.subscribe']
+      ['channel.hype_train.begin'],
+      ['channel.hype_train.end'],
+      ['channel.hype_train.progress'],
+      ['channel.raid'],
+      ['channel.subscribe'],
+      ['channel.subscription.gift'],
+      ['channel.subscription.message'],
+      ['channel.update'],
+      ['stream.online'],
+      ['stream.online']
     ]
     for (const [eventType, condition] of eventTypes) {
       const existing = subscriptions.find(sub => sub.type === eventType)
@@ -110,10 +184,25 @@ export default class TwitchController extends EventEmitter {
         token,
         clientId: this.clientId,
         type: eventType,
-        webhookSecret: this.webhookSecret,
+        webhookSecret: this.eventsubSecret,
         callback: this.callback,
         condition: condition ?? { broadcaster_user_id: this.userId }
       })
+      logger.info(`Subscription created for ${eventType}`)
+    }
+  }
+
+  setupChatBot = async () => {
+    const authProvider = getAuthProvider()
+    this.chatClient = new ChatClient({
+      authProvider,
+      channels: [this.username]
+    })
+
+    try {
+      await this.chatClient.connect()
+    } catch (error) {
+      logger.error(error)
     }
   }
 

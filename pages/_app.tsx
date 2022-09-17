@@ -19,7 +19,7 @@ function MyApp({ Component, pageProps }) {
 
   return (
     <ThemeProvider enableSystem themes={modes} attribute="class">
-      {getLayout(<Component {...pageProps} />)}
+      <Component {...pageProps} />
     </ThemeProvider>
   )
 }

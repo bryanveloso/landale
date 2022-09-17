@@ -9,7 +9,7 @@ export const useSocket = () => {
 
   const init = async () => {
     initialized = true
-    socket = io('ws://localhost:3000')
+    socket = io('ws://localhost:8008')
     socket.connect()
 
     socket.on('connect', () => {

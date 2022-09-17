@@ -37,7 +37,7 @@ const listener = async (req: IncomingMessage, res: CustomServerResponse) => {
 const init = async () => {
   httpProxy
     .createProxyServer({ target: `${url}/api/twitch`, ignorePath: true })
-    .listen(8000)
+    .listen(8009)
 
   await app.prepare()
   server = createServer(listener as RequestListener) as CustomServer

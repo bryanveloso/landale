@@ -3,8 +3,9 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 
 import { NextApiResponseServerIO } from 'lib'
 import { TwitchEvent } from 'lib/twitch.controller'
+import { logger } from 'logger'
 
-const secret = process.env.TWITCH_WEBHOOK_SECRET as string
+const secret = process.env.TWITCH_EVENTSUB_SECRET as string
 
 // Notification request headers
 const TWITCH_MESSAGE_ID = 'Twitch-Eventsub-Message-Id'.toLowerCase()
@@ -27,13 +28,13 @@ export default async function handler(
   res: NextApiResponse
 ) {
   const message = getHmacMessage(req)
-  const hmac = HMAC_PREFIX + getHmac(secret, message)
+  const hmac = HMAC_PREFIX + getHmac(secret, message) // Signature to compare
 
   if (verifyMessage(hmac, req.headers[TWITCH_MESSAGE_SIGNATURE] as string)) {
-    console.log('signatures match')
+    logger.debug('signatures match')
 
     const notification = req.body
-    console.log(notification)
+    logger.debug(notification)
 
     if (MESSAGE_TYPE_NOTIFICATION === req.headers[MESSAGE_TYPE]) {
       await handleEvent(
@@ -44,9 +45,9 @@ export default async function handler(
     } else if (MESSAGE_TYPE_VERIFICATION === req.headers[MESSAGE_TYPE]) {
       return res.status(200).send(notification.challenge)
     } else if (MESSAGE_TYPE_REVOCATION === req.headers[MESSAGE_TYPE]) {
-      console.log(`${notification.subscription.type} notifications revoked!`)
-      console.log(`reason: ${notification.subscription.status}`)
-      console.log(
+      logger.info(`${notification.subscription.type} notifications revoked!`)
+      logger.info(`reason: ${notification.subscription.status}`)
+      logger.info(
         `condition: ${JSON.stringify(
           notification.subscription.condition,
           null,
@@ -55,7 +56,7 @@ export default async function handler(
       )
       return res.status(200).end()
     } else {
-      console.log(`Unknown message type: ${req.headers[MESSAGE_TYPE]}`)
+      logger.info(`Unknown message type: ${req.headers[MESSAGE_TYPE]}`)
       return res.status(200).end()
     }
   } else {
@@ -72,12 +73,11 @@ const handleEvent = async (
   try {
     await res.server.twitch.handleEvent(payload)
   } catch (error) {
-    console.error(error)
+    logger.error(error)
   }
 }
-
-// Build the message used to get the HMAC
-const getHmacMessage = (req: NextApiRequest) => {
+// Build the message used to get the HMAC.
+function getHmacMessage(req: NextApiRequest) {
   return (
     (((req.headers[TWITCH_MESSAGE_ID] as string) +
       req.headers[TWITCH_MESSAGE_TIMESTAMP]) as string) +
@@ -85,13 +85,14 @@ const getHmacMessage = (req: NextApiRequest) => {
   )
 }
 
-// Get the HMAC
-const getHmac = (secret: string, message: string) => {
+// Get the HMAC.
+function getHmac(secret: string, message: string) {
   return crypto.createHmac('sha256', secret).update(message).digest('hex')
 }
 
-// Verify whether our hash matches the hash that Twitch passed in the header
-const verifyMessage = (hmac: string, verifySignature: string) => {
+// Verify whether our hash matches the hash that Twitch passed in the header.
+function verifyMessage(hmac: string, verifySignature: string) {
   if (!hmac || !verifySignature) return false
+
   return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(verifySignature))
 }
