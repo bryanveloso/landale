@@ -9,7 +9,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        inter: ['InterVariable', ...fontFamily.sans]
+        inter: ['InterVariable', ...fontFamily.sans],
+        system: ['system-ui', ...fontFamily.sans]
       }
     }
   },
