@@ -1,5 +1,7 @@
 import { Server as ServerIO } from 'socket.io'
 
+import { logger } from 'logger'
+
 import { CustomServer } from './server'
 
 export default class SocketController {
@@ -10,7 +12,7 @@ export default class SocketController {
   }
 
   emit(event: string, payload: unknown) {
-    console.log(`Emitting ${event} with payload ${JSON.stringify(payload)}`)
+    logger.info({ payload }, `Emitting "${event}"`)
     return this.socketServer.emit(event, payload)
   }
 }

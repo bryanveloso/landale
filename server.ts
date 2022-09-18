@@ -48,7 +48,10 @@ const init = async () => {
     await ngrok.connect({
       addr: 8009,
       authtoken: process.env.NGROK_AUTH_TOKEN,
-      hostname: process.env.NGROK_HOSTNAME
+      hostname: process.env.NGROK_HOSTNAME,
+      onLogEvent: logEventMessage => {
+        logger.debug(logEventMessage)
+      }
     })
   })
 

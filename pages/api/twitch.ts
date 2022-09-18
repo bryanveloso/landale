@@ -68,7 +68,7 @@ const handleEvent = async (
   payload: TwitchEvent,
   res: NextApiResponseServerIO
 ) => {
-  res.server.emit('twitch-event', payload)
+  res.server.socket.emit('twitch-event', payload)
 
   try {
     await res.server.twitch.handleEvent(payload)

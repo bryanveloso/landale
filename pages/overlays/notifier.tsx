@@ -1,5 +1,7 @@
-import hash from 'object-hash'
+import { motion, AnimatePresence } from 'framer-motion'
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
+import hash from 'object-hash'
+import { useState } from 'react'
 
 import { NotifiableTwitchEvent, Notification } from 'components/notification'
 import { useSocket } from 'hooks'
@@ -7,7 +9,6 @@ import { useEvent } from 'hooks/use-event'
 import { useQueue } from 'hooks/use-queue'
 import { useTwitchEvent } from 'hooks/use-twitch-event'
 import { TwitchEvent } from 'lib/twitch.controller'
-import { useState } from 'react'
 
 const MAX_NOTIFICATIONS = 2
 const NOTIFICATION_DURATION = 3
@@ -47,9 +48,31 @@ export default function Notifier({
 
   return (
     <div className="relative h-[1080px] w-[1920px]">
-      {notificationsWithPrevious?.map(notification => (
-        <Notification notification={notification} />
-      ))}
+      <ul className="absolute top-8 right-8 z-50 h-52">
+        <AnimatePresence initial={false}>
+          {notificationsWithPrevious?.map(notification => (
+            <motion.li
+              key={notification.key}
+              layout="position"
+              initial={{ opacity: 0.33, x: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.33,
+                type: 'spring',
+                damping: 25,
+                stiffness: 300,
+                mass: 0.5
+              }}
+              exit={{
+                opacity: 0,
+                transition: { duration: 0.33, ease: 'anticipate' }
+              }}
+            >
+              <Notification notification={notification} className="list-none" />
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
     </div>
   )
 }

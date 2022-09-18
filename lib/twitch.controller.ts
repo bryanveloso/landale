@@ -3,24 +3,25 @@ import { EventEmitter } from 'stream'
 import { ApiClient, HelixEventSubSubscription } from '@twurple/api'
 import { RefreshingAuthProvider } from '@twurple/auth'
 import { ChatClient, PrivateMessage } from '@twurple/chat'
-import type {
-  EventSubChannelCheerEvent,
-  EventSubChannelFollowEvent,
-  EventSubChannelHypeTrainBeginEvent,
-  EventSubChannelHypeTrainEndEvent,
-  EventSubChannelHypeTrainProgressEvent,
-  EventSubChannelRaidEvent,
-  EventSubChannelSubscriptionEvent,
-  EventSubChannelSubscriptionGiftEvent,
-  EventSubChannelSubscriptionMessageEvent,
-  EventSubChannelUpdateEvent,
-  EventSubStreamOfflineEvent,
-  EventSubStreamOnlineEvent
-} from '@twurple/eventsub'
 
-import { CustomServer } from './server'
-import ObsController from './obs.controller'
 import { logger } from 'logger'
+
+import ObsController from './obs.controller'
+import { CustomServer } from './server'
+import {
+  EventSubChannelCheerEventData,
+  EventSubChannelFollowEventData,
+  EventSubChannelHypeTrainBeginEventData,
+  EventSubChannelHypeTrainEndEventData,
+  EventSubChannelHypeTrainProgressEventData,
+  EventSubChannelRaidEventData,
+  EventSubChannelSubscriptionEventData,
+  EventSubChannelSubscriptionGiftEventData,
+  EventSubChannelSubscriptionMessageEventData,
+  EventSubChannelUpdateEventData,
+  EventSubStreamOfflineEventData,
+  EventSubStreamOnlineEventData
+} from './twitch.types'
 
 export interface TwitchEventBase {
   key: string
@@ -35,62 +36,62 @@ export interface TwitchEventBase {
 
 export type TwitchChannelCheerEvent = TwitchEventBase & {
   type: 'channel.cheer'
-  event: EventSubChannelCheerEvent
+  event: EventSubChannelCheerEventData
 }
 
 export type TwitchChannelFollowEvent = TwitchEventBase & {
   type: 'channel.follow'
-  event: EventSubChannelFollowEvent
+  event: EventSubChannelFollowEventData
 }
 
 export type TwitchChannelHypeTrainBeginEvent = TwitchEventBase & {
   type: 'channel.hype_train.begin'
-  event: EventSubChannelHypeTrainBeginEvent
+  event: EventSubChannelHypeTrainBeginEventData
 }
 
 export type TwitchChannelHypeTrainEndEvent = TwitchEventBase & {
   type: 'channel.hype_train.end'
-  event: EventSubChannelHypeTrainEndEvent
+  event: EventSubChannelHypeTrainEndEventData
 }
 
 export type TwitchChannelHypeTrainProgressEvent = TwitchEventBase & {
   type: 'channel.hype_train.progress'
-  event: EventSubChannelHypeTrainProgressEvent
+  event: EventSubChannelHypeTrainProgressEventData
 }
 
 export type TwitchChannelRaidEvent = TwitchEventBase & {
   type: 'channel.raid'
-  event: EventSubChannelRaidEvent
+  event: EventSubChannelRaidEventData
 }
 
 export type TwitchChannelSubscriptionEvent = TwitchEventBase & {
   type: 'channel.subscribe'
-  event: EventSubChannelSubscriptionEvent
+  event: EventSubChannelSubscriptionEventData
 }
 
 export type TwitchChannelSubscriptionGiftEvent = TwitchEventBase & {
   type: 'channel.subscription.gift'
-  event: EventSubChannelSubscriptionGiftEvent
+  event: EventSubChannelSubscriptionGiftEventData
 }
 
 export type TwitchChannelSubscriptionMessageEvent = TwitchEventBase & {
   type: 'channel.subscription.message'
-  event: EventSubChannelSubscriptionMessageEvent
+  event: EventSubChannelSubscriptionMessageEventData
 }
 
 export type TwitchChannelUpdateEvent = TwitchEventBase & {
   type: 'channel.update'
-  event: EventSubChannelUpdateEvent
+  event: EventSubChannelUpdateEventData
 }
 
 export type TwitchStreamOfflineEvent = TwitchEventBase & {
   type: 'stream.offline'
-  event: EventSubStreamOfflineEvent
+  event: EventSubStreamOfflineEventData
 }
 
 export type TwitchStreamOnlineEvent = TwitchEventBase & {
   type: 'stream.online'
-  event: EventSubStreamOnlineEvent
+  event: EventSubStreamOnlineEventData
 }
 
 export type TwitchEventType =
