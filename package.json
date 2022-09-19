@@ -61,6 +61,7 @@
     "@twurple/chat": "^5.2.3",
     "@twurple/eventsub": "^5.2.3",
     "@twurple/eventsub-ngrok": "^5.2.3",
+    "classnames": "^2.3.2",
     "dotenv": "^16.0.2",
     "electron-next": "^3.1.5",
     "http-proxy": "^1.18.1",

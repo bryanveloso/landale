@@ -7,7 +7,7 @@ import SocketController from './socket.controller'
 
 export type Scene = '[🎬] Intro' | '[🎬] Talk'
 
-export type Source = '[🌎] Notifier'
+export type Source = '[🌎] Shared Background' | '[🌎] Shared Foreground'
 
 export default class ObsController extends EventEmitter {
   obs = new OBSWebSocket()
@@ -16,12 +16,13 @@ export default class ObsController extends EventEmitter {
 
   private async initObsWebSocket() {
     await this.obs.connect('ws://localhost:4455', 'yEbNMh47kzPYFf8h')
-    logger.info(`[ObsController] Connected and authenticated`)
+    logger.info(`OBS connected and authenticated`)
 
     const response = await this.obs.call('GetCurrentProgramScene')
     this.currentScene = response.currentProgramSceneName as Scene
 
-    // await this.refreshBrowserSource('[🌎] Notifier')
+    await this.refreshBrowserSource('[🌎] Shared Background')
+    await this.refreshBrowserSource('[🌎] Shared Foreground')
   }
 
   constructor(socketController: SocketController) {
