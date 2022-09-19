@@ -3,7 +3,7 @@ import { useState } from 'react'
 
 const wallpapers = [
   { id: 0, name: 'xenoblade', asset: '/wallpaper/xenoblade.png' },
-  { id: 1, name: 'endwalker', asset: 'endwalker.png' }
+  { id: 1, name: 'endwalker', asset: '/wallpaper/endwalker.png' }
 ]
 
 export const Wallpaper = () => {
@@ -12,7 +12,7 @@ export const Wallpaper = () => {
   return (
     <AnimatePresence>
       <div className="w-[1920px] h-[1080px] overflow-hidden">
-        <motion.img src="/wallpaper/xenoblade.png" />
+        <motion.img src={wallpapers[0].asset} />
       </div>
     </AnimatePresence>
   )

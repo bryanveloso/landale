@@ -44,6 +44,7 @@ specifiers:
   react: ^18.2.0
   react-dom: ^18.2.0
   react-hot-toast: ^2.4.0
+  react-live-clock: ^6.0.6
   rimraf: ^3.0.2
   socket.io: ^4.5.2
   socket.io-client: ^4.5.2
@@ -71,6 +72,7 @@ dependencies:
   react: 18.2.0
   react-dom: 18.2.0_react@18.2.0
   react-hot-toast: 2.4.0_owo25xnefcwdq3zjgtohz6dbju
+  react-live-clock: 6.0.6_vlhhbf2di2koyyk5njmiv6j45i
   socket.io: 4.5.2
   socket.io-client: 4.5.2
   ts-node: 10.9.1_r66v3hbyjqcyf2okijq7h73tzi
@@ -3862,6 +3864,16 @@ packages:
     hasBin: true
     dev: true
 
+  /moment-timezone/0.5.37:
+    resolution: {integrity: sha512-uEDzDNFhfaywRl+vwXxffjjq1q0Vzr+fcQpQ1bU0kbzorfS7zVtZnCnGc8mhWmF39d4g4YriF6kwA75mJKE/Zg==}
+    dependencies:
+      moment: 2.29.4
+    dev: false
+
+  /moment/2.29.4:
+    resolution: {integrity: sha512-5LC9SOxjSc2HF6vO2CyuTDNivEdoz2IvyJJGj6X8DJ0eFyfszE0QiEd+iXmBvUP3WHxSjFH/vIsA0EN00cgr8w==}
+    dev: false
+
   /ms/2.0.0:
     resolution: {integrity: sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==}
     dev: true
@@ -4429,7 +4441,6 @@ packages:
       loose-envify: 1.4.0
       object-assign: 4.1.1
       react-is: 16.13.1
-    dev: true
 
   /proto-list/1.2.4:
     resolution: {integrity: sha512-vtK/94akxsTMhe0/cbfpR+syPuszcuwhqVjJq26CuNDgFGj682oRBXOP5MJpv2r7JtE8MsiepGIqvvOTBwn2vA==}
@@ -4505,7 +4516,32 @@ packages:
 
   /react-is/16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
-    dev: true
+
+  /react-live-clock/6.0.6_vlhhbf2di2koyyk5njmiv6j45i:
+    resolution: {integrity: sha512-UDRz8c+eOqxeplcsK6FSHx7OAmnLKS0/R4sfJsxaSNvZ3QkEL8si9Zi41muc6To8LsVerV1WV/FynYkgBXIWFg==}
+    peerDependencies:
+      moment: ^2.29.1
+      moment-timezone: ^0.5.33
+      react: ^16.14.0 || ^17 || ^18
+      react-moment: 1.1.2
+    dependencies:
+      moment: 2.29.4
+      moment-timezone: 0.5.37
+      react: 18.2.0
+      react-moment: 1.1.2_mmavuqf6ek6upnyryxchoaliru
+    dev: false
+
+  /react-moment/1.1.2_mmavuqf6ek6upnyryxchoaliru:
+    resolution: {integrity: sha512-lfb+shYXI2tXlQrNUpNr05/1D/kzFj8Isbfp89DQrpZk0fs2JIAnLHWETR0hQS9zvtzwLWlVv0wKLffbue5HoA==}
+    peerDependencies:
+      moment: ^2.29.0
+      prop-types: ^15.7.0
+      react: ^16.0 || ^17.0.0 || ^18.0.0
+    dependencies:
+      moment: 2.29.4
+      prop-types: 15.8.1
+      react: 18.2.0
+    dev: false
 
   /react/18.2.0:
     resolution: {integrity: sha512-/3IjMdb2L9QbBdWiW5e3P2/npwMBaU9mHCSCUzNln0ZCYbcfTsGbTJrU/kGemdH2IWmB2ioZ+zkxtmq6g09fGQ==}
