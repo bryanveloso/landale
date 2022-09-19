@@ -12,7 +12,7 @@ export const Wallpaper = () => {
   return (
     <AnimatePresence>
       <div className="w-[1920px] h-[1080px] overflow-hidden">
-        <motion.img src={wallpapers[1].asset} />
+        <motion.img src={wallpapers[0].asset} />
       </div>
     </AnimatePresence>
   )
