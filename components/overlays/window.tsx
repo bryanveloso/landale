@@ -1,3 +1,4 @@
+import { useStatus } from 'providers/status'
 import { FC, HTMLAttributes } from 'react'
 
 export const Controls: FC = () => {
@@ -68,13 +69,13 @@ const NavigationMenu: FC<HTMLAttributes<'svg'>> = ({ className }) => {
   )
 }
 
-const TitleBar = () => {
+const TitleBar = ({ category }) => {
   return (
     <div className="absolute grid grid-cols-[288px_1600px] items-stretch w-full h-[52px] rounded-t-lg text-[#E5E5E5] z-50">
       <div></div>
       <div className="flex items-center gap-3 px-5 shadow-titlebar-inset bg-titlebar rounded-tr-lg">
         <VideoGamePC className="w-6 h-6" />
-        <div className="font-medium">Destiny 2</div>
+        <div className="font-medium">{category}</div>
         {/* <NavigationMenu className="w-6 h-6" /> */}
       </div>
     </div>
@@ -98,7 +99,7 @@ export const Window: FC<WindowProps> = ({ category }) => {
     >
       <div className="absolute w-full h-full rounded-lg ring-2 ring-offset-0 ring-inset ring-white/10 z-50"></div>
       <Controls />
-      <TitleBar />
+      <TitleBar category={category} />
       <div className="grid grid-cols-[288px_1600px] h-full">
         <Sidebar />
       </div>
