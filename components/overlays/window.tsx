@@ -31,6 +31,43 @@ const VideoGamePC: FC<HTMLAttributes<'svg'>> = ({ className }) => {
   )
 }
 
+const NavigationMenu: FC<HTMLAttributes<'svg'>> = ({ className }) => {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      className={className}
+    >
+      <g>
+        <rect
+          x={0.5}
+          y={2.5}
+          width={23}
+          height={3}
+          rx={1}
+          fill="currentColor"
+        />
+        <rect
+          x={0.5}
+          y={10.5}
+          width={23}
+          height={3}
+          rx={1}
+          fill="currentColor"
+        />
+        <rect
+          x={0.5}
+          y={18.5}
+          width={23}
+          height={3}
+          rx={1}
+          fill="currentColor"
+        />
+      </g>
+    </svg>
+  )
+}
+
 const TitleBar = () => {
   return (
     <div className="absolute grid grid-cols-[288px_1600px] items-stretch w-full h-[52px] rounded-t-lg text-[#E5E5E5] z-50">
@@ -38,6 +75,7 @@ const TitleBar = () => {
       <div className="flex items-center gap-3 px-5 shadow-titlebar-inset bg-titlebar rounded-tr-lg">
         <VideoGamePC className="w-6 h-6" />
         <div className="font-medium">Destiny 2</div>
+        {/* <NavigationMenu className="w-6 h-6" /> */}
       </div>
     </div>
   )
@@ -49,7 +87,11 @@ const Sidebar: FC = () => {
   )
 }
 
-export const Window: FC = () => {
+export interface WindowProps {
+  category?: string
+}
+
+export const Window: FC<WindowProps> = ({ category }) => {
   return (
     <div
       className={`absolute m-4 mt-16 w-[1888px] h-[952px] rounded-lg shadow-2xl bg-window shadow-black/50 backdrop-blur-xl ring-1 ring-black ring-offset-0`}
