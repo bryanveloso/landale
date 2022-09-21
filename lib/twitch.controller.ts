@@ -157,12 +157,10 @@ export default class TwitchController extends EventEmitter {
 
   setupEventSub = async () => {
     const token = await this.getToken()
-
     const subscriptions = await listSubscriptions({
       token,
       clientId: this.clientId
     })
-    console.log(subscriptions)
     const eventTypes: [TwitchEventType, object?][] = [
       ['channel.cheer'],
       ['channel.follow'],
@@ -279,6 +277,10 @@ export default class TwitchController extends EventEmitter {
       default:
         break
     }
+  }
+
+  getStreamInfo = async () => {
+    return this.apiClient?.streams.getStreamByUserId(this.userId)
   }
 }
 
