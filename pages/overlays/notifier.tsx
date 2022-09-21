@@ -32,29 +32,27 @@ export default function Notifier({
     notification => !!notification
   ) as NotifiableTwitchEvent[]
 
-  const handleTwitchEvent = (twitchEvent: TwitchEvent) => {
+  useTwitchEvent((twitchEvent: TwitchEvent) => {
     const key = hash(twitchEvent)
     const event = { ...twitchEvent, key }
 
     if (event.type !== 'channel.update') {
       setNotifications(n => [...n, event])
     }
-  }
-
-  useTwitchEvent(handleTwitchEvent)
+  })
 
   const { socket } = useSocket()
   useEvent<boolean>(socket, 'transitioning', value => setTransitioning(value))
 
   return (
     <div className="relative h-[1080px] w-[1920px]">
-      <ul className="absolute top-8 right-8 z-50 h-52">
+      <ul className="absolute top-8 right-8 z-50 h-52 w-[400px]">
         <AnimatePresence initial={false}>
           {notificationsWithPrevious?.map(notification => (
             <motion.li
               key={notification.key}
               layout="position"
-              initial={{ opacity: 0.33, x: -50 }}
+              initial={{ opacity: 0.33, y: -50 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
                 duration: 0.33,

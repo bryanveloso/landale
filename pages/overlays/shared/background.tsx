@@ -1,8 +1,9 @@
+import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
 import hash from 'object-hash'
 import { useEffect, useState } from 'react'
 import { ApiClient } from '@twurple/api'
 
-import { MenuBar, Wallpaper } from '~/components/overlays'
+import { MenuBar, VerticalCamera, Wallpaper } from '~/components/overlays'
 import {
   Controls,
   TitleBar,
@@ -11,7 +12,8 @@ import {
 } from '~/components/overlays/window'
 import { useTwitchEvent } from '~/hooks'
 import {
-  getAuthProvider,
+  getStreamInfo,
+  NextApiResponseServerIO,
   TwitchChannelUpdateEvent,
   TwitchEvent,
   TwitchStreamOfflineEvent,
@@ -24,7 +26,9 @@ type TwitchStatusEvent =
   | TwitchStreamOfflineEvent
   | TwitchStreamOnlineEvent
 
-const Background = () => {
+const Background = ({
+  stream
+}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
   const [category, setCategory] = useState('')
   const [timestamp, setTimestamp] = useState('')
   const [title, setTitle] = useState('')
@@ -69,6 +73,15 @@ const Background = () => {
       <Wallpaper />
     </>
   )
+}
+
+const getServerSideProps: GetServerSideProps = async context => {
+  const rawStream = await getStreamInfo(context.res as NextApiResponseServerIO)
+  const stream = JSON.parse(JSON.stringify(rawStream))
+
+  return {
+    props: { stream }
+  }
 }
 
 export default Background
