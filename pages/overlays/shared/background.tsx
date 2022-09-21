@@ -1,17 +1,23 @@
 import hash from 'object-hash'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { ApiClient } from '@twurple/api'
 
-import { MenuBar } from 'components/overlays/menubar'
-import { Wallpaper } from 'components/overlays/wallpaper'
-import { Window } from 'components/overlays/window'
-import { useTwitchEvent } from 'hooks/use-twitch-event'
+import { MenuBar, Wallpaper } from '~/components/overlays'
 import {
+  Controls,
+  TitleBar,
+  Sidebar,
+  Window
+} from '~/components/overlays/window'
+import { useTwitchEvent } from '~/hooks'
+import {
+  getAuthProvider,
   TwitchChannelUpdateEvent,
   TwitchEvent,
   TwitchStreamOfflineEvent,
   TwitchStreamOnlineEvent
-} from 'lib'
-import { logger } from 'logger'
+} from '~/lib'
+import { logger } from '~/logger'
 
 type TwitchStatusEvent =
   | TwitchChannelUpdateEvent
@@ -23,7 +29,7 @@ const Background = () => {
   const [timestamp, setTimestamp] = useState('')
   const [title, setTitle] = useState('')
 
-  const handleTwitchEvent = (twitchEvent: TwitchEvent) => {
+  useTwitchEvent((twitchEvent: TwitchEvent) => {
     const key = hash(twitchEvent)
     const event = { ...twitchEvent, key } as TwitchStatusEvent
 
@@ -47,14 +53,19 @@ const Background = () => {
       default:
         break
     }
-  }
-
-  useTwitchEvent(handleTwitchEvent)
+  })
 
   return (
     <>
       <MenuBar />
-      <Window category={category} />
+      <Window>
+        <div className="absolute w-full h-full rounded-lg ring-2 ring-offset-0 ring-inset ring-white/10 z-50" />
+        <Controls />
+        <TitleBar category={category} />
+        <div className="grid grid-cols-[288px_1600px] h-full">
+          <Sidebar />
+        </div>
+      </Window>
       <Wallpaper />
     </>
   )

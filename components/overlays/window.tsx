@@ -1,5 +1,4 @@
-import { useStatus } from 'providers/status'
-import { FC, HTMLAttributes } from 'react'
+import { FC, HTMLAttributes, PropsWithChildren } from 'react'
 
 export const Controls: FC = () => {
   return (
@@ -69,7 +68,7 @@ const NavigationMenu: FC<HTMLAttributes<'svg'>> = ({ className }) => {
   )
 }
 
-const TitleBar = ({ category }) => {
+export const TitleBar = ({ category }) => {
   return (
     <div className="absolute grid grid-cols-[288px_1600px] items-stretch w-full h-[52px] rounded-t-lg text-[#E5E5E5] z-50">
       <div></div>
@@ -82,28 +81,18 @@ const TitleBar = ({ category }) => {
   )
 }
 
-const Sidebar: FC = () => {
+export const Sidebar: FC = () => {
   return (
     <div className="bg-sidebar h-full w-72 z-40 rounded-l-lg shadow-sidebar-inset"></div>
   )
 }
 
-export interface WindowProps {
-  category?: string
-}
-
-export const Window: FC<WindowProps> = ({ category }) => {
+export const Window: FC<PropsWithChildren> = ({ children }) => {
   return (
     <div
       className={`absolute m-4 mt-16 w-[1888px] h-[952px] rounded-lg shadow-2xl bg-window shadow-black/50 backdrop-blur-xl ring-1 ring-black ring-offset-0`}
     >
-      <div className="absolute w-full h-full rounded-lg ring-2 ring-offset-0 ring-inset ring-white/10 z-50"></div>
-      <Controls />
-      <TitleBar category={category} />
-      <div className="grid grid-cols-[288px_1600px] h-full">
-        <Sidebar />
-      </div>
-      {/* <TitleBar /> */}
+      {children}
     </div>
   )
 }

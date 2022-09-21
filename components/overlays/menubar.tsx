@@ -1,7 +1,7 @@
 import type { FC, HTMLAttributes } from 'react'
 import Clock from 'react-live-clock'
 
-import { useHasMounted } from 'hooks'
+import { useHasMounted } from '~/hooks'
 
 const Battery100Icon: FC<HTMLAttributes<'div'>> = ({ className }) => (
   <svg

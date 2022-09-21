@@ -1,8 +1,9 @@
+import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
 import Head from 'next/head'
-import { GetServerSideProps } from 'next'
-import { getLayout } from '@landale/layouts/for-app'
 
-const Home = ({ host }) => {
+const Home = ({
+  host
+}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
   return (
     <div>
       <Head>
@@ -19,8 +20,6 @@ const Home = ({ host }) => {
 }
 
 export default Home
-
-Home.getLayout = getLayout
 
 export const getServerSideProps: GetServerSideProps = async context => {
   const host = context.req.headers.host

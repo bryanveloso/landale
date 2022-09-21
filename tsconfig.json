@@ -16,7 +16,13 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@landale/*": ["/*"]
+      "~/hooks": ["hooks"],
+      "~/lib": ["lib"],
+      "~/logger": ["logger"],
+
+      "~/components/*": ["components/*"],
+      "~/hooks/*": ["hooks/*"],
+      "~/lib/*": ["lib/*"]
     }
   },
   "include": [
