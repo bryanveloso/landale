@@ -3,7 +3,11 @@ import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
 import hash from 'object-hash'
 import { useState } from 'react'
 
-import { NotifiableTwitchEvent, Notification } from 'components/notification'
+import {
+  NotifiableTwitchEvent,
+  Notification,
+  SubscriptionNotification
+} from 'components/notification'
 import { useSocket } from 'hooks'
 import { useEvent } from 'hooks/use-event'
 import { useQueue } from 'hooks/use-queue'
@@ -46,7 +50,11 @@ export default function Notifier({
 
   return (
     <div className="relative h-[1080px] w-[1920px]">
-      <ul className="absolute top-8 right-8 z-50 h-52 w-[400px]">
+      <div className="absolute top-8 right-8 z-50 h-52 w-[400px]">
+        <span>Subscription</span>
+        <span>HypnotikXIV subscribed for 30000 months!</span>
+      </div>
+      {/* <ul className="absolute top-8 right-8 z-50 h-52 w-[400px]">
         <AnimatePresence initial={false}>
           {notificationsWithPrevious?.map(notification => (
             <motion.li
@@ -70,7 +78,7 @@ export default function Notifier({
             </motion.li>
           ))}
         </AnimatePresence>
-      </ul>
+      </ul> */}
     </div>
   )
 }
