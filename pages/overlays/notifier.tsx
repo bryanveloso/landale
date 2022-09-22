@@ -50,9 +50,14 @@ export default function Notifier({
 
   return (
     <div className="relative h-[1080px] w-[1920px]">
-      <div className="absolute top-8 right-8 z-50 h-52 w-[400px]">
-        <span>Subscription</span>
-        <span>HypnotikXIV subscribed for 30000 months!</span>
+      <div className="absolute top-20 right-8 w-[420px] z-50 rounded-lg shadow-lg shadow-black/50 bg-[#2F3036] p-4 ring-2 ring-offset-0 ring-inset ring-white/20">
+        <div className="flex gap-3 items-center">
+          <div className="w-14 h-14"></div>
+          <div className="text-sm text-[#EAEAEB]">
+            <strong className="font-bold">Subscription</strong>
+            <div>HypnotikXIV subscribed for 80 months!</div>
+          </div>
+        </div>
       </div>
       {/* <ul className="absolute top-8 right-8 z-50 h-52 w-[400px]">
         <AnimatePresence initial={false}>
