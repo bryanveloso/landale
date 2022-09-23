@@ -3,16 +3,9 @@ import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
 import hash from 'object-hash'
 import { useState } from 'react'
 
-import {
-  NotifiableTwitchEvent,
-  Notification,
-  SubscriptionNotification
-} from 'components/notification'
-import { useSocket } from 'hooks'
-import { useEvent } from 'hooks/use-event'
-import { useQueue } from 'hooks/use-queue'
-import { useTwitchEvent } from 'hooks/use-twitch-event'
-import { TwitchEvent } from 'lib/twitch.controller'
+import { NotifiableTwitchEvent, Notification } from '~/components/notification'
+import { useEvent, useQueue, useSocket, useTwitchEvent } from '~/hooks'
+import { TwitchEvent } from '~/lib'
 
 const MAX_NOTIFICATIONS = 2
 const NOTIFICATION_DURATION = 3
@@ -71,7 +64,7 @@ export default function Notifier({
                 transition: { duration: 0.5 }
               }}
             >
-              <Notification notification={notification} className="list-none" />
+              <Notification notification={notification} />
             </motion.li>
           ))}
         </AnimatePresence>
