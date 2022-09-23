@@ -1,5 +1,6 @@
 import { FC, PropsWithChildren } from 'react'
-import { NavigationMenu, VideoGamePC } from '~/components/icons'
+
+import { VideoGamePC } from '~/components/icons'
 
 export const Controls: FC = () => {
   return (
@@ -11,7 +12,11 @@ export const Controls: FC = () => {
   )
 }
 
-export const TitleBar: FC = ({ category }) => {
+export interface TitleBarProps {
+  category?: string
+}
+
+export const TitleBar: FC<TitleBarProps> = ({ category }) => {
   return (
     <div className="absolute grid grid-cols-[288px_1600px] items-stretch w-full h-[52px] rounded-t-lg text-[#E5E5E5] z-50">
       <div className="flex items-center gap-3 px-5 justify-end"></div>
