@@ -5,7 +5,12 @@ import { logger } from 'logger'
 
 import SocketController from './socket.controller'
 
-export type Scene = '[🎬] Intro' | '[🎬] Talk'
+export type Scene =
+  | '[🎬] Intro'
+  | '[🎬] Mac Studio'
+  | '[🎬] Outro'
+  | '[🎬] PC'
+  | '[🎬] Talk'
 
 export type Source =
   | '[🌎] Notifier'
@@ -36,18 +41,22 @@ export default class ObsController extends EventEmitter {
     this.initObsWebSocket()
   }
 
-  async endStream() {
+  startStream = async () => {
+    return this.obs.call('StartStream')
+  }
+
+  endStream = async () => {
     return this.obs.call('StopStream')
   }
 
-  async refreshBrowserSource(inputName: Source) {
+  refreshBrowserSource = async (inputName: Source) => {
     return this.obs.call('PressInputPropertiesButton', {
       inputName,
       propertyName: 'refreshnocache'
     })
   }
 
-  async setScene(sceneName: Scene) {
+  setScene = async (sceneName: Scene) => {
     this.currentScene = sceneName
     this.emit('sceneChange', sceneName)
 

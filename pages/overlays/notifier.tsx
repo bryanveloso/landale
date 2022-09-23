@@ -50,25 +50,16 @@ export default function Notifier({
 
   return (
     <div className="relative h-[1080px] w-[1920px]">
-      <div className="absolute top-20 right-8 w-[420px] z-50 rounded-lg shadow-lg shadow-black/50 bg-[#2F3036] p-4 ring-2 ring-offset-0 ring-inset ring-white/20">
-        <div className="flex gap-3 items-center">
-          <div className="w-14 h-14"></div>
-          <div className="text-sm text-[#EAEAEB]">
-            <strong className="font-bold">Subscription</strong>
-            <div>HypnotikXIV subscribed for 80 months!</div>
-          </div>
-        </div>
-      </div>
-      {/* <ul className="absolute top-8 right-8 z-50 h-52 w-[400px]">
+      <ul className="absolute top-20 right-8 z-50 h-52 w-96">
         <AnimatePresence initial={false}>
           {notificationsWithPrevious?.map(notification => (
             <motion.li
               key={notification.key}
-              layout="position"
+              layout
               initial={{ opacity: 0.33, y: -50 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
-                duration: 0.33,
+                duration: 0.5,
                 type: 'spring',
                 damping: 25,
                 stiffness: 300,
@@ -76,14 +67,15 @@ export default function Notifier({
               }}
               exit={{
                 opacity: 0,
-                transition: { duration: 0.33, ease: 'anticipate' }
+                x: 200,
+                transition: { duration: 0.5 }
               }}
             >
               <Notification notification={notification} className="list-none" />
             </motion.li>
           ))}
         </AnimatePresence>
-      </ul> */}
+      </ul>
     </div>
   )
 }
