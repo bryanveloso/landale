@@ -60,18 +60,18 @@ const Background = ({
   })
 
   return (
-    <>
+    <div>
       <MenuBar />
       <Window>
-        <div className="absolute w-full h-full rounded-lg ring-2 ring-offset-0 ring-inset ring-white/10 z-50" />
+        <div className="absolute w-full h-full rounded-lg ring-1 ring-offset-0 ring-inset ring-white/10 z-50" />
         <Controls />
         <TitleBar category={category} />
         <div className="grid grid-cols-[288px_1600px] h-full">
           <Sidebar />
         </div>
       </Window>
-      <Wallpaper />
-    </>
+      <Wallpaper category={category} />
+    </div>
   )
 }
 

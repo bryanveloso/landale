@@ -1,4 +1,4 @@
-import type { FC } from 'react'
+import { FC } from 'react'
 import Clock from 'react-live-clock'
 import Image from 'next/future/image'
 
