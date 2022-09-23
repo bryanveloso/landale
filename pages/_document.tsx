@@ -7,7 +7,7 @@ class Document extends NextDocument {
         <Head>
           <meta charSet="utf-8" />
         </Head>
-        <body>
+        <body className="bg-black">
           <Main />
           <NextScript />
         </body>
