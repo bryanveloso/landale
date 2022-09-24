@@ -3,10 +3,7 @@ lockfileVersion: 5.4
 specifiers:
   '@fontsource/inter': ^4.5.12
   '@next/env': ^12.3.0
-  '@radix-ui/colors': ^0.1.8
-  '@radix-ui/react-aspect-ratio': ^1.0.0
   '@react-hookz/web': ^15.1.0
-  '@stitches/react': ^1.2.8
   '@swc/cli': ^0.1.57
   '@swc/core': ^1.3.1
   '@swc/core-linux-musl': ^1.2.42
@@ -34,7 +31,6 @@ specifiers:
   http-proxy: ^1.18.1
   next: 12.3.0
   next-logger: ^3.0.1
-  next-themes: ^0.2.1
   ngrok: ^4.3.3
   object-hash: ^3.0.0
   obs-websocket-js: ^5.0.1
@@ -44,7 +40,6 @@ specifiers:
   postcss: ^8.4.16
   react: ^18.2.0
   react-dom: ^18.2.0
-  react-hot-toast: ^2.4.0
   react-live-clock: ^6.0.6
   rimraf: ^3.0.2
   socket.io: ^4.5.2
@@ -74,7 +69,6 @@ dependencies:
   pino-http: 8.2.0
   react: 18.2.0
   react-dom: 18.2.0_react@18.2.0
-  react-hot-toast: 2.4.0_owo25xnefcwdq3zjgtohz6dbju
   react-live-clock: 6.0.6_vlhhbf2di2koyyk5njmiv6j45i
   socket.io: 4.5.2
   socket.io-client: 4.5.2
@@ -82,9 +76,6 @@ dependencies:
 
 devDependencies:
   '@fontsource/inter': 4.5.12
-  '@radix-ui/colors': 0.1.8
-  '@radix-ui/react-aspect-ratio': 1.0.0_biqbaboplfbrettd7655fr4n2y
-  '@stitches/react': 1.2.8_react@18.2.0
   '@swc/cli': 0.1.57_@swc+core@1.3.1
   '@swc/core': 1.3.1
   '@swc/core-linux-musl': 1.2.42
@@ -102,7 +93,6 @@ devDependencies:
   eslint-config-next: 12.3.0_irgkl5vooow2ydyo6aokmferha
   framer-motion: 7.3.5_biqbaboplfbrettd7655fr4n2y
   next: 12.3.0_biqbaboplfbrettd7655fr4n2y
-  next-themes: 0.2.1_c3hne4hwj64hb7tofigd3bvkji
   ngrok: 4.3.3
   pino-pretty: 9.1.0
   postcss: 8.4.16
@@ -600,53 +590,6 @@ packages:
       fastq: 1.13.0
     dev: true
 
-  /@radix-ui/colors/0.1.8:
-    resolution: {integrity: sha512-jwRMXYwC0hUo0mv6wGpuw254Pd9p/R6Td5xsRpOmaWkUHlooNWqVcadgyzlRumMq3xfOTXwJReU0Jv+EIy4Jbw==}
-    dev: true
-
-  /@radix-ui/react-aspect-ratio/1.0.0_biqbaboplfbrettd7655fr4n2y:
-    resolution: {integrity: sha512-/QlrIrrcWU8QPz5AccWgKdQGUFw+EKZaxzlH5eWqbOCBTmq0kM1lgaa9EbsmyJwOTtlN0Az9F83lNboQubifwg==}
-    peerDependencies:
-      react: ^16.8 || ^17.0 || ^18.0
-      react-dom: ^16.8 || ^17.0 || ^18.0
-    dependencies:
-      '@babel/runtime': 7.19.0
-      '@radix-ui/react-primitive': 1.0.0_biqbaboplfbrettd7655fr4n2y
-      react: 18.2.0
-      react-dom: 18.2.0_react@18.2.0
-    dev: true
-
-  /@radix-ui/react-compose-refs/1.0.0_react@18.2.0:
-    resolution: {integrity: sha512-0KaSv6sx787/hK3eF53iOkiSLwAGlFMx5lotrqD2pTjB18KbybKoEIgkNZTKC60YECDQTKGTRcDBILwZVqVKvA==}
-    peerDependencies:
-      react: ^16.8 || ^17.0 || ^18.0
-    dependencies:
-      '@babel/runtime': 7.19.0
-      react: 18.2.0
-    dev: true
-
-  /@radix-ui/react-primitive/1.0.0_biqbaboplfbrettd7655fr4n2y:
-    resolution: {integrity: sha512-EyXe6mnRlHZ8b6f4ilTDrXmkLShICIuOTTj0GX4w1rp+wSxf3+TD05u1UOITC8VsJ2a9nwHvdXtOXEOl0Cw/zQ==}
-    peerDependencies:
-      react: ^16.8 || ^17.0 || ^18.0
-      react-dom: ^16.8 || ^17.0 || ^18.0
-    dependencies:
-      '@babel/runtime': 7.19.0
-      '@radix-ui/react-slot': 1.0.0_react@18.2.0
-      react: 18.2.0
-      react-dom: 18.2.0_react@18.2.0
-    dev: true
-
-  /@radix-ui/react-slot/1.0.0_react@18.2.0:
-    resolution: {integrity: sha512-3mrKauI/tWXo1Ll+gN5dHcxDPdm/Df1ufcDLCecn+pnCIVcdWE7CujXo8QaXOWRJyZyQWWbpB8eFwHzWXlv5mQ==}
-    peerDependencies:
-      react: ^16.8 || ^17.0 || ^18.0
-    dependencies:
-      '@babel/runtime': 7.19.0
-      '@radix-ui/react-compose-refs': 1.0.0_react@18.2.0
-      react: 18.2.0
-    dev: true
-
   /@react-hookz/deep-equal/1.0.3:
     resolution: {integrity: sha512-lGZR5l3YRjzeIOHtJhiq96vQKrsq+9lsCyv+0fROMQeSNWtLLzX3R+psHNi6nsoP3XEhspiZ92nsiPmdNo8ztQ==}
     dev: false
@@ -682,14 +625,6 @@ packages:
   /@socket.io/component-emitter/3.1.0:
     resolution: {integrity: sha512-+9jVqKhRSpsc591z5vX+X5Yyw+he/HCB4iQ/RYxw35CEPaY1gnsNE43nf9n9AaYjAQrTiI/mOwKUKdUs9vf7Xg==}
     dev: false
-
-  /@stitches/react/1.2.8_react@18.2.0:
-    resolution: {integrity: sha512-9g9dWI4gsSVe8bNLlb+lMkBYsnIKCZTmvqvDG+Avnn69XfmHZKiaMrx7cgTaddq7aTPPmXiTsbFcUy0xgI4+wA==}
-    peerDependencies:
-      react: '>= 16.3.0'
-    dependencies:
-      react: 18.2.0
-    dev: true
 
   /@swc/cli/0.1.57_@swc+core@1.3.1:
     resolution: {integrity: sha512-HxM8TqYHhAg+zp7+RdTU69bnkl4MWdt1ygyp6BDIPjTiaJVH6Dizn2ezbgDS8mnFZI1FyhKvxU/bbaUs8XhzQg==}
@@ -1986,6 +1921,7 @@ packages:
 
   /csstype/3.1.1:
     resolution: {integrity: sha512-DJR/VvkAvSZW9bTouZue2sSxDwdTN92uHjqeKVm+0dAqdfNykRzQ95tay8aXMBAAPpUiq4Qcug2L7neoRh2Egw==}
+    dev: true
 
   /damerau-levenshtein/1.0.8:
     resolution: {integrity: sha512-sdQSFB7+llfUcQHUQO3+B8ERRj0Oa4w9POWMI/puGtuf7gFywGmkaLCElnudfTiKZV+NvHqL0ifzdrI8Ro7ESA==}
@@ -3106,14 +3042,6 @@ packages:
       slash: 3.0.0
     dev: true
 
-  /goober/2.1.11_csstype@3.1.1:
-    resolution: {integrity: sha512-5SS2lmxbhqH0u9ABEWq7WPU69a4i2pYcHeCxqaNq6Cw3mnrF0ghWNM4tEGid4dKy8XNIAUbuThuozDHHKJVh3A==}
-    peerDependencies:
-      csstype: ^3.0.10
-    dependencies:
-      csstype: 3.1.1
-    dev: false
-
   /got/11.8.5:
     resolution: {integrity: sha512-o0Je4NvQObAuZPHLFoRSkdG2lTgtcynqymzg2Vupdx6PorhaT5MCbIyXG6d4D94kk8ZG57QeosgdiqfJWhEhlQ==}
     engines: {node: '>=10.19.0'}
@@ -3930,18 +3858,6 @@ packages:
       pino: 7.11.0
     dev: false
 
-  /next-themes/0.2.1_c3hne4hwj64hb7tofigd3bvkji:
-    resolution: {integrity: sha512-B+AKNfYNIzh0vqQQKqQItTS8evEouKD7H5Hj3kmuPERwddR2TxvDSFZuTj6T7Jfn1oyeUyJMydPl1Bkxkh0W7A==}
-    peerDependencies:
-      next: '*'
-      react: '*'
-      react-dom: '*'
-    dependencies:
-      next: 12.3.0_biqbaboplfbrettd7655fr4n2y
-      react: 18.2.0
-      react-dom: 18.2.0_react@18.2.0
-    dev: true
-
   /next/12.3.0_biqbaboplfbrettd7655fr4n2y:
     resolution: {integrity: sha512-GpzI6me9V1+XYtfK0Ae9WD0mKqHyzQlGq1xH1rzNIYMASo4Tkl4rTe9jSqtBpXFhOS33KohXs9ZY38Akkhdciw==}
     engines: {node: '>=12.22.0'}
@@ -4521,20 +4437,6 @@ packages:
       loose-envify: 1.4.0
       react: 18.2.0
       scheduler: 0.23.0
-
-  /react-hot-toast/2.4.0_owo25xnefcwdq3zjgtohz6dbju:
-    resolution: {integrity: sha512-qnnVbXropKuwUpriVVosgo8QrB+IaPJCpL8oBI6Ov84uvHZ5QQcTp2qg6ku2wNfgJl6rlQXJIQU5q+5lmPOutA==}
-    engines: {node: '>=10'}
-    peerDependencies:
-      react: '>=16'
-      react-dom: '>=16'
-    dependencies:
-      goober: 2.1.11_csstype@3.1.1
-      react: 18.2.0
-      react-dom: 18.2.0_react@18.2.0
-    transitivePeerDependencies:
-      - csstype
-    dev: false
 
   /react-is/16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
