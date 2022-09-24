@@ -11,7 +11,7 @@ export const MenuBar: FC = () => {
   const hasMounted = useHasMounted()
 
   return (
-    <div className="absolute w-[1920px] h-12 px-6 flex items-center backdrop-blur-xl bg-black/25 text-system">
+    <div className="absolute w-[1920px] h-12 px-6 flex items-center backdrop-blur-xl bg-black/50 text-system z-20">
       <div className="flex justify-start gap-4">
         <Image src={logo} alt="Logo" className="w-6" />
         <div className="flex-auto font-bold text-white">Avalonstar</div>

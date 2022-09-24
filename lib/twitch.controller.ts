@@ -141,6 +141,9 @@ export default class TwitchController extends EventEmitter {
     this.server = server
     this.obs = obs
 
+    this.obs.on('sceneChange', scene => {
+      console.log(scene)
+    })
     this.setup()
   }
 

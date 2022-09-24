@@ -1,9 +1,10 @@
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
 import hash from 'object-hash'
-import { useEffect, useState } from 'react'
 import { ApiClient } from '@twurple/api'
+import { ClientCredentialsAuthProvider } from '@twurple/auth'
+import { useEffect, useState } from 'react'
 
-import { MenuBar, VerticalCamera, Wallpaper } from '~/components/overlays'
+import { Dock, MenuBar, VerticalCamera, Wallpaper } from '~/components/overlays'
 import {
   Controls,
   TitleBar,
@@ -12,6 +13,7 @@ import {
 } from '~/components/overlays/window'
 import { useTwitchEvent } from '~/hooks'
 import {
+  getChannelInfo,
   getStreamInfo,
   NextApiResponseServerIO,
   TwitchChannelUpdateEvent,
@@ -20,6 +22,7 @@ import {
   TwitchStreamOnlineEvent
 } from '~/lib'
 import { logger } from '~/logger'
+import gameList from '~/lib/games'
 
 type TwitchStatusEvent =
   | TwitchChannelUpdateEvent
@@ -27,11 +30,15 @@ type TwitchStatusEvent =
   | TwitchStreamOnlineEvent
 
 const Background = ({
-  stream
+  game
 }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
   const [category, setCategory] = useState('')
   const [timestamp, setTimestamp] = useState('')
   const [title, setTitle] = useState('')
+
+  useEffect(() => {
+    setCategory(game)
+  }, [])
 
   useTwitchEvent((twitchEvent: TwitchEvent) => {
     const key = hash(twitchEvent)
@@ -60,7 +67,7 @@ const Background = ({
   })
 
   return (
-    <div>
+    <div className="relative w-[1920px] h-[1080px] bg-black">
       <MenuBar />
       <Window>
         <div className="absolute w-full h-full rounded-lg ring-1 ring-offset-0 ring-inset ring-white/10 z-50" />
@@ -75,12 +82,23 @@ const Background = ({
   )
 }
 
-const getServerSideProps: GetServerSideProps = async context => {
-  const rawStream = await getStreamInfo(context.res as NextApiResponseServerIO)
-  const stream = JSON.parse(JSON.stringify(rawStream))
+export const getServerSideProps: GetServerSideProps = async context => {
+  const { TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET, TWITCH_USER_ID } = process.env
 
-  return {
-    props: { stream }
+  try {
+    const authProvider = new ClientCredentialsAuthProvider(
+      TWITCH_CLIENT_ID!,
+      TWITCH_CLIENT_SECRET!
+    )
+    const apiClient = new ApiClient({ authProvider })
+    const channel = await apiClient.channels.getChannelInfoById(TWITCH_USER_ID!)
+
+    return {
+      props: { game: channel?.gameName }
+    }
+  } catch (error) {
+    console.error(error)
+    return { props: {} }
   }
 }
 

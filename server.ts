@@ -1,8 +1,9 @@
-import { createServer, IncomingMessage, RequestListener } from 'http'
+import { createServer, IncomingMessage, request, RequestListener } from 'http'
 import httpProxy from 'http-proxy'
 import next from 'next'
 import ngrok from 'ngrok'
 import { loadEnvConfig } from '@next/env'
+import { pinoHttp } from 'pino-http'
 import { parse } from 'url'
 
 import { CustomServer, CustomServerResponse } from './lib'
@@ -10,6 +11,7 @@ import SocketController from './lib/socket.controller'
 import ObsController from './lib/obs.controller'
 import TwitchController from './lib/twitch.controller'
 import { logger } from './logger'
+import StreamController from './lib/stream.controller'
 
 loadEnvConfig('./', process.env.NODE_ENV !== 'production', logger)
 
@@ -22,9 +24,12 @@ const url = `http://${hostname}:${port}`
 
 let server: CustomServer
 
+const requestLogger = pinoHttp({ logger, useLevel: 'debug' })
+
 const listener = async (req: IncomingMessage, res: CustomServerResponse) => {
   try {
     res.server = server
+    requestLogger(req, res)
 
     const parsedUrl = parse(req.url as string, true)
     await handle(req, res, parsedUrl)
@@ -58,10 +63,12 @@ const init = async () => {
   const socketController = new SocketController(server)
   const obsController = new ObsController(socketController)
   const twitchController = new TwitchController(server, obsController)
+  const streamController = new StreamController(twitchController)
 
   server.socket = socketController
   server.obs = obsController
   server.twitch = twitchController
+  server.stream = streamController
 }
 
 init()
