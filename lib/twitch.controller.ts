@@ -279,8 +279,16 @@ export default class TwitchController extends EventEmitter {
     }
   }
 
+  getChannelInfo = async () => {
+    return this.apiClient?.channels.getChannelInfoById(this.userId)
+  }
+
   getStreamInfo = async () => {
     return this.apiClient?.streams.getStreamByUserId(this.userId)
+  }
+
+  getUserInfo = async () => {
+    return this.apiClient?.users.getUserById(this.userId)
   }
 }
 
