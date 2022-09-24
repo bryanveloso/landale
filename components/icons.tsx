@@ -33,6 +33,22 @@ export const ButtonRefreshArrow: FC<ComponentPropsWithoutRef<'svg'>> = ({
   </svg>
 )
 
+export const Logomark: FC<ComponentPropsWithoutRef<'svg'>> = ({
+  className
+}) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 65 57"
+    className={className}
+  >
+    <path
+      fill="currentColor"
+      fillRule="evenodd"
+      d="M33.12 41.56a.19.19 0 0 1-.33-.02l-3.94-7.13a4.34 4.34 0 0 1 .2-3.93L39.87 11.3c1.07-1.89 2.48-2.77 4.46-2.77 1.54 0 2.83.71 3.57 1.64 1 1.26 1.2 3.03.32 4.6l-15.1 26.8Zm-10.55-18.5a.13.13 0 0 1-.22 0l-5.2-9.1c-1.32-2.32-.21-5.22 3-5.22h4.73c3.08 0 4.22 2.86 2.9 5.18l-5.2 9.14ZM40.56 0c-1.15 0-2.38.31-3.33.95a8.6 8.6 0 0 0-1.88 2.14c-.03.05-.07.07-.1.07-.04 0-.08-.02-.12-.06-.42-.57-.88-1.45-1.61-2.03A5.27 5.27 0 0 0 30.09 0S10.99.02 4.56 0a3.53 3.53 0 0 0-3.13 5.36C8.5 17.82 22.8 42.97 29.83 55.2a3.54 3.54 0 0 0 3.16 1.83 3.5 3.5 0 0 0 3.08-1.81C43.1 43 57.28 17.84 64.41 5.38 65.78 2.98 64.4 0 61.3 0H40.56Z"
+    />
+  </svg>
+)
+
 export const NavigationMenu: FC<ComponentPropsWithoutRef<'svg'>> = ({
   className
 }) => {
