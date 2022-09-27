@@ -10,3 +10,6 @@ Landale is a system made up of different, interconnecting components:
 
 * The core of Landale is the Electron app that lives in this repository. The idea behind Landale.app is to provide myself with a visual control center. One could feisably build in controls to interact with OBS or just have a place to display a customizable chat. 
 * The overlays themselves live inside `/renderer/overlays` as a Next.JS project. I've chosen Next because of my familiarity with React (Synthform was also React-based).
+
+## Acknowledgements
+

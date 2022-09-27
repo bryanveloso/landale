@@ -1,5 +1,9 @@
 {
+  "editor.quickSuggestions": {
+    "strings": true
+  },
   "files.associations": {
-    "*.yaml": "home-assistant"
-  }
+    "*.css": "tailwindcss"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib"
 }

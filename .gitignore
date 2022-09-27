@@ -9,8 +9,8 @@ node_modules
 /coverage
 
 # next.js
-/renderer/.next/
-/renderer/out/
+/.next
+/out
 
 # production
 /main
@@ -34,3 +34,6 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# twurple
+tokens.json
