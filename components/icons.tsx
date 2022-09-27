@@ -49,64 +49,71 @@ export const Logomark: FC<ComponentPropsWithoutRef<'svg'>> = ({
   </svg>
 )
 
-export const NavigationMenu: FC<ComponentPropsWithoutRef<'svg'>> = ({
+export const NavigationMenu: FC<ComponentPropsWithoutRef<'svg'>> = ({ className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    className={className}
+  >
+    <g>
+      <rect x={0.5} y={2.5} width={23} height={3} rx={1} fill="currentColor" />
+      <rect x={0.5} y={10.5} width={23} height={3} rx={1} fill="currentColor" />
+      <rect x={0.5} y={18.5} width={23} height={3} rx={1} fill="currentColor" />
+    </g>
+  </svg>
+)
+
+export const SmallCloseIcon: FC<ComponentPropsWithoutRef<'svg'>> = ({
   className
-}) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      className={className}
-    >
-      <g>
-        <rect
-          x={0.5}
-          y={2.5}
-          width={23}
-          height={3}
-          rx={1}
-          fill="currentColor"
-        />
-        <rect
-          x={0.5}
-          y={10.5}
-          width={23}
-          height={3}
-          rx={1}
-          fill="currentColor"
-        />
-        <rect
-          x={0.5}
-          y={18.5}
-          width={23}
-          height={3}
-          rx={1}
-          fill="currentColor"
-        />
-      </g>
-    </svg>
-  )
-}
+}) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 12 12"
+    className={className}
+  >
+    <path
+      fill="currentColor"
+      fillRule="evenodd"
+      d="M6 12A6 6 0 1 0 6 0a6 6 0 0 0 0 12Zm2.93-3.07a.86.86 0 0 0 .02-1.2L7.2 6l1.74-1.73a.87.87 0 0 0-.02-1.2.86.86 0 0 0-1.2 0L6 4.78 4.26 3.05a.88.88 0 0 0-1.2.01.88.88 0 0 0 0 1.2l1.73 1.73-1.74 1.75c-.3.3-.31.86.02 1.19.32.33.9.32 1.2.01L6 7.2l1.74 1.74c.31.31.86.31 1.2-.01Z"
+    />
+  </svg>
+)
+
+export const SmallFullScreenIcon: FC<ComponentPropsWithoutRef<'svg'>> = ({
+  className
+}) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 12 12"
+    className={className}
+  >
+    <path
+      fill="currentColor"
+      fillRule="evenodd"
+      d="M6 12A6 6 0 1 0 6 0a6 6 0 0 0 0 12ZM3.85 5.27l2.88 2.88a.5.5 0 0 1-.35.85H4a1 1 0 0 1-1-1V5.62a.5.5 0 0 1 .85-.35ZM8 3a1 1 0 0 1 1 1v2.38a.5.5 0 0 1-.85.35L5.27 3.85A.5.5 0 0 1 5.62 3H8Z"
+      transform="matrix(-1 0 0 1 12 0)"
+    />
+  </svg>
+)
 
 export const VideoGamePC: FC<ComponentPropsWithoutRef<'svg'>> = ({
   className
-}) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      className={className}
-    >
-      <g>
-        <path
-          d="M6,3.75H9a2,2,0,0,1,2,2v4.5a1,1,0,0,0,2,0V5.75a4,4,0,0,0-4-4H6a1,1,0,0,0,0,2Z"
-          fill="currentColor"
-        />
-        <path
-          d="M18.5,11.25a5.54,5.54,0,0,0-3.64,1.37.46.46,0,0,1-.33.13H9.47a.46.46,0,0,1-.33-.13,5.5,5.5,0,1,0,0,8.26.46.46,0,0,1,.33-.13h5.06a.46.46,0,0,1,.33.13,5.5,5.5,0,1,0,3.64-9.63Zm-11.25,6H6.5a.5.5,0,0,0-.5.5v.75a.75.75,0,0,1-1.5,0v-.75a.5.5,0,0,0-.5-.5H3.25a.75.75,0,0,1,0-1.5H4a.5.5,0,0,0,.5-.5V14.5a.75.75,0,0,1,1.5,0v.75a.5.5,0,0,0,.5.5h.75a.75.75,0,0,1,0,1.5Zm8.75.5a1,1,0,1,1,1-1A1,1,0,0,1,16,17.75Zm2.5,2.5a1,1,0,1,1,1-1A1,1,0,0,1,18.5,20.25Zm0-5a1,1,0,1,1,1-1A1,1,0,0,1,18.5,15.25Zm2.5,2.5a1,1,0,1,1,1-1A1,1,0,0,1,21,17.75Z"
-          fill="currentColor"
-        />
-      </g>
-    </svg>
-  )
-}
+}) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    className={className}
+  >
+    <g>
+      <path
+        d="M6,3.75H9a2,2,0,0,1,2,2v4.5a1,1,0,0,0,2,0V5.75a4,4,0,0,0-4-4H6a1,1,0,0,0,0,2Z"
+        fill="currentColor"
+      />
+      <path
+        d="M18.5,11.25a5.54,5.54,0,0,0-3.64,1.37.46.46,0,0,1-.33.13H9.47a.46.46,0,0,1-.33-.13,5.5,5.5,0,1,0,0,8.26.46.46,0,0,1,.33-.13h5.06a.46.46,0,0,1,.33.13,5.5,5.5,0,1,0,3.64-9.63Zm-11.25,6H6.5a.5.5,0,0,0-.5.5v.75a.75.75,0,0,1-1.5,0v-.75a.5.5,0,0,0-.5-.5H3.25a.75.75,0,0,1,0-1.5H4a.5.5,0,0,0,.5-.5V14.5a.75.75,0,0,1,1.5,0v.75a.5.5,0,0,0,.5.5h.75a.75.75,0,0,1,0,1.5Zm8.75.5a1,1,0,1,1,1-1A1,1,0,0,1,16,17.75Zm2.5,2.5a1,1,0,1,1,1-1A1,1,0,0,1,18.5,20.25Zm0-5a1,1,0,1,1,1-1A1,1,0,0,1,18.5,15.25Zm2.5,2.5a1,1,0,1,1,1-1A1,1,0,0,1,21,17.75Z"
+        fill="currentColor"
+      />
+    </g>
+  </svg>
+)
+
