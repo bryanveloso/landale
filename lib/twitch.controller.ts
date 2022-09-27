@@ -1,7 +1,10 @@
 import { promises as fs, readFileSync } from 'fs'
 import { EventEmitter } from 'stream'
 import { ApiClient, HelixEventSubSubscription } from '@twurple/api'
-import { RefreshingAuthProvider } from '@twurple/auth'
+import {
+  ClientCredentialsAuthProvider,
+  RefreshingAuthProvider
+} from '@twurple/auth'
 import { ChatClient, PrivateMessage } from '@twurple/chat'
 
 import { logger } from 'logger'
@@ -154,7 +157,10 @@ export default class TwitchController extends EventEmitter {
   }
 
   setupApiClient = () => {
-    const authProvider = getAuthProvider()
+    const authProvider = new ClientCredentialsAuthProvider(
+      this.clientId,
+      this.clientSecret
+    )
     this.apiClient = new ApiClient({ authProvider })
   }
 

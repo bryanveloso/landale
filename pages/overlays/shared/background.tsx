@@ -4,7 +4,7 @@ import { ApiClient } from '@twurple/api'
 import { ClientCredentialsAuthProvider } from '@twurple/auth'
 import { useEffect, useState } from 'react'
 
-import { Dock, MenuBar, VerticalCamera, Wallpaper } from '~/components/overlays'
+import { MenuBar, Wallpaper } from '~/components/overlays'
 import {
   Controls,
   TitleBar,
@@ -14,7 +14,6 @@ import {
 import { useTwitchEvent } from '~/hooks'
 import {
   getChannelInfo,
-  getStreamInfo,
   NextApiResponseServerIO,
   TwitchChannelUpdateEvent,
   TwitchEvent,
@@ -22,7 +21,6 @@ import {
   TwitchStreamOnlineEvent
 } from '~/lib'
 import { logger } from '~/logger'
-import gameList from '~/lib/games'
 
 type TwitchStatusEvent =
   | TwitchChannelUpdateEvent
@@ -83,22 +81,12 @@ const Background = ({
 }
 
 export const getServerSideProps: GetServerSideProps = async context => {
-  const { TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET, TWITCH_USER_ID } = process.env
-
-  try {
-    const authProvider = new ClientCredentialsAuthProvider(
-      TWITCH_CLIENT_ID!,
-      TWITCH_CLIENT_SECRET!
-    )
-    const apiClient = new ApiClient({ authProvider })
-    const channel = await apiClient.channels.getChannelInfoById(TWITCH_USER_ID!)
-
-    return {
-      props: { game: channel?.gameName }
+  const channel = await getChannelInfo(context.res as NextApiResponseServerIO)
+  return {
+    props: {
+      game: channel?.gameName,
+      debug: context.query.debug === 'true'
     }
-  } catch (error) {
-    console.error(error)
-    return { props: {} }
   }
 }
 
