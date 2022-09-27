@@ -23,15 +23,19 @@ export default class ObsController extends EventEmitter {
   socketController: SocketController
 
   private async initObsWebSocket() {
-    await this.obs.connect('ws://localhost:4455', 'yEbNMh47kzPYFf8h')
-    logger.info(`OBS connected and authenticated`)
+    try {
+      await this.obs.connect('ws://localhost:4455', 'yEbNMh47kzPYFf8h')
+      logger.info(`OBS connected and authenticated`)
 
-    const response = await this.obs.call('GetCurrentProgramScene')
-    this.currentScene = response.currentProgramSceneName as Scene
+      const response = await this.obs.call('GetCurrentProgramScene')
+      this.currentScene = response.currentProgramSceneName as Scene
 
-    await this.refreshBrowserSource('[🌎] Notifier')
-    await this.refreshBrowserSource('[🌎] Shared Background')
-    await this.refreshBrowserSource('[🌎] Shared Foreground')
+      await this.refreshBrowserSource('[🌎] Notifier')
+      await this.refreshBrowserSource('[🌎] Shared Background')
+      await this.refreshBrowserSource('[🌎] Shared Foreground')
+    } catch (error) {
+      logger.error(`OBS is not open! Please restart Landale after opening OBS.`)
+    }
   }
 
   constructor(socketController: SocketController) {
