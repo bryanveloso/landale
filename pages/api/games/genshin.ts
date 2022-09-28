@@ -1,7 +1,13 @@
 import crypto from 'crypto'
+import axios from 'redaxios'
 import { NextApiRequest } from 'next'
 import { NextApiResponseServerIO } from '~/lib'
-import { logger } from '~/logger'
+
+/**
+ * Available Genshin API Endpoints:
+ * - /index: General player information, pulled characters, etc.
+ * - /dailyNote: Daily ritual information, resin count, etc.
+ */
 
 const apiUrl = 'https://bbs-api-os.hoyolab.com/game_record/genshin/api/index'
 const cookie = process.env.GENSHIN_USER_COOKIE!!
@@ -29,31 +35,26 @@ const getDynamicSecret = (salt: string) => {
 }
 
 export default async function handler(
-  req: NextApiRequest,
+  _req: NextApiRequest,
   res: NextApiResponseServerIO
 ) {
-  const url = `${apiUrl}?role_id=${uid}&server=${server}`
   const ds = getDynamicSecret('6s25p5ox5y14umn1p61aqyyvbvvl3lrt')
 
-  console.log(ds)
+  try {
+    const { data } = await axios.get(apiUrl, {
+      withCredentials: true,
+      params: { role_id: uid, server },
+      headers: {
+        DS: ds,
+        'x-rpc-language': 'en-us',
+        'x-rpc-app_version': '1.5.0',
+        'x-rpc-client_type': '5',
+        Cookie: cookie
+      }
+    })
 
-  const response = await fetch(url, {
-    method: 'GET',
-    credentials: 'include',
-    headers: {
-      DS: ds,
-      'x-rpc-language': 'en-us',
-      'x-rpc-app_version': '1.5.0',
-      'x-rpc-client_type': '5',
-      Cookie: cookie
-    }
-  })
-
-  if (!response.ok) {
-    logger.error(`Fetch error: ${response.statusText}`)
+    res.status(200).json(data)
+  } catch (error) {
+    res.status(500)
   }
-
-  const json = await response.json()
-
-  res.status(200).json(json)
 }

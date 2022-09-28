@@ -10,3 +10,14 @@ export type { EventSubChannelSubscriptionMessageEventData } from '@twurple/event
 export type { EventSubChannelUpdateEventData } from '@twurple/eventsub/lib/events/EventSubChannelUpdateEvent'
 export type { EventSubStreamOfflineEventData } from '@twurple/eventsub/lib/events/EventSubStreamOfflineEvent'
 export type { EventSubStreamOnlineEventData } from '@twurple/eventsub/lib/events/EventSubStreamOnlineEvent'
+
+export type HelixChannelRawDataObject = {
+  broadcaster_id: string
+  broadcaster_login: string
+  broadcaster_name: string
+  broadcaster_language: 'en'
+  game_id: string
+  game_name: string
+  title: string
+  delay: number
+}
