@@ -3,12 +3,16 @@ import hash from 'object-hash'
 import { useEffect, useState } from 'react'
 
 import { MenuBar, Wallpaper } from '~/components/overlays'
+<<<<<<< HEAD
 import {
   Controls,
   Sidebar,
   TitleBar,
   Window
 } from '~/components/overlays/windows'
+=======
+import { Controls, TitleBar, Sidebar, Window } from '~/components/overlays'
+>>>>>>> f79e31d (WIP.)
 import { useTwitchEvent } from '~/hooks'
 import { useChannel } from '~/hooks/use-channel'
 import {

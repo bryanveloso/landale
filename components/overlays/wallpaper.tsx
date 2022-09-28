@@ -3,6 +3,7 @@ import Image from 'next/future/image'
 import { FC } from 'react'
 
 import wallpapers from '~/lib/games'
+import { useChannel } from '~/lib/providers/channel'
 
 const variants = {
   enter: {
@@ -16,12 +17,10 @@ const variants = {
   }
 } as Variants
 
-export interface WallpaperProps {
-  category?: string
-}
-
-export const Wallpaper: FC<WallpaperProps> = ({ category }) => {
-  const image = wallpapers.find(w => w.name === category) ?? wallpapers[0]
+export const Wallpaper: FC = () => {
+  const { channel } = useChannel()
+  const image =
+    wallpapers.find(w => w.name === channel?.game_name) ?? wallpapers[0]
 
   return (
     <AnimatePresence mode="wait">
