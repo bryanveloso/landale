@@ -1,5 +1,4 @@
 import { promises as fs, readFileSync } from 'fs'
-import type OBSWebSocket from 'obs-websocket-js'
 import { EventEmitter } from 'stream'
 import { ApiClient, HelixEventSubSubscription } from '@twurple/api'
 import {
@@ -128,7 +127,7 @@ export type TwitchEvent =
 
 export default class TwitchController extends EventEmitter {
   private server: CustomServer
-  private obs: OBSWebSocket
+  private obs: ObsController
   private apiClient?: ApiClient
   private callback = process.env.TWITCH_CALLBACK_URL as string
   private clientId = process.env.TWITCH_CLIENT_ID as string
@@ -143,13 +142,13 @@ export default class TwitchController extends EventEmitter {
     super()
 
     this.server = server
-    this.obs = obs.obs
+    this.obs = obs
 
-    this.obs.on('CurrentProgramSceneChanged', scene => {
+    this.obs.obs.on('CurrentProgramSceneChanged', scene => {
       console.log('scene', scene)
     })
 
-    this.obs.on('SceneItemEnableStateChanged', args => {
+    this.obs.obs.on('SceneItemEnableStateChanged', args => {
       console.log('item', args)
     })
 
@@ -304,6 +303,10 @@ export default class TwitchController extends EventEmitter {
 
   getUserInfo = async () => {
     return this.apiClient?.users.getUserById(this.userId)
+  }
+
+  runCommercial = async () => {
+    return this.apiClient?.channels.startChannelCommercial(this.userId, 180)
   }
 }
 
