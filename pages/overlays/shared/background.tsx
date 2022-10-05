@@ -77,6 +77,7 @@ const Background = ({
         <TitleBar />
         <div className="grid grid-cols-[288px_1600px] h-full">
           <Sidebar />
+          <div className="bg-black/90 rounded-r-lg" />
         </div>
       </Window>
       <Wallpaper category={data?.game} />
