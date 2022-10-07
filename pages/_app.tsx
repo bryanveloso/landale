@@ -7,8 +7,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const queryClient = new QueryClient()
 
-import { ChannelProvider } from '~/lib/providers/channel'
-
 function MyApp({ Component, pageProps }: AppProps) {
   return (
     <QueryClientProvider client={queryClient}>

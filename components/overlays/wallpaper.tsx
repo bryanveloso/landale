@@ -2,8 +2,8 @@ import { motion, AnimatePresence, Variants } from 'framer-motion'
 import Image from 'next/future/image'
 import { FC } from 'react'
 
+import { useChannel } from '~/hooks'
 import wallpapers from '~/lib/games'
-import { useChannel } from '~/lib/providers/channel'
 
 const variants = {
   enter: {
@@ -18,9 +18,8 @@ const variants = {
 } as Variants
 
 export const Wallpaper: FC = () => {
-  const { channel } = useChannel()
-  const image =
-    wallpapers.find(w => w.name === channel?.game_name) ?? wallpapers[0]
+  const { data } = useChannel()
+  const image = wallpapers.find(w => w.name === data?.game) ?? wallpapers[0]
 
   return (
     <AnimatePresence mode="wait">
