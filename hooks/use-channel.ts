@@ -12,16 +12,23 @@ export const useChannel = () => {
   })
 
   const [game, setGame] = useState(data?.gameName)
+  const [gameId, setGameId] = useState(data?.gameId)
+  const [title, setTitle] = useState(data?.title)
+
   useEffect(() => {
     setGame(data?.gameName)
+    setGameId(data?.gameId)
+    setTitle(data?.title)
   }, [data])
 
   const handleTwitchEvent = (event: TwitchEvent) => {
     if (event.type === 'channel.update') {
       setGame(event.event.category_name)
+      setGameId(event.event.category_id)
+      setTitle(event.event.title)
     }
   }
   useTwitchEvent(handleTwitchEvent)
 
-  return { data: { ...(data ?? {}), game } }
+  return { data: { game, gameId, title } }
 }

@@ -1,17 +1,16 @@
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
 import hash from 'object-hash'
-import { ApiClient } from '@twurple/api'
-import { ClientCredentialsAuthProvider } from '@twurple/auth'
 import { useEffect, useState } from 'react'
 
 import { MenuBar, Wallpaper } from '~/components/overlays'
 import {
   Controls,
-  TitleBar,
   Sidebar,
+  TitleBar,
   Window
-} from '~/components/overlays/window'
+} from '~/components/overlays/windows'
 import { useTwitchEvent } from '~/hooks'
+import { useChannel } from '~/hooks/use-channel'
 import {
   getChannelInfo,
   NextApiResponseServerIO,
@@ -30,6 +29,7 @@ type TwitchStatusEvent =
 const Background = ({
   game
 }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
+  const { data } = useChannel()
   const [category, setCategory] = useState('')
   const [timestamp, setTimestamp] = useState('')
   const [title, setTitle] = useState('')
@@ -70,12 +70,12 @@ const Background = ({
       <Window>
         <div className="absolute w-full h-full rounded-lg ring-1 ring-offset-0 ring-inset ring-white/10 z-50" />
         <Controls />
-        <TitleBar category={category} />
+        <TitleBar />
         <div className="grid grid-cols-[288px_1600px] h-full">
           <Sidebar />
         </div>
       </Window>
-      <Wallpaper category={category} />
+      <Wallpaper category={data?.game} />
     </div>
   )
 }

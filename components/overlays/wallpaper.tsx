@@ -31,7 +31,7 @@ export const Wallpaper: FC<WallpaperProps> = ({ category }) => {
         initial="enter"
         animate="visible"
         exit="exit"
-        transition={{ opacity: { duration: 0.2 } }}
+        transition={{ opacity: { duration: 0.5 } }}
         className="absolute top-0 w-[1920px] h-[1080px] overflow-hidden bg-black z-10"
       >
         <Image

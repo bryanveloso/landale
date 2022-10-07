@@ -1,3 +1,4 @@
+export * from './use-channel'
 export * from './use-event'
 export * from './use-has-mounted'
 export * from './use-obs'
