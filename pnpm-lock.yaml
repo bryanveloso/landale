@@ -7,6 +7,7 @@ specifiers:
   '@swc/cli': ^0.1.57
   '@swc/core': ^1.3.3
   '@swc/core-linux-musl': ^1.2.42
+  '@tanstack/react-query': ^4.10.1
   '@twurple/api': ^5.2.4
   '@twurple/auth': ^5.2.4
   '@twurple/chat': ^5.2.4
@@ -53,6 +54,7 @@ specifiers:
 dependencies:
   '@next/env': 12.3.1
   '@react-hookz/web': 15.1.0_biqbaboplfbrettd7655fr4n2y
+  '@tanstack/react-query': 4.10.1_biqbaboplfbrettd7655fr4n2y
   '@twurple/api': 5.2.4_@twurple+auth@5.2.4
   '@twurple/auth': 5.2.4
   '@twurple/chat': 5.2.4_@twurple+auth@5.2.4
@@ -814,6 +816,28 @@ packages:
     engines: {node: '>=10'}
     dependencies:
       defer-to-connect: 2.0.1
+
+  /@tanstack/query-core/4.10.1:
+    resolution: {integrity: sha512-UZRYzjgQSfYhQ+cJX0CspAbzutf8p93gR1xFjQuH3OYcb/7t3WnHkdb/qC9mbqrfWXN/JAbBTJlTU/XQHc5HbA==}
+    dev: false
+
+  /@tanstack/react-query/4.10.1_biqbaboplfbrettd7655fr4n2y:
+    resolution: {integrity: sha512-6GaLYAsAu/4aX6HR4krpOej9qbKWXe0X0eccikpv5hAw4CoAAPG29Pydql1nTl9cYF2zd21unVm4yApklFY0AA==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
+      react-native: '*'
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+      react-native:
+        optional: true
+    dependencies:
+      '@tanstack/query-core': 4.10.1
+      react: 18.2.0
+      react-dom: 18.2.0_react@18.2.0
+      use-sync-external-store: 1.2.0_react@18.2.0
+    dev: false
 
   /@tootallnate/once/2.0.0:
     resolution: {integrity: sha512-XCuKFP5PS55gnMVu3dty8KPatLqUoy/ZYzDzAGCQ8JNFCkLXzmI7vNHCR+XpbZaMWQK/vQubr7PkYq8g470J/A==}

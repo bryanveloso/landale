@@ -2,6 +2,7 @@ import cn from 'classnames'
 import { FC, PropsWithChildren } from 'react'
 
 import { Logomark, VideoGamePC } from '~/components/icons'
+import { useChannel } from '~/hooks/use-channel'
 
 export const Controls: FC = () => {
   return (
@@ -13,17 +14,15 @@ export const Controls: FC = () => {
   )
 }
 
-export interface TitleBarProps {
-  category?: string
-}
+export const TitleBar: FC = () => {
+  const channel = useChannel()
 
-export const TitleBar: FC<TitleBarProps> = ({ category }) => {
   return (
     <div className="absolute grid grid-cols-[288px_1600px] items-stretch w-full h-[52px] rounded-t-lg text-[#E5E5E5] z-50">
       <div className="flex items-center gap-3 px-5 justify-end"></div>
       <div className="flex items-center gap-3 px-5 shadow-titlebar-inset bg-titlebar rounded-tr-lg">
         <VideoGamePC className="w-6 h-6" />
-        <div className="font-semibold">{category}</div>
+        <div className="font-semibold">{channel?.data?.game}</div>
       </div>
     </div>
   )
