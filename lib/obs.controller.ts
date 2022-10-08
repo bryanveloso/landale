@@ -26,7 +26,10 @@ export default class ObsController extends EventEmitter {
 
   private async initObsWebSocket() {
     try {
-      await this.obs.connect('ws://localhost:4455', 'yEbNMh47kzPYFf8h')
+      await this.obs.connect(
+        `ws://${process.env.OBS_WEBSOCKET_URL ?? 'localhost'}:4455`,
+        'yEbNMh47kzPYFf8h'
+      )
       logger.info(`OBS connected and authenticated`)
 
       const response = await this.obs.call('GetCurrentProgramScene')
