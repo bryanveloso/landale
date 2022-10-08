@@ -32,7 +32,7 @@ export default class StreamController {
 
   init = async () => {
     const info = await this.twitch.getStreamInfo()
-    // this.streamStartTime = info?.startDate
+    this.streamStartTime = info?.startDate
   }
 
   handleStreamOnline = async () => {

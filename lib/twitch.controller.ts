@@ -144,14 +144,6 @@ export default class TwitchController extends EventEmitter {
     this.server = server
     this.obs = obs
 
-    this.obs.obs.on('CurrentProgramSceneChanged', scene => {
-      console.log('scene', scene)
-    })
-
-    this.obs.obs.on('SceneItemEnableStateChanged', args => {
-      console.log('item', args)
-    })
-
     this.setup()
   }
 
