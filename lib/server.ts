@@ -1,16 +1,18 @@
 import { IncomingMessage, Server as NetServer, ServerResponse } from 'http'
 import { NextApiResponse } from 'next'
 
+import GameController from './game.controller'
 import ObsController from './obs.controller'
-import TwitchController from './twitch.controller'
 import SocketController from './socket.controller'
 import StreamController from './stream.controller'
+import TwitchController from './twitch.controller'
 
 export type CustomServer = NetServer & {
-  socket: SocketController
+  game: GameController
   obs: ObsController
-  twitch: TwitchController
+  socket: SocketController
   stream: StreamController
+  twitch: TwitchController
 }
 
 export type CustomServerResponse = ServerResponse & {

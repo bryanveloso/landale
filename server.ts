@@ -12,6 +12,7 @@ import ObsController from './lib/obs.controller'
 import TwitchController from './lib/twitch.controller'
 import { logger } from './logger'
 import StreamController from './lib/stream.controller'
+import GameController from './lib/game.controller'
 
 loadEnvConfig('./', process.env.NODE_ENV !== 'production', logger)
 
@@ -64,11 +65,17 @@ const init = async () => {
   const obsController = new ObsController(socketController)
   const twitchController = new TwitchController(server, obsController)
   const streamController = new StreamController(twitchController)
+  const gameController = new GameController(
+    server,
+    obsController,
+    twitchController
+  )
 
   server.socket = socketController
   server.obs = obsController
   server.twitch = twitchController
   server.stream = streamController
+  server.game = gameController
 }
 
 init()
