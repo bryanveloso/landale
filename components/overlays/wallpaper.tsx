@@ -35,7 +35,7 @@ export const Wallpaper: FC = () => {
         <Image
           fill
           priority
-          src={image?.asset}
+          src={image?.wallpaper}
           alt="Wallpaper"
           style={{ objectFit: 'cover' }}
         />

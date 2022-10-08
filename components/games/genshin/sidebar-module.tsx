@@ -1,15 +1,17 @@
+import { useQuery } from '@tanstack/react-query'
+
 import Image from 'next/future/image'
 import { FC } from 'react'
 import axios from 'redaxios'
-import useSWR from 'swr'
-
-const fetcher = (url: string) => axios.get(url).then(res => res.data)
 
 const GenshinModule: FC = () => {
   // Fetch metadata information.
-  const { data, error } = useSWR('/api/games/genshin', fetcher)
+  const { data } = useQuery(['genshin'], async () => {
+    return await (
+      await axios.get('/api/games/genshin')
+    ).data
+  })
 
-  if (error) return <div>failed to load</div>
   if (!data) return <div>loading...</div>
 
   return (

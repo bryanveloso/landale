@@ -1,12 +1,6 @@
-import dynamic from 'next/dynamic'
-
 import { FC, Suspense } from 'react'
 
 import { Logomark } from '~/components/icons'
-
-const GenshinModule = dynamic(() => import('../games/genshin/module'), {
-  suspense: true
-})
 
 const navigationItems = [
   {
@@ -43,9 +37,7 @@ export const Sidebar: FC = () => {
         <div className="grow">
           <div className="">
             <Navigation />
-            <Suspense fallback={'Loading...'}>
-              <GenshinModule />
-            </Suspense>
+            <Suspense fallback={'Loading...'}></Suspense>
           </div>
         </div>
         <div className="text-white">

@@ -1,14 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { HelixChannel } from '@twurple/api/lib'
 import { useEffect, useState } from 'react'
+import axios from 'redaxios'
 
 import { TwitchEvent } from '~/lib'
 import { useTwitchEvent } from './use-twitch-event'
 
 export const useChannel = () => {
   const { data } = useQuery<HelixChannel>(['channel'], async () => {
-    const res = await fetch('/api/channel')
-    return await res.json()
+    return await (
+      await axios.get('/api/channel')
+    ).data
   })
 
   const [game, setGame] = useState(data?.gameName)
