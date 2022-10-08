@@ -1,5 +1,5 @@
 import EventEmitter from 'events'
-import OBSWebSocket from 'obs-websocket-js'
+import OBSWebSocket, { OBSResponseTypes } from 'obs-websocket-js'
 
 import { logger } from 'logger'
 
@@ -74,5 +74,26 @@ export default class ObsController extends EventEmitter {
     return this.obs.call('SetCurrentProgramScene', {
       sceneName
     })
+  }
+
+  toggleSource = async (
+    sceneName: Scene,
+    sourceName: Source,
+    enabled: boolean
+  ) => {
+    this.emit('sourceChange', `${sceneName}: ${sourceName}`)
+
+    const response: OBSResponseTypes['GetSceneItemId'] = await this.obs.call(
+      'GetSceneItemId',
+      { sceneName, sourceName }
+    )
+
+    if (response) {
+      return this.obs.call('SetSceneItemEnabled', {
+        sceneName,
+        sceneItemId: response.sceneItemId,
+        sceneItemEnabled: enabled
+      })
+    }
   }
 }
