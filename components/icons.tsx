@@ -116,4 +116,3 @@ export const VideoGamePC: FC<ComponentPropsWithoutRef<'svg'>> = ({
     </g>
   </svg>
 )
-

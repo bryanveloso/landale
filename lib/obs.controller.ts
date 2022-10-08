@@ -13,12 +13,14 @@ export type Scene =
   | '[🎬] Talk'
 
 export type Source =
+  | '[🌎] Horizontal Camera'
   | '[🌎] Notifier'
   | '[🌎] Shared Background'
   | '[🌎] Shared Foreground'
+  | '[🌎] Vertical Camera'
 
 export default class ObsController extends EventEmitter {
-  obs = new OBSWebSocket()
+  obs: OBSWebSocket = new OBSWebSocket()
   currentScene: Scene | undefined
   socketController: SocketController
 
@@ -33,6 +35,8 @@ export default class ObsController extends EventEmitter {
       await this.refreshBrowserSource('[🌎] Notifier')
       await this.refreshBrowserSource('[🌎] Shared Background')
       await this.refreshBrowserSource('[🌎] Shared Foreground')
+      await this.refreshBrowserSource('[🌎] Horizontal Camera')
+      await this.refreshBrowserSource('[🌎] Vertical Camera')
     } catch (error) {
       logger.error(`OBS is not open! Please restart Landale after opening OBS.`)
     }

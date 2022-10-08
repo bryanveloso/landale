@@ -12,8 +12,6 @@ import {
 import { useTwitchEvent } from '~/hooks'
 import { useChannel } from '~/hooks/use-channel'
 import {
-  getChannelInfo,
-  NextApiResponseServerIO,
   TwitchChannelUpdateEvent,
   TwitchEvent,
   TwitchStreamOfflineEvent,
@@ -26,30 +24,16 @@ type TwitchStatusEvent =
   | TwitchStreamOfflineEvent
   | TwitchStreamOnlineEvent
 
-const Background = ({
-  game
-}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
-  const { data } = useChannel()
-  const [category, setCategory] = useState('')
+const Background = ({}: InferGetServerSidePropsType<
+  typeof getServerSideProps
+>) => {
   const [timestamp, setTimestamp] = useState('')
-  const [title, setTitle] = useState('')
-
-  useEffect(() => {
-    setCategory(game)
-  }, [])
 
   useTwitchEvent((twitchEvent: TwitchEvent) => {
     const key = hash(twitchEvent)
     const event = { ...twitchEvent, key } as TwitchStatusEvent
 
     switch (event.type) {
-      case 'channel.update':
-        logger.info('channel.update', event)
-        const { category_name, title } = event.event
-        logger.info(`the category is ${category_name}`)
-        setCategory(category_name)
-        setTitle(title)
-        break
       case 'stream.offline':
         logger.info('stream.offline', event)
         setTimestamp('')
@@ -73,18 +57,17 @@ const Background = ({
         <TitleBar />
         <div className="grid grid-cols-[288px_1600px] h-full">
           <Sidebar />
+          <div className="bg-black/90 rounded-r-lg" />
         </div>
       </Window>
-      <Wallpaper category={data?.game} />
+      <Wallpaper />
     </div>
   )
 }
 
 export const getServerSideProps: GetServerSideProps = async context => {
-  const channel = await getChannelInfo(context.res as NextApiResponseServerIO)
   return {
     props: {
-      game: channel?.gameName,
       debug: context.query.debug === 'true'
     }
   }

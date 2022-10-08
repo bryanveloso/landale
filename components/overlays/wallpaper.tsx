@@ -2,6 +2,7 @@ import { motion, AnimatePresence, Variants } from 'framer-motion'
 import Image from 'next/future/image'
 import { FC } from 'react'
 
+import { useChannel } from '~/hooks'
 import wallpapers from '~/lib/games'
 
 const variants = {
@@ -16,12 +17,9 @@ const variants = {
   }
 } as Variants
 
-export interface WallpaperProps {
-  category?: string
-}
-
-export const Wallpaper: FC<WallpaperProps> = ({ category }) => {
-  const image = wallpapers.find(w => w.name === category) ?? wallpapers[0]
+export const Wallpaper: FC = () => {
+  const { data } = useChannel()
+  const image = wallpapers.find(w => w.name === data?.game) ?? wallpapers[0]
 
   return (
     <AnimatePresence mode="wait">
@@ -37,7 +35,7 @@ export const Wallpaper: FC<WallpaperProps> = ({ category }) => {
         <Image
           fill
           priority
-          src={image?.asset}
+          src={image?.wallpaper}
           alt="Wallpaper"
           style={{ objectFit: 'cover' }}
         />

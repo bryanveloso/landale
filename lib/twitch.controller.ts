@@ -144,9 +144,14 @@ export default class TwitchController extends EventEmitter {
     this.server = server
     this.obs = obs
 
-    this.obs.on('sceneChange', scene => {
-      console.log(scene)
+    this.obs.obs.on('CurrentProgramSceneChanged', scene => {
+      console.log('scene', scene)
     })
+
+    this.obs.obs.on('SceneItemEnableStateChanged', args => {
+      console.log('item', args)
+    })
+
     this.setup()
   }
 
@@ -298,6 +303,10 @@ export default class TwitchController extends EventEmitter {
 
   getUserInfo = async () => {
     return this.apiClient?.users.getUserById(this.userId)
+  }
+
+  runCommercial = async () => {
+    return this.apiClient?.channels.startChannelCommercial(this.userId, 180)
   }
 }
 
