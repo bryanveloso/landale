@@ -9,30 +9,32 @@ export type Scene =
   | '[🎬] Intro'
   | '[🎬] Mac Studio'
   | '[🎬] Outro'
-  | '[🎬] PC'
   | '[🎬] Talk'
+  | '[🎮] IronMON'
+  | '[🎮] PC'
 
 export type Source =
   | '[🌎] Horizontal Camera'
+  | '[🌎] IronMON Tracker'
   | '[🌎] Notifier'
   | '[🌎] Shared Background'
   | '[🌎] Shared Foreground'
   | '[🌎] Vertical Camera'
 
 export default class ObsController extends EventEmitter {
-  obs: OBSWebSocket = new OBSWebSocket()
+  websocket: OBSWebSocket = new OBSWebSocket()
   currentScene: Scene | undefined
   socketController: SocketController
 
   private async initObsWebSocket() {
     try {
-      await this.obs.connect(
+      await this.websocket.connect(
         `ws://${process.env.OBS_WEBSOCKET_URL ?? 'localhost'}:4455`,
         'yEbNMh47kzPYFf8h'
       )
       logger.info(`OBS connected and authenticated`)
 
-      const response = await this.obs.call('GetCurrentProgramScene')
+      const response = await this.websocket.call('GetCurrentProgramScene')
       this.currentScene = response.currentProgramSceneName as Scene
 
       await this.refreshBrowserSource('[🌎] Notifier')
@@ -53,15 +55,15 @@ export default class ObsController extends EventEmitter {
   }
 
   startStream = async () => {
-    return this.obs.call('StartStream')
+    return this.websocket.call('StartStream')
   }
 
   endStream = async () => {
-    return this.obs.call('StopStream')
+    return this.websocket.call('StopStream')
   }
 
   refreshBrowserSource = async (inputName: Source) => {
-    return this.obs.call('PressInputPropertiesButton', {
+    return this.websocket.call('PressInputPropertiesButton', {
       inputName,
       propertyName: 'refreshnocache'
     })
@@ -71,7 +73,7 @@ export default class ObsController extends EventEmitter {
     this.currentScene = sceneName
     this.emit('sceneChange', sceneName)
 
-    return this.obs.call('SetCurrentProgramScene', {
+    return this.websocket.call('SetCurrentProgramScene', {
       sceneName
     })
   }
@@ -83,13 +85,11 @@ export default class ObsController extends EventEmitter {
   ) => {
     this.emit('sourceChange', `${sceneName}: ${sourceName}`)
 
-    const response: OBSResponseTypes['GetSceneItemId'] = await this.obs.call(
-      'GetSceneItemId',
-      { sceneName, sourceName }
-    )
+    const response: OBSResponseTypes['GetSceneItemId'] =
+      await this.websocket.call('GetSceneItemId', { sceneName, sourceName })
 
     if (response) {
-      return this.obs.call('SetSceneItemEnabled', {
+      return this.websocket.call('SetSceneItemEnabled', {
         sceneName,
         sceneItemId: response.sceneItemId,
         sceneItemEnabled: enabled

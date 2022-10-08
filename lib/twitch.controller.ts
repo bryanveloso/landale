@@ -279,6 +279,8 @@ export default class TwitchController extends EventEmitter {
       case 'stream.online':
         this.emit('online')
         break
+      case 'channel.update':
+        this.emit('update', event)
 
       default:
         break
