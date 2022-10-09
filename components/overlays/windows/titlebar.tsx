@@ -17,7 +17,7 @@ export const TitleBar: FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ opacity: { duration: 0.2 } }}
-            className="font-semibold"
+            className="font-bold"
           >
             {channel?.data?.game}
           </motion.div>

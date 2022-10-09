@@ -1,6 +1,7 @@
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
 import hash from 'object-hash'
 import { useEffect, useState } from 'react'
+import { Logomark } from '~/components/icons'
 
 import { MenuBar, Wallpaper } from '~/components/overlays'
 import {
@@ -10,7 +11,6 @@ import {
   Window
 } from '~/components/overlays/windows'
 import { useTwitchEvent } from '~/hooks'
-import { useChannel } from '~/hooks/use-channel'
 import {
   TwitchChannelUpdateEvent,
   TwitchEvent,
@@ -55,7 +55,13 @@ const Background = ({}: InferGetServerSidePropsType<
         <div className="absolute w-full h-full rounded-lg ring-1 ring-offset-0 ring-inset ring-white/10 z-50" />
         <Controls />
         <TitleBar />
-        <div className="grid grid-cols-[288px_1600px] h-full">
+        <div className="grid grid-cols-[92px_196px_1600px] h-full">
+          <div className="flex flex-col h-full bg-gradient-to-b from-black/50 to-black/30 shadow-sidebar-inset rounded-l-lg">
+            <div className="grow"></div>
+            <div className="py-6 text-white">
+              <Logomark className="h-10 mx-auto opacity-10" />
+            </div>
+          </div>
           <Sidebar />
           <div className="bg-black/90 rounded-r-lg" />
         </div>
