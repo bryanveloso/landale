@@ -3,7 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   images: {
-    domains: ['upload-os-bbs.mihoyo.com']
+    domains: ['rainwave.cc', 'upload-os-bbs.mihoyo.com']
   }
 }
 

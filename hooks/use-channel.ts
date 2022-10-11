@@ -6,7 +6,15 @@ import axios from 'redaxios'
 import { TwitchEvent } from '~/lib'
 import { useTwitchEvent } from './use-twitch-event'
 
-export const useChannel = () => {
+export interface ChannelResponse {
+  data: {
+    game?: string
+    gameId?: string
+    title?: string
+  }
+}
+
+export const useChannel = (): ChannelResponse => {
   const { data } = useQuery<HelixChannel>(['channel'], async () => {
     return await (
       await axios.get('/api/channel')
