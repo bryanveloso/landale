@@ -1,4 +1,10 @@
 import type { ComponentPropsWithoutRef, FC } from 'react'
+import IcoMoon, { IconProps } from 'react-icomoon'
+import iconSet from '../assets/icons/selection.json'
+
+const Icon = (props: IconProps) => <IcoMoon iconSet={iconSet} {...props} />
+
+export default Icon
 
 export const Battery100Icon: FC<ComponentPropsWithoutRef<'svg'>> = ({
   className
