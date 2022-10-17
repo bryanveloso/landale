@@ -1,6 +1,10 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import {
+  AnimatePresence,
+  motion,
+  useWillChange,
+  type Variants
+} from 'framer-motion'
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
-import hash from 'object-hash'
 import { RainwaveEventSong } from 'rainwave-websocket-sdk'
 import axios from 'redaxios'
 import {
@@ -12,7 +16,8 @@ import {
 } from 'rainwave-websocket-sdk'
 import { type ApiInfo } from 'rainwave-websocket-sdk/dist/types'
 import { useQuery } from '@tanstack/react-query'
-import { FC, useEffect, useState } from 'react'
+import { FC, useCallback, useEffect, useState } from 'react'
+import Icon from '~/components/icons'
 
 export interface RainwaveResponse {
   album_diff: AlbumDiff
@@ -33,6 +38,31 @@ const getRainwave = async (): Promise<RainwaveResponse> => {
   ).data
 }
 
+const container = {
+  hidden: {
+    opacity: 0,
+    width: 0,
+    transition: {
+      when: 'afterChildren'
+    }
+  },
+  visible: {
+    opacity: 1,
+    width: 'fit-content',
+    transition: {
+      type: 'spring',
+      bounce: 0,
+      when: 'beforeChildren',
+      staggerChildren: 0.1
+    }
+  }
+} as Variants
+
+const item = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 }
+} as Variants
+
 export const Rainwave = ({
   initialData
 }: {
@@ -47,48 +77,47 @@ export const Rainwave = ({
   const [song, setSong] = useState<RainwaveEventSong>(
     data.sched_current.songs[0]
   )
-  const [user, setUser] = useState<User>(data.user)
   const [isVisible, setIsVisible] = useState<boolean>(data.user.tuned_in)
+  const willChange = useWillChange()
 
   useEffect(() => {
-    setUser(data.user)
     setSong(data.sched_current.songs[0])
+    setIsVisible(data.user.tuned_in)
   }, [data])
 
   if (status === 'error') return <span>Error: {error?.message}</span>
 
   return (
-    <motion.div
-      layout
-      key={song.id}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ opacity: { duration: 0.2 } }}
-      className="flex items-center max-w-fit"
-    >
-      <div
-        className="flex justify-center rounded-sm w-6 h-6 aspect-square bg-cover bg-center ring-4 ring-black"
-        style={{
-          backgroundImage: `url(https://rainwave.cc${song.albums[0].art}_320.jpg)`
-        }}
-      />
-      <motion.div
-        key={hash(song.id)}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ opacity: { duration: 0.2 } }}
-        className="pl-2 text-white text-sm"
-      >
-        {song.title}
-        {Array.from(song.artists.values(), v => v.name).join(', ')}
-      </motion.div>
-      {/* <div className="text-xs font-bold">{'POWERED BY RAINWAVE.CC'}</div> */}
-      {/* <div className="text-xs">
-        <pre>{JSON.stringify(song, null, 2)}</pre>
-      </div>
-      <div className="text-xs">
-        <pre>{JSON.stringify(user, null, 2)}</pre>
-      </div> */}
-    </motion.div>
+    <AnimatePresence mode="wait">
+      {isVisible && (
+        <motion.div
+          layout="position"
+          initial="hidden"
+          animate={isVisible ? 'visible' : 'hidden'}
+          variants={container}
+          exit="hidden"
+          className="flex items-center rounded-md ring-inset ring-0 ring-white/50"
+          style={{ willChange }}
+        >
+          <motion.div
+            variants={item}
+            className="flex items-center p-1.5 rounded-l-md px-3 font-semibold text-sm border-r border-white/50"
+          >
+            <Icon icon="music-line" size={24} />
+            <span className="pl-2">!rainwave</span>
+          </motion.div>
+          <motion.div
+            variants={item}
+            className="text-white text-sm px-3 overflow-hidden"
+          >
+            <strong className="truncate">{song.title}</strong>
+            <span className="text-white/50">
+              {' by '}
+              {Array.from(song.artists.values(), v => v.name).join(', ')}
+            </span>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
