@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 const obs = new OBSWebSocket()
 
 export const useObs = () => {
-  const [connected, setConnected] = useState(false)
-  const [scene, setScene] = useState()
+  const [connected, setConnected] = useState<boolean>(false)
 
   useEffect(() => {
     const init = async () => {
