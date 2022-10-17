@@ -14,6 +14,7 @@ export type Scene =
   | '[🎮] PC'
 
 export type Source =
+  | '[🌎] Intro'
   | '[🌎] Horizontal Camera'
   | '[🌎] IronMON Tracker'
   | '[🌎] Notifier'
@@ -37,6 +38,7 @@ export default class ObsController extends EventEmitter {
       const response = await this.websocket.call('GetCurrentProgramScene')
       this.currentScene = response.currentProgramSceneName as Scene
 
+      await this.refreshBrowserSource('[🌎] IronMON Tracker')
       await this.refreshBrowserSource('[🌎] Notifier')
       await this.refreshBrowserSource('[🌎] Shared Background')
       await this.refreshBrowserSource('[🌎] Shared Foreground')
