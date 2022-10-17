@@ -35,8 +35,8 @@ const Background = ({
   rainwave
 }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
   const channel = useChannel()
-  const [timestamp, setTimestamp] = useState('')
   const hasMounted = useHasMounted()
+  const [timestamp, setTimestamp] = useState<string>()
 
   useTwitchEvent((twitchEvent: TwitchEvent) => {
     const key = hash(twitchEvent)

@@ -4,6 +4,7 @@ specifiers:
   '@fontsource/inter': ^4.5.13
   '@next/env': ^12.3.1
   '@react-hookz/web': ^15.1.0
+  '@speechly/react-client': ^2.2.0
   '@swc/cli': ^0.1.57
   '@swc/core': ^1.3.7
   '@swc/core-linux-musl': ^1.2.42
@@ -60,6 +61,7 @@ specifiers:
 dependencies:
   '@next/env': 12.3.1
   '@react-hookz/web': 15.1.0_biqbaboplfbrettd7655fr4n2y
+  '@speechly/react-client': 2.2.0_react@18.2.0
   '@tanstack/react-query': 4.12.0_biqbaboplfbrettd7655fr4n2y
   '@twurple/api': 5.2.5_@twurple+auth@5.2.5
   '@twurple/auth': 5.2.5
@@ -638,6 +640,22 @@ packages:
 
   /@socket.io/component-emitter/3.1.0:
     resolution: {integrity: sha512-+9jVqKhRSpsc591z5vX+X5Yyw+he/HCB4iQ/RYxw35CEPaY1gnsNE43nf9n9AaYjAQrTiI/mOwKUKdUs9vf7Xg==}
+    dev: false
+
+  /@speechly/browser-client/2.6.0:
+    resolution: {integrity: sha512-plAcyWUFWzwNvBupB8bhHClm7DO//7GTrOngRHezMjKJ0iUEkE2Ck3lip3gU+h1pJY27H5cvDKUqMTkfHhJZIw==}
+    dependencies:
+      base-64: 0.1.0
+      uuid: 8.3.2
+    dev: false
+
+  /@speechly/react-client/2.2.0_react@18.2.0:
+    resolution: {integrity: sha512-q4jS5h6niuMlWNg1bqdrgXlwxnx+Qk9SrJcmrmKS5o0GYB9KkWH2YheVhGZltOwovk1nVU4YGSyPrUytsADFCQ==}
+    peerDependencies:
+      react: '>=16.9.0'
+    dependencies:
+      '@speechly/browser-client': 2.6.0
+      react: 18.2.0
     dev: false
 
   /@swc/cli/0.1.57_@swc+core@1.3.8:
@@ -1514,6 +1532,10 @@ packages:
   /balanced-match/1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
     dev: true
+
+  /base-64/0.1.0:
+    resolution: {integrity: sha512-Y5gU45svrR5tI2Vt/X9GPd3L0HNIKzGu202EjxrXMpuc2V2CiKgemAbUUsqYmZJvPtCXoUKjNZwBJzsNScUbXA==}
+    dev: false
 
   /base64-js/1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
