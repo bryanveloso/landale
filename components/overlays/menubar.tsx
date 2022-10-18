@@ -3,9 +3,10 @@ import Clock from 'react-live-clock'
 import Image from 'next/future/image'
 
 import Icon from '~/components/icons'
-import { useHasMounted } from '~/hooks'
+import { useHasMounted, useStream } from '~/hooks'
 
 import logo from '../../public/avalonstar.png'
+import { Battery } from './battery'
 
 export const MenuBar: FC = () => {
   const hasMounted = useHasMounted()
@@ -22,7 +23,7 @@ export const MenuBar: FC = () => {
             <Icon icon="clock-line" size={24} />
             <span className="pl-2">04:00:00</span>
           </div> */}
-          <Icon icon="battery-full-line" size={24} className="text-green-400" />
+          <Battery />
           {hasMounted && <Clock ticking format="MMM D h:mm A" />}
         </div>
       </div>

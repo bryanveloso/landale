@@ -61,6 +61,7 @@
     "@twurple/eventsub": "^5.2.5",
     "@twurple/eventsub-ngrok": "^5.2.5",
     "classnames": "^2.3.2",
+    "date-fns": "^2.29.3",
     "dotenv": "^16.0.3",
     "electron-next": "^3.1.5",
     "http-proxy": "^1.18.1",
