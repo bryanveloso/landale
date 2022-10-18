@@ -2,17 +2,23 @@ import { FC, useMemo, useState } from 'react'
 import { differenceInHours, parseISO } from 'date-fns'
 
 import Icon from '~/components/icons'
-import { useStream } from '~/hooks'
+import { useInterval, useStream } from '~/hooks'
 
 export const Battery: FC = () => {
   const { data } = useStream()
+
+  const [currentTime, setCurrentTime] = useState(Date.now())
   const [iconString, setIconString] = useState<string>('battery-full-line')
   const [iconColor, setIconColor] = useState<string>('text-green-400')
+
+  useInterval(() => {
+    setCurrentTime(Date.now())
+  }, 1000 * 60 * 5)
 
   useMemo(() => {
     if (data.startDate !== undefined) {
       const difference: number = differenceInHours(
-        Date.now(),
+        currentTime,
         parseISO(data.startDate)
       )
 

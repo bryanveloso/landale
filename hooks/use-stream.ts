@@ -16,11 +16,8 @@ export const useStream = (): StreamResponse => {
   const { data } = useQuery(
     ['stream'],
     async () => {
-      return await (
-        await axios.get('/api/stream')
-      ).data
-    },
-    { refetchInterval: 1000 * 60 * 5 }
+      return await(await axios.get('/api/stream')).data
+    }
   )
 
   const [startDate, setStartDate] = useState<string | undefined>(
