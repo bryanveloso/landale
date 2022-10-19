@@ -1,3 +1,5 @@
+import { useQuery } from '@tanstack/react-query'
+import { motion } from 'framer-motion'
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
 import axios from 'redaxios'
 
@@ -23,6 +25,12 @@ const Background = ({
   const channel = useChannel()
   const hasMounted = useHasMounted()
 
+  const { data } = useQuery(['kaizo'], async () => {
+    return await (
+      await axios.get('http://192.168.88.50:8008/stats/kaizo')
+    ).data
+  })
+
   return (
     <div className="relative w-[1920px] h-[1080px] bg-black">
       <MenuBar />
@@ -31,6 +39,19 @@ const Background = ({
         <Controls />
         <TitleBar>
           <Metadata key="metadata" channel={channel} />
+          {/*  */}
+          <div>
+            <motion.div
+              layout="position"
+              className="grow flex items-center gap-3 pr-3 bg-black/40 rounded-md"
+            >
+              <div className="bg-black/40 p-2 rounded-l-md px-3 font-semibold text-sm text-white/50">
+                Number of Attempts
+              </div>
+              <div className="font-bold">133</div>
+            </motion.div>
+          </div>
+          {/*  */}
           {hasMounted && <Rainwave key="rainwave" initialData={rainwave} />}
         </TitleBar>
         <div className="grid grid-cols-[92px_196px_1600px] h-full">

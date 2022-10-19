@@ -1,8 +1,10 @@
-import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
-import { FC, PropsWithChildren } from 'react'
+import { LayoutGroup, motion } from 'framer-motion'
+import { ComponentProps, FC, PropsWithChildren } from 'react'
 import Icon from '~/components/icons'
 
-export const TitleBar: FC<PropsWithChildren> = ({ children }) => {
+export const TitleBar: FC<PropsWithChildren<ComponentProps<'div'>>> = ({
+  children
+}) => {
   return (
     <div className="absolute grid grid-cols-[288px_1600px] items-stretch w-full h-[52px] rounded-t-lg text-[#E5E5E5] z-50">
       <div className="flex items-center gap-3 px-5 justify-end">
@@ -16,7 +18,7 @@ export const TitleBar: FC<PropsWithChildren> = ({ children }) => {
           <Icon icon="chevron-left-line" size={24} className="text-white/50" />
           <Icon icon="chevron-right-line" size={24} className="text-white/50" />
           {children}
-          <Icon icon="menu-line" size={24} className="text-white/50" />
+          <Icon icon="bell-line" size={24} className="text-white/50" />
         </motion.div>
       </LayoutGroup>
     </div>
