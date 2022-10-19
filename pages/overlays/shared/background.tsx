@@ -27,7 +27,7 @@ const Background = ({
 
   const { data } = useQuery(['kaizo'], async () => {
     return await (
-      await axios.get('http://192.168.88.50:8008/stats/kaizo')
+      await axios.get('http://192.168.88.56:8008/stats/kaizo')
     ).data
   })
 
@@ -48,7 +48,7 @@ const Background = ({
               <div className="bg-black/40 p-2 rounded-l-md px-3 font-semibold text-sm text-white/50">
                 Number of Attempts
               </div>
-              <div className="font-bold">133</div>
+              <div className="font-bold">{data && data.attempts}</div>
             </motion.div>
           </div>
           {/*  */}
