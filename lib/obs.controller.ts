@@ -38,6 +38,7 @@ export default class ObsController extends EventEmitter {
       const response = await this.websocket.call('GetCurrentProgramScene')
       this.currentScene = response.currentProgramSceneName as Scene
 
+      await this.refreshBrowserSource('[🌎] Intro')
       await this.refreshBrowserSource('[🌎] IronMON Tracker')
       await this.refreshBrowserSource('[🌎] Notifier')
       await this.refreshBrowserSource('[🌎] Shared Background')
