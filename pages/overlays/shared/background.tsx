@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
+import dynamic from 'next/dynamic'
 import axios from 'redaxios'
 
 import { Logomark } from '~/components/icons'
@@ -18,18 +18,19 @@ import {
 import { Metadata } from '~/components/overlays/windows/titlebar-metadata'
 import { useChannel, useHasMounted } from '~/hooks'
 
+const AttemptCounter = dynamic(
+  () => import('~/components/games/pokemon/attempt-counter'),
+  {
+    suspense: true
+  }
+)
+
 const Background = ({
   debug,
   rainwave
 }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
   const channel = useChannel()
   const hasMounted = useHasMounted()
-
-  const { data } = useQuery(['kaizo'], async () => {
-    return await (
-      await axios.get('http://192.168.88.56:8008/stats/kaizo')
-    ).data
-  })
 
   return (
     <div className="relative w-[1920px] h-[1080px] bg-black">
@@ -39,19 +40,9 @@ const Background = ({
         <Controls />
         <TitleBar>
           <Metadata key="metadata" channel={channel} />
-          {/*  */}
-          <div>
-            <motion.div
-              layout="position"
-              className="grow flex items-center gap-3 pr-3 bg-black/40 rounded-md"
-            >
-              <div className="bg-black/40 p-2 rounded-l-md px-3 font-semibold text-sm text-white/50">
-                Number of Attempts
-              </div>
-              <div className="font-bold">{data && data.attempts}</div>
-            </motion.div>
-          </div>
-          {/*  */}
+          {channel.data.game === 'Pokémon FireRed/LeafGreen' && (
+            <AttemptCounter />
+          )}
           {hasMounted && <Rainwave key="rainwave" initialData={rainwave} />}
         </TitleBar>
         <div className="grid grid-cols-[92px_196px_1600px] h-full">
