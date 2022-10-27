@@ -1,6 +1,6 @@
 import { FC } from 'react'
 import Clock from 'react-live-clock'
-import Image from 'next/future/image'
+import Image from 'next/image'
 
 import Icon from '~/components/icons'
 import { useHasMounted, useStream } from '~/hooks'

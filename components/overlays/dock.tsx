@@ -1,5 +1,5 @@
 import { FC } from 'react'
-import Image from 'next/future/image'
+import Image from 'next/image'
 
 export const Dock: FC = () => {
   return (

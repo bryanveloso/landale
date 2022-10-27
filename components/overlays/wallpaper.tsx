@@ -1,5 +1,5 @@
 import { motion, AnimatePresence, Variants } from 'framer-motion'
-import Image from 'next/future/image'
+import Image from 'next/image'
 import { FC } from 'react'
 
 import { useChannel } from '~/hooks'

@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query'
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next'
 import dynamic from 'next/dynamic'
 import axios from 'redaxios'
