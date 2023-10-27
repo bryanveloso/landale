@@ -10,6 +10,16 @@ fn main() {
   let tray = create_tray();
 
   tauri::Builder::default()
+    .setup(|app| {
+      tauri::async_runtime::spawn(async move {
+        let (mut rx, mut child) = Command::new_sidecar("app")
+            .expect("Failed to setup `app` sidecar.")
+            .spawn()
+            .expect("Failed to sapwn packaged node.");
+      });
+
+      Ok(())
+    })
     .system_tray(tray)
     .on_window_event(|event| match event.event() {
       tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -17,7 +27,7 @@ fn main() {
         api.prevent_close();
       }
       _ => {}
-    })
+  })
     .build(tauri::generate_context!())
     .expect("error while running tauri application")
     .run(|_app_handle, event| match event {
