@@ -8,23 +8,40 @@
     ]
   },
   "scripts": {
-    "dev": "next dev -p 8088",
+    "dev": "ts-node server.ts",
+    "next": "next dev -p 8088",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "package": "pkg package.json --output src-tauri/binaries/app && node scripts/move-binary.js"
   },
   "dependencies": {
+    "@next/env": "^14.0.0",
     "@ngrok/ngrok": "^0.9.0",
+    "@twurple/api": "^7.0.4",
+    "@twurple/auth": "^7.0.4",
+    "@twurple/chat": "^7.0.4",
+    "@twurple/eventsub-base": "^7.0.4",
+    "@twurple/eventsub-ngrok": "^7.0.4",
+    "@twurple/eventsub-ws": "^7.0.4",
+    "bufferutil": "^4.0.8",
+    "chalk": "^4.1.2",
     "execa": "^8.0.1",
+    "http-proxy": "^1.18.1",
     "next": "^14.0.0",
+    "obs-websocket-js": "^5.0.3",
     "pkg": "^5.8.1",
+    "prettier-plugin-tailwindcss": "^0.5.6",
+    "rainwave-websocket-sdk": "^1.0.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-icomoon": "^2.5.7"
+    "react-icomoon": "^2.5.7",
+    "socket.io": "^4.7.2",
+    "ts-node": "^10.9.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^1.5.6",
+    "@types/http-proxy": "^1.17.13",
     "@types/node": "^20.8.9",
     "@types/react": "^18.2.33",
     "@types/react-dom": "^18.2.14",

@@ -3,7 +3,7 @@ const ngrok = require("@ngrok/ngrok")
 // setup ngrok ingress in the parent process
 var makeListener = true
 var host = "localhost"
-var port = process.env.PORT || "8088"
+var port = process.env.PORT || '8089'
 
 process.argv.forEach((item, index) => {
   // The first process to configure is a child which runs building, then the parent
