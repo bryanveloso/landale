@@ -1,4 +1,5 @@
 import { Avalonstar } from '@/components/icons'
+import { Rainwave } from '@/components/modules/rainwave'
 import Image from 'next/image'
 
 export default function () {
@@ -15,8 +16,11 @@ export default function () {
               width={36}
               height={36}
               alt="Avocadostar"
+              priority
             />
             <Avalonstar className="text-white w-40" />
+
+            <Rainwave />
           </div>
         </div>
       </div>

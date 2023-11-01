@@ -18,6 +18,7 @@
   "dependencies": {
     "@next/env": "^14.0.0",
     "@ngrok/ngrok": "^0.9.0",
+    "@tanstack/react-query": "^5.4.3",
     "@twurple/api": "^7.0.4",
     "@twurple/auth": "^7.0.4",
     "@twurple/chat": "^7.0.4",
@@ -27,6 +28,7 @@
     "bufferutil": "^4.0.8",
     "chalk": "^4.1.2",
     "execa": "^8.0.1",
+    "framer-motion": "^10.16.4",
     "http-proxy": "^1.18.1",
     "next": "^14.0.0",
     "obs-websocket-js": "^5.0.3",
@@ -36,6 +38,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icomoon": "^2.5.7",
+    "redaxios": "^0.5.1",
     "socket.io": "^4.7.2",
     "ts-node": "^10.9.1"
   },
