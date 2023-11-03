@@ -4,7 +4,7 @@ import OBSWebSocket, { OBSResponseTypes } from 'obs-websocket-js'
 
 import SocketController from './socket.controller'
 
-export type Scene = '[🎬] Intro' | '[🎬] Alys'
+export type Scene = '[🎬] Intro' | '[🎬] Alys' | '[🎬] Words on Stream'
 
 export type Source = '[🌎] Background' | '[🌎] Horizontal Camera'
 
@@ -20,8 +20,8 @@ export default class ObsController extends EventEmitter {
 
       console.log(
         ` ${chalk.green(
-          '✓'
-        )} Connected to OBSWebSocket v${obsWebSocketVersion}, (using RPC ${negotiatedRpcVersion})`
+          '✓',
+        )} Connected to OBSWebSocket v${obsWebSocketVersion}, (using RPC ${negotiatedRpcVersion})`,
       )
 
       const response = await this.websocket.call('GetCurrentProgramScene')
@@ -46,5 +46,12 @@ export default class ObsController extends EventEmitter {
       inputName,
       propertyName: 'refreshnocache',
     })
+  }
+
+  setScene = async (sceneName: Scene) => {
+    this.currentScene = sceneName
+    this.emit('sceneChange', sceneName)
+
+    return this.websocket.call('SetCurrentProgramScene', { sceneName })
   }
 }

@@ -1,38 +1,33 @@
 import chalk from 'chalk'
 import { promises as fs } from 'fs'
-import { ApiClient, HelixEventSubSubscription } from '@twurple/api'
-import {
-  AccessToken,
-  RefreshingAuthProvider,
-  TokenInfoData,
-} from '@twurple/auth'
+import { ApiClient } from '@twurple/api'
+import { AccessToken, RefreshingAuthProvider } from '@twurple/auth'
 import { ChatClient, ChatMessage } from '@twurple/chat'
 import type {
-  EventSubChannelCheerEvent,
-  EventSubChannelFollowEvent,
-  EventSubChannelHypeTrainBeginEvent,
-  EventSubChannelHypeTrainEndEvent,
-  EventSubChannelHypeTrainProgressEvent,
-  EventSubChannelRaidEvent,
-  EventSubChannelSubscriptionEvent,
-  EventSubChannelSubscriptionGiftEvent,
-  EventSubChannelSubscriptionMessageEvent,
-  EventSubChannelUpdateEvent,
-  EventSubStreamOfflineEvent,
-  EventSubStreamOnlineEvent,
+  EventSubChannelGoalType,
+  EventSubChannelHypeTrainContribution,
+  EventSubChannelHypeTrainContributionType,
+  EventSubChannelSubscriptionEventTier,
+  EventSubChannelSubscriptionGiftEventTier,
+  EventSubChannelSubscriptionMessageEventTier,
+  EventSubStreamOnlineEventStreamType,
 } from '@twurple/eventsub-base'
 import { EventSubWsListener } from '@twurple/eventsub-ws'
 
 import ObsController from './obs.controller'
 import { CustomServer } from './server'
 
-// Because Twurple's Data types are private, we have to use this to filter out the functions.
-// Reference: https://stackoverflow.com/questions/55479658/how-to-create-a-type-excluding-instance-methods-from-a-class-in-typescript
-type NonFunctionPropertyNames<T> = {
-  [K in keyof T]: T[K] extends Function ? never : K
-}[keyof T]
+export interface Broadcaster {
+  broadcaster_display_name: string
+  broadcaster_id: string
+  broadcaster_name: string
+}
 
-type NonFunctionProperties<T> = Pick<T, NonFunctionPropertyNames<T>>
+export interface User {
+  user_display_name: string
+  user_id: string
+  user_name: string
+}
 
 export interface TwitchChatEvent {
   channel: string
@@ -51,74 +46,213 @@ export interface TwitchEventBase {
 
 export type TwitchChannelCheerEvent = TwitchEventBase & {
   type: 'channel.cheer'
-  event: NonFunctionProperties<EventSubChannelCheerEvent>
+  event: Broadcaster & {
+    bits: number
+    is_anonymous: boolean
+    message: string
+    user_display_name: string | null
+    user_id: string | null
+    user_name: string | null
+  }
 }
 
 export type TwitchChannelFollowEvent = TwitchEventBase & {
   type: 'channel.follow'
-  event: NonFunctionProperties<EventSubChannelFollowEvent>
+  event: Broadcaster &
+    User & {
+      follow_date: string
+    }
+}
+
+export type TwitchChannelGoalBeginEvent = TwitchEventBase & {
+  type: 'channel.goal.begin'
+  event: Broadcaster & {
+    current_amount: number
+    description: string
+    id: string
+    start_date: string
+    target_amount: number
+    type: EventSubChannelGoalType
+  }
+}
+
+export type TwitchChannelGoalProgressEvent = TwitchEventBase & {
+  type: 'channel.goal.progress'
+  event: Broadcaster & {
+    current_amount: number
+    description: string
+    id: string
+    start_date: string
+    target_amount: number
+    type: EventSubChannelGoalType
+  }
 }
 
 export type TwitchChannelHypeTrainBeginEvent = TwitchEventBase & {
   type: 'channel.hype_train.begin'
-  event: NonFunctionProperties<EventSubChannelHypeTrainBeginEvent>
+  event: Broadcaster & {
+    expiry_date: string
+    goal: number
+    id: string
+    last_contribution: EventSubChannelHypeTrainContribution
+    level: number
+    progress: number
+    start_date: string
+    top_contributors: EventSubChannelHypeTrainContribution[]
+    total: number
+  }
+}
+
+export type TwitchChannelHypeTrainContribution = TwitchEventBase & {
+  type: 'channel.hype_train.contribution'
+  event: User & {
+    total: number
+    type: EventSubChannelHypeTrainContributionType
+  }
 }
 
 export type TwitchChannelHypeTrainEndEvent = TwitchEventBase & {
   type: 'channel.hype_train.end'
-  event: NonFunctionProperties<EventSubChannelHypeTrainEndEvent>
+  event: Broadcaster & {
+    cooldown_end_date: string
+    end_date: string
+    id: string
+    level: number
+    start_date: string
+    top_contributors: EventSubChannelHypeTrainContribution[]
+    total: number
+  }
 }
 
 export type TwitchChannelHypeTrainProgressEvent = TwitchEventBase & {
   type: 'channel.hype_train.progress'
-  event: NonFunctionProperties<EventSubChannelHypeTrainProgressEvent>
+  event: Broadcaster & {
+    expiry_date: string
+    goal: number
+    id: string
+    last_contribution: EventSubChannelHypeTrainContribution
+    level: number
+    progress: number
+    start_date: string
+    top_contributors: EventSubChannelHypeTrainContribution[]
+    total: number
+  }
 }
 
 export type TwitchChannelRaidEvent = TwitchEventBase & {
   type: 'channel.raid'
-  event: NonFunctionProperties<EventSubChannelRaidEvent>
+  event: {
+    raided_broadcaster_display_name: string
+    raided_broadcaster_id: string
+    raided_broadcaster_name: string
+    raiding_broadcaster_display_name: string
+    raiding_broadcaster_id: string
+    raiding_broadcaster_name: string
+    viewers: number
+  }
+}
+
+export type TwitchChannelRedemptionAddEvent = TwitchEventBase & {
+  type: 'channel.redemption.add'
+  event: Broadcaster &
+    User & {
+      id: string
+      input: string
+      redemption_date: string
+      reward_cost: number
+      reward_id: string
+      reward_prompt: string
+      reward_title: string
+      status: string
+    }
+}
+
+export type TwitchChannelRedemptionUpdateEvent = TwitchEventBase & {
+  type: 'channel.redemption.update'
+  event: Broadcaster &
+    User & {
+      id: string
+      input: string
+      redemption_date: string
+      reward_cost: number
+      reward_id: string
+      reward_prompt: string
+      reward_title: string
+      status: string
+    }
 }
 
 export type TwitchChannelSubscriptionEvent = TwitchEventBase & {
   type: 'channel.subscribe'
-  event: Omit<
-    NonFunctionProperties<EventSubChannelSubscriptionEvent>,
-    '[rawDataSymbol]'
-  >
+  event: Broadcaster &
+    User & {
+      is_gift: boolean
+      tier: EventSubChannelSubscriptionEventTier
+    }
 }
 
 export type TwitchChannelSubscriptionGiftEvent = TwitchEventBase & {
   type: 'channel.subscription.gift'
-  event: NonFunctionProperties<EventSubChannelSubscriptionGiftEvent>
+  event: Broadcaster & {
+    amount: number
+    cumulative_amount: number | null
+    gifter_display_name: string
+    gifter_id: string
+    gifter_name: string
+    is_anonymous: boolean
+    tier: EventSubChannelSubscriptionGiftEventTier
+  }
 }
 
 export type TwitchChannelSubscriptionMessageEvent = TwitchEventBase & {
   type: 'channel.subscription.message'
-  event: NonFunctionProperties<EventSubChannelSubscriptionMessageEvent>
+  event: Broadcaster &
+    User & {
+      cumulative_months: number
+      duration_months: number
+      emote_offsets: Map<string, string[]>
+      message_text: string
+      streak_months: number | null
+      tier: EventSubChannelSubscriptionMessageEventTier
+    }
 }
 
 export type TwitchChannelUpdateEvent = TwitchEventBase & {
   type: 'channel.update'
-  event: NonFunctionProperties<EventSubChannelUpdateEvent>
+  event: Broadcaster & {
+    category_id: string
+    category_name: string
+    is_mature: boolean
+    language: string
+    title: string
+  }
 }
 
 export type TwitchStreamOfflineEvent = TwitchEventBase & {
   type: 'stream.offline'
-  event: NonFunctionProperties<EventSubStreamOfflineEvent>
+  event: Broadcaster
 }
 
 export type TwitchStreamOnlineEvent = TwitchEventBase & {
   type: 'stream.online'
-  event: NonFunctionProperties<EventSubStreamOnlineEvent>
+  event: Broadcaster & {
+    id: string
+    start_date: string
+    type: EventSubStreamOnlineEventStreamType
+  }
 }
 
 export type TwitchEventType =
   | 'channel.cheer'
   | 'channel.follow'
+  | 'channel.goal.begin'
+  | 'channel.goal.progress'
   | 'channel.hype_train.begin'
   | 'channel.hype_train.end'
   | 'channel.hype_train.progress'
   | 'channel.raid'
+  | 'channel.redemption.add'
+  | 'channel.redemption.update'
   | 'channel.subscribe'
   | 'channel.subscription.gift'
   | 'channel.subscription.message'
@@ -129,10 +263,14 @@ export type TwitchEventType =
 export type TwitchEvent =
   | TwitchChannelCheerEvent
   | TwitchChannelFollowEvent
+  | TwitchChannelGoalBeginEvent
+  | TwitchChannelGoalProgressEvent
   | TwitchChannelHypeTrainBeginEvent
   | TwitchChannelHypeTrainEndEvent
   | TwitchChannelHypeTrainProgressEvent
   | TwitchChannelRaidEvent
+  | TwitchChannelRedemptionAddEvent
+  | TwitchChannelRedemptionUpdateEvent
   | TwitchChannelSubscriptionEvent
   | TwitchChannelSubscriptionGiftEvent
   | TwitchChannelSubscriptionMessageEvent
@@ -197,28 +335,182 @@ export default class TwitchController {
       apiClient: this.apiClient!,
     })
 
-    this.listener.onChannelCheer(this.userId, (event) => {})
+    this.listener.onChannelCheer(this.userId, (event) => {
+      this.handleEvent({
+        key: '',
+        subscription: {
+          type: 'channel.cheer',
+        },
+        type: 'channel.cheer',
+        event: {
+          bits: event.bits,
+          broadcaster_display_name: event.broadcasterDisplayName,
+          broadcaster_id: event.broadcasterId,
+          broadcaster_name: event.broadcasterName,
+          is_anonymous: event.isAnonymous,
+          message: event.message,
+          user_display_name: event.userDisplayName || '',
+          user_id: event.userId || '',
+          user_name: event.userName || '',
+        },
+      })
+    })
 
-    this.listener.onChannelFollow(this.userId, this.userId, (event) => {})
+    this.listener.onChannelFollow(this.userId, this.userId, (event) => {
+      this.handleEvent({
+        key: '',
+        subscription: {
+          type: 'channel.follow',
+        },
+        type: 'channel.follow',
+        event: {
+          broadcaster_display_name: event.broadcasterDisplayName,
+          broadcaster_id: event.broadcasterId,
+          broadcaster_name: event.broadcasterName,
+          follow_date: event.followDate.toISOString(),
+          user_display_name: event.userDisplayName,
+          user_id: event.userId,
+          user_name: event.userName,
+        },
+      })
+    })
 
-    this.listener.onChannelGoalBegin(this.userId, (event) => {})
+    this.listener.onChannelGoalBegin(this.userId, (event) => {
+      this.handleEvent({
+        key: '',
+        subscription: {
+          type: 'channel.goal.begin',
+        },
+        type: 'channel.goal.begin',
+        event: {
+          broadcaster_display_name: event.broadcasterDisplayName,
+          broadcaster_id: event.broadcasterId,
+          broadcaster_name: event.broadcasterName,
+          current_amount: event.currentAmount,
+          description: event.description,
+          id: event.id,
+          start_date: event.startDate.toISOString(),
+          target_amount: event.targetAmount,
+          type: event.type,
+        },
+      })
+    })
 
-    this.listener.onChannelGoalProgress(this.userId, (event) => {})
+    this.listener.onChannelGoalProgress(this.userId, (event) => {
+      this.handleEvent({
+        key: '',
+        subscription: {
+          type: 'channel.goal.progress',
+        },
+        type: 'channel.goal.progress',
+        event: {
+          broadcaster_display_name: event.broadcasterDisplayName,
+          broadcaster_id: event.broadcasterId,
+          broadcaster_name: event.broadcasterName,
+          current_amount: event.currentAmount,
+          description: event.description,
+          id: event.id,
+          start_date: event.startDate.toISOString(),
+          target_amount: event.targetAmount,
+          type: event.type,
+        },
+      })
+    })
 
-    this.listener.onChannelRaidFrom(this.userId, (event) => {})
+    this.listener.onChannelRaidFrom(this.userId, (event) => {
+      this.handleEvent({
+        key: '',
+        subscription: {
+          type: 'channel.raid',
+        },
+        type: 'channel.raid',
+        event: {
+          raided_broadcaster_display_name: event.raidedBroadcasterDisplayName,
+          raided_broadcaster_id: event.raidedBroadcasterId,
+          raided_broadcaster_name: event.raidedBroadcasterName,
+          raiding_broadcaster_display_name: event.raidingBroadcasterDisplayName,
+          raiding_broadcaster_id: event.raidingBroadcasterId,
+          raiding_broadcaster_name: event.raidingBroadcasterName,
+          viewers: event.viewers,
+        },
+      })
+    })
 
-    // this.listener.onChannelRedemptionAddForReward()
+    // this.listener.onChannelRedemptionAddForReward(this.userId, (event) => { })
 
-    this.listener.onChannelRedemptionUpdate(this.userId, (event) => {})
+    this.listener.onChannelRedemptionUpdate(this.userId, (event) => {
+      this.handleEvent({
+        key: '',
+        subscription: {
+          type: 'channel.redemption.update',
+        },
+        type: 'channel.redemption.update',
+        event: {
+          broadcaster_display_name: event.broadcasterDisplayName,
+          broadcaster_id: event.broadcasterId,
+          broadcaster_name: event.broadcasterName,
+          id: event.id,
+          input: event.input,
+          redemption_date: event.redemptionDate.toISOString(),
+          reward_cost: event.rewardCost,
+          reward_id: event.rewardId,
+          reward_prompt: event.rewardPrompt,
+          reward_title: event.rewardTitle,
+          status: event.status,
+          user_display_name: event.userDisplayName,
+          user_id: event.userId,
+          user_name: event.userName,
+        },
+      })
+    })
 
     // this.listener.onChannelRedemptionUpdateForReward()
 
-    // Channel Subscription
-    this.listener.onChannelSubscription(this.userId, (event) => {})
+    this.listener.onChannelSubscription(this.userId, (event) => {
+      this.handleEvent({
+        key: '',
+        subscription: {
+          type: 'channel.subscribe',
+        },
+        type: 'channel.subscribe',
+        event: {
+          broadcaster_display_name: event.broadcasterDisplayName,
+          broadcaster_id: event.broadcasterId,
+          broadcaster_name: event.broadcasterName,
+          is_gift: event.isGift,
+          tier: event.tier,
+          user_display_name: event.userDisplayName,
+          user_id: event.userId,
+          user_name: event.userName,
+        },
+      })
+    })
 
-    this.listener.onChannelSubscriptionGift(this.userId, (event) => {})
+    this.listener.onChannelSubscriptionGift(this.userId, (event) => {
+      this.handleEvent({
+        key: '',
+        subscription: {
+          type: 'channel.subscription.gift',
+        },
+        type: 'channel.subscription.gift',
+        event: {
+          amount: event.amount,
+          broadcaster_display_name: event.broadcasterDisplayName,
+          broadcaster_id: event.broadcasterId,
+          broadcaster_name: event.broadcasterName,
+          cumulative_amount: event.cumulativeAmount,
+          gifter_display_name: event.gifterDisplayName,
+          gifter_id: event.gifterId,
+          gifter_name: event.gifterName,
+          is_anonymous: event.isAnonymous,
+          tier: event.tier,
+        },
+      })
+    })
 
-    this.listener.onChannelUpdate(this.userId, (event) => {})
+    this.listener.onChannelUpdate(this.userId, (event) => {
+      this.server.emit('update', event)
+    })
 
     this.listener.onStreamOffline(this.userId, () => {
       this.server.emit('offline')
@@ -237,53 +529,6 @@ export default class TwitchController {
     })
 
     this.listener.start()
-
-    // const token = await this.getToken()
-    // const subscriptions = await listSubscriptions({
-    //   token,
-    //   clientId: this.clientId,
-    // })
-    // const eventTypes: [TwitchEventType, object?][] = [
-    //   ['channel.cheer'],
-    //   ['channel.follow'],
-    //   ['channel.hype_train.begin'],
-    //   ['channel.hype_train.end'],
-    //   ['channel.hype_train.progress'],
-    //   ['channel.raid', { to_broadcaster_user_id: this.userId }],
-    //   ['channel.subscribe'],
-    //   ['channel.subscription.gift'],
-    //   ['channel.subscription.message'],
-    //   ['channel.update'],
-    //   ['stream.online'],
-    //   ['stream.online'],
-    // ]
-    // for (const [eventType, condition] of eventTypes) {
-    //   const existing = subscriptions.find((sub) => sub.type === eventType)
-    //   if (
-    //     existing &&
-    //     (existing.status === 'enabled' ||
-    //       existing.status === 'webhook_callback_verification_pending')
-    //   ) {
-    //     continue
-    //   }
-
-    //   if (existing) {
-    //     await deleteSubscription({
-    //       subscription: existing,
-    //       token,
-    //       clientId: this.clientId,
-    //     })
-    //   }
-
-    //   await createSubscription({
-    //     token,
-    //     clientId: this.clientId,
-    //     type: eventType,
-    //     webhookSecret: this.eventsubSecret,
-    //     callback: this.callback,
-    //     condition: condition ?? { broadcaster_user_id: this.userId },
-    //   })
-    // }
   }
 
   setupChatBot = async () => {
@@ -304,7 +549,7 @@ export default class TwitchController {
         channel: string,
         user: string,
         message: string,
-        msg: ChatMessage
+        msg: ChatMessage,
       ) => {
         this.server.emit('new-chat-message', { channel, user, message })
         this.server.socket.emit('twitch-chat-event', {
@@ -314,7 +559,7 @@ export default class TwitchController {
           broadcaster: msg.userInfo,
           moderator: msg.userInfo.isMod,
         })
-      }
+      },
     )
   }
 
@@ -378,100 +623,6 @@ export default class TwitchController {
 
   runCommercial = async () => {
     return this.apiClient?.channels.startChannelCommercial(this.userId, 180)
-  }
-}
-
-const listSubscriptions = async ({
-  token,
-  clientId,
-}: {
-  token: string
-  clientId: string
-}) => {
-  const subscriptions = await fetch(
-    'https://api.twitch.tv/helix/eventsub/subscriptions',
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Client-Id': clientId,
-      },
-    }
-  )
-
-  const { data } = (await subscriptions.json()) as {
-    data: HelixEventSubSubscription[]
-  }
-  return data
-}
-
-const deleteSubscription = async ({
-  subscription,
-  token,
-  clientId,
-}: {
-  subscription: HelixEventSubSubscription
-  token: string
-  clientId: string
-}) => {
-  const { id } = subscription
-  const response = await fetch(
-    `https://api.twitch.tv/helix/eventsub/subscriptions?id=${id}`,
-    {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Client-Id': clientId,
-      },
-    }
-  )
-
-  return response
-}
-
-const createSubscription = async ({
-  token,
-  clientId,
-  type,
-  condition,
-  callback,
-  webhookSecret: secret,
-}: {
-  token: string
-  clientId: string
-  type: TwitchEventType
-  condition: unknown
-  callback: string
-  webhookSecret: string
-}) => {
-  const body = JSON.stringify({
-    type,
-    version: '1',
-    condition,
-    transport: {
-      method: 'webhook',
-      callback,
-      secret,
-    },
-  })
-
-  try {
-    const subscription = await fetch(
-      'https://api.twitch.tv/helix/eventsub/subscriptions',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Client-Id': clientId,
-          'Content-Type': 'application/json',
-        },
-        body,
-      }
-    )
-
-    const response = await subscription.json()
-    return response
-  } catch (error) {
-    console.error(error)
   }
 }
 
