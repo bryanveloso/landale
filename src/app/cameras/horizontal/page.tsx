@@ -1,21 +1,32 @@
-import { SmallCloseIcon, SmallFullScreenIcon } from "@/components/icons"
+import { FC } from 'react';
 
-/**
- * Browser source size should be 474x322.
- */
-export default function () {
+import { Controls } from './_components/controls';
+import { Indicator } from './_components/indicator';
+
+const Display: FC = () => {
   return (
     <div
-      className={`flex flex-col w-[426px] m-6 bg-[#23292f] shadow-black/50 shadow-xl rounded-xl ring-1 ring-offset-0 ring-inset ring-white/20`}
-    >
-      <div
-        className={`flex-auto flex justify-center items-center gap-2 p-2 px-4 text-sm text-white/25 font-bold`}
-      >
-        <SmallCloseIcon className={`w-3 h-3`} />
-        <SmallFullScreenIcon className={`w-3 h-3`} />
-        <div className={`flex-auto text-center`}>&nbsp;</div>
+      className={` h-full w-48 rounded-sm bg-muted-bluegrey shadow-md shadow-black/75`}
+    ></div>
+  );
+};
+
+/**
+ * Browser source size should be 560x294.
+ */
+
+export default function () {
+  return (
+    <div className="m-6 flex w-[640px] flex-col rounded-2xl bg-gradient-to-b from-gradient-lighter to-[#1E2229] shadow-xl shadow-black/50">
+      <div className="p-3">
+        <Indicator />
+        <div className="relative aspect-[4/1] rounded-lg bg-[#13141B] p-3 shadow-[inset_0_0_0_1px_#0E0D12]">
+          <div className="flex aspect-[4/1]">
+            <Controls />
+            <Display />
+          </div>
+        </div>
       </div>
-      <div className={`aspect-video m-2 mt-0 bg-[#1a1f23] rounded-lg`}></div>
     </div>
-  )
+  );
 }
