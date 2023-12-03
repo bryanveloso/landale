@@ -15,9 +15,21 @@ rust-version = "1.60"
 tauri-build = { version = "1.5.0", features = [] }
 
 [dependencies]
-serde_json = "1.0"
+anyhow = "1.0.44"
+axum = { version = "0.6.20" }
+dotenvy = "0.15.7"
+env_logger = "0.10.1"
+futures-util = "0.3.29"
+log = "0.4.20"
+obws = { version = "0.11.5", features = ["events"] }
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.5.1", features = [ "shell-sidecar", "system-tray"] }
+serde_json = "1.0"
+socketioxide = { git = "https://github.com/Totodore/socketioxide" }
+tauri = { version = "1.5.1", features = ["system-tray"] }
+tokio = { version = "1.34.0", features = ["rt-multi-thread", "macros"] }
+tokio-stream = "0.1.14"
+tower = "0.4.13"
+tower-http = { version = "0.4.4", features = ["cors", "fs"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

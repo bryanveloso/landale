@@ -7,54 +7,51 @@ import { parse } from 'url'
 
 import { CustomServer, CustomServerResponse } from '@/lib'
 
-import ObsController from './src/lib/obs.controller'
-import SocketController from './src/lib/socket.controller'
-import TwitchController from './src/lib/twitch.controller'
+import TwitchController from './src/lib/twitch.controller';
+import CategoryController from './src/lib/category.controller';
 
-loadEnvConfig('./', process.env.NODE_ENV !== 'production')
+loadEnvConfig('./', process.env.NODE_ENV !== 'production');
 
-const dev = process.env.NODE_ENV !== 'production'
-const hostname = 'localhost'
-const port = 8088
-const app = next({ dev, hostname, port })
-const handle = app.getRequestHandler()
-const url = `http://${hostname}:${port}`
+const dev = process.env.NODE_ENV !== 'production';
+const hostname = 'localhost';
+const port = 8088;
+const app = next({ dev, hostname, port });
+const handle = app.getRequestHandler();
+const url = `http://${hostname}:${port}`;
 
-let server: CustomServer
+let server: CustomServer;
 
 const listener = async (req: IncomingMessage, res: CustomServerResponse) => {
   try {
-    res.server = server
+    res.server = server;
 
-    const parsedUrl = parse(req.url as string, true)
-    const { pathname } = parsedUrl
+    const parsedUrl = parse(req.url as string, true);
+    const { pathname } = parsedUrl;
 
-    await handle(req, res, parsedUrl)
+    await handle(req, res, parsedUrl);
   } catch (err) {
-    console.error('Error occured handling request: ', req.url, err)
-    res.statusCode = 500
-    res.end('Internal Server Error')
+    console.error('Error occured handling request: ', req.url, err);
+    res.statusCode = 500;
+    res.end('Internal Server Error');
   }
-}
+};
 
 const init = async () => {
   httpProxy
     .createProxyServer({ target: `${url}/api/twitch`, ignorePath: true })
-    .listen(8089)
+    .listen(8089);
 
-  await app.prepare()
-  server = createServer(listener as unknown as RequestListener) as CustomServer
+  await app.prepare();
+  server = createServer(listener as unknown as RequestListener) as CustomServer;
   server.listen(port, () => {
-    console.log(` ${chalk.green('✓')} Ready on ${url}`)
-  })
+    console.log(` ${chalk.green('✓')} Ready on ${url}`);
+  });
 
-  const socketController = new SocketController(server)
-  const obsController = new ObsController(socketController)
-  const twitchController = new TwitchController(server, obsController)
+  const categoryController = new CategoryController(server);
+  const twitchController = new TwitchController(server);
 
-  server.socket = socketController
-  server.obs = obsController
-  server.twitch = twitchController
-}
+  server.category = categoryController;
+  server.twitch = twitchController;
+};
 
 init()

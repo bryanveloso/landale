@@ -14,7 +14,6 @@ import type {
 } from '@twurple/eventsub-base'
 import { EventSubWsListener } from '@twurple/eventsub-ws'
 
-import ObsController from './obs.controller'
 import { CustomServer } from './server'
 
 export interface Broadcaster {
@@ -299,43 +298,39 @@ export interface TwitchEventSubscription {
 }
 
 export default class TwitchController {
-  private server: CustomServer
-  private obs: ObsController
-  private apiClient?: ApiClient
-  private listener?: EventSubWsListener
-  private callback = process.env.TWITCH_CALLBACK_URL as string
-  private clientId = process.env.TWITCH_CLIENT_ID as string
-  private clientSecret = process.env.TWITCH_CLIENT_SECRET as string
-  private eventsubSecret = process.env.TWITCH_EVENTSUB_SECRET as string
-  private userId = process.env.TWITCH_USER_ID as string
-  username = process.env.TWITCH_USERNAME as string
+  private server: CustomServer;
+  private apiClient?: ApiClient;
+  private listener?: EventSubWsListener;
+  private callback = process.env.TWITCH_CALLBACK_URL as string;
+  private clientId = process.env.TWITCH_CLIENT_ID as string;
+  private clientSecret = process.env.TWITCH_CLIENT_SECRET as string;
+  private eventsubSecret = process.env.TWITCH_EVENTSUB_SECRET as string;
+  private userId = process.env.TWITCH_USER_ID as string;
+  username = process.env.TWITCH_USERNAME as string;
 
-  chatClient?: ChatClient
+  chatClient?: ChatClient;
 
-  constructor(server: CustomServer, obs: ObsController) {
-    this.obs = obs
-    this.server = server
+  constructor(server: CustomServer) {
+    this.server = server;
 
-    this.setup()
+    this.setup();
   }
 
   setup = async () => {
-    await this.setupApiClient()
-    await this.setupEventSub()
-    await this.setupChatBot()
-  }
+    await this.setupApiClient();
+    await this.setupEventSub();
+    await this.setupChatBot();
+  };
 
   setupApiClient = async () => {
-    const authProvider = await getAuthProvider()
-    this.apiClient = new ApiClient({ authProvider })
-  }
+    const authProvider = await getAuthProvider();
+    this.apiClient = new ApiClient({ authProvider });
+  };
 
   setupEventSub = async () => {
-    this.listener = new EventSubWsListener({
-      apiClient: this.apiClient!,
-    })
+    this.listener = new EventSubWsListener({ apiClient: this.apiClient! });
 
-    this.listener.onChannelCheer(this.userId, (event) => {
+    this.listener.onChannelCheer(this.userId, event => {
       this.handleEvent({
         key: '',
         subscription: {
@@ -353,10 +348,10 @@ export default class TwitchController {
           user_id: event.userId || '',
           user_name: event.userName || '',
         },
-      })
-    })
+      });
+    });
 
-    this.listener.onChannelFollow(this.userId, this.userId, (event) => {
+    this.listener.onChannelFollow(this.userId, this.userId, event => {
       this.handleEvent({
         key: '',
         subscription: {
@@ -372,10 +367,10 @@ export default class TwitchController {
           user_id: event.userId,
           user_name: event.userName,
         },
-      })
-    })
+      });
+    });
 
-    this.listener.onChannelGoalBegin(this.userId, (event) => {
+    this.listener.onChannelGoalBegin(this.userId, event => {
       this.handleEvent({
         key: '',
         subscription: {
@@ -393,10 +388,10 @@ export default class TwitchController {
           target_amount: event.targetAmount,
           type: event.type,
         },
-      })
-    })
+      });
+    });
 
-    this.listener.onChannelGoalProgress(this.userId, (event) => {
+    this.listener.onChannelGoalProgress(this.userId, event => {
       this.handleEvent({
         key: '',
         subscription: {
@@ -414,10 +409,10 @@ export default class TwitchController {
           target_amount: event.targetAmount,
           type: event.type,
         },
-      })
-    })
+      });
+    });
 
-    this.listener.onChannelRaidFrom(this.userId, (event) => {
+    this.listener.onChannelRaidFrom(this.userId, event => {
       this.handleEvent({
         key: '',
         subscription: {
@@ -433,12 +428,12 @@ export default class TwitchController {
           raiding_broadcaster_name: event.raidingBroadcasterName,
           viewers: event.viewers,
         },
-      })
-    })
+      });
+    });
 
     // this.listener.onChannelRedemptionAddForReward(this.userId, (event) => { })
 
-    this.listener.onChannelRedemptionUpdate(this.userId, (event) => {
+    this.listener.onChannelRedemptionUpdate(this.userId, event => {
       this.handleEvent({
         key: '',
         subscription: {
@@ -461,12 +456,12 @@ export default class TwitchController {
           user_id: event.userId,
           user_name: event.userName,
         },
-      })
-    })
+      });
+    });
 
     // this.listener.onChannelRedemptionUpdateForReward()
 
-    this.listener.onChannelSubscription(this.userId, (event) => {
+    this.listener.onChannelSubscription(this.userId, event => {
       this.handleEvent({
         key: '',
         subscription: {
@@ -483,10 +478,10 @@ export default class TwitchController {
           user_id: event.userId,
           user_name: event.userName,
         },
-      })
-    })
+      });
+    });
 
-    this.listener.onChannelSubscriptionGift(this.userId, (event) => {
+    this.listener.onChannelSubscriptionGift(this.userId, event => {
       this.handleEvent({
         key: '',
         subscription: {
@@ -505,43 +500,42 @@ export default class TwitchController {
           is_anonymous: event.isAnonymous,
           tier: event.tier,
         },
-      })
-    })
+      });
+    });
 
-    this.listener.onChannelUpdate(this.userId, (event) => {
-      this.server.emit('update', event)
-    })
+    this.listener.onChannelUpdate(this.userId, event => {
+      console.log(JSON.stringify(event, null, 2));
+      this.server.emit('update', event);
+    });
 
     this.listener.onStreamOffline(this.userId, () => {
-      this.server.emit('offline')
-    })
+      this.server.emit('offline');
+    });
 
     this.listener.onStreamOnline(this.userId, () => {
-      this.server.emit('online')
-    })
+      this.server.emit('online');
+    });
 
-    this.listener.onUserSocketConnect(() => {
-      console.log(` ${chalk.green('✓')} Connected to Twitch EventSub`)
-    })
+    this.listener.onUserSocketConnect(event => {
+      console.log(` ${chalk.green('✓')} Connected to Twitch EventSub`);
+    });
 
     this.listener.onUserSocketDisconnect(() => {
-      console.log(` ${chalk.red('✗')} Disconnected from Twitch EventSub`)
-    })
-
-    this.listener.start()
-  }
+      console.log(` ${chalk.red('✗')} Disconnected from Twitch EventSub`);
+    });
+  };
 
   setupChatBot = async () => {
-    const authProvider = await getAuthProvider()
+    const authProvider = await getAuthProvider();
     this.chatClient = new ChatClient({
       authProvider,
       channels: [this.username],
-    })
+    });
 
     try {
-      this.chatClient.connect()
+      this.chatClient.connect();
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
 
     this.chatClient.onMessage(
@@ -549,34 +543,34 @@ export default class TwitchController {
         channel: string,
         user: string,
         message: string,
-        msg: ChatMessage,
+        msg: ChatMessage
       ) => {
-        this.server.emit('new-chat-message', { channel, user, message })
+        this.server.emit('new-chat-message', { channel, user, message });
         this.server.socket.emit('twitch-chat-event', {
           channel,
           user,
           message,
           broadcaster: msg.userInfo,
           moderator: msg.userInfo.isMod,
-        })
-      },
-    )
-  }
+        });
+      }
+    );
+  };
 
   getToken = async () => {
     const params: Record<string, string> = {
       client_id: this.clientId,
       client_secret: this.clientSecret,
       grant_type: 'client_credentials',
-    }
+    };
 
-    const formBody = []
+    const formBody = [];
     for (const property in params) {
-      const encodedKey = encodeURIComponent(property)
-      const encodedValue = encodeURIComponent(params[property])
-      formBody.push(encodedKey + '=' + encodedValue)
+      const encodedKey = encodeURIComponent(property);
+      const encodedValue = encodeURIComponent(params[property]);
+      formBody.push(encodedKey + '=' + encodedValue);
     }
-    const body = formBody.join('&')
+    const body = formBody.join('&');
 
     const response = await fetch('https://id.twitch.tv/oauth2/token', {
       method: 'POST',
@@ -584,46 +578,46 @@ export default class TwitchController {
         'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
       },
       body,
-    })
+    });
 
     const { access_token: token } = (await response.json()) as {
-      access_token: string
-    }
-    return token
-  }
+      access_token: string;
+    };
+    return token;
+  };
 
   handleEvent = async (event: TwitchEvent) => {
-    this.server.socket.emit('twitch-event', event)
+    this.server.socket.emit('twitch-event', event);
 
     switch (event.subscription.type) {
       case 'stream.offline':
-        this.server.emit('online')
+        this.server.emit('online');
       case 'stream.online':
-        this.server.emit('online')
-        break
+        this.server.emit('online');
+        break;
       case 'channel.update':
-        this.server.emit('update', event)
+        this.server.emit('update', event);
 
       default:
-        break
+        break;
     }
-  }
+  };
 
   getChannelInfo = async () => {
-    return this.apiClient?.channels.getChannelInfoById(this.userId)
-  }
+    return this.apiClient?.channels.getChannelInfoById(this.userId);
+  };
 
   getStreamInfo = async () => {
-    return this.apiClient?.streams.getStreamByUserId(this.userId)
-  }
+    return this.apiClient?.streams.getStreamByUserId(this.userId);
+  };
 
   getUserInfo = async () => {
-    return this.apiClient?.users.getUserById(this.userId)
-  }
+    return this.apiClient?.users.getUserById(this.userId);
+  };
 
   runCommercial = async () => {
-    return this.apiClient?.channels.startChannelCommercial(this.userId, 180)
-  }
+    return this.apiClient?.channels.startChannelCommercial(this.userId, 180);
+  };
 }
 
 export const getAuthProvider = async () => {

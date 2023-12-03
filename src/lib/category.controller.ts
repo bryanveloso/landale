@@ -1,46 +1,44 @@
-import ObsController from './obs.controller'
-import { CustomServer } from './server'
-import type { TwitchChannelUpdateEvent } from './twitch.controller'
+import { CustomServer } from './server';
+import type { TwitchChannelUpdateEvent } from './twitch.controller';
 
 export default class CategoryController {
-  private server: CustomServer
-  private obs: ObsController
+  private server: CustomServer;
 
-  private currentCategory: string
-  private previousCategory: string
+  private currentCategory: string;
+  private previousCategory: string;
 
-  constructor(server: CustomServer, obs: ObsController) {
-    this.server = server
-    this.obs = obs
+  constructor(server: CustomServer) {
+    this.server = server;
 
-    this.currentCategory = ''
-    this.previousCategory = ''
+    this.currentCategory = '';
+    this.previousCategory = '';
 
-    this.initCategoryController()
+    this.initCategoryController();
   }
 
   private initCategoryController() {
     this.server.on('update', (event: TwitchChannelUpdateEvent) => {
-      event && this.updateCategory(event.event.category_name)
-    })
+      if (event) {
+        this.updateCategory(event.event.category_name);
+      }
+    });
   }
 
   async updateCategory(category_name: string) {
     if (category_name === this.currentCategory) {
-      return
+      return;
     }
 
-    this.previousCategory = this.currentCategory
-    console.log(` ➡️ Category changed to: "${category_name}"`)
-    this.currentCategory = category_name
+    this.previousCategory = this.currentCategory;
+    console.log(` ➡️ Category changed to: "${category_name}"`);
+    this.currentCategory = category_name;
 
     switch (category_name) {
       case 'Words on Stream':
-        await this.obs.setScene('[🎬] Words on Stream')
-        break
+        break;
 
       default:
-        break
+        break;
     }
   }
 }
