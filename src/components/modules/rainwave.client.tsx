@@ -48,27 +48,23 @@ export const RainwaveClient = () => {
             animate={isTunedIn ? 'visible' : 'hidden'}
             variants={container}
             exit="hidden"
-            className="flex items-center rounded-md ring-inset ring-0 ring-white/50"
+            className="flex items-center rounded-md ring-0 ring-inset ring-white/50"
             style={{ willChange }}
           >
             <motion.div
               variants={item}
-              className="text-white overflow-hidden mr-4"
+              className="mr-4 overflow-hidden text-white"
             >
-              <div>
-                <strong className="truncate text-ellipsis text-lg">
-                  {song.title}
-                </strong>
+              <div className="truncate text-ellipsis text-xl">
+                <strong>{song.title}</strong>
               </div>
-              <div>
-                <span className="text-muted-green truncate w-24">
-                  {song.albums[0].name}
-                </span>
+              <div className="w-80 truncate text-ellipsis text-muted-green">
+                <span>{song.albums[0].name}</span>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
     )
-  )
+  );
 }

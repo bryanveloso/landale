@@ -38,7 +38,12 @@ export const Timecode: FC = () => {
   }, [socket, isConnected]);
 
   return (
-    <div className={cn('flex text-xl tabular-nums', karla.className)}>
+    <div
+      className={cn(
+        'flex flex-auto items-end text-xl tabular-nums',
+        karla.className
+      )}
+    >
       <div className="pr-0.5">
         <span className="text-3xl">{hours}</span>
         <span className="font-semibold opacity-60">h</span>
