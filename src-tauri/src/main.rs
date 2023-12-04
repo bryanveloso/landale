@@ -18,7 +18,6 @@ use std::{
 
 use axum::{Router, Server};
 use dotenvy::dotenv;
-use env_logger;
 use log::{error, info};
 use serde_json::Value;
 use socketioxide::{
@@ -26,12 +25,13 @@ use socketioxide::{
     SocketIo,
 };
 use tauri::{CustomMenuItem, SystemTray, SystemTrayMenu};
+use tauri_plugin_log::Builder;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 
 mod obs;
 
-// Initialize Socketoxide.
+// Initialize Socketioxide.
 const DEFAULT_SOCKET_PORT: u16 = 7177;
 
 async fn socket_init() {
@@ -39,9 +39,8 @@ async fn socket_init() {
 
     let (layer, io) = SocketIo::new_layer();
 
-    io.ns("/", |s: SocketRef, Data::<Value>(data)| {
-        info!("Received data: {:?}", data);
-        s.emit("Welcome", data).ok();
+    io.ns("/", |s: SocketRef, Data::<Value>(_data)| {
+        info!("Socket.io connected: {:?} {:?}", s.ns(), s.id);
     });
 
     tokio::spawn(obs::handle_events(io.clone()));
@@ -65,12 +64,18 @@ async fn socket_init() {
     let server = Server::bind(&addr).serve(app.into_make_service());
 
     if let Err(e) = server.await {
-        error!("Server error: {}", e);
+        error!("server error: {}", e);
     }
 }
 
 fn main() {
-    env_logger::init();
+    let logger = Builder::new()
+        .level_for("hyper", log::LevelFilter::Warn)
+        .level_for("tokio_tungstenite", log::LevelFilter::Warn)
+        .level_for("tungstenite::protocol", log::LevelFilter::Warn)
+        .level_for("tracing", log::LevelFilter::Warn)
+        .level_for("obws", log::LevelFilter::Warn)
+        .build();
 
     let tray = create_tray();
 
@@ -84,6 +89,7 @@ fn main() {
             }
             _ => {}
         })
+        .plugin(logger)
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|_app_handle, event| match event {

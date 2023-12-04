@@ -27,7 +27,7 @@ pub async fn handle_events(io: SocketIo) -> Result<()> {
     let client = match init().await {
         Ok(client) => client,
         Err(e) => {
-            let _ = io.emit("obs:error", e.to_string());
+            io.emit("obs:error", e.to_string()).ok();
             return Err(e);
         }
     };
@@ -42,10 +42,10 @@ pub async fn handle_events(io: SocketIo) -> Result<()> {
         match event {
             Event::InputMuteStateChanged { name, muted } => {
                 if name == "[🎙️] RE20" {
-                    let _ = io.emit("obs:microphone", MicrophoneStatus { muted });
+                    io.emit("obs:microphone", MicrophoneStatus { muted }).ok();
                 }
-            },
-            
+            }
+
             _ => {}
         }
     }
@@ -66,11 +66,11 @@ pub async fn handle_status(io: SocketIo) -> Result<()> {
     let mut stream = IntervalStream::new(time::interval(Duration::from_secs(1)));
     while let Some(_timer) = stream.next().await {
         let status = client.streaming().status().await?;
-        let _ = io.emit("obs:status", status);
+        io.emit("obs:status", status).ok();
     }
 
     // Setup functionality.
-    let _ = client.inputs().press_properties_button("[🌎] Horizontal Camera", "refreshnocache").await?;
+    // let _ = client.inputs().press_properties_button("[🌎] Horizontal Camera", "refreshnocache").await?;
 
     Ok(())
 }
