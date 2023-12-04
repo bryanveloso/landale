@@ -1,8 +1,9 @@
-import { Inter } from 'next/font/google';
+import { Inter, Karla } from 'next/font/google';
 
 import { Providers } from './providers';
 
 import './globals.css';
+import { cn } from '@/lib/utils';
 
 const inter = Inter({ subsets: ['latin'], preload: true, display: 'swap' });
 
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <Providers>
       <html lang="en">
-        <body className={inter.className}>{children}</body>
+        <body className={cn(inter.className)}>{children}</body>
       </html>
     </Providers>
   );

@@ -1,7 +1,8 @@
 'use client'
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { FC, PropsWithChildren, useState } from 'react'
+import { SocketProvider } from '@/lib/socket.provider';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { FC, PropsWithChildren, useState } from 'react';
 
 export const Providers: FC<PropsWithChildren> = ({ children }) => {
   const [queryClient] = useState(
@@ -10,10 +11,12 @@ export const Providers: FC<PropsWithChildren> = ({ children }) => {
         defaultOptions: {
           queries: { staleTime: 60 * 1000 },
         },
-      }),
-  )
+      })
+  );
 
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  )
-}
+    <SocketProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </SocketProvider>
+  );
+};
