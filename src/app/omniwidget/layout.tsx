@@ -2,7 +2,7 @@ import Image from 'next/image';
 import { FC, PropsWithChildren, ReactNode } from 'react';
 
 /**
- * OBS Browser Source Dimensions: 1920x216.
+ * OBS Browser Source Dimensions: 1920x284.
  */
 
 type LayoutProps = PropsWithChildren<{}> & {
@@ -13,8 +13,8 @@ type LayoutProps = PropsWithChildren<{}> & {
 const Layout: FC<LayoutProps> = props => {
   return (
     <main className="flex items-end justify-end">
-      <div className="bg-shark-950/30  m-6 flex rounded-2xl">
-        <div className="rounded-l-2xl p-6">
+      <div className="bg-shark-950/30  m-6 flex flex-col  rounded-2xl">
+        <div className="flex justify-end rounded-l-2xl p-6 py-4">
           <Image
             src="/avalonstar.png"
             width={36}
