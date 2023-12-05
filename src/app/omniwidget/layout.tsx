@@ -23,11 +23,13 @@ const Layout: FC<LayoutProps> = props => {
             priority
           />
         </div>
-        {/* <div className="ring-1 ring-purple-500">{props.twitch}</div> */}
-        <div className="from-shark-800 to-shark-900 flex rounded-2xl bg-gradient-to-b shadow-xl shadow-black/50">
-          <div className="bg-shark-950 relative m-3 flex rounded-lg shadow-[inset_0_0_0_1px_theme(colors.shark.950)]">
-            <div className="h-36">{props.rainwave}</div>
-            <div className="h-36">{props.children}</div>
+        <div>
+          {/* <div className="ring-1 ring-purple-500">{props.twitch}</div> */}
+          <div className="from-shark-800 to-shark-900 flex rounded-2xl bg-gradient-to-b shadow-xl shadow-black/50">
+            <div className="bg-shark-950 relative m-3 flex rounded-lg shadow-[inset_0_0_0_1px_theme(colors.shark.950)]">
+              <div className="h-36">{props.rainwave}</div>
+              <div className="h-36">{props.children}</div>
+            </div>
           </div>
         </div>
       </div>
