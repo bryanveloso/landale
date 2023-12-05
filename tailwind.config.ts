@@ -27,14 +27,23 @@ const config: Config = {
           dark: '#0d0a11',
           midgrey: '#939393',
         },
-        gradient: {
-          lighter: '#23292f',
-          darker: '#1a1f23',
+        shark: {
+          '50': '#d3dfdf',
+          '100': '#c0cfd3',
+          '200': '#a8bac2',
+          '300': '#819ba7',
+          '400': '#5a737c',
+          '500': '#44585f',
+          '600': '#35434b',
+          '700': '#2b353b',
+          '800': '#232a2e', // 'gradent.lighter'
+          '900': '#1a1f23', // 'gradient.darker'
+          '950': '#121517',
         },
       },
     },
   },
   plugins: [],
-}
+};
 
 export default config

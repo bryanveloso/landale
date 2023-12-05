@@ -13,8 +13,8 @@ type LayoutProps = PropsWithChildren<{}> & {
 const Layout: FC<LayoutProps> = props => {
   return (
     <main className="flex items-end justify-end">
-      <div className="m-6 flex items-start">
-        <div className="m-6">
+      <div className="bg-shark-950/30  m-6 flex rounded-2xl">
+        <div className="rounded-l-2xl p-6">
           <Image
             src="/avalonstar.png"
             width={36}
@@ -24,8 +24,8 @@ const Layout: FC<LayoutProps> = props => {
           />
         </div>
         {/* <div className="ring-1 ring-purple-500">{props.twitch}</div> */}
-        <div className="flex rounded-2xl bg-gradient-to-b from-gradient-lighter to-[#1E2229] shadow-xl shadow-black/50">
-          <div className="relative m-3 flex rounded-lg bg-[#13141B] shadow-[inset_0_0_0_1px_#0E0D12]">
+        <div className="from-shark-800 to-shark-900 flex rounded-2xl bg-gradient-to-b shadow-xl shadow-black/50">
+          <div className="bg-shark-950 relative m-3 flex rounded-lg shadow-[inset_0_0_0_1px_theme(colors.shark.950)]">
             <div className="h-36">{props.rainwave}</div>
             <div className="h-36">{props.children}</div>
           </div>

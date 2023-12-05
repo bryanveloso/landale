@@ -1,7 +1,6 @@
 import Image from 'next/image'
 
-import { Avalonstar } from '@/components/icons'
-import { Rainwave } from '@/components/modules/rainwave'
+import { Avalonstar } from '@/components/icons';
 import { Logomark } from '@/components/logomark'
 
 export default function () {
