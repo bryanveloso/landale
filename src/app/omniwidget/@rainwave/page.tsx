@@ -53,7 +53,6 @@ const Page = () => {
             <span className="rounded-sm px-2 py-1 text-sm text-muted-yellow ring-1 ring-muted-yellow/30">
               !rainwave
             </span>
-            di
           </motion.div>
           <motion.div
             key={song?.title}
