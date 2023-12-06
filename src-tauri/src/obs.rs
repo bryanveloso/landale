@@ -57,7 +57,7 @@ pub async fn handle_status(io: SocketIo) -> Result<()> {
     let client = match init().await {
         Ok(client) => client,
         Err(e) => {
-            let _ = io.emit("obs:error", e.to_string());
+            io.emit("obs:error", e.to_string()).ok();
             return Err(e);
         }
     };
@@ -69,8 +69,18 @@ pub async fn handle_status(io: SocketIo) -> Result<()> {
         io.emit("obs:status", status).ok();
     }
 
-    // Setup functionality.
-    // let _ = client.inputs().press_properties_button("[🌎] Horizontal Camera", "refreshnocache").await?;
+    Ok(())
+}
+
+pub async fn handle_scenes() -> Result<()> {
+    let client = match init().await {
+        Ok(client) => client,
+        Err(e) => return Err(e) 
+    };
+
+    client.inputs().press_properties_button("[🌎] Omnywidget", "refreshnocache").await.ok();
+    client.inputs().press_properties_button("[🌎] Introduction Background", "refreshnocache").await.ok();
+    client.inputs().press_properties_button("[🌎] Kaizo Background", "refreshnocache").await.ok();
 
     Ok(())
 }

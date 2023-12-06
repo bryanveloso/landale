@@ -80,8 +80,10 @@ fn main() {
     let tray = create_tray();
 
     tauri::async_runtime::spawn(socket_init());
+    tauri::async_runtime::spawn(obs::handle_scenes());
     tauri::Builder::default()
         .system_tray(tray)
+        .setup(|_app| Ok(()))
         .on_window_event(|event| match event.event() {
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 event.window().hide().unwrap();
