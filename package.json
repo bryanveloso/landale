@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@next/env": "^14.0.3",
-    "@ngrok/ngrok": "^0.9.1",
     "@tanstack/react-query": "^5.12.2",
     "@tanstack/react-query-next-experimental": "^5.12.2",
     "@twurple/api": "^7.0.6",
