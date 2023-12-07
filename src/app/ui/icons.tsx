@@ -1,13 +1,13 @@
-import type { ComponentPropsWithoutRef, FC } from "react"
-import IcoMoon, { IconProps, iconList } from "react-icomoon"
+import type { ComponentPropsWithoutRef, FC } from 'react';
+import IcoMoon, { IconProps, iconList } from 'react-icomoon';
 
-import iconSet from "@/assets/icons.json"
+import iconSet from '@/assets/icons.json';
 
-const Icon = (props: IconProps) => <IcoMoon iconSet={iconSet} {...props} />
+const Icon = (props: IconProps) => <IcoMoon iconSet={iconSet} {...props} />;
 
-export default Icon
+export default Icon;
 
-export const ButtonRefreshArrow: FC<ComponentPropsWithoutRef<"svg">> = ({
+export const ButtonRefreshArrow: FC<ComponentPropsWithoutRef<'svg'>> = ({
   className,
 }) => (
   <svg
@@ -20,7 +20,7 @@ export const ButtonRefreshArrow: FC<ComponentPropsWithoutRef<"svg">> = ({
       fill="currentColor"
     />
   </svg>
-)
+);
 
 export const Avalonstar: FC<ComponentPropsWithoutRef<'svg'>> = ({
   className,
@@ -44,7 +44,7 @@ export const Avalonstar: FC<ComponentPropsWithoutRef<'svg'>> = ({
       fill="currentColor"
     />
   </svg>
-)
+);
 
 export const BV: FC<ComponentPropsWithoutRef<'svg'>> = ({ className }) => (
   <svg
@@ -58,9 +58,9 @@ export const BV: FC<ComponentPropsWithoutRef<'svg'>> = ({ className }) => (
       d="M33.12 41.56a.19.19 0 0 1-.33-.02l-3.94-7.13a4.34 4.34 0 0 1 .2-3.93L39.87 11.3c1.07-1.89 2.48-2.77 4.46-2.77 1.54 0 2.83.71 3.57 1.64 1 1.26 1.2 3.03.32 4.6l-15.1 26.8Zm-10.55-18.5a.13.13 0 0 1-.22 0l-5.2-9.1c-1.32-2.32-.21-5.22 3-5.22h4.73c3.08 0 4.22 2.86 2.9 5.18l-5.2 9.14ZM40.56 0c-1.15 0-2.38.31-3.33.95a8.6 8.6 0 0 0-1.88 2.14c-.03.05-.07.07-.1.07-.04 0-.08-.02-.12-.06-.42-.57-.88-1.45-1.61-2.03A5.27 5.27 0 0 0 30.09 0S10.99.02 4.56 0a3.53 3.53 0 0 0-3.13 5.36C8.5 17.82 22.8 42.97 29.83 55.2a3.54 3.54 0 0 0 3.16 1.83 3.5 3.5 0 0 0 3.08-1.81C43.1 43 57.28 17.84 64.41 5.38 65.78 2.98 64.4 0 61.3 0H40.56Z"
     />
   </svg>
-)
+);
 
-export const NavigationMenu: FC<ComponentPropsWithoutRef<"svg">> = ({
+export const NavigationMenu: FC<ComponentPropsWithoutRef<'svg'>> = ({
   className,
 }) => (
   <svg
@@ -74,9 +74,9 @@ export const NavigationMenu: FC<ComponentPropsWithoutRef<"svg">> = ({
       <rect x={0.5} y={18.5} width={23} height={3} rx={1} fill="currentColor" />
     </g>
   </svg>
-)
+);
 
-export const SmallCloseIcon: FC<ComponentPropsWithoutRef<"svg">> = ({
+export const SmallCloseIcon: FC<ComponentPropsWithoutRef<'svg'>> = ({
   className,
 }) => (
   <svg
@@ -90,9 +90,9 @@ export const SmallCloseIcon: FC<ComponentPropsWithoutRef<"svg">> = ({
       d="M6 12A6 6 0 1 0 6 0a6 6 0 0 0 0 12Zm2.93-3.07a.86.86 0 0 0 .02-1.2L7.2 6l1.74-1.73a.87.87 0 0 0-.02-1.2.86.86 0 0 0-1.2 0L6 4.78 4.26 3.05a.88.88 0 0 0-1.2.01.88.88 0 0 0 0 1.2l1.73 1.73-1.74 1.75c-.3.3-.31.86.02 1.19.32.33.9.32 1.2.01L6 7.2l1.74 1.74c.31.31.86.31 1.2-.01Z"
     />
   </svg>
-)
+);
 
-export const SmallFullScreenIcon: FC<ComponentPropsWithoutRef<"svg">> = ({
+export const SmallFullScreenIcon: FC<ComponentPropsWithoutRef<'svg'>> = ({
   className,
 }) => (
   <svg
@@ -107,9 +107,55 @@ export const SmallFullScreenIcon: FC<ComponentPropsWithoutRef<"svg">> = ({
       transform="matrix(-1 0 0 1 12 0)"
     />
   </svg>
-)
+);
 
-export const VideoGamePC: FC<ComponentPropsWithoutRef<"svg">> = ({
+export const Muted: FC<ComponentPropsWithoutRef<'svg'>> = ({ className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 10 10"
+    className={className}
+  >
+    <path
+      fill="currentColor"
+      fillRule="evenodd"
+      d="M1.067.183a.625.625 0 1 0-.884.884L6.97 7.853l.002.002 1.962 1.962a.625.625 0 0 0 .884-.884L8.272 7.388a4.109 4.109 0 0 0 .853-2.513v-.5a.625.625 0 1 0-1.25 0v.5c0 .6-.183 1.157-.498 1.618l-.784-.784A2 2 0 0 0 7 4.5V2a2 2 0 1 0-4 0v.116L1.067.183Zm1.058 4.192a.625.625 0 1 0-1.25 0v.5a4.126 4.126 0 0 0 3.5 4.078v.422a.625.625 0 1 0 1.25 0v-1A.625.625 0 0 0 5 7.75a2.875 2.875 0 0 1-2.875-2.875v-.5Z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+
+export const Unmuted: FC<ComponentPropsWithoutRef<'svg'>> = ({ className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 10 10"
+    className={className}
+  >
+    <path
+      fill="currentColor"
+      fillRule="evenodd"
+      d="M6.414 5.914A2 2 0 0 1 3 4.5V2a2 2 0 1 1 4 0v2.5a2 2 0 0 1-.586 1.414Zm1.644-2.106a.625.625 0 0 1 1.067.442v.5a4.132 4.132 0 0 1-3.5 4.078v.547a.625.625 0 0 1-1.25 0v-.547a4.132 4.132 0 0 1-3.5-4.078v-.5a.625.625 0 1 1 1.25 0v.5a2.875 2.875 0 1 0 5.75 0v-.5c0-.166.066-.325.183-.442Z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+
+export const Video: FC<ComponentPropsWithoutRef<'svg'>> = ({ className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 10 10"
+    className={className}
+  >
+    <path
+      fill="currentColor"
+      d="M9.515 2.476a.97.97 0 0 0-.924-.053L7 3.013V2.5A1.5 1.5 0 0 0 5.5 1h-4A1.5 1.5 0 0 0 0 2.5l0 5A1.5 1.5 0 0 0 1.5 9h4A1.5 1.5 0 0 0 7 7.5v-.514l1.53.563A1 1 0 0 0 10 6.667V3.333a1 1 0 0 0-.485-.857Z"
+    />
+  </svg>
+);
+
+export const VideoGamePC: FC<ComponentPropsWithoutRef<'svg'>> = ({
   className,
 }) => (
   <svg
@@ -128,4 +174,4 @@ export const VideoGamePC: FC<ComponentPropsWithoutRef<"svg">> = ({
       />
     </g>
   </svg>
-)
+);

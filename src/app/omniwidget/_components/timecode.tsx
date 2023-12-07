@@ -10,11 +10,13 @@ import { cn } from '@/lib/utils';
 const karla = Karla({ subsets: ['latin'], preload: true, display: 'swap' });
 
 export const Timecode: FC = () => {
+  const [isLoading, setIsLoading] = useState(true);
+
   const { socket, isConnected } = useSocket();
 
-  const [hours, setHours] = useState<string>();
-  const [minutes, setMinutes] = useState<string>();
-  const [seconds, setSeconds] = useState<string>();
+  const [hours, setHours] = useState<string>('00');
+  const [minutes, setMinutes] = useState<string>('00');
+  const [seconds, setSeconds] = useState<string>('00');
 
   const handleData = useCallback(
     (data: OBSResponseTypes['GetStreamStatus']) => {
@@ -37,6 +39,10 @@ export const Timecode: FC = () => {
     };
   }, [socket, isConnected]);
 
+  if (isLoading) {
+    // throw new Promise(resolve => {});
+  }
+
   return (
     <div
       className={cn(
@@ -52,7 +58,7 @@ export const Timecode: FC = () => {
         <span className="text-3xl">{minutes}</span>
         <span className="font-semibold opacity-60">m</span>
       </div>
-      <div className="hidden pr-0.5">
+      <div className="pr-0.5">
         <span className="text-3xl">{seconds}</span>
         <span className="font-semibold opacity-60">s</span>
       </div>
