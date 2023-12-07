@@ -1,5 +1,3 @@
-require("./ngrok.config.js")
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export',
@@ -7,6 +5,6 @@ const nextConfig = {
     domains: ['rainwave.cc'],
     unoptimized: true,
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;
