@@ -6,7 +6,7 @@ import { useSocket } from '@/lib/socket.provider';
 import { cn } from '@/lib/utils';
 
 export const Indicator: FC = () => {
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const { socket } = useSocket();
 
   const handleData = useCallback(({ muted }: { muted: boolean }) => {
