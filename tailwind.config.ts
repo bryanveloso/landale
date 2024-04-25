@@ -41,6 +41,10 @@ const config: Config = {
           '950': '#121517',
         },
       },
+      fontFamily: {
+        sans: ['var(--font-geist-sans)'],
+        mono: ['var(--font-geist-mono)'],
+      },
     },
   },
   plugins: [],
