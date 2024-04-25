@@ -1,10 +1,3 @@
-export interface Attempts {
-  id: string;
-  checkpoints: number[];
-}
-
-export interface LastHitResult {}
-
 export const checkpoints = [
   { 0: { id: 'rival-1', name: 'Lab', detailed: 'Past Lab' } },
   {
@@ -20,9 +13,14 @@ export const checkpoints = [
   { 5: { id: 'misty', name: 'Misty', detailed: 'Past Misty' } },
 ] as { [key: number]: { id: string; name: string; detailed: string } }[];
 
+export interface Attempts {
+  id: string;
+  checkpoints: number[];
+}
+
 export const parseCSV = (csv: string): Attempts[] => {
   const lines = csv.trim().split('\n');
-  const headers = lines[0].split(',').slice(1); // Skip the first column, assuming it's "ID"
+  const headers = lines[0].split(',').slice(1);
 
   const attempts: Attempts[] = [];
 
@@ -36,10 +34,20 @@ export const parseCSV = (csv: string): Attempts[] => {
   return attempts;
 };
 
+export const extractHeaders = (csv: string): string[] => {
+  const lines = csv.trim().split('\n');
+  return lines[0].split(',').slice(1);
+};
+
+export type PersonalBest = {
+  id: string;
+  checkpoint: string;
+};
+
 export const calculatePersonalBest = (
   attempts: Attempts[],
   checkpoints: string[]
-): Record<string, string> => {
+): PersonalBest => {
   let id = '';
   let maxIndex = -1;
 

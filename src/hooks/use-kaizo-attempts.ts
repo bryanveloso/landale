@@ -27,7 +27,7 @@ export const useKaizoAttempts = () => {
   });
 
   return {
-    data,
+    csv: data,
     status,
   };
 };

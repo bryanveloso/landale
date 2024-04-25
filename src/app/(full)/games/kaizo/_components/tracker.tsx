@@ -1,0 +1,11 @@
+export const Tracker = () => (
+  <div className="flex justify-end">
+    <div className="m-6 flex flex-col items-start">
+      <div className="flex rounded-2xl bg-gradient-to-b from-shark-800 to-shark-900 shadow-xl shadow-black/50">
+        <div className="relative m-3 flex rounded-lg bg-shark-950 p-3 shadow-[inset_0_0_0_1px_theme(colors.shark.950)]">
+          <div className="h-[416px] w-96 bg-red-500"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
