@@ -37,7 +37,7 @@ export const Timecode: FC = () => {
     return () => {
       socket.off('obs:status', handleData);
     };
-  }, [socket, isConnected]);
+  }, [socket, isConnected, handleData]);
 
   if (isLoading) {
     // throw new Promise(resolve => {});
