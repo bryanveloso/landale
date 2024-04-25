@@ -14,7 +14,7 @@ export type SocketContext = {
   isConnected: boolean;
 };
 
-export const socket = io('ws://localhost:7177');
+export const socket = io('ws://saya.local:7177');
 
 export const SocketContext = createContext<SocketContext>({
   socket,

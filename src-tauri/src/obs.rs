@@ -18,7 +18,7 @@ async fn init() -> Result<Client> {
     dotenv().ok();
     let password = env::var("OBS_WEBSOCKET_PASSWORD")
         .map_err(|_| anyhow!("OBS_WEBSOCKET_PASSWORD not set in .env file."))?;
-    let client = Client::connect("localhost", 4455, Some(password)).await?;
+    let client = Client::connect("demi.local", 4455, Some(password)).await?;
 
     Ok(client)
 }

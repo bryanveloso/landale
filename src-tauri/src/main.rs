@@ -11,10 +11,7 @@ We'll be instead using WebSockets to communicate between the two.
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{
-    env,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-};
+use std::{env, net::ToSocketAddrs};
 
 use axum::{Router, Server};
 use dotenvy::dotenv;
@@ -57,7 +54,11 @@ async fn socket_init() {
         .parse()
         .unwrap_or(DEFAULT_SOCKET_PORT);
 
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
+    let addr = format!("{}:{}", "saya.local", port)
+        .to_socket_addrs()
+        .expect("Error formatting socket address.")
+        .next()
+        .unwrap();
 
     info!("Local socket server listening on: http://{}", addr);
 
@@ -73,6 +74,7 @@ fn main() {
         .level_for("hyper", log::LevelFilter::Warn)
         .level_for("tokio_tungstenite", log::LevelFilter::Warn)
         .level_for("tungstenite::protocol", log::LevelFilter::Warn)
+        .level_for("tungstenite::handshake", log::LevelFilter::Warn)
         .level_for("tracing", log::LevelFilter::Warn)
         .level_for("obws", log::LevelFilter::Warn)
         .build();
