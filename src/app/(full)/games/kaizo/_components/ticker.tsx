@@ -15,6 +15,11 @@ import {
   parseCSV,
 } from '@/lib/services/landale/kaizo';
 
+import ava from './ava.png';
+import brock from './brock.png';
+import oak from './oak.png';
+import post from './post.png';
+
 export const Ticker = () => {
   const { count, status: countStatus } = useKaizoAttemptCount();
   const { csv, status: csvStatus } = useKaizoAttempts();
@@ -43,13 +48,7 @@ export const Ticker = () => {
       <div className="flex w-full justify-between gap-12 px-12">
         <div className="flex items-center">
           <span className="relative rounded p-1 px-2 pl-12">
-            <Image
-              src="/games/kaizo/post.png"
-              width={56}
-              height={64}
-              alt="Post"
-              className="absolute -top-9 left-0"
-            />
+            <Image src={post} alt="Post" className="absolute -top-9 left-0" />
           </span>
           <span className="test bg-gradient-to-b from-main-avayellow to-main-avayellow/60 bg-clip-text pl-4 font-mono text-2xl font-black text-transparent">
             #{count}
@@ -57,13 +56,7 @@ export const Ticker = () => {
         </div>
         <div className="flex items-center">
           <span className="relative rounded bg-black p-1 px-2 pl-12">
-            <Image
-              src="/games/kaizo/ava.png"
-              width={64}
-              height={96}
-              alt="Ava"
-              className="absolute -left-4 -top-10"
-            />
+            <Image src={ava} alt="Ava" className="absolute -left-4 -top-10" />
             <span className="text-muted-lightbluegrey">PERSONAL BEST</span>
           </span>
           <span className="pl-4 font-mono text-xl">
@@ -74,13 +67,7 @@ export const Ticker = () => {
 
         <div className="flex items-center">
           <span className="relative rounded bg-black p-1 px-2 pl-12">
-            <Image
-              src="/games/kaizo/oak.png"
-              width={64}
-              height={96}
-              alt="Oak"
-              className="absolute -left-4 -top-10"
-            />
+            <Image src={oak} alt="Oak" className="absolute -left-4 -top-10" />
             <span className="text-muted-lightbluegrey">LAB ESCAPE RATE</span>
           </span>
           <span className="pl-4 font-mono text-xl">{labEscapeRate}%</span>
@@ -88,9 +75,7 @@ export const Ticker = () => {
         <div className="flex items-center">
           <span className="relative rounded bg-black p-1 px-2 pl-12">
             <Image
-              src="/games/kaizo/brock.png"
-              width={64}
-              height={96}
+              src={brock}
               alt="Brock"
               className="absolute -left-4 -top-10"
             />
