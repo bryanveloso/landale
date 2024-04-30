@@ -11,7 +11,7 @@ We'll be instead using WebSockets to communicate between the two.
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{env, net::ToSocketAddrs};
+use std::{env, net::{Ipv4Addr, SocketAddr, IpAddr}};
 
 use axum::{Router, Server};
 use dotenvy::dotenv;
@@ -54,13 +54,9 @@ async fn socket_init() {
         .parse()
         .unwrap_or(DEFAULT_SOCKET_PORT);
 
-    let addr = format!("{}:{}", "saya.local", port)
-        .to_socket_addrs()
-        .expect("Error formatting socket address.")
-        .next()
-        .unwrap();
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), port);
 
-    info!("Local socket server listening on: http://{}", addr);
+    println!("Local socket server listening on: http://{}", addr);
 
     let server = Server::bind(&addr).serve(app.into_make_service());
 
