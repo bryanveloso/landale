@@ -41,7 +41,7 @@ pub async fn handle_events(io: SocketIo) -> Result<()> {
 
         match event {
             Event::InputMuteStateChanged { name, muted } => {
-                if name == "[🎙️] RE20" {
+                if name.contains("RE20") {
                     io.emit("obs:microphone", MicrophoneStatus { muted }).ok();
                 }
             }
