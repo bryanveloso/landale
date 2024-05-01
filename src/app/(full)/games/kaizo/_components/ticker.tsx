@@ -50,7 +50,7 @@ export const Ticker = () => {
           <span className="relative rounded p-1 px-2 pl-12">
             <Image src={post} alt="Post" className="absolute -top-9 left-0" />
           </span>
-          <span className="test bg-gradient-to-b from-main-avayellow to-main-avayellow/60 bg-clip-text pl-4 font-mono text-2xl font-black text-transparent">
+          <span className="test bg-gradient-to-b from-main-avayellow to-main-avayellow/60 bg-clip-text pl-4 font-mono text-3xl font-black text-transparent">
             #{count}
           </span>
         </div>
