@@ -101,7 +101,7 @@ export const findLastHitForCheckpoint = (
     }
   }
 
-  distance = mostRecentRunIndex - lastHitIndex - 1;
+  distance = mostRecentRunIndex - lastHitIndex;
 
   return {
     mostRecentRunIndex,
