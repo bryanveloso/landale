@@ -56,7 +56,12 @@ export const Ticker = () => {
         </div>
         <div className="flex items-center">
           <span className="relative rounded bg-black p-1 px-2 pl-12">
-            <Image src={ava} alt="Ava" className="absolute -left-4 -top-10" />
+            <Image
+              src={ava}
+              alt="Ava"
+              className="absolute -left-4 -top-10"
+              priority
+            />
             <span className="text-muted-lightbluegrey">PERSONAL BEST</span>
           </span>
           <span className="pl-4 font-mono text-xl">
@@ -79,7 +84,9 @@ export const Ticker = () => {
               alt="Brock"
               className="absolute -left-4 -top-10"
             />
-            <span className="text-muted-lightbluegrey">LAST BROCK ESCAPE</span>
+            <span className="text-muted-lightbluegrey">
+              LAST RUN PAST BROCK
+            </span>
           </span>
           <span className="pl-4 font-mono text-xl font-semibold">
             {lastBrockEscape?.distance} runs ago

@@ -1,7 +1,10 @@
 'use client';
 
+import { useSocket } from '@/lib/socket.provider';
+
 import { Ticker } from './_components/ticker';
 import { Tracker } from './_components/tracker';
+import { useEffect } from 'react';
 
 /**
  * Tracker widget to be sized to 384x418.
@@ -9,17 +12,25 @@ import { Tracker } from './_components/tracker';
  * */
 
 const Page = () => {
-  return (
-    <main className="flex h-screen flex-col">
-      <Tracker />
-      <Ticker />
+  const { socket } = useSocket();
 
-      {/* "Fake" Sidebar */}
-      <div className="absolute -z-10 ml-[1499px] flex">
-        <div className="h-screen w-3 bg-black"></div>
-        <div className="h-screen w-3  bg-gradient-to-b from-shark-900 to-shark-950"></div>
-      </div>
-    </main>
+  const handleData = (data: any) => {
+    console.log(data);
+  };
+
+  useEffect(() => {
+    socket.on('bizhawk:message', handleData);
+
+    return () => {
+      socket.off('bizhawk:message', handleData);
+    };
+  }, [socket]);
+
+  return (
+    <>
+      <Tracker />
+      {/* <Ticker /> */}
+    </>
   );
 };
 

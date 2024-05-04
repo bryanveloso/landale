@@ -1,17 +1,56 @@
-export const checkpoints = [
-  { 0: { id: 'rival-1', name: 'Lab', detailed: 'Past Lab' } },
-  {
-    1: {
-      id: 'first-trainer',
-      name: 'First Trainer',
-      detailed: 'Past First Trainer',
-    },
-  },
-  { 2: { id: 'rival-2', name: 'Rival 2', detailed: 'Past Rival 2' } },
-  { 3: { id: 'brock', name: 'Brock', detailed: 'Past Brock' } },
-  { 4: { id: 'rival-3', name: 'Rival 3', detailed: 'Past Rival 3' } },
-  { 5: { id: 'misty', name: 'Misty', detailed: 'Past Misty' } },
-] as { [key: number]: { id: string; name: string; detailed: string } }[];
+enum Game {
+  RubySapphire = 1,
+  Emerald,
+  FireRedLeafGreen,
+}
+
+export type BizhawkMessage = {
+  type: 'checkpoint' | 'init' | 'seed';
+  metadata: SeedMetadata | CheckpointMetadata;
+};
+
+export type InitializeMetadata = {
+  version: string;
+  game: Game;
+};
+
+export type CheckpointMetadata = Checkpoint;
+
+export type SeedMetadata = {
+  number: number;
+};
+
+export type Checkpoint = {
+  id: string;
+  name: string;
+};
+
+export const checkpoints: Checkpoint[] = [
+  { id: 'lab', name: 'Lab' },
+  { id: 'rival-1', name: 'Rival 1' },
+  { id: 'first-trainer', name: 'First Trainer' },
+  { id: 'rival-2', name: 'Rival 2' },
+  { id: 'brock', name: 'Brock' },
+  { id: 'rival-3', name: 'Rival 3' },
+  { id: 'rival-4', name: 'Rival 4' },
+  { id: 'misty', name: 'Misty' },
+  { id: 'surge', name: 'Surge' },
+  { id: 'rival-5', name: 'Rival 5' },
+  { id: 'rocket-hideout', name: 'Rocket Hideout' },
+  { id: 'erika', name: 'Erika' },
+  { id: 'koga', name: 'Koga' },
+  { id: 'rival-6', name: 'Rival 6' },
+  { id: 'silph-co', name: 'Silph Co.' },
+  { id: 'sabrina', name: 'Sabrina' },
+  { id: 'blaine', name: 'Blaine' },
+  { id: 'giovanni', name: 'Giovanni' },
+  { id: 'rival-7', name: 'Rival 7' },
+  { id: 'lorelai', name: 'Lorelai' },
+  { id: 'bruno', name: 'Bruno' },
+  { id: 'agatha', name: 'Agatha' },
+  { id: 'lance', name: 'Lance' },
+  { id: 'champ', name: 'Champ' },
+];
 
 export interface Attempts {
   id: string;
