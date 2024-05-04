@@ -26,6 +26,7 @@ use tauri_plugin_log::Builder;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 
+mod bizhawk;
 mod obs;
 
 // Initialize Socketioxide.
@@ -42,6 +43,8 @@ async fn socket_init() {
 
     tokio::spawn(obs::handle_events(io.clone()));
     tokio::spawn(obs::handle_status(io.clone()));
+    
+    tokio::spawn(bizhawk::handle_events(io.clone()));
 
     let app: Router = axum::Router::new().layer(
         ServiceBuilder::new()
@@ -56,7 +59,7 @@ async fn socket_init() {
 
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), port);
 
-    println!("Local socket server listening on: http://{}", addr);
+    info!("Local socket server listening on: http://{}", addr);
 
     let server = Server::bind(&addr).serve(app.into_make_service());
 
