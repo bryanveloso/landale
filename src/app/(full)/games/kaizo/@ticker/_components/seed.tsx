@@ -31,13 +31,13 @@ export const Seed: FC = () => {
   }, [count, seed]);
 
   return (
-    <div className="flex w-44 items-center">
+    <motion.div className="flex w-44 flex-none items-center" layout>
       <span className="relative rounded p-1 px-2 pl-12">
         <Image src={post} alt="Post" className="absolute -top-9 left-0" />
       </span>
       <span className="test bg-gradient-to-b from-main-avayellow to-main-avayellow/60 bg-clip-text pl-4 font-mono text-3xl font-black text-transparent">
         #<motion.span>{number}</motion.span>
       </span>
-    </div>
+    </motion.div>
   );
 };
