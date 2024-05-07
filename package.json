@@ -2,11 +2,11 @@
   "name": "landale",
   "version": "0.1",
   "module": "index.ts",
+  "scripts": {
+    "dev": "bun --filter '*' dev"
+  },
   "type": "module",
   "workspaces": [
     "packages/*"
-  ],
-  "scripts": {
-    "dev": "bun --filter '*' dev"
-  }
+  ]
 }
