@@ -3,12 +3,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "bunx --bun vite",
+    "build": "tsc && bunx --bun vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "bunx --bun vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.35.1",
+    "@tanstack/react-query-devtools": "^5.35.1",
+    "@tanstack/react-router": "^1.31.20",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",
     "react": "^18.2.0",

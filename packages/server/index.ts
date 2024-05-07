@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 
-import { version } from '~/package.json';
+import { version } from './package.json';
 
 console.log(
   chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`)
