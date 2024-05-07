@@ -1,5 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { Slot } from '@/components/slot';
+
 export const Route = createFileRoute('/(full)/ironmon')({
   component: Ironmon,
 });
@@ -11,11 +13,7 @@ function Ironmon() {
       <aside className="flex justify-end">
         <div className="m-6 flex flex-col">
           <div className="flex h-36 items-end justify-end overflow-hidden"></div>
-          <div className="from-shark-800 to-shark-900 flex rounded-2xl bg-gradient-to-b shadow-xl shadow-black/50">
-            <div className="bg-shark-950 relative m-3 flex rounded-lg p-3 shadow-[inset_0_0_0_1px_theme(colors.shark.950)]">
-              <div className="bg-avayellow h-[416px] w-96"></div>
-            </div>
-          </div>
+          <Slot width="w-96" height="h-[416px]" />
         </div>
       </aside>
 

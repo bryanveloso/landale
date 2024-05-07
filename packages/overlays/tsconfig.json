@@ -23,9 +23,9 @@
     /* Paths */
     "baseUrl": ".",
     "paths": {
-      "+/*": ["assets/*"],
-      "@/*": ["src/*"],
-      "~/*": ["public/*"],
+      "+/*": ["./assets/*"],
+      "@/*": ["./src/*"],
+      "~/*": ["./public/*"],
     }
   },
   "include": ["src"],
