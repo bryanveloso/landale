@@ -12,11 +12,17 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/index'
+import { Route as fullIronmonImport } from './routes/(full)/ironmon'
 
 // Create/Update Routes
 
 const IndexRoute = IndexImport.update({
   path: '/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const fullIronmonRoute = fullIronmonImport.update({
+  path: '/ironmon',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -28,11 +34,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/(full)/ironmon': {
+      preLoaderRoute: typeof fullIronmonImport
+      parentRoute: typeof rootRoute
+    }
   }
 }
 
 // Create and export the route tree
 
-export const routeTree = rootRoute.addChildren([IndexRoute])
+export const routeTree = rootRoute.addChildren([IndexRoute, fullIronmonRoute])
 
 /* prettier-ignore-end */
