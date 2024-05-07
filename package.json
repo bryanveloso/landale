@@ -1,5 +1,6 @@
 {
   "name": "landale",
+  "version": "0.1",
   "module": "server/index.ts",
   "type": "module",
   "devDependencies": {
