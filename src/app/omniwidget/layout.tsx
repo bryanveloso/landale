@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { FC, PropsWithChildren, ReactNode } from 'react';
+import type { FC, PropsWithChildren, ReactNode } from 'react';
 
 /**
  * OBS Browser Source Dimensions: 1920x284.

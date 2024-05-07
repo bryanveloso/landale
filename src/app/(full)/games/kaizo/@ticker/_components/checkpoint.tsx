@@ -14,6 +14,10 @@ const RivalOneComponent = dynamic(
   async () => (await import('./checkpoints/rival-one')).Checkpoint
 );
 
+const RivalTwoComponent = dynamic(
+  async () => (await import('./checkpoints/rival-two')).Checkpoint
+);
+
 const FirstTrainerComponent = dynamic(
   async () => (await import('./checkpoints/first-trainer')).Checkpoint
 );
@@ -26,6 +30,7 @@ const componentsMap: ComponentsMap = {
   LAB: () => LabComponent,
   RIVAL1: () => RivalOneComponent,
   FIRSTTRAINER: () => FirstTrainerComponent,
+  RIVAL2: () => RivalTwoComponent,
 
   // Default component.
   DEFAULT: () => Loading,

@@ -19,7 +19,7 @@ export const Indicator: FC = () => {
     return () => {
       socket.off('obs:microphone', handleData);
     };
-  }, []);
+  }, [socket, handleData]);
 
   return (
     <div

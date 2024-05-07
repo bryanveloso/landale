@@ -21,6 +21,8 @@ export const Timecode: FC = () => {
   const handleData = useCallback(
     (data: OBSResponseTypes['GetStreamStatus']) => {
       const { outputTimecode } = data;
+      console.log(data);
+
       const timecode = outputTimecode.slice(0, -4);
       const [hours, minutes, seconds] = timecode.split(':');
 
@@ -47,7 +49,8 @@ export const Timecode: FC = () => {
     <div
       className={cn(
         'flex flex-auto items-end text-xl tabular-nums',
-        karla.className
+        karla.className,
+        'hidden'
       )}
     >
       <div className="pr-0.5">
