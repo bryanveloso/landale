@@ -14,18 +14,21 @@ export type InitializeMetadata = {
   game: Game;
 };
 
-export type CheckpointMetadata = Checkpoint;
+export type CheckpointMetadata = {
+  number: number;
+  name: string;
+};
 
 export type SeedMetadata = {
   number: number;
 };
 
-export type Checkpoint = {
+export type CheckpointMap = {
   id: string;
   name: string;
 };
 
-export const checkpoints: Checkpoint[] = [
+export const checkpoints: CheckpointMap[] = [
   { id: 'lab', name: 'Lab' },
   { id: 'rival-1', name: 'Rival 1' },
   { id: 'first-trainer', name: 'First Trainer' },
