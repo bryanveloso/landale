@@ -2,19 +2,13 @@ import chalk from 'chalk';
 
 import { version } from '~/package.json';
 
-declare module 'bun' {
-  interface Env {
-    LANDALE_WEBSOCKET_PORT: number;
-    LANDALE_TCPSOCKET_PORT: number;
-  }
-}
-
-console.log(chalk.bold.green(`Landale Overlay System v${version}`));
-console.log(`Starting Server: Using Bun version ${chalk.yellow(Bun.version)}`);
+console.log(
+  chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`)
+);
 
 const ws = Bun.serve({
   hostname: '0.0.0.0',
-  port: process.env.LANDALE_WEBSOCKET_PORT,
+  port: 7175,
   fetch(req, server) {
     if (server.upgrade(req)) return;
     return new Response('Upgrade failed', { status: 500 });
@@ -35,11 +29,13 @@ const ws = Bun.serve({
   },
 });
 
-console.log(`WebSocket server listening on ${ws.hostname}:${ws.port}`);
+console.log(
+  `  ${chalk.green('➜')}  ${chalk.bold('WebSocket Server')}: ${ws.hostname}:${ws.port}`
+);
 
 const tcp = Bun.listen<{}>({
   hostname: '0.0.0.0',
-  port: process.env.LANDALE_TCPSOCKET_PORT,
+  port: 8080,
   socket: {
     data(socket, data) {
       console.log(`Recieved data: ${data.toString('utf-8')}`);
@@ -59,4 +55,6 @@ const tcp = Bun.listen<{}>({
   },
 });
 
-console.log(`TCPSocket server listening on ${tcp.hostname}:${tcp.port}`);
+console.log(
+  `  ${chalk.green('➜')}  ${chalk.bold('TCPSocket Server')}: ${tcp.hostname}:${tcp.port}`
+);
