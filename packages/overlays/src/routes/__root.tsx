@@ -12,7 +12,6 @@ export const Route = createRootRouteWithContext<{
 function Root() {
   return (
     <>
-      <hr />
       <Outlet />
       <ReactQueryDevtools />
       <TanStackRouterDevtools />
