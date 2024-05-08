@@ -4,23 +4,16 @@ import useWebSocket from 'react-use-websocket';
 import { IronmonMessage } from './services/ironmon';
 import { useQueryClient } from '@tanstack/react-query';
 
+type SocketMessage = { source: 'tcp' } & IronmonMessage;
+
 const socketUrl = 'ws://saya.local:7175';
 
 const isHeartbeat = (data: string) => data === 'pong';
 
-export type SocketContext = {
+export const SocketContext = createContext<{
   isConnected: boolean;
-
-  messages: {
-    ironmon: IronmonMessage[];
-  };
-};
-
-export const SocketContext = createContext<SocketContext>({
+}>({
   isConnected: false,
-  messages: {
-    ironmon: [],
-  },
 });
 
 export const SocketProvider: FC<PropsWithChildren> = ({ children }) => {
@@ -38,7 +31,17 @@ export const SocketProvider: FC<PropsWithChildren> = ({ children }) => {
 
   useEffect(() => {
     if (lastMessage && lastMessage.data) {
-      console.log(JSON.parse(lastMessage.data));
+      const { source, type, metadata } = JSON.parse(
+        lastMessage.data
+      ) as SocketMessage;
+      switch (source) {
+        case 'tcp':
+          console.log(source, type, metadata);
+          queryClient.setQueryData(['ironmon', type], metadata);
+          break;
+        default:
+          break;
+      }
     }
   }, [lastMessage, queryClient]);
 
@@ -46,9 +49,6 @@ export const SocketProvider: FC<PropsWithChildren> = ({ children }) => {
     <SocketContext
       value={{
         isConnected: readyState === 1,
-        messages: {
-          ironmon: [],
-        },
       }}
     >
       {children}
