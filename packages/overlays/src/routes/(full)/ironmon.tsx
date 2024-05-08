@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { Slot } from '@/components/slot';
+import { Seed } from '@/components/ironmon/seed';
 
 export const Route = createFileRoute('/(full)/ironmon')({
   component: Ironmon,
@@ -9,6 +10,8 @@ export const Route = createFileRoute('/(full)/ironmon')({
 function Ironmon() {
   return (
     <div className="w-canvas h-canvas flex flex-col">
+      <Seed />
+
       {/* Sidebar */}
       <aside className="flex justify-end">
         <div className="m-6 flex flex-col">
