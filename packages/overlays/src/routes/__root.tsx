@@ -1,7 +1,6 @@
+import React, { Suspense } from 'react';
 import { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/router-devtools';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -9,12 +8,32 @@ export const Route = createRootRouteWithContext<{
   component: Root,
 });
 
+// Lazy load the devtools if running outside of OBS Studio.
+const ReactQueryDevtools =
+  'obsstudio' in window
+    ? () => null
+    : React.lazy(() =>
+        import('@tanstack/react-query-devtools').then(res => ({
+          default: res.ReactQueryDevtools,
+        }))
+      );
+const TanStackRouterDevtools =
+  'obsstudio' in window
+    ? () => null
+    : React.lazy(() =>
+        import('@tanstack/router-devtools').then(res => ({
+          default: res.TanStackRouterDevtools,
+        }))
+      );
+
 function Root() {
   return (
     <>
       <Outlet />
-      <ReactQueryDevtools />
-      <TanStackRouterDevtools />
+      <Suspense>
+        <ReactQueryDevtools />
+        <TanStackRouterDevtools />
+      </Suspense>
     </>
   );
 }
