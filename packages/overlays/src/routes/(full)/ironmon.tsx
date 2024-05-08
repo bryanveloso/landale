@@ -8,7 +8,7 @@ export const Route = createFileRoute('/(full)/ironmon')({
 
 function Ironmon() {
   return (
-    <div className="h-canvas w-canvas relative">
+    <div className="w-canvas h-canvas flex flex-col">
       {/* Sidebar */}
       <aside className="flex justify-end">
         <div className="m-6 flex flex-col">
@@ -18,9 +18,9 @@ function Ironmon() {
       </aside>
 
       {/* Fake Separator */}
-      <div className="absolute top-0 -z-10 ml-[1499px] flex">
+      <div className="absolute -z-10 ml-[1499px] flex">
         <div className="h-canvas w-3 bg-black"></div>
-        <div className="from-shark-900 to-shark-950 h-canvas w-3 bg-gradient-to-b"></div>
+        <div className="h-canvas bg-shark-950 w-3"></div>
       </div>
     </div>
   );
