@@ -36,7 +36,6 @@ export const SocketProvider: FC<PropsWithChildren> = ({ children }) => {
       ) as SocketMessage;
       switch (source) {
         case 'tcp':
-          console.log(source, type, metadata);
           queryClient.setQueryData(['ironmon', type], metadata);
           break;
         default:
@@ -46,12 +45,12 @@ export const SocketProvider: FC<PropsWithChildren> = ({ children }) => {
   }, [lastMessage, queryClient]);
 
   return (
-    <SocketContext
+    <SocketContext.Provider
       value={{
         isConnected: readyState === 1,
       }}
     >
       {children}
-    </SocketContext>
+    </SocketContext.Provider>
   );
 };
