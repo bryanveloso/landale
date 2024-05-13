@@ -23,10 +23,7 @@ function Ironmon() {
       </aside>
 
       {/* Location Widget */}
-      <div className="h-canvas absolute right-[84px] -z-10 w-[302px] bg-black"></div>
-
-      {/* Bottom Line */}
-      <div className="bg-shark-950 flex h-10 w-[1534px] shadow-[inset_0_2px_0_#1a1f22]"></div>
+      <div className="h-canvas absolute right-[84px] bottom-[40px] -z-10 w-[302px] bg-black"></div>
     </div>
   );
 }
