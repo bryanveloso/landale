@@ -1,0 +1,41 @@
+{
+  "name": "overlays",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bunx --bun vite",
+    "build": "tsc && bunx --bun vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "bunx --bun vite preview"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.0.18",
+    "@tailwindcss/vite": "^4.0.0-alpha.14",
+    "@tanstack/react-query": "^5.35.1",
+    "@tanstack/react-query-devtools": "^5.35.1",
+    "@tanstack/react-router": "^1.31.20",
+    "framer-motion": "^11.1.9",
+    "obs-websocket-js": "^5.0.5",
+    "react": "18.3",
+    "react-dom": "18.3",
+    "react-use-websocket": "^4.8.1",
+    "tailwindcss": "^4.0.0-alpha.14",
+    "vite-tsconfig-paths": "^4.3.2"
+  },
+  "devDependencies": {
+    "@tanstack/router-devtools": "^1.31.20",
+    "@tanstack/router-vite-plugin": "^1.31.18",
+    "@types/react": "18.3",
+    "@types/react-dom": "18.3",
+    "@typescript-eslint/eslint-plugin": "^7.2.0",
+    "@typescript-eslint/parser": "^7.2.0",
+    "@vitejs/plugin-react-swc": "^3.5.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.6",
+    "prettier": "^3.2.5",
+    "prettier-plugin-tailwindcss": "^0.5.14",
+    "typescript": "^5.2.2",
+    "vite": "^5.2.0"
+  }
+}

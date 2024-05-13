@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  /* Fonts */
+  --font-family-sans: "Inter Variable", sans-serif;
+
+  /* Colors */
+  --color-*: initial;
+
+  --color-black: #000000;
+  --color-white: #ffffff;
+
+  --color-main-dark: #241f33;
+  --color-main-light: #efefef;
+  --color-avagreen: #5be058;
+  --color-avapurple: #6644e8;
+  --color-avablue: #1cdaf4;
+  --color-avayellow: #ffdd33;
+
+  --color-muted-green: #bbf4b0;
+  --color-muted-purple: #928add;
+  --color-muted-bluegrey: #6d8591;
+  --color-muted-yellow: #fff683;
+  --color-muted-lightgreen: #e7f7e7;
+  --color-muted-lightbluegrey: #b4cbd6;
+  --color-muted-dark: #0d0a11;
+  --color-muted-midgrey: #939393;
+
+  --color-shark-50:  #d3dfdf;
+  --color-shark-100: #c0cfd3;
+  --color-shark-200: #a8bac2;
+  --color-shark-300: #819ba7;
+  --color-shark-400: #5a737c;
+  --color-shark-500: #44585f;
+  --color-shark-600: #35434b;
+  --color-shark-700: #2b353b;
+  --color-shark-800: #232a2e; /* gradent.lighter */
+  --color-shark-900: #1a1f23; /* gradient.darker */
+  --color-shark-950: #121517;
+
+  /* Box Model */
+  --height-canvas: 1080px;
+  --width-canvas: 1920px;
+}

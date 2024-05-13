@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Landale Overlay System
 
-## Getting Started
+This is the **Landale Overlay System**, the continuing culmination of my efforts over the past decade to create an overlay system [for my Twitch channel](https://twitch.tv/avalonstar). It is a series of components and tools that are used in conjunction with [OBS Studio](https://obsproject.com) to support the games I play and the content I create. This is not meant to be a general-purpose overlay system, as it is highly specialized for my needs, but it's public so that you can see how I've built it.
 
-First, run the development server:
+## Features
+
+TBD.
+
+## Design Philosophy
+
+The philosophy behind **my brand of overlay design** has always been:
+
+1. **Every element on an overlay should appear as a part of a greater whole.** It should not feel like a collection of disparate elements.
+  - Satisfying broadcast design is about cohesion and a sense of space. 
+    - Most elements in my designs are visually anchored, in one way or another, to a side of the screen. This anchoring makes the appearance and disappearance of elements feel like they have an origin point.
+    - Elements follow a base-12 system, meaning that they are either spaced or sized in multiples of 12 pixels. 
+    - I purposefully create slight overlaps between elements to create a sense of depth.
+  - Alert design has been and still is based on the concept of each alert being designed in a vacuum. While alerts designed this way can share a similar aesthetic, they feel separate from the rest of the experience. This denies the end-user guidance on where to place these elements, leading to a very disjointed experience where anything can appear out of nowhere at any time.
+2. **Browser sources are a layer of the canvas stack like any other source.** Design and build with that in mind.
+  - Browser sources are stacked around other "immutable" sources, mainly video sources. Browser sources further down the stack serve as buckets for the aforementioned immutable sources, with ones higher in the stack serving as adornment, as a mask, or as the layer that displays alerts.
+3. **Do as much as possible with a browser source.** The less reliance the system has on other sources, such as images and (more importantly) image masks, the better. 
+  - This is mainly a personal preference, as it is much faster for me to make changes to styling than to create and export a new image asset.
+  - When I worked for Twitch, I hosted my overlays online so they could be used while away from home with minimal setup.
+
+## History
+
+
+### Why Landale?
+
+**Landale** is the name of the ship from the Sega Genesis-era RPG Phantasy Star IV. It's also the last name of the titular character from the original Phantasy Star, Alis Landale.
+
+## Installation
+
+The LOS takes advantage of a lot of the baked-in functionality of the [Bun](https://bun.sh) JavaScript runtime. 
+
+To install dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+To run:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+```bash
+bun run index.ts
+```
