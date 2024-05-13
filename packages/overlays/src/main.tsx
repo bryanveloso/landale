@@ -8,6 +8,7 @@ import { routeTree } from './routeTree.gen';
 
 import './index.css';
 import { SocketProvider } from './lib/socket.provider';
+import { OBSProvider } from './lib/obs.provider';
 
 const queryClient = new QueryClient();
 
@@ -29,7 +30,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <SocketProvider>
-        <RouterProvider router={router} />
+        <OBSProvider>
+          <RouterProvider router={router} />
+        </OBSProvider>
       </SocketProvider>
     </QueryClientProvider>
   </React.StrictMode>

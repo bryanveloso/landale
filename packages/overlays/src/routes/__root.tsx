@@ -1,11 +1,18 @@
-import React, { Suspense } from 'react';
+import React, { FC, PropsWithChildren, Suspense } from 'react';
 import { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
+
+import { DefaultCatchBoundary } from '@/components/error';
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
 }>()({
-  component: Root,
+  component: RootComponent,
+  errorComponent: ({ error }) => (
+    <RootDocument>
+      <DefaultCatchBoundary error={error} reset={undefined as never} />
+    </RootDocument>
+  ),
 });
 
 // Lazy load the devtools if running outside of OBS Studio.
@@ -26,14 +33,22 @@ const TanStackRouterDevtools =
         }))
       );
 
-function Root() {
+const RootDocument: FC<PropsWithChildren> = ({ children }) => {
   return (
     <>
-      <Outlet />
+      {children}
       <Suspense>
         <ReactQueryDevtools />
         <TanStackRouterDevtools />
       </Suspense>
     </>
+  );
+};
+
+function RootComponent() {
+  return (
+    <RootDocument>
+      <Outlet />
+    </RootDocument>
   );
 }

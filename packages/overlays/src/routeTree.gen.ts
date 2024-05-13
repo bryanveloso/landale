@@ -12,7 +12,9 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/index'
+import { Route as widgetOmnywidgetImport } from './routes/(widget)/omnywidget'
 import { Route as fullIronmonImport } from './routes/(full)/ironmon'
+import { Route as fullFoundationImport } from './routes/(full)/foundation'
 
 // Create/Update Routes
 
@@ -21,8 +23,18 @@ const IndexRoute = IndexImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const widgetOmnywidgetRoute = widgetOmnywidgetImport.update({
+  path: '/omnywidget',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const fullIronmonRoute = fullIronmonImport.update({
   path: '/ironmon',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const fullFoundationRoute = fullFoundationImport.update({
+  path: '/foundation',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -34,8 +46,16 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/(full)/foundation': {
+      preLoaderRoute: typeof fullFoundationImport
+      parentRoute: typeof rootRoute
+    }
     '/(full)/ironmon': {
       preLoaderRoute: typeof fullIronmonImport
+      parentRoute: typeof rootRoute
+    }
+    '/(widget)/omnywidget': {
+      preLoaderRoute: typeof widgetOmnywidgetImport
       parentRoute: typeof rootRoute
     }
   }
@@ -43,6 +63,11 @@ declare module '@tanstack/react-router' {
 
 // Create and export the route tree
 
-export const routeTree = rootRoute.addChildren([IndexRoute, fullIronmonRoute])
+export const routeTree = rootRoute.addChildren([
+  IndexRoute,
+  fullFoundationRoute,
+  fullIronmonRoute,
+  widgetOmnywidgetRoute,
+])
 
 /* prettier-ignore-end */
