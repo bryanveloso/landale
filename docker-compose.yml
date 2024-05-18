@@ -6,7 +6,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: landale
-      POSTGRES_USÍER: landale
+      POSTGRES_USER: landale
       POSTGRES_PASSWORD: landale
     ports:
       - "5433:5432"
