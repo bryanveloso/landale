@@ -1,0 +1,23 @@
+{
+  "name": "database",
+  "version": "1.0.0",
+  "exports": {
+    ".": "./src/client.ts"
+  },
+  "scripts": {
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "studio": "prisma studio"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "prisma": "^5.14.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0"
+  }
+}

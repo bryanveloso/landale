@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Challenge {
+  id          Int    @id @default(autoincrement())
+  name        String
+  description String?
+  seeds       Seed[]
+
+  @@map("challenges")
+}
+
+model Seed {
+  id          Int          @id
+  type        Challenge    @relation(fields: [id], references: [id])
+  checkpoints Checkpoint[]
+
+  @@map("seeds")
+}
+
+model Checkpoint {
+  id      Int     @id @default(autoincrement())
+  seed    Seed    @relation(fields: [id], references: [id])
+  seedId  Int
+  name    String
+  reached Boolean
+
+  @@map("checkpoints")
+}
