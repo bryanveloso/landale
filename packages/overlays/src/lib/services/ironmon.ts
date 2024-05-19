@@ -26,6 +26,12 @@ export type CheckpointMessage = {
   metadata: {
     id: number;
     name: string;
+    seed: number;
+    next: {
+      trainer: string;
+      clearRate: number;
+      lastCleared: number;
+    };
   };
 };
 
