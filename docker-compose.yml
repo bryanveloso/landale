@@ -16,6 +16,8 @@ services:
     working_dir: /workspace/packages/server
     volumes:
       - ./:/workspace
+    environment:
+      DATABASE_URL: postgres://landale:landale@db:5432/landale
     ports:
       - "7175:7175"
       - "8080:8080"
@@ -25,8 +27,6 @@ services:
     working_dir: /workspace/packages/overlays
     volumes:
       - ./:/workspace
-    environment:
-      DATABASE_URL: postgres://landale:landale@db:5432/landale
     ports:
       - "8088:8088"
     depends_on:
