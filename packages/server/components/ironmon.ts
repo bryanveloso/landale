@@ -49,14 +49,14 @@ const handleCheckpoint = async (message: any) => {
 
 const handleSeed = async (message: any) => {
   const {
-    metadata: { id },
+    metadata: { count },
   } = message;
 
   // Create a new seed in the database.
   await prisma.seed.upsert({
-    where: { id },
+    where: { id: count },
     update: {},
-    create: { challengeId: 1, id },
+    create: { challengeId: 1, id: count },
   });
 };
 
