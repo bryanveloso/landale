@@ -1,20 +1,55 @@
 import type { Server, TCPSocketListener, Socket } from 'bun';
 
+import * as ironmon from './ironmon';
+
 const handleOpen = (socket: Socket<{}>) => {
   console.log(`🔀 TCP: Socket opened by ${socket.remoteAddress}`);
 };
 
-const handleData = (socket: Socket<{}>, data: Buffer, wss: Server) => {
-  console.log(
-    `🔀 TCP: Received data from ${socket.remoteAddress}: ${data.toString('utf-8')}`
-  );
+const handleData = async (socket: Socket<{}>, data: Buffer, wss: Server) => {
+  // Handle the incoming message and handle multiple payloads appearing in the same message.
+  let buffer = '';
+  buffer += data.toString('utf-8');
 
-  const payload = {
-    source: 'tcp',
-    ...JSON.parse(data.toString().split(' ')[1]),
-  };
+  while (buffer.length > 0) {
+    const space = buffer.indexOf(' ');
+    if (space === -1) {
+      break;
+    }
 
-  wss.publish('transport', JSON.stringify(payload));
+    const length = parseInt(buffer.slice(0, space), 10);
+    if (isNaN(length)) {
+      console.error(
+        `🔀 TCP: Invalid message length: ${buffer.slice(0, space)}`
+      );
+      buffer = '';
+      break;
+    }
+
+    const startIndex = space + 1;
+    const endIndex = startIndex + length;
+
+    if (buffer.length >= endIndex) {
+      const message = buffer.slice(startIndex, endIndex);
+      console.log(
+        `🔀 TCP: Received data from ${socket.remoteAddress}: ${message}`
+      );
+
+      // Attempt to process the message.
+      try {
+        const parsedMessage = JSON.parse(message);
+        const payload = await ironmon.handleMessage(parsedMessage);
+        console.log(`🔀 TCP: Processed payload: ${JSON.stringify(payload)}`);
+        wss.publish('transport', JSON.stringify(payload));
+      } catch (e: any) {
+        console.error(`🔀 TCP: Error processing message: ${e}`);
+      }
+
+      buffer = buffer.slice(endIndex);
+    } else {
+      break;
+    }
+  }
 };
 
 const handleClose = (socket: Socket<{}>) => {
