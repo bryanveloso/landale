@@ -8,28 +8,42 @@ datasource db {
 }
 
 model Challenge {
-  id          Int    @id @default(autoincrement())
-  name        String
-  description String?
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
   seeds       Seed[]
+  checkpoints Checkpoint[]
 
   @@map("challenges")
 }
 
+model Checkpoint {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  trainer     String
+  order       Int
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  challengeId Int
+  results     Result[]
+
+  @@map("checkpoints")
+}
+
 model Seed {
-  id          Int          @id
-  type        Challenge    @relation(fields: [id], references: [id])
-  checkpoints Checkpoint[]
+  id          Int       @id
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  challengeId Int
+  results     Result[]
 
   @@map("seeds")
 }
 
-model Checkpoint {
-  id      Int     @id @default(autoincrement())
-  seed    Seed    @relation(fields: [id], references: [id])
-  seedId  Int
-  name    String
-  reached Boolean
+model Result {
+  id           Int        @id @default(autoincrement())
+  seed         Seed       @relation(fields: [seedId], references: [id])
+  seedId       Int
+  checkpoint   Checkpoint @relation(fields: [checkpointId], references: [id])
+  checkpointId Int
+  result       Boolean
 
-  @@map("checkpoints")
+  @@map("results")
 }
