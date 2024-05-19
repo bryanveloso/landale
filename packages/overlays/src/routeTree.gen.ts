@@ -43,18 +43,30 @@ const fullFoundationRoute = fullFoundationImport.update({
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
     '/(full)/foundation': {
+      id: '/foundation'
+      path: '/foundation'
+      fullPath: '/foundation'
       preLoaderRoute: typeof fullFoundationImport
       parentRoute: typeof rootRoute
     }
     '/(full)/ironmon': {
+      id: '/ironmon'
+      path: '/ironmon'
+      fullPath: '/ironmon'
       preLoaderRoute: typeof fullIronmonImport
       parentRoute: typeof rootRoute
     }
     '/(widget)/omnywidget': {
+      id: '/omnywidget'
+      path: '/omnywidget'
+      fullPath: '/omnywidget'
       preLoaderRoute: typeof widgetOmnywidgetImport
       parentRoute: typeof rootRoute
     }
@@ -63,11 +75,11 @@ declare module '@tanstack/react-router' {
 
 // Create and export the route tree
 
-export const routeTree = rootRoute.addChildren([
+export const routeTree = rootRoute.addChildren({
   IndexRoute,
   fullFoundationRoute,
   fullIronmonRoute,
   widgetOmnywidgetRoute,
-])
+})
 
 /* prettier-ignore-end */
