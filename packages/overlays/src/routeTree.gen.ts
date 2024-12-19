@@ -13,6 +13,7 @@
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/index'
 import { Route as widgetOmnywidgetImport } from './routes/(widget)/omnywidget'
+import { Route as fullSpeedrunningImport } from './routes/(full)/speedrunning'
 import { Route as fullIronmonImport } from './routes/(full)/ironmon'
 import { Route as fullFoundationImport } from './routes/(full)/foundation'
 
@@ -25,6 +26,11 @@ const IndexRoute = IndexImport.update({
 
 const widgetOmnywidgetRoute = widgetOmnywidgetImport.update({
   path: '/omnywidget',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const fullSpeedrunningRoute = fullSpeedrunningImport.update({
+  path: '/speedrunning',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -63,6 +69,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof fullIronmonImport
       parentRoute: typeof rootRoute
     }
+    '/(full)/speedrunning': {
+      id: '/speedrunning'
+      path: '/speedrunning'
+      fullPath: '/speedrunning'
+      preLoaderRoute: typeof fullSpeedrunningImport
+      parentRoute: typeof rootRoute
+    }
     '/(widget)/omnywidget': {
       id: '/omnywidget'
       path: '/omnywidget'
@@ -79,6 +92,7 @@ export const routeTree = rootRoute.addChildren({
   IndexRoute,
   fullFoundationRoute,
   fullIronmonRoute,
+  fullSpeedrunningRoute,
   widgetOmnywidgetRoute,
 })
 
