@@ -21,6 +21,7 @@ services:
     ports:
       - "7175:7175"
       - "8080:8080"
+      - "8081:8081"
 
   overlays:
     build: .
