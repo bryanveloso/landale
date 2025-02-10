@@ -2,6 +2,7 @@ import chalk from 'chalk';
 
 import { TCPSocketServer } from './components/tcp';
 import { WebSocketServer } from './components/wss';
+import * as Twitch from './components/twitch';
 
 import { version } from './package.json';
 
@@ -19,4 +20,6 @@ console.log(
   console.log(
     `  ${chalk.green('➜')}  ${chalk.bold('TCPSocket Server')}: ${tcp.hostname}:${tcp.port}\n`
   );
+
+  const twitch = await Twitch.init(wss);
 })();

@@ -176,3 +176,6 @@ dist
 
 # CSV files
 *.csv
+
+# Twtich auth file
+twitch-token.json
