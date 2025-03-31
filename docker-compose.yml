@@ -9,8 +9,8 @@ services:
       POSTGRES_USER: landale
       POSTGRES_PASSWORD: landale
     ports:
-      - "5433:5432"
-  
+      - '5433:5432'
+
   server:
     build: .
     working_dir: /workspace/packages/server
@@ -19,9 +19,9 @@ services:
     environment:
       DATABASE_URL: postgres://landale:landale@db:5432/landale
     ports:
-      - "7175:7175"
-      - "8080:8080"
-      - "8081:8081"
+      - '7175:7175'
+      - '8080:8080'
+      - '8081:8081'
 
   overlays:
     build: .
@@ -29,7 +29,7 @@ services:
     volumes:
       - ./:/workspace
     ports:
-      - "8088:8088"
+      - '8088:8088'
     depends_on:
       - server
       - db
