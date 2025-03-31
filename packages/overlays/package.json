@@ -9,37 +9,37 @@
     "preview": "bunx --bun vite preview"
   },
   "dependencies": {
-    "@fontsource-variable/inter": "^5.0.18",
-    "@tanstack/react-query": "^5.35.1",
-    "@tanstack/react-query-devtools": "^5.35.1",
-    "@tanstack/react-router": "^1.31.20",
-    "framer-motion": "^11.1.9",
-    "obs-websocket-js": "^5.0.5",
+    "@fontsource-variable/inter": "^5.2.5",
+    "@tanstack/react-query": "^5.71.0",
+    "@tanstack/react-query-devtools": "^5.71.0",
+    "@tanstack/react-router": "^1.114.29",
+    "framer-motion": "^11.18.2",
+    "obs-websocket-js": "^5.0.6",
     "react": "18.3",
     "react-dom": "18.3",
-    "react-use-websocket": "^4.8.1",
-    "tailwindcss": "^3.4.3",
+    "react-use-websocket": "^4.13.0",
+    "tailwindcss": "^3.4.17",
     "vite-tsconfig-paths": "^4.3.2"
   },
   "devDependencies": {
-    "@tanstack/router-devtools": "^1.31.20",
-    "@tanstack/router-vite-plugin": "^1.31.18",
+    "@tanstack/router-devtools": "^1.114.29",
+    "@tanstack/router-vite-plugin": "^1.114.30",
     "@types/react": "18.3",
     "@types/react-dom": "18.3",
-    "@typescript-eslint/eslint-plugin": "^7.2.0",
-    "@typescript-eslint/parser": "^7.2.0",
-    "@vitejs/plugin-react-swc": "^3.5.0",
-    "autoprefixer": "^10.4.19",
-    "eslint": "^8.57.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.6",
-    "postcss": "^8.4.38",
-    "prettier": "^3.2.5",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react-swc": "^3.8.1",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "postcss": "^8.5.3",
+    "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.5.14",
-    "typescript": "^5.2.2",
-    "vite": "^5.2.0"
+    "typescript": "^5.8.2",
+    "vite": "^5.4.15"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-arm64-gnu": "^4.17.2"
+    "@rollup/rollup-linux-arm64-gnu": "^4.38.0"
   }
 }
