@@ -10,79 +10,79 @@
 
 // Import Routes
 
-import { Route as rootRoute } from './routes/__root'
-import { Route as IndexImport } from './routes/index'
-import { Route as widgetOmnywidgetImport } from './routes/(widget)/omnywidget'
-import { Route as fullSpeedrunningImport } from './routes/(full)/speedrunning'
-import { Route as fullIronmonImport } from './routes/(full)/ironmon'
-import { Route as fullFoundationImport } from './routes/(full)/foundation'
+import { Route as rootRoute } from './routes/__root';
+import { Route as IndexImport } from './routes/index';
+import { Route as widgetOmnywidgetImport } from './routes/(widget)/omnywidget';
+import { Route as fullSpeedrunningImport } from './routes/(full)/speedrunning';
+import { Route as fullIronmonImport } from './routes/(full)/ironmon';
+import { Route as fullFoundationImport } from './routes/(full)/foundation';
 
 // Create/Update Routes
 
 const IndexRoute = IndexImport.update({
   path: '/',
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 const widgetOmnywidgetRoute = widgetOmnywidgetImport.update({
   path: '/omnywidget',
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 const fullSpeedrunningRoute = fullSpeedrunningImport.update({
   path: '/speedrunning',
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 const fullIronmonRoute = fullIronmonImport.update({
   path: '/ironmon',
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 const fullFoundationRoute = fullFoundationImport.update({
   path: '/foundation',
   getParentRoute: () => rootRoute,
-} as any)
+} as any);
 
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexImport
-      parentRoute: typeof rootRoute
-    }
+      id: '/';
+      path: '/';
+      fullPath: '/';
+      preLoaderRoute: typeof IndexImport;
+      parentRoute: typeof rootRoute;
+    };
     '/(full)/foundation': {
-      id: '/foundation'
-      path: '/foundation'
-      fullPath: '/foundation'
-      preLoaderRoute: typeof fullFoundationImport
-      parentRoute: typeof rootRoute
-    }
+      id: '/foundation';
+      path: '/foundation';
+      fullPath: '/foundation';
+      preLoaderRoute: typeof fullFoundationImport;
+      parentRoute: typeof rootRoute;
+    };
     '/(full)/ironmon': {
-      id: '/ironmon'
-      path: '/ironmon'
-      fullPath: '/ironmon'
-      preLoaderRoute: typeof fullIronmonImport
-      parentRoute: typeof rootRoute
-    }
+      id: '/ironmon';
+      path: '/ironmon';
+      fullPath: '/ironmon';
+      preLoaderRoute: typeof fullIronmonImport;
+      parentRoute: typeof rootRoute;
+    };
     '/(full)/speedrunning': {
-      id: '/speedrunning'
-      path: '/speedrunning'
-      fullPath: '/speedrunning'
-      preLoaderRoute: typeof fullSpeedrunningImport
-      parentRoute: typeof rootRoute
-    }
+      id: '/speedrunning';
+      path: '/speedrunning';
+      fullPath: '/speedrunning';
+      preLoaderRoute: typeof fullSpeedrunningImport;
+      parentRoute: typeof rootRoute;
+    };
     '/(widget)/omnywidget': {
-      id: '/omnywidget'
-      path: '/omnywidget'
-      fullPath: '/omnywidget'
-      preLoaderRoute: typeof widgetOmnywidgetImport
-      parentRoute: typeof rootRoute
-    }
+      id: '/omnywidget';
+      path: '/omnywidget';
+      fullPath: '/omnywidget';
+      preLoaderRoute: typeof widgetOmnywidgetImport;
+      parentRoute: typeof rootRoute;
+    };
   }
 }
 
@@ -94,6 +94,6 @@ export const routeTree = rootRoute.addChildren({
   fullIronmonRoute,
   fullSpeedrunningRoute,
   widgetOmnywidgetRoute,
-})
+});
 
 /* prettier-ignore-end */

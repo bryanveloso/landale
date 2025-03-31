@@ -1,25 +1,19 @@
-import chalk from 'chalk';
+import chalk from 'chalk'
 
-import { TCPSocketServer } from './components/tcp';
-import { WebSocketServer } from './components/wss';
-import * as Twitch from './components/twitch';
+import { TCPSocketServer } from './components/tcp'
+import { WebSocketServer } from './components/wss'
+import * as Twitch from './components/twitch'
 
-import { version } from './package.json';
+import { version } from './package.json'
 
-console.log(
-  chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`)
-);
+console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
 
-(async () => {
-  const wss = await WebSocketServer.init();
-  console.log(
-    `  ${chalk.green('➜')}  ${chalk.bold('WebSocket Server')}: ${wss.hostname}:${wss.port}`
-  );
+;(async () => {
+  const wss = await WebSocketServer.init()
+  console.log(`  ${chalk.green('➜')}  ${chalk.bold('WebSocket Server')}: ${wss.hostname}:${wss.port}`)
 
-  const tcp = await TCPSocketServer.init(wss);
-  console.log(
-    `  ${chalk.green('➜')}  ${chalk.bold('TCPSocket Server')}: ${tcp.hostname}:${tcp.port}\n`
-  );
+  const tcp = await TCPSocketServer.init(wss)
+  console.log(`  ${chalk.green('➜')}  ${chalk.bold('TCPSocket Server')}: ${tcp.hostname}:${tcp.port}\n`)
 
-  const twitch = await Twitch.init(wss);
-})();
+  const twitch = await Twitch.init(wss)
+})()

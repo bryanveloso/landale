@@ -33,14 +33,14 @@ export const Timeline: FC<{ totalCheckpoints?: number }> = ({
         <Fragment key={checkpoint}>
           {index > 0 && (
             <motion.div
-              className="bg-shark-400 -m-0.5 h-1 w-3"
+              className="-m-0.5 h-1 w-3 bg-shark-400"
               initial={false}
               animate={{ width: currentCheckpoint > index ? 24 : 24 }}
               transition={{ duration: 0.5 }}
             />
           )}
           <motion.div
-            className="bg-avablue border-shark-400 h-4 w-4 shrink-0 rounded-full border-4"
+            className="h-4 w-4 shrink-0 rounded-full border-4 border-shark-400 bg-avablue"
             initial={{ scale: 0.8 }}
             animate={{
               opacity: currentCheckpoint >= checkpoint ? 1 : 1,
