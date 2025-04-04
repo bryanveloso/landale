@@ -4,7 +4,9 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "dev": "bun --hot run index.ts"
+    "build": "tsc",
+    "dev": "bun --hot run src/index.ts",
+    "start": "bun run dist/index.js"
   },
   "devDependencies": {
     "@types/bun": "latest",
