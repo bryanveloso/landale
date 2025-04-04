@@ -8,6 +8,8 @@ import { PubSubClient } from '@twurple/pubsub'
 const clientId = process.env.TWITCH_CLIENT_ID!
 const clientSecret = process.env.TWITCH_CLIENT_SECRET!
 const eventSubSecret = process.env.TWITCH_EVENTSUB_SECRET!
+const userId = process.env.TWITCH_USER_ID!
+
 const authProvider = new RefreshingAuthProvider({ clientId, clientSecret })
 
 const setupChat = async (authProvider: AuthProvider) => {
@@ -30,6 +32,10 @@ const setupEventSub = async (apiClient: ApiClient) => {
   })
 
   listener.start()
+
+  listener.onChannelChatMessage(userId, userId, e => {
+    console.log(JSON.stringify(e, null, 4))
+  })
 }
 
 const setupPubSub = async (authProvider: AuthProvider) => {
