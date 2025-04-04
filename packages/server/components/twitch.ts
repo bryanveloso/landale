@@ -33,7 +33,7 @@ const setupEventSub = async (apiClient: ApiClient) => {
 
   listener.start()
 
-  listener.onChannelChatMessage(userId, userId, e => {
+  listener.onChannelChatMessage(userId, userId, (e) => {
     console.log(JSON.stringify(e, null, 4))
   })
 }

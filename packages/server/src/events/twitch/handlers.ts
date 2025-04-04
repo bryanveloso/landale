@@ -13,7 +13,7 @@ const authProvider = new RefreshingAuthProvider({ clientId, clientSecret })
 
 export async function initialize() {
   try {
-    const tokenFile = __dirname + '/twitch-token.json'
+    const tokenFile = `${__dirname}/twitch-token.json`
     const tokenData = await Bun.file(tokenFile).json()
 
     authProvider.onRefresh(async (_, newTokenData) => {
@@ -42,8 +42,15 @@ export async function initialize() {
 }
 
 function setupEventListeners(listener: EventSubHttpListener, apiClient: ApiClient) {
+  // Channel message subscription
   listener.onChannelChatMessage(userId, userId, (e) => {
     emitEvent('twitch:message', e)
     console.log('Received message:', e.messageId)
   })
+
+  // Add additional event subscriptions here
+  // Example:
+  // listener.onChannelFollow(userId, (e) => {
+  //   emitEvent('twitch:follow', e)
+  // })
 }

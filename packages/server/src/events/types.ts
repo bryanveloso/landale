@@ -1,4 +1,4 @@
-import type { TwitchEvent } from "./twitch/types"
+import type { TwitchEvent } from './twitch/types'
 
 export type EventMap = {
   'twitch:message': TwitchEvent['message']
