@@ -20,7 +20,7 @@ export default {
         lightgreen: '#e7f7e7',
         lightbluegrey: '#b4cbd6',
         dark: '#0d0a11',
-        midgrey: '#939393',
+        midgrey: '#939393'
       },
 
       //
@@ -35,16 +35,16 @@ export default {
         700: '#2b353b',
         800: '#232a2e' /* gradent.lighter */,
         900: '#1a1f23' /* gradient.darker */,
-        950: '#121517',
-      },
+        950: '#121517'
+      }
     },
     fontFamily: {
-      sans: ['Inter Variable', 'sans-serif'],
+      sans: ['Inter Variable', 'sans-serif']
     },
     extend: {
       height: { canvas: '1080px' },
-      width: { canvas: '1920px' },
-    },
+      width: { canvas: '1920px' }
+    }
   },
-  plugins: [],
-};
+  plugins: []
+}

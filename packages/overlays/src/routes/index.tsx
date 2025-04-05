@@ -1,9 +1,9 @@
-import React from 'react';
-import { createFileRoute } from '@tanstack/react-router';
+import React from 'react'
+import { createFileRoute } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
-  component: Home,
-});
+  component: Home
+})
 
 function Home() {
   return (
@@ -11,5 +11,5 @@ function Home() {
       <h3>Welcome Home!</h3>
       <p>{React.version}</p>
     </div>
-  );
+  )
 }
