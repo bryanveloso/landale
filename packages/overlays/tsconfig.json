@@ -26,6 +26,8 @@
       "+/*": ["./assets/*"],
       "@/*": ["./src/*"],
       "~/*": ["./public/*"],
+      "@landale/server": ["../server/src"],
+      "@landale/server/*": ["../server/src/*"],
     }
   },
   "include": ["src"],
