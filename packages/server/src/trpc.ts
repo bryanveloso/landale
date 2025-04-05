@@ -23,4 +23,5 @@ export const appRouter = router({
   twitch: twitchRouter
 })
 
+// Define the router type
 export type AppRouter = typeof appRouter

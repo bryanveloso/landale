@@ -1,5 +1,5 @@
 import { ApiClient } from '@twurple/api'
-import { RefreshingAuthProvider, type AuthProvider } from '@twurple/auth'
+import { RefreshingAuthProvider } from '@twurple/auth'
 import { EventSubHttpListener, ReverseProxyAdapter } from '@twurple/eventsub-http'
 
 import { emitEvent } from '..'
@@ -33,7 +33,7 @@ export async function initialize() {
     })
 
     listener.start()
-    setupEventListeners(listener, apiClient)
+    setupEventListeners(listener)
     return listener
   } catch (error) {
     console.error('Error initializing Twitch API:', error)
@@ -41,7 +41,7 @@ export async function initialize() {
   }
 }
 
-function setupEventListeners(listener: EventSubHttpListener, apiClient: ApiClient) {
+function setupEventListeners(listener: EventSubHttpListener) {
   // Channel message subscription
   listener.onChannelChatMessage(userId, userId, (e) => {
     emitEvent('twitch:message', e)

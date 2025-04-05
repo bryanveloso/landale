@@ -1,39 +1,35 @@
-import '@fontsource-variable/inter';
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { RouterProvider, createRouter } from '@tanstack/react-router';
+import '@fontsource-variable/inter'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { RouterProvider, createRouter } from '@tanstack/react-router'
 
-import { routeTree } from './routeTree.gen';
+import { OBSProvider } from '@/lib/obs.provider'
+import { QueryProvider, queryClient } from '@/lib/query.provider'
 
-import './index.css';
-import { SocketProvider } from './lib/socket.provider';
-import { OBSProvider } from './lib/obs.provider';
+import { routeTree } from './routeTree.gen'
 
-const queryClient = new QueryClient();
+import './index.css'
 
 const router = createRouter({
   routeTree,
   context: { queryClient },
   defaultPreload: 'intent',
-  defaultPreloadStaleTime: 0,
-});
+  defaultPreloadStaleTime: 0
+})
 
 // Register router for type-safety.
 declare module '@tanstack/react-router' {
   interface Register {
-    router: typeof router;
+    router: typeof router
   }
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <SocketProvider>
-        <OBSProvider>
-          <RouterProvider router={router} />
-        </OBSProvider>
-      </SocketProvider>
-    </QueryClientProvider>
+    <QueryProvider>
+      <OBSProvider>
+        <RouterProvider router={router} />
+      </OBSProvider>
+    </QueryProvider>
   </React.StrictMode>
-);
+)

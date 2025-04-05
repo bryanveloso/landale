@@ -16,37 +16,44 @@ import { Route as widgetOmnywidgetImport } from './routes/(widget)/omnywidget'
 import { Route as fullSpeedrunningImport } from './routes/(full)/speedrunning'
 import { Route as fullIronmonImport } from './routes/(full)/ironmon'
 import { Route as fullFoundationImport } from './routes/(full)/foundation'
+import { Route as fullEmoterainImport } from './routes/(full)/emoterain'
 
 // Create/Update Routes
 
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const widgetOmnywidgetRoute = widgetOmnywidgetImport.update({
   id: '/(widget)/omnywidget',
   path: '/omnywidget',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const fullSpeedrunningRoute = fullSpeedrunningImport.update({
   id: '/(full)/speedrunning',
   path: '/speedrunning',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const fullIronmonRoute = fullIronmonImport.update({
   id: '/(full)/ironmon',
   path: '/ironmon',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const fullFoundationRoute = fullFoundationImport.update({
   id: '/(full)/foundation',
   path: '/foundation',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
+} as any)
+
+const fullEmoterainRoute = fullEmoterainImport.update({
+  id: '/(full)/emoterain',
+  path: '/emoterain',
+  getParentRoute: () => rootRoute
 } as any)
 
 // Populate the FileRoutesByPath interface
@@ -58,6 +65,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/(full)/emoterain': {
+      id: '/(full)/emoterain'
+      path: '/emoterain'
+      fullPath: '/emoterain'
+      preLoaderRoute: typeof fullEmoterainImport
       parentRoute: typeof rootRoute
     }
     '/(full)/foundation': {
@@ -95,6 +109,7 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/emoterain': typeof fullEmoterainRoute
   '/foundation': typeof fullFoundationRoute
   '/ironmon': typeof fullIronmonRoute
   '/speedrunning': typeof fullSpeedrunningRoute
@@ -103,6 +118,7 @@ export interface FileRoutesByFullPath {
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/emoterain': typeof fullEmoterainRoute
   '/foundation': typeof fullFoundationRoute
   '/ironmon': typeof fullIronmonRoute
   '/speedrunning': typeof fullSpeedrunningRoute
@@ -112,6 +128,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/(full)/emoterain': typeof fullEmoterainRoute
   '/(full)/foundation': typeof fullFoundationRoute
   '/(full)/ironmon': typeof fullIronmonRoute
   '/(full)/speedrunning': typeof fullSpeedrunningRoute
@@ -120,12 +137,13 @@ export interface FileRoutesById {
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/foundation' | '/ironmon' | '/speedrunning' | '/omnywidget'
+  fullPaths: '/' | '/emoterain' | '/foundation' | '/ironmon' | '/speedrunning' | '/omnywidget'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/foundation' | '/ironmon' | '/speedrunning' | '/omnywidget'
+  to: '/' | '/emoterain' | '/foundation' | '/ironmon' | '/speedrunning' | '/omnywidget'
   id:
     | '__root__'
     | '/'
+    | '/(full)/emoterain'
     | '/(full)/foundation'
     | '/(full)/ironmon'
     | '/(full)/speedrunning'
@@ -135,6 +153,7 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  fullEmoterainRoute: typeof fullEmoterainRoute
   fullFoundationRoute: typeof fullFoundationRoute
   fullIronmonRoute: typeof fullIronmonRoute
   fullSpeedrunningRoute: typeof fullSpeedrunningRoute
@@ -143,15 +162,14 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  fullEmoterainRoute: fullEmoterainRoute,
   fullFoundationRoute: fullFoundationRoute,
   fullIronmonRoute: fullIronmonRoute,
   fullSpeedrunningRoute: fullSpeedrunningRoute,
-  widgetOmnywidgetRoute: widgetOmnywidgetRoute,
+  widgetOmnywidgetRoute: widgetOmnywidgetRoute
 }
 
-export const routeTree = rootRoute
-  ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+export const routeTree = rootRoute._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>()
 
 /* ROUTE_MANIFEST_START
 {
@@ -160,6 +178,7 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
+        "/(full)/emoterain",
         "/(full)/foundation",
         "/(full)/ironmon",
         "/(full)/speedrunning",
@@ -168,6 +187,9 @@ export const routeTree = rootRoute
     },
     "/": {
       "filePath": "index.tsx"
+    },
+    "/(full)/emoterain": {
+      "filePath": "(full)/emoterain.tsx"
     },
     "/(full)/foundation": {
       "filePath": "(full)/foundation.tsx"
