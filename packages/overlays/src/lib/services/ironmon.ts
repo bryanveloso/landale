@@ -1,47 +1,47 @@
 enum Game {
   RubySapphire = 1,
   Emerald,
-  FireRedLeafGreen,
+  FireRedLeafGreen
 }
 
-export type IronmonMessage = InitMessage | SeedMessage | CheckpointMessage;
+export type IronmonMessage = InitMessage | SeedMessage | CheckpointMessage
 
 export type InitMessage = {
-  type: 'init';
+  type: 'init'
   metadata: {
-    version: string;
-    game: Game;
-  };
-};
+    version: string
+    game: Game
+  }
+}
 
 export type SeedMessage = {
-  type: 'seed';
+  type: 'seed'
   metadata: {
-    count: number;
-  };
-};
+    count: number
+  }
+}
 
 export type CheckpointMessage = {
-  type: 'checkpoint';
+  type: 'checkpoint'
   metadata: {
-    id: number;
-    name: string;
-    seed: number;
+    id: number
+    name: string
+    seed: number
     next: {
-      trainer: string;
-      clearRate: number;
-      lastCleared: number;
-    };
-  };
-};
+      trainer: string
+      clearRate: number
+      lastCleared: number
+    }
+  }
+}
 
 // ---
 
 type Checkpoint = {
-  id: number;
-  slug: string;
-  trainers: string;
-};
+  id: number
+  slug: string
+  trainers: string
+}
 
 export const checkpoints: Checkpoint[] = [
   { id: 1, trainers: 'None', slug: 'LAB' },
@@ -67,5 +67,5 @@ export const checkpoints: Checkpoint[] = [
   { id: 21, trainers: 'Bruno', slug: 'BRUNO' },
   { id: 22, trainers: 'Agatha', slug: 'AGATHA' },
   { id: 23, trainers: 'Lance', slug: 'LANCE' },
-  { id: 24, trainers: 'Champ', slug: 'CHAMP' },
-];
+  { id: 24, trainers: 'Champ', slug: 'CHAMP' }
+]

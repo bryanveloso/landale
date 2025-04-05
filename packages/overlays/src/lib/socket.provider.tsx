@@ -1,56 +1,53 @@
-import { FC, PropsWithChildren, createContext, useEffect } from 'react';
-import useWebSocket from 'react-use-websocket';
+import { FC, PropsWithChildren, createContext, useEffect } from 'react'
+import useWebSocket from 'react-use-websocket'
 
-import { IronmonMessage } from './services/ironmon';
-import { useQueryClient } from '@tanstack/react-query';
+import { IronmonMessage } from './services/ironmon'
+import { useQueryClient } from '@tanstack/react-query'
 
-type SocketMessage = { source: 'tcp' } & IronmonMessage;
+type SocketMessage = { source: 'tcp' } & IronmonMessage
 
-const socketUrl = 'ws://saya.local:7175';
+const socketUrl = 'ws://saya.local:7175'
 
-const isHeartbeat = (data: string) => data === 'pong';
+const isHeartbeat = (data: string) => data === 'pong'
 
 export const SocketContext = createContext<{
-  isConnected: boolean;
+  isConnected: boolean
 }>({
-  isConnected: false,
-});
+  isConnected: false
+})
 
 export const SocketProvider: FC<PropsWithChildren> = ({ children }) => {
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient()
   const { lastMessage, readyState } = useWebSocket(socketUrl, {
-    filter: message => !isHeartbeat(message.data),
+    filter: (message) => !isHeartbeat(message.data),
     heartbeat: true,
     onOpen: () => console.log('🟢 <SocketContext /> connected.'),
     onClose: () => console.log('🔴 <SocketContext /> disconnected.'),
-    shouldReconnect: closeEvent => {
-      console.log(closeEvent);
-      return true;
-    },
-  });
+    shouldReconnect: (closeEvent) => {
+      console.log(closeEvent)
+      return true
+    }
+  })
 
   useEffect(() => {
     if (lastMessage && lastMessage.data) {
-      const { source, type, metadata } = JSON.parse(
-        lastMessage.data
-      ) as SocketMessage;
+      const { source, type, metadata } = JSON.parse(lastMessage.data) as SocketMessage
       switch (source) {
         case 'tcp':
-          queryClient.setQueryData(['ironmon', type], metadata);
-          break;
+          queryClient.setQueryData(['ironmon', type], metadata)
+          break
         default:
-          break;
+          break
       }
     }
-  }, [lastMessage, queryClient]);
+  }, [lastMessage, queryClient])
 
   return (
     <SocketContext.Provider
       value={{
-        isConnected: readyState === 1,
-      }}
-    >
+        isConnected: readyState === 1
+      }}>
       {children}
     </SocketContext.Provider>
-  );
-};
+  )
+}

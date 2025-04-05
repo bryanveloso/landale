@@ -1,14 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router'
 
-import { Slot } from '@/components/slot';
+import { Slot } from '@/components/slot'
 
 export const Route = createFileRoute('/(full)/speedrunning')({
-  component: Speedrunning,
-});
+  component: Speedrunning
+})
 
 function Speedrunning() {
   return (
-    <div className="relative flex h-canvas w-canvas flex-col justify-between">
+    <div className="h-canvas w-canvas relative flex flex-col justify-between">
       {/* Sidebar */}
       <aside className="flex justify-end">
         <div className="m-6 flex flex-col gap-3">
@@ -18,5 +18,5 @@ function Speedrunning() {
         </div>
       </aside>
     </div>
-  );
+  )
 }
