@@ -34,27 +34,6 @@ const server: Server = Bun.serve({
   websocket
 })
 
-// const server: Server = Bun.serve(
-//   createBunServeHandler(
-//     {
-//       router: appRouter,
-//       createContext,
-//       endpoint: '/trpc',
-//       onError: (error: Error) => {
-//         console.error('tRPC error:', error)
-//       },
-//       batching: { enabled: true }
-//     } as TrpcHandlerOptions,
-//     {
-//       port: 7175,
-//       hostname: '0.0.0.0',
-//       fetch(_request, _server) {
-//         return new Response('Not found', { status: 404 })
-//       }
-//     } as ServeOptions
-//   )
-// )
-
 console.log(`  ${chalk.green('➜')}  ${chalk.bold('tRPC Server')}: ${server.hostname}:${server.port}`)
 
 // Initialize Twitch EventSub
