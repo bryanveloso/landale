@@ -41,16 +41,46 @@ export async function initialize() {
   }
 }
 
-function setupEventListeners(listener: EventSubHttpListener) {
-  // Channel message subscription
-  listener.onChannelChatMessage(userId, userId, (e) => {
-    emitEvent('twitch:message', e)
-    console.log('Received message:', e.messageId)
+const setupEventListeners = async (listener: EventSubHttpListener) => {
+  // Channel cheer subscription
+  listener.onChannelCheer(userId, (e) => {
+    console.log('Received cheer:', e)
+    emitEvent('twitch:cheer', {
+      bits: e.bits,
+      isAnonymous: e.isAnonymous,
+      message: e.message,
+      userDisplayName: e.userDisplayName,
+      userId: e.userId,
+      userName: e.userName
+    })
   })
 
-  // Add additional event subscriptions here
-  // Example:
-  // listener.onChannelFollow(userId, (e) => {
-  //   emitEvent('twitch:follow', e)
-  // })
+  // Channel message subscription
+  listener.onChannelChatMessage(userId, userId, (e) => {
+    console.log('Received message:', e.messageId)
+    emitEvent('twitch:message', {
+      badges: e.badges,
+      bits: e.bits,
+      chatterDisplayName: e.chatterDisplayName,
+      chatterId: e.chatterId,
+      chatterName: e.chatterName,
+      color: e.color,
+      isCheer: e.isCheer,
+      isRedemption: e.isRedemption,
+      messageId: e.messageId,
+      messageParts: e.messageParts,
+      messageText: e.messageText,
+      messageType: e.messageType,
+      parentMessageId: e.parentMessageId,
+      parentMessageText: e.parentMessageText,
+      parentMessageUserDisplayName: e.parentMessageUserDisplayName,
+      parentMessageUserId: e.parentMessageUserId,
+      parentMessageUserName: e.parentMessageUserName,
+      rewardId: e.rewardId,
+      threadMessageId: e.threadMessageId,
+      threadMessageUserDisplayName: e.threadMessageUserDisplayName,
+      threadMessageUserId: e.threadMessageUserId,
+      threadMessageUserName: e.threadMessageUserName
+    })
+  })
 }

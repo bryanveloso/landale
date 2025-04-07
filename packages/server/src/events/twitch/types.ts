@@ -1,5 +1,6 @@
-import type { EventSubChannelChatMessageEvent } from '@twurple/eventsub-base'
+import type { EventSubChannelChatMessageEvent, EventSubChannelCheerEvent } from '@twurple/eventsub-base'
 
 export interface TwitchEvent {
-  message: EventSubChannelChatMessageEvent
+  cheer: Partial<EventSubChannelCheerEvent>
+  message: Partial<EventSubChannelChatMessageEvent>
 }
