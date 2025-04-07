@@ -1,6 +1,7 @@
 import type { TwitchEvent } from './twitch/types'
 
 export type EventMap = {
+  'twitch:cheer': TwitchEvent['cheer']
   'twitch:message': TwitchEvent['message']
 }
 
