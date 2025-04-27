@@ -11,13 +11,13 @@
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.5",
     "@landale/server": "workspace:*",
-    "@rive-app/react-canvas": "^4.18.8",
+    "@rive-app/react-canvas": "^4.18.9",
     "@tanstack/react-query": "^5.74.4",
     "@tanstack/react-query-devtools": "^5.74.6",
-    "@tanstack/react-router": "^1.117.0",
+    "@tanstack/react-router": "^1.117.1",
     "@trpc/client": "^11.1.1",
     "@trpc/tanstack-react-query": "^11.1.1",
-    "framer-motion": "^12.8.0",
+    "framer-motion": "^12.9.2",
     "obs-websocket-js": "^5.0.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -26,8 +26,8 @@
     "vite-tsconfig-paths": "^5.1.4"
   },
   "devDependencies": {
-    "@tanstack/react-router-devtools": "^1.117.0",
-    "@tanstack/router-vite-plugin": "^1.117.0",
+    "@tanstack/react-router-devtools": "^1.117.1",
+    "@tanstack/router-vite-plugin": "^1.117.2",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@typescript-eslint/eslint-plugin": "^8.31.0",
@@ -41,7 +41,7 @@
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "typescript": "^5.8.3",
-    "vite": "^6.3.2"
+    "vite": "^6.3.3"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-arm64-gnu": "^4.40.0"
