@@ -1,6 +1,6 @@
 import prisma from 'database'
 import { eventEmitter } from '@/events'
-import type { CheckpointMessage, SeedMessage, IronmonEvent } from './types'
+import type { CheckpointMessage, SeedMessage, InitMessage, IronmonEvent } from './types'
 
 /**
  * Service layer for checkpoint operations
@@ -127,10 +127,11 @@ export async function handleSeed(message: SeedMessage): Promise<IronmonEvent['se
 /**
  * Handles init messages from IronMON
  */
-export async function handleInit(message: IronmonEvent['init']): Promise<IronmonEvent['init']> {
+export async function handleInit(message: InitMessage): Promise<IronmonEvent['init']> {
   const eventData: IronmonEvent['init'] = {
     source: 'tcp',
-    ...message
+    type: message.type,
+    metadata: message.metadata
   }
 
   // Emit the event

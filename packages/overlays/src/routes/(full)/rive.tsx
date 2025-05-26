@@ -1,4 +1,5 @@
-import { useRive } from '@rive-app/react-canvas'
+import { useState, useEffect } from 'react'
+import { useRive, useStateMachineInput } from '@rive-app/react-canvas'
 import { createFileRoute } from '@tanstack/react-router'
 
 import LandaleRive from '@/assets/landale.riv?url'
