@@ -26,10 +26,10 @@ function Ironmon() {
         {/* Seed Display */}
         <div className="flex justify-start">
           <div className="m-6 flex flex-col">
-            <div className="bg-shark-800 flex rounded-2xl bg-gradient-to-b from-white/20 to-black/20 bg-blend-soft-light shadow-xl shadow-black/50 ring-2 ring-inset ring-white/10">
+            <div className="bg-shark-800 flex rounded-2xl bg-gradient-to-b from-white/20 to-black/20 bg-blend-soft-light shadow-xl ring-2 shadow-black/50 ring-white/10 ring-inset">
               <div className="bg-shark-950 relative m-3 rounded-lg p-1.5">
                 <div className="flex items-center gap-1">
-                  <div className="bg-shark-950 flex h-12 flex-auto grow items-center gap-3 rounded bg-gradient-to-b from-white/20 to-black/20 px-4 bg-blend-soft-light ring-2 ring-inset ring-white/10">
+                  <div className="bg-shark-950 flex h-12 flex-auto grow items-center gap-3 rounded bg-gradient-to-b from-white/20 to-black/20 px-4 bg-blend-soft-light ring-2 ring-white/10 ring-inset">
                     <div className="relative -top-1.5 left-8 -ml-12">
                       <img src="./games/kaizo/ava.png" />
                     </div>
@@ -45,7 +45,7 @@ function Ironmon() {
         </div>
 
         {/* Location Widget */}
-        <div className="h-canvas absolute bottom-[40px] right-[84px] -z-10 w-[302px] bg-black">
+        <div className="h-canvas absolute right-[84px] bottom-[40px] -z-10 w-[302px] bg-black">
           <img src="/1.png?url" />
         </div>
       </div>

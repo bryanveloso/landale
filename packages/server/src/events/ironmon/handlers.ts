@@ -33,9 +33,7 @@ class CheckpointService {
       prisma.seed.count()
     ])
 
-    const clearRate = seedCount > 0 
-      ? Math.round((clearCount / seedCount) * 10000) / 100 
-      : 0
+    const clearRate = seedCount > 0 ? Math.round((clearCount / seedCount) * 10000) / 100 : 0
 
     // Get last cleared seed
     const lastCleared = await prisma.result.findFirst({
@@ -60,7 +58,7 @@ class SeedService {
     await prisma.seed.upsert({
       where: { id: seedId },
       update: {},
-      create: { 
+      create: {
         id: seedId,
         challengeId: 1 // Default challenge ID
       }

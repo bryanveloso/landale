@@ -12,7 +12,7 @@ export function useIronmonSubscription() {
       onData: (data) => {
         // Update query cache based on message type
         queryClient.setQueryData(['ironmon', data.type], data.metadata)
-        
+
         // Log for debugging
         console.log(`IronMON ${data.type}:`, data.metadata)
       }
