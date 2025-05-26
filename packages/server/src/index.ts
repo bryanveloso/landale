@@ -5,8 +5,11 @@ import { createBunWSHandler, type CreateBunContextOptions } from 'trpc-bun-adapt
 import * as Twitch from '@/events/twitch/handlers'
 import * as IronMON from '@/events/ironmon'
 import { appRouter, type AppRouter } from '@/trpc'
+import { createLogger } from '@/lib/logger'
 
 import { version } from '../package.json'
+
+const log = createLogger('main')
 
 console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
 
@@ -17,7 +20,9 @@ const createContext = async (_opts: CreateBunContextOptions) => {
 const websocket = createBunWSHandler({
   router: appRouter,
   createContext,
-  onError: console.error,
+  onError: (error) => {
+    log.error({ error }, 'tRPC error occurred')
+  },
   batching: { enabled: true }
 })
 
@@ -40,19 +45,19 @@ console.log(`  ${chalk.green('➜')}  ${chalk.bold('tRPC Server')}: ${server.hos
 // Initialize IronMON TCP Server
 IronMON.initialize()
   .then(() => {
-    console.log(`  ${chalk.green('•')}  IronMON TCP Server initialized successfully.`)
+    log.info('IronMON TCP Server initialized successfully.')
   })
   .catch((error) => {
-    console.error(`  ${chalk.red('•')}  Failed to initialize IronMON TCP Server:`, error)
+    log.error('Failed to initialize IronMON TCP Server:', error)
   })
 
 // Initialize Twitch EventSub
 Twitch.initialize()
   .then(() => {
-    console.log(`  ${chalk.green('•')}  Twitch EventSub initialized successfully.`)
+    log.info('Twitch EventSub initialized successfully.')
   })
   .catch((error) => {
-    console.error(`  ${chalk.red('•')}  Failed to initialize Twitch EventSub integration:`, error)
+    log.error('Failed to initialize Twitch EventSub integration:', error)
   })
 
 // Handle graceful shutdown
