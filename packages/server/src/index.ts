@@ -3,6 +3,7 @@ import chalk from 'chalk'
 import { createBunWSHandler, type CreateBunContextOptions } from 'trpc-bun-adapter'
 
 import * as Twitch from '@/events/twitch/handlers'
+import * as IronMON from '@/events/ironmon'
 import { appRouter, type AppRouter } from '@/trpc'
 
 import { version } from '../package.json'
@@ -36,6 +37,15 @@ const server: Server = Bun.serve({
 
 console.log(`  ${chalk.green('➜')}  ${chalk.bold('tRPC Server')}: ${server.hostname}:${server.port}`)
 
+// Initialize IronMON TCP Server
+IronMON.initialize()
+  .then(() => {
+    console.log(`  ${chalk.green('•')}  IronMON TCP Server initialized successfully.`)
+  })
+  .catch((error) => {
+    console.error(`  ${chalk.red('•')}  Failed to initialize IronMON TCP Server:`, error)
+  })
+
 // Initialize Twitch EventSub
 Twitch.initialize()
   .then(() => {
@@ -46,9 +56,10 @@ Twitch.initialize()
   })
 
 // Handle graceful shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log(`\n  🛑 Shutting down server...`)
   server.stop()
+  await IronMON.shutdown()
   process.exit(0)
 })
 
