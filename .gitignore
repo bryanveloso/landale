@@ -181,3 +181,6 @@ dist
 twitch-token.json
 
 **/CLAUDE.local.md
+
+# Cached emotes
+packages/overlays/public/emotes/

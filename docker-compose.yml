@@ -28,6 +28,7 @@ services:
     working_dir: /workspace/packages/overlays
     volumes:
       - ./:/workspace
+      - emotes_cache:/workspace/packages/overlays/public/emotes
     ports:
       - '8088:8088'
     depends_on:
@@ -36,3 +37,4 @@ services:
 
 volumes:
   postgres_data:
+  emotes_cache:
