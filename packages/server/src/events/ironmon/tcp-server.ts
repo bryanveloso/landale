@@ -10,7 +10,7 @@ interface TCPServerOptions {
 
 export class IronmonTCPServer {
   private server?: TCPSocketListener
-  private buffer = new Map<Socket, string>()
+  private buffer = new Map<Socket<unknown>, string>()
   private options: Required<TCPServerOptions>
 
   constructor(options: TCPServerOptions = {}) {
@@ -23,7 +23,7 @@ export class IronmonTCPServer {
   /**
    * Handles incoming socket connections
    */
-  private handleOpen = (socket: Socket<{}>) => {
+  private handleOpen = (socket: Socket<unknown>) => {
     console.log(`  ${chalk.green('→')}  TCP client connected: ${socket.remoteAddress}`)
     this.buffer.set(socket, '')
   }
@@ -32,7 +32,7 @@ export class IronmonTCPServer {
    * Handles incoming data from the socket
    * Messages are length-prefixed: "LENGTH MESSAGE" (e.g., "23 {"type":"init",...}")
    */
-  private handleData = async (socket: Socket<{}>, data: Buffer) => {
+  private handleData = async (socket: Socket<unknown>, data: Buffer) => {
     // Get or create buffer for this socket
     let buffer = this.buffer.get(socket) || ''
     buffer += data.toString('utf-8')
@@ -98,7 +98,7 @@ export class IronmonTCPServer {
     // Route to appropriate handler based on message type
     switch (message.type) {
       case 'init':
-        await handleInit({ ...message, source: 'tcp' })
+        await handleInit(message)
         break
       case 'seed':
         await handleSeed(message)
@@ -112,7 +112,7 @@ export class IronmonTCPServer {
   /**
    * Handles socket closure
    */
-  private handleClose = (socket: Socket<{}>) => {
+  private handleClose = (socket: Socket<unknown>) => {
     console.log(`  ${chalk.yellow('←')}  TCP client disconnected: ${socket.remoteAddress}`)
     this.buffer.delete(socket)
   }
@@ -120,7 +120,7 @@ export class IronmonTCPServer {
   /**
    * Handles socket errors
    */
-  private handleError = (socket: Socket<{}>, error: Error) => {
+  private handleError = (socket: Socket<unknown>, error: Error) => {
     console.error(`  ${chalk.red('✗')}  TCP socket error from ${socket.remoteAddress}:`, error.message)
   }
 
@@ -132,7 +132,7 @@ export class IronmonTCPServer {
       throw new Error('TCP server is already running')
     }
 
-    this.server = Bun.listen<{}>({
+    this.server = Bun.listen({
       hostname: this.options.hostname,
       port: this.options.port,
       socket: {

@@ -3,8 +3,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 
-import { OBSProvider } from '@/lib/obs.provider'
-import { QueryProvider, queryClient } from '@/lib/query.provider'
+import { OBSProvider } from '@/lib/providers/obs'
+import { QueryProvider, queryClient } from '@/lib/providers/query'
 
 import { routeTree } from './routeTree.gen'
 
