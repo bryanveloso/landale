@@ -7,6 +7,7 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 export default defineConfig({
   plugins: [react(), TanStackRouterVite(), tsconfigPaths()],
   server: {
+    allowedHosts: ['saya.local'],
     host: true,
     port: 8088
   }
