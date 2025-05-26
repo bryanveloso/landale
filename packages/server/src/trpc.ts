@@ -1,94 +1,174 @@
-import { initTRPC } from '@trpc/server'
+import { initTRPC, TRPCError } from '@trpc/server'
+import { ZodError } from 'zod'
 import { eventEmitter } from './events'
+import { createLogger } from './lib/logger'
 
-// Initialize tRPC.
-const t = initTRPC.create()
+const log = createLogger('trpc')
+
+// Initialize tRPC with error formatter
+const t = initTRPC.create({
+  errorFormatter({ shape, error }) {
+    return {
+      ...shape,
+      data: {
+        ...shape.data,
+        zodError: error.cause instanceof ZodError ? error.cause.flatten() : null
+      }
+    }
+  }
+})
+
 const router = t.router
-const publicProcedure = t.procedure
+
+// Base procedure with error handling and logging
+const publicProcedure = t.procedure.use(async (opts) => {
+  const start = Date.now()
+
+  try {
+    const result = await opts.next({
+      ctx: opts.ctx
+    })
+
+    const durationMs = Date.now() - start
+    const meta = { path: opts.path, type: opts.type, durationMs }
+
+    if (!result.ok) {
+      log.error('Procedure failed', { ...meta, error: result.error })
+    }
+
+    return result
+  } catch (error) {
+    const durationMs = Date.now() - start
+    log.error('Unexpected error in procedure', { path: opts.path, type: opts.type, durationMs, error })
+    throw error
+  }
+})
 
 export const twitchRouter = router({
-  onMessage: publicProcedure.subscription(async function* () {
-    const stream = eventEmitter.events('twitch:message')
+  onMessage: publicProcedure.subscription(async function* (opts) {
     try {
+      const stream = eventEmitter.events('twitch:message')
+
       for await (const data of stream) {
+        // Validate the stream is still active
+        if (opts.signal?.aborted) {
+          break
+        }
         yield data
       }
+    } catch (error) {
+      log.error('Error in Twitch message subscription', error)
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to stream Twitch messages',
+        cause: error
+      })
     } finally {
-      // Cleanup happens automatically when the client unsubscribes.
+      log.debug('Twitch message subscription ended')
     }
   })
 })
 
 export const ironmonRouter = router({
-  onInit: publicProcedure.subscription(async function* () {
-    const stream = eventEmitter.events('ironmon:init')
+  onInit: publicProcedure.subscription(async function* (opts) {
     try {
+      const stream = eventEmitter.events('ironmon:init')
+
       for await (const data of stream) {
+        if (opts.signal?.aborted) break
         yield data
       }
-    } finally {
-      // Cleanup happens automatically when the client unsubscribes.
+    } catch (error) {
+      log.error('Error in IronMON init subscription', error)
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to stream IronMON init events',
+        cause: error
+      })
     }
   }),
 
-  onSeed: publicProcedure.subscription(async function* () {
-    const stream = eventEmitter.events('ironmon:seed')
+  onSeed: publicProcedure.subscription(async function* (opts) {
     try {
+      const stream = eventEmitter.events('ironmon:seed')
+
       for await (const data of stream) {
+        if (opts.signal?.aborted) break
         yield data
       }
-    } finally {
-      // Cleanup happens automatically when the client unsubscribes.
+    } catch (error) {
+      log.error('Error in IronMON seed subscription', error)
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to stream IronMON seed events',
+        cause: error
+      })
     }
   }),
 
-  onCheckpoint: publicProcedure.subscription(async function* () {
-    const stream = eventEmitter.events('ironmon:checkpoint')
+  onCheckpoint: publicProcedure.subscription(async function* (opts) {
     try {
+      const stream = eventEmitter.events('ironmon:checkpoint')
+
       for await (const data of stream) {
+        if (opts.signal?.aborted) break
         yield data
       }
-    } finally {
-      // Cleanup happens automatically when the client unsubscribes.
+    } catch (error) {
+      log.error('Error in IronMON checkpoint subscription', error)
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to stream IronMON checkpoint events',
+        cause: error
+      })
     }
   }),
 
   // Combined subscription for all IronMON events
-  onMessage: publicProcedure.subscription(async function* () {
-    // Create a unified stream by listening to all events
+  onMessage: publicProcedure.subscription(async function* (opts) {
     const unsubscribers: (() => void)[] = []
-    const queue: any[] = []
-    let resolveNext: ((value: IteratorResult<any>) => void) | null = null
-
-    // Subscribe to all IronMON events
-    const eventTypes = ['ironmon:init', 'ironmon:seed', 'ironmon:checkpoint'] as const
-
-    for (const eventType of eventTypes) {
-      const unsubscribe = eventEmitter.on(eventType, (data) => {
-        if (resolveNext) {
-          resolveNext({ value: data, done: false })
-          resolveNext = null
-        } else {
-          queue.push(data)
-        }
-      })
-      unsubscribers.push(unsubscribe)
-    }
+    const queue: unknown[] = []
+    let resolveNext: ((value: IteratorResult<unknown>) => void) | null = null
 
     try {
+      // Subscribe to all IronMON events
+      const eventTypes = ['ironmon:init', 'ironmon:seed', 'ironmon:checkpoint'] as const
+
+      for (const eventType of eventTypes) {
+        const unsubscribe = eventEmitter.on(eventType, (data) => {
+          if (resolveNext) {
+            resolveNext({ value: data, done: false })
+            resolveNext = null
+          } else {
+            queue.push(data)
+          }
+        })
+        unsubscribers.push(unsubscribe)
+      }
+
       while (true) {
+        if (opts.signal?.aborted) break
+
         if (queue.length > 0) {
           yield queue.shift()
         } else {
           // Wait for next event
-          yield await new Promise<any>((resolve) => {
+          yield await new Promise<unknown>((resolve) => {
             resolveNext = (result) => resolve(result.value)
           })
         }
       }
+    } catch (error) {
+      log.error('Error in combined IronMON subscription', error)
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to stream IronMON events',
+        cause: error
+      })
     } finally {
       // Cleanup all subscriptions
       unsubscribers.forEach((fn) => fn())
+      log.debug('Combined IronMON subscription ended')
     }
   })
 })
