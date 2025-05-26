@@ -1,7 +1,8 @@
 import { useTRPC } from '@/lib/trpc'
 import { createFileRoute } from '@tanstack/react-router'
 import { useSubscription } from '@trpc/tanstack-react-query'
-import { EmoteRain } from '@/components/emoterain/emote-rain'
+
+import { EmoteRain } from '@/components/emotes/emote-rain'
 import { ErrorBoundary } from '@/components/error-boundary'
 
 export const Route = createFileRoute('/(full)/emoterain')({
