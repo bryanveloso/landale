@@ -25,6 +25,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@landale/shared": "workspace:*",
     "@trpc/server": "^11.1.2",
     "@twurple/api": "^7.3.0",
     "@twurple/auth": "^7.3.0",
