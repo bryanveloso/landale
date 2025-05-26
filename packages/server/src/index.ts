@@ -2,6 +2,7 @@ import type { Server } from 'bun'
 import chalk from 'chalk'
 import { createBunWSHandler, type CreateBunContextOptions } from 'trpc-bun-adapter'
 
+import { env } from '@/lib/env'
 import * as Twitch from '@/events/twitch/handlers'
 import * as IronMON from '@/events/ironmon'
 import { appRouter, type AppRouter } from '@/trpc'
@@ -12,6 +13,7 @@ import { version } from '../package.json'
 const log = createLogger('main')
 
 console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
+log.info(`Environment: ${env.NODE_ENV}`)
 
 const createContext = async (_opts: CreateBunContextOptions) => {
   return {}
@@ -21,7 +23,7 @@ const websocket = createBunWSHandler({
   router: appRouter,
   createContext,
   onError: (error) => {
-    log.error({ error }, 'tRPC error occurred')
+    log.error('tRPC error occurred', error)
   },
   batching: { enabled: true }
 })

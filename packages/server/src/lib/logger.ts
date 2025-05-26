@@ -1,13 +1,15 @@
 import chalk from 'chalk'
 import pino from 'pino'
 
+// Import env separately to avoid circular dependency
 const isDevelopment = process.env.NODE_ENV !== 'production'
 const useStructuredLogging = process.env.STRUCTURED_LOGGING === 'true'
+const logLevel = process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info')
 
 // Create the underlying pino logger for when we need structured output
 const pinoLogger = pino({
   name: 'landale-server',
-  level: process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info'),
+  level: logLevel,
   transport: useStructuredLogging && isDevelopment
     ? {
         target: 'pino-pretty',

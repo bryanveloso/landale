@@ -2,12 +2,13 @@ import { ApiClient } from '@twurple/api'
 import { RefreshingAuthProvider } from '@twurple/auth'
 import { EventSubHttpListener, ReverseProxyAdapter } from '@twurple/eventsub-http'
 
+import { env } from '@/lib/env'
 import { emitEvent } from '..'
 
-const clientId = process.env.TWITCH_CLIENT_ID!
-const clientSecret = process.env.TWITCH_CLIENT_SECRET!
-const eventSubSecret = process.env.TWITCH_EVENTSUB_SECRET!
-const userId = process.env.TWITCH_USER_ID!
+const clientId = env.TWITCH_CLIENT_ID
+const clientSecret = env.TWITCH_CLIENT_SECRET
+const eventSubSecret = env.TWITCH_EVENTSUB_SECRET
+const userId = env.TWITCH_USER_ID
 
 const authProvider = new RefreshingAuthProvider({ clientId, clientSecret })
 
