@@ -31,6 +31,21 @@ const server: Server = Bun.serve({
   port: 7175,
   hostname: '0.0.0.0',
   fetch: (request, server) => {
+    const url = new URL(request.url)
+    
+    // Health check endpoint
+    if (url.pathname === '/health') {
+      return new Response(JSON.stringify({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        version: '0.3.0'
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+    
+    // WebSocket upgrade
     if (server.upgrade(request, { data: { req: request } })) {
       return
     }

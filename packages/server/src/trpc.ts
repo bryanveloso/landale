@@ -93,7 +93,18 @@ export const ironmonRouter = router({
   })
 })
 
+// Health check procedure
+const healthProcedure = publicProcedure.query(async () => {
+  return {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    version: '0.3.0'
+  }
+})
+
 export const appRouter = router({
+  health: healthProcedure,
   twitch: twitchRouter,
   ironmon: ironmonRouter
 })
