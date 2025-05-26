@@ -20,8 +20,8 @@ function RouteComponent() {
           data.messageParts.forEach((part) => {
             if (part.type === 'emote' && part.emote) {
               // Queue the emote
-              if ((window as any).queueEmote) {
-                ;(window as any).queueEmote(part.emote.id)
+              if (window.queueEmote) {
+                window.queueEmote(part.emote.id)
               }
             }
           })

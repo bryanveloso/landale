@@ -240,9 +240,9 @@ export const EmoteRain = memo(function EmoteRain() {
 
   // Expose queue method for external use
   useEffect(() => {
-    (window as any).queueEmote = queueEmote
+    window.queueEmote = queueEmote
     return () => {
-      delete (window as any).queueEmote
+      delete window.queueEmote
     }
   }, [queueEmote])
 
