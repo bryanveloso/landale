@@ -236,7 +236,7 @@ export function EmoteRain() {
     }, 50) // Check queue every 50ms
 
     return () => clearInterval(interval)
-  })
+  }, [])
 
   // Expose queue method for external use
   useEffect(() => {
@@ -244,7 +244,24 @@ export function EmoteRain() {
     return () => {
       delete (window as any).queueEmote
     }
-  })
+  }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clean up Matter.js engine on unmount
+      if (engineRef.current) {
+        Matter.Engine.clear(engineRef.current)
+      }
+      if (renderRef.current) {
+        Matter.Render.stop(renderRef.current)
+        renderRef.current.canvas.remove()
+      }
+      // Clear all refs
+      emoteBodiesRef.current.clear()
+      spawnQueueRef.current = []
+    }
+  }, [])
 
   return (
     <canvas
