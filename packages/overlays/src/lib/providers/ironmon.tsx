@@ -24,9 +24,5 @@ export const IronmonProvider: FC<PropsWithChildren> = ({ children }) => {
   // TODO: Add connection status tracking
   const isConnected = true
 
-  return (
-    <IronmonContext.Provider value={{ isConnected }}>
-      {children}
-    </IronmonContext.Provider>
-  )
+  return <IronmonContext.Provider value={{ isConnected }}>{children}</IronmonContext.Provider>
 }
