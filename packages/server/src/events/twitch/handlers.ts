@@ -3,7 +3,11 @@ import { RefreshingAuthProvider } from '@twurple/auth'
 import { EventSubWsListener } from '@twurple/eventsub-ws'
 
 import { env } from '@/lib/env'
+import { createLogger } from '@/lib/logger'
+
 import { emitEvent } from '..'
+
+const logger = createLogger('twitch')
 
 const clientId = env.TWITCH_CLIENT_ID
 const clientSecret = env.TWITCH_CLIENT_SECRET
@@ -23,13 +27,24 @@ export async function initialize() {
     await authProvider.addUserForToken(tokenData, ['chat'])
 
     const apiClient = new ApiClient({ authProvider })
+
+    // Clean up broken subscriptions to avoid hitting limits
+    logger.info('Cleaning up broken EventSub subscriptions...')
+    await apiClient.eventSub.deleteBrokenSubscriptions()
+    logger.info('Subscription cleanup completed.')
+
     const listener = new EventSubWsListener({ apiClient })
+
+    // Add error handler to prevent retries on subscription failures
+    listener.onSubscriptionDeleteFailure((error) => {
+      logger.warn('Subscription deletion failed', error)
+    })
 
     listener.start()
     setupEventListeners(listener)
     return listener
   } catch (error) {
-    console.error('Error initializing Twitch API:', error)
+    logger.error('Error initializing Twitch API.', error)
     throw error
   }
 }
@@ -37,7 +52,7 @@ export async function initialize() {
 const setupEventListeners = async (listener: EventSubWsListener) => {
   // Channel cheer subscription
   listener.onChannelCheer(userId, (e) => {
-    console.log('Received cheer:', e)
+    logger.debug(`Received cheer: ${e.bits} bits from ${e.userDisplayName}`)
     emitEvent('twitch:cheer', {
       bits: e.bits,
       isAnonymous: e.isAnonymous,
@@ -50,7 +65,7 @@ const setupEventListeners = async (listener: EventSubWsListener) => {
 
   // Channel message subscription
   listener.onChannelChatMessage(userId, userId, (e) => {
-    console.log('Received message:', e.messageId)
+    logger.debug(`Received message from ${e.chatterDisplayName}: ${e.messageText}`)
     emitEvent('twitch:message', {
       badges: e.badges,
       bits: e.bits,
