@@ -1,7 +1,7 @@
-version: '3.8'
 services:
   db:
-    image: postgres:latest
+    image: postgres:16-alpine
+    restart: unless-stopped
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -10,30 +10,60 @@ services:
       POSTGRES_PASSWORD: landale
     ports:
       - '5433:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U landale -d landale"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   server:
-    build: .
-    working_dir: /workspace/packages/server
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    working_dir: /app/packages/server
     volumes:
-      - ./:/workspace
+      - ./:/app
+      - /app/node_modules
+      - /app/packages/server/node_modules
+      - /app/packages/database/node_modules
+      - /app/packages/overlays/node_modules
+      - /app/packages/shared/node_modules
     environment:
       DATABASE_URL: postgres://landale:landale@db:5432/landale
+      NODE_ENV: development
+    env_file:
+      - .env
     ports:
       - '7175:7175'
       - '8080:8080'
       - '8081:8081'
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["bun", "--hot", "run", "src/index.ts"]
 
   overlays:
-    build: .
-    working_dir: /workspace/packages/overlays
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    working_dir: /app/packages/overlays
     volumes:
-      - ./:/workspace
-      - emotes_cache:/workspace/packages/overlays/public/emotes
+      - ./:/app
+      - /app/node_modules
+      - /app/packages/server/node_modules
+      - /app/packages/database/node_modules
+      - /app/packages/overlays/node_modules
+      - /app/packages/shared/node_modules
+      - emotes_cache:/app/packages/overlays/public/emotes
+    environment:
+      NODE_ENV: development
     ports:
       - '8088:8088'
     depends_on:
       - server
-      - db
+    command: ["bunx", "--bun", "vite"]
 
 volumes:
   postgres_data:
