@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo, useCallback } from 'react'
 import Matter from 'matter-js'
 
 interface EmoteConfig {
@@ -33,7 +33,7 @@ const DEFAULT_CONFIG: EmoteConfig = {
   rotationSpeed: 0.2      // Max rotation speed
 }
 
-export function EmoteRain() {
+export const EmoteRain = memo(function EmoteRain() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<Matter.Engine | null>(null)
   const renderRef = useRef<Matter.Render | null>(null)
@@ -145,9 +145,9 @@ export function EmoteRain() {
   }, [config.gravity])
 
   // Method to queue an emote for spawning
-  const queueEmote = (emoteId: string) => {
+  const queueEmote = useCallback((emoteId: string) => {
     spawnQueueRef.current.push(emoteId)
-  }
+  }, [])
 
   // Method to spawn an emote from the queue
   const spawnEmoteFromQueue = () => {
@@ -244,7 +244,7 @@ export function EmoteRain() {
     return () => {
       delete (window as any).queueEmote
     }
-  }, [])
+  }, [queueEmote])
 
   return (
     <canvas
@@ -253,4 +253,4 @@ export function EmoteRain() {
       style={{ zIndex: 9999 }}
     />
   )
-}
+})
