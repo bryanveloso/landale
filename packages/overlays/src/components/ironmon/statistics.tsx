@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { FC } from 'react'
+import { FC, memo } from 'react'
 
 import { type CheckpointMessage } from '@/lib/services/ironmon'
 
-export const Statistics: FC = () => {
+export const Statistics: FC = memo(() => {
   const query = useQuery<CheckpointMessage['metadata']>({
     queryKey: ['ironmon', 'checkpoint'],
 
@@ -26,4 +26,6 @@ export const Statistics: FC = () => {
       </div>
     </div>
   )
-}
+})
+
+Statistics.displayName = 'Statistics'
