@@ -1,4 +1,4 @@
-import type { Server } from 'bun'
+import type { Server, ServerWebSocket } from 'bun'
 import chalk from 'chalk'
 import { createBunWSHandler, type CreateBunContextOptions } from 'trpc-bun-adapter'
 
@@ -9,6 +9,16 @@ import { appRouter, type AppRouter } from '@/trpc'
 import { createLogger } from '@/lib/logger'
 
 import { version } from '../package.json'
+
+// Type for the WebSocket data context
+interface WSData {
+  req: Request
+}
+
+// Extend the ServerWebSocket type to include our custom properties
+interface ExtendedWebSocket extends ServerWebSocket<WSData> {
+  pingInterval?: NodeJS.Timeout
+}
 
 const log = createLogger('main')
 
@@ -36,50 +46,56 @@ const server: Server = Bun.serve({
   hostname: '0.0.0.0',
   fetch: (request, server) => {
     const url = new URL(request.url)
-    
+
     // Health check endpoint
     if (url.pathname === '/health') {
-      return new Response(JSON.stringify({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        version: '0.3.0'
-      }), {
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return new Response(
+        JSON.stringify({
+          status: 'ok',
+          timestamp: new Date().toISOString(),
+          uptime: process.uptime(),
+          version: '0.3.0'
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' }
+        }
+      )
     }
-    
+
     // WebSocket upgrade
     if (server.upgrade(request, { data: { req: request } })) {
       return
     }
 
-    return new Response('Please use websocket protocol', { status: 404 })
+    return new Response('Please use websocket protocol.', { status: 404 })
   },
   websocket: {
     ...websocket,
     open(ws) {
-      log.info(`WebSocket connection opened from ${ws.remoteAddress}`)
+      const extWs = ws as unknown as ExtendedWebSocket
+      log.info(`WebSocket connection opened from ${extWs.remoteAddress}.`)
       // Send a ping every 30 seconds to keep connection alive
       const pingInterval = setInterval(() => {
-        if (ws.readyState === 1) { // OPEN state
-          ws.ping()
+        if (extWs.readyState === 1) {
+          // OPEN state
+          extWs.ping()
         }
       }, 30000)
-      
+
       // Store interval ID on the websocket instance
-      ;(ws as any).pingInterval = pingInterval
-      
+      extWs.pingInterval = pingInterval
+
       websocket.open?.(ws)
     },
     close(ws, code, reason) {
+      const extWs = ws as unknown as ExtendedWebSocket
       log.info(`WebSocket connection closed: ${code} - ${reason}`)
       // Clear the ping interval
-      const pingInterval = (ws as any).pingInterval
-      if (pingInterval) {
-        clearInterval(pingInterval)
+      if (extWs.pingInterval) {
+        clearInterval(extWs.pingInterval)
+        extWs.pingInterval = undefined
       }
-      
+
       websocket.close?.(ws, code, reason)
     },
     message: websocket.message
@@ -109,16 +125,16 @@ Twitch.initialize()
 // Handle graceful shutdown
 const shutdown = async (signal: string) => {
   console.log(`\n  🛑 Received ${signal}, shutting down server...`)
-  
+
   // Notify all connected clients to reconnect
-  log.info('Broadcasting reconnection notification to all clients')
-  
+  log.info('Broadcasting reconnection notification to all clients.')
+
   // Stop accepting new connections
   server.stop()
-  
+
   // Cleanup other services
   await IronMON.shutdown()
-  
+
   process.exit(0)
 }
 
