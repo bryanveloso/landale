@@ -180,7 +180,5 @@ dist
 # Twtich auth file
 twitch-token.json
 
-**/CLAUDE.local.md
-
 # Cached emotes
 packages/overlays/public/emotes/
