@@ -19,6 +19,7 @@
     "@trpc/client": "^11.1.2",
     "@trpc/tanstack-react-query": "^11.1.2",
     "framer-motion": "^12.12.2",
+    "matter-js": "^0.20.0",
     "obs-websocket-js": "^5.0.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@tanstack/react-router-devtools": "^1.120.10",
     "@tanstack/router-vite-plugin": "^1.120.10",
+    "@types/matter-js": "^0.19.8",
     "@types/react": "^19.1.5",
     "@types/react-dom": "^19.1.5",
     "@typescript-eslint/eslint-plugin": "^8.32.1",
