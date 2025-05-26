@@ -1,13 +1,37 @@
-FROM oven/bun:latest
+# Use specific version for reproducibility
+FROM oven/bun:1.2.14-alpine
 
-WORKDIR /workspace
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
 
+WORKDIR /app
+
+# Copy package files for better layer caching
+COPY package.json bun.lock ./
+
+# Create package directories
+RUN mkdir -p packages/database packages/server packages/overlays packages/shared
+
+# Copy individual package.json files
+COPY packages/database/package.json ./packages/database/
+COPY packages/server/package.json ./packages/server/
+COPY packages/overlays/package.json ./packages/overlays/
+COPY packages/shared/package.json ./packages/shared/
+
+# Install dependencies
+RUN bun install
+
+# Copy the rest of the application
 COPY . .
 
-RUN bun install
+# Generate Prisma client
+RUN cd packages/database && bunx prisma generate
 
-# We have to run `bun install` a second time because of the following:
-# https://github.com/vitejs/vite/discussions/15532#discussioncomment-8141236
-RUN bun install
+# Expose ports (documentation purposes)
+EXPOSE 7175 8080 8081 8088
 
+# Default to development mode (can be overridden in docker-compose)
+ENV NODE_ENV=development
+
+# Use exec form for proper signal handling
 CMD ["bun", "run", "dev"]
