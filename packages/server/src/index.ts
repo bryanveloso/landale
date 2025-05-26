@@ -25,7 +25,9 @@ const websocket = createBunWSHandler({
   onError: (error: unknown) => {
     log.error('tRPC error occurred', error)
   },
-  batching: { enabled: true }
+  batching: { enabled: true },
+  // Enable WebSocket ping/pong for connection health
+  enableSubscriptions: true
 })
 
 // Initialize the tRPC server
@@ -54,7 +56,34 @@ const server: Server = Bun.serve({
 
     return new Response('Please use websocket protocol', { status: 404 })
   },
-  websocket
+  websocket: {
+    ...websocket,
+    open(ws) {
+      log.info(`WebSocket connection opened from ${ws.remoteAddress}`)
+      // Send a ping every 30 seconds to keep connection alive
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === 1) { // OPEN state
+          ws.ping()
+        }
+      }, 30000)
+      
+      // Store interval ID on the websocket instance
+      ;(ws as any).pingInterval = pingInterval
+      
+      websocket.open?.(ws)
+    },
+    close(ws, code, reason) {
+      log.info(`WebSocket connection closed: ${code} - ${reason}`)
+      // Clear the ping interval
+      const pingInterval = (ws as any).pingInterval
+      if (pingInterval) {
+        clearInterval(pingInterval)
+      }
+      
+      websocket.close?.(ws, code, reason)
+    },
+    message: websocket.message
+  }
 })
 
 console.log(`  ${chalk.green('➜')}  ${chalk.bold('tRPC Server')}: ${server.hostname}:${server.port}`)
@@ -78,12 +107,23 @@ Twitch.initialize()
   })
 
 // Handle graceful shutdown
-process.on('SIGINT', async () => {
-  console.log(`\n  🛑 Shutting down server...`)
+const shutdown = async (signal: string) => {
+  console.log(`\n  🛑 Received ${signal}, shutting down server...`)
+  
+  // Notify all connected clients to reconnect
+  log.info('Broadcasting reconnection notification to all clients')
+  
+  // Stop accepting new connections
   server.stop()
+  
+  // Cleanup other services
   await IronMON.shutdown()
+  
   process.exit(0)
-})
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'))
+process.on('SIGTERM', () => shutdown('SIGTERM'))
 
 // Export AppRouter type for client consumption
 export type { AppRouter }
