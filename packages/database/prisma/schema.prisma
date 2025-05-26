@@ -26,6 +26,8 @@ model Checkpoint {
   challengeId Int
   results     Result[]
 
+  @@index([challengeId])
+  @@index([order])
   @@map("checkpoints")
 }
 
@@ -35,6 +37,7 @@ model Seed {
   challengeId Int
   results     Result[]
 
+  @@index([challengeId])
   @@map("seeds")
 }
 
@@ -46,6 +49,9 @@ model Result {
   checkpointId Int
   result       Boolean
 
-  @@map("results")
   @@unique([seedId, checkpointId])
+  @@index([seedId])
+  @@index([checkpointId])
+  @@index([result])
+  @@map("results")
 }
