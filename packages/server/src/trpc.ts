@@ -30,7 +30,7 @@ export const ironmonRouter = router({
       // Cleanup happens automatically when the client unsubscribes.
     }
   }),
-  
+
   onSeed: publicProcedure.subscription(async function* () {
     const stream = eventEmitter.events('ironmon:seed')
     try {
@@ -41,7 +41,7 @@ export const ironmonRouter = router({
       // Cleanup happens automatically when the client unsubscribes.
     }
   }),
-  
+
   onCheckpoint: publicProcedure.subscription(async function* () {
     const stream = eventEmitter.events('ironmon:checkpoint')
     try {
@@ -52,17 +52,17 @@ export const ironmonRouter = router({
       // Cleanup happens automatically when the client unsubscribes.
     }
   }),
-  
+
   // Combined subscription for all IronMON events
   onMessage: publicProcedure.subscription(async function* () {
     // Create a unified stream by listening to all events
     const unsubscribers: (() => void)[] = []
     const queue: any[] = []
     let resolveNext: ((value: IteratorResult<any>) => void) | null = null
-    
+
     // Subscribe to all IronMON events
     const eventTypes = ['ironmon:init', 'ironmon:seed', 'ironmon:checkpoint'] as const
-    
+
     for (const eventType of eventTypes) {
       const unsubscribe = eventEmitter.on(eventType, (data) => {
         if (resolveNext) {
@@ -74,7 +74,7 @@ export const ironmonRouter = router({
       })
       unsubscribers.push(unsubscribe)
     }
-    
+
     try {
       while (true) {
         if (queue.length > 0) {
@@ -88,7 +88,7 @@ export const ironmonRouter = router({
       }
     } finally {
       // Cleanup all subscriptions
-      unsubscribers.forEach(fn => fn())
+      unsubscribers.forEach((fn) => fn())
     }
   })
 })

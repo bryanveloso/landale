@@ -50,7 +50,7 @@ export type IronmonMessage = z.infer<typeof ironmonMessageSchema>
 export type IronmonEvent = {
   init: InitMessage & { source: 'tcp' }
   seed: SeedMessage & { source: 'tcp' }
-  checkpoint: CheckpointMessage & { 
+  checkpoint: CheckpointMessage & {
     source: 'tcp'
     metadata: CheckpointMessage['metadata'] & {
       next?: {

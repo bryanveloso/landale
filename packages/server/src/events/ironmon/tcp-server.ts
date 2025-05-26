@@ -48,7 +48,7 @@ export class IronmonTCPServer {
       // Parse the message length
       const lengthStr = buffer.slice(0, spaceIndex)
       const length = parseInt(lengthStr, 10)
-      
+
       if (isNaN(length)) {
         console.error(`  ${chalk.red('✗')}  Invalid message length: ${lengthStr}`)
         buffer = ''
@@ -58,14 +58,14 @@ export class IronmonTCPServer {
       // Check if we have the complete message
       const messageStart = spaceIndex + 1
       const messageEnd = messageStart + length
-      
+
       if (buffer.length < messageEnd) {
         break // Wait for more data
       }
 
       // Extract and process the message
       const messageStr = buffer.slice(messageStart, messageEnd)
-      
+
       try {
         await this.processMessage(messageStr)
       } catch (error) {
@@ -86,7 +86,7 @@ export class IronmonTCPServer {
   private async processMessage(messageStr: string) {
     // Parse and validate the message
     const parseResult = ironmonMessageSchema.safeParse(JSON.parse(messageStr))
-    
+
     if (!parseResult.success) {
       console.error(`  ${chalk.red('✗')}  Invalid IronMON message:`, parseResult.error.format())
       return
@@ -143,7 +143,9 @@ export class IronmonTCPServer {
       }
     })
 
-    console.log(`  ${chalk.green('➜')}  ${chalk.bold('IronMON TCP Server')}: ${this.options.hostname}:${this.options.port}`)
+    console.log(
+      `  ${chalk.green('➜')}  ${chalk.bold('IronMON TCP Server')}: ${this.options.hostname}:${this.options.port}`
+    )
   }
 
   /**
