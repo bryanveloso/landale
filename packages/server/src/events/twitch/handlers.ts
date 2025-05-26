@@ -1,13 +1,12 @@
 import { ApiClient } from '@twurple/api'
 import { RefreshingAuthProvider } from '@twurple/auth'
-import { EventSubHttpListener, ReverseProxyAdapter } from '@twurple/eventsub-http'
+import { EventSubWsListener } from '@twurple/eventsub-ws'
 
 import { env } from '@/lib/env'
 import { emitEvent } from '..'
 
 const clientId = env.TWITCH_CLIENT_ID
 const clientSecret = env.TWITCH_CLIENT_SECRET
-const eventSubSecret = env.TWITCH_EVENTSUB_SECRET
 const userId = env.TWITCH_USER_ID
 
 const authProvider = new RefreshingAuthProvider({ clientId, clientSecret })
@@ -24,14 +23,7 @@ export async function initialize() {
     await authProvider.addUserForToken(tokenData, ['chat'])
 
     const apiClient = new ApiClient({ authProvider })
-    const listener = new EventSubHttpListener({
-      apiClient,
-      secret: eventSubSecret,
-      adapter: new ReverseProxyAdapter({
-        hostName: 'twitch.veloso.house',
-        port: 8081
-      })
-    })
+    const listener = new EventSubWsListener({ apiClient })
 
     listener.start()
     setupEventListeners(listener)
@@ -42,7 +34,7 @@ export async function initialize() {
   }
 }
 
-const setupEventListeners = async (listener: EventSubHttpListener) => {
+const setupEventListeners = async (listener: EventSubWsListener) => {
   // Channel cheer subscription
   listener.onChannelCheer(userId, (e) => {
     console.log('Received cheer:', e)
