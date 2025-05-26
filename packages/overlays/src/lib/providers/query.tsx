@@ -12,7 +12,22 @@ export const queryClient = new QueryClient({
 })
 
 const wsClient = createWSClient({
-  url: 'ws://localhost:7175'
+  url: 'ws://localhost:7175',
+  onOpen: () => {
+    console.log('[WebSocket] Connected to server')
+  },
+  onClose: (cause) => {
+    console.log('[WebSocket] Disconnected:', cause)
+  },
+  retryDelayMs: (attemptIndex) => {
+    // Exponential backoff with max delay of 30 seconds
+    const delays = [1000, 2000, 5000, 10000, 30000]
+    return delays[Math.min(attemptIndex, delays.length - 1)]
+  },
+  lazy: {
+    enabled: false,
+    closeMs: 0
+  }
 })
 
 export const QueryProvider: FC<PropsWithChildren> = ({ children }) => {
