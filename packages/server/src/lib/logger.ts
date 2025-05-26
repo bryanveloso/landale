@@ -30,15 +30,16 @@ class PrettyLogger {
     this.module = module
   }
 
-  info(message: string, ...args: any[]) {
+  info(message: string, ...args: unknown[]) {
     if (useStructuredLogging) {
-      pinoLogger.info({ module: this.module, ...args[0] }, message)
+      const [meta] = args
+      pinoLogger.info({ module: this.module, ...(typeof meta === 'object' && meta !== null ? meta : {}) }, message)
     } else {
       console.log(`  ${chalk.green('•')}  ${message}`)
     }
   }
 
-  error(message: string, error?: Error | any, ...args: any[]) {
+  error(message: string, error?: Error | unknown, ...args: unknown[]) {
     if (useStructuredLogging) {
       pinoLogger.error({ module: this.module, error, ...args }, message)
     } else {
@@ -46,17 +47,19 @@ class PrettyLogger {
     }
   }
 
-  warn(message: string, ...args: any[]) {
+  warn(message: string, ...args: unknown[]) {
     if (useStructuredLogging) {
-      pinoLogger.warn({ module: this.module, ...args[0] }, message)
+      const [meta] = args
+      pinoLogger.warn({ module: this.module, ...(typeof meta === 'object' && meta !== null ? meta : {}) }, message)
     } else {
       console.warn(`  ${chalk.yellow('•')}  ${message}`)
     }
   }
 
-  debug(message: string, ...args: any[]) {
+  debug(message: string, ...args: unknown[]) {
     if (useStructuredLogging) {
-      pinoLogger.debug({ module: this.module, ...args[0] }, message)
+      const [meta] = args
+      pinoLogger.debug({ module: this.module, ...(typeof meta === 'object' && meta !== null ? meta : {}) }, message)
     } else if (isDevelopment) {
       console.log(`  ${chalk.gray('○')}  ${message}`)
     }

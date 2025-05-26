@@ -22,7 +22,7 @@ const createContext = async (_opts: CreateBunContextOptions) => {
 const websocket = createBunWSHandler({
   router: appRouter,
   createContext,
-  onError: (error) => {
+  onError: (error: unknown) => {
     log.error('tRPC error occurred', error)
   },
   batching: { enabled: true }
