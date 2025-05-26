@@ -41,7 +41,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["bun", "--hot", "run", "src/index.ts"]
+    command: ["bun", "run", "src/index.ts"]
 
   overlays:
     build:
