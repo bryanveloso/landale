@@ -11,10 +11,13 @@ export const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } }
 })
 
+// Use the same hostname as the current page to support different environments
+const wsUrl = `ws://${window.location.hostname}:7175`
+
 const wsClient = createWSClient({
-  url: 'ws://localhost:7175',
+  url: wsUrl,
   onOpen: () => {
-    console.log('[WebSocket] Connected to server')
+    console.log(`[WebSocket] Connected to server at ${wsUrl}`)
   },
   onClose: (cause) => {
     console.log('[WebSocket] Disconnected:', cause)

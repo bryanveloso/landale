@@ -1,4 +1,4 @@
-import prisma from 'database'
+import prisma from '@landale/database'
 import { eventEmitter } from '@/events'
 import type { CheckpointMessage, SeedMessage, InitMessage, IronmonEvent } from './types'
 
