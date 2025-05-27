@@ -14,14 +14,8 @@ export const Route = createFileRoute('/(full)/flying-toasters')({
 function FlyingToastersRoute() {
   return (
     <FlyingToasters
-      sprites={[
-        defaultToasterConfig,
-        toast0Config,
-        toast1Config,
-        toast2Config,
-        toast3Config,
-      ]}
-      density={20}
+      sprites={[defaultToasterConfig, toast0Config, toast1Config, toast2Config, toast3Config]}
+      density={10}
     />
   )
 }
