@@ -1,7 +1,7 @@
 import type { TCPSocketListener, Socket } from 'bun'
 import chalk from 'chalk'
 import { ironmonMessageSchema } from './types'
-import { handleCheckpoint, handleInit, handleSeed } from './handlers'
+import { handleCheckpoint, handleInit, handleSeed, handleLocation } from './handlers'
 
 interface TCPServerOptions {
   port?: number
@@ -84,8 +84,16 @@ export class IronmonTCPServer {
    * Processes a single IronMON message
    */
   private async processMessage(messageStr: string) {
+    let parsedMessage: unknown
+    try {
+      parsedMessage = JSON.parse(messageStr)
+    } catch {
+      console.error(`  ${chalk.red('✗')}  Failed to parse JSON:`, messageStr)
+      return
+    }
+
     // Parse and validate the message
-    const parseResult = ironmonMessageSchema.safeParse(JSON.parse(messageStr))
+    const parseResult = ironmonMessageSchema.safeParse(parsedMessage)
 
     if (!parseResult.success) {
       console.error(`  ${chalk.red('✗')}  Invalid IronMON message:`, parseResult.error.format())
@@ -105,6 +113,9 @@ export class IronmonTCPServer {
         break
       case 'checkpoint':
         await handleCheckpoint(message)
+        break
+      case 'location':
+        await handleLocation(message)
         break
     }
   }

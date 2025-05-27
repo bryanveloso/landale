@@ -7,6 +7,7 @@ export type EventMap = {
   'ironmon:init': IronmonEvent['init']
   'ironmon:seed': IronmonEvent['seed']
   'ironmon:checkpoint': IronmonEvent['checkpoint']
+  'ironmon:location': IronmonEvent['location']
 }
 
 export type SubscriptionData<T extends keyof EventMap> = {
