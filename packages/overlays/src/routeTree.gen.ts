@@ -17,6 +17,7 @@ import { Route as fullSpeedrunningImport } from './routes/(full)/speedrunning'
 import { Route as fullRiveImport } from './routes/(full)/rive'
 import { Route as fullIronmonImport } from './routes/(full)/ironmon'
 import { Route as fullFoundationImport } from './routes/(full)/foundation'
+import { Route as fullFlyingToastersImport } from './routes/(full)/flying-toasters'
 import { Route as fullEmoterainImport } from './routes/(full)/emoterain'
 
 // Create/Update Routes
@@ -24,43 +25,49 @@ import { Route as fullEmoterainImport } from './routes/(full)/emoterain'
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRoute
+  getParentRoute: () => rootRoute,
 } as any)
 
 const widgetOmnywidgetRoute = widgetOmnywidgetImport.update({
   id: '/(widget)/omnywidget',
   path: '/omnywidget',
-  getParentRoute: () => rootRoute
+  getParentRoute: () => rootRoute,
 } as any)
 
 const fullSpeedrunningRoute = fullSpeedrunningImport.update({
   id: '/(full)/speedrunning',
   path: '/speedrunning',
-  getParentRoute: () => rootRoute
+  getParentRoute: () => rootRoute,
 } as any)
 
 const fullRiveRoute = fullRiveImport.update({
   id: '/(full)/rive',
   path: '/rive',
-  getParentRoute: () => rootRoute
+  getParentRoute: () => rootRoute,
 } as any)
 
 const fullIronmonRoute = fullIronmonImport.update({
   id: '/(full)/ironmon',
   path: '/ironmon',
-  getParentRoute: () => rootRoute
+  getParentRoute: () => rootRoute,
 } as any)
 
 const fullFoundationRoute = fullFoundationImport.update({
   id: '/(full)/foundation',
   path: '/foundation',
-  getParentRoute: () => rootRoute
+  getParentRoute: () => rootRoute,
+} as any)
+
+const fullFlyingToastersRoute = fullFlyingToastersImport.update({
+  id: '/(full)/flying-toasters',
+  path: '/flying-toasters',
+  getParentRoute: () => rootRoute,
 } as any)
 
 const fullEmoterainRoute = fullEmoterainImport.update({
   id: '/(full)/emoterain',
   path: '/emoterain',
-  getParentRoute: () => rootRoute
+  getParentRoute: () => rootRoute,
 } as any)
 
 // Populate the FileRoutesByPath interface
@@ -79,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/emoterain'
       fullPath: '/emoterain'
       preLoaderRoute: typeof fullEmoterainImport
+      parentRoute: typeof rootRoute
+    }
+    '/(full)/flying-toasters': {
+      id: '/(full)/flying-toasters'
+      path: '/flying-toasters'
+      fullPath: '/flying-toasters'
+      preLoaderRoute: typeof fullFlyingToastersImport
       parentRoute: typeof rootRoute
     }
     '/(full)/foundation': {
@@ -124,6 +138,7 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/emoterain': typeof fullEmoterainRoute
+  '/flying-toasters': typeof fullFlyingToastersRoute
   '/foundation': typeof fullFoundationRoute
   '/ironmon': typeof fullIronmonRoute
   '/rive': typeof fullRiveRoute
@@ -134,6 +149,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/emoterain': typeof fullEmoterainRoute
+  '/flying-toasters': typeof fullFlyingToastersRoute
   '/foundation': typeof fullFoundationRoute
   '/ironmon': typeof fullIronmonRoute
   '/rive': typeof fullRiveRoute
@@ -145,6 +161,7 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/(full)/emoterain': typeof fullEmoterainRoute
+  '/(full)/flying-toasters': typeof fullFlyingToastersRoute
   '/(full)/foundation': typeof fullFoundationRoute
   '/(full)/ironmon': typeof fullIronmonRoute
   '/(full)/rive': typeof fullRiveRoute
@@ -154,13 +171,30 @@ export interface FileRoutesById {
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/emoterain' | '/foundation' | '/ironmon' | '/rive' | '/speedrunning' | '/omnywidget'
+  fullPaths:
+    | '/'
+    | '/emoterain'
+    | '/flying-toasters'
+    | '/foundation'
+    | '/ironmon'
+    | '/rive'
+    | '/speedrunning'
+    | '/omnywidget'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/emoterain' | '/foundation' | '/ironmon' | '/rive' | '/speedrunning' | '/omnywidget'
+  to:
+    | '/'
+    | '/emoterain'
+    | '/flying-toasters'
+    | '/foundation'
+    | '/ironmon'
+    | '/rive'
+    | '/speedrunning'
+    | '/omnywidget'
   id:
     | '__root__'
     | '/'
     | '/(full)/emoterain'
+    | '/(full)/flying-toasters'
     | '/(full)/foundation'
     | '/(full)/ironmon'
     | '/(full)/rive'
@@ -172,6 +206,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   fullEmoterainRoute: typeof fullEmoterainRoute
+  fullFlyingToastersRoute: typeof fullFlyingToastersRoute
   fullFoundationRoute: typeof fullFoundationRoute
   fullIronmonRoute: typeof fullIronmonRoute
   fullRiveRoute: typeof fullRiveRoute
@@ -182,14 +217,17 @@ export interface RootRouteChildren {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   fullEmoterainRoute: fullEmoterainRoute,
+  fullFlyingToastersRoute: fullFlyingToastersRoute,
   fullFoundationRoute: fullFoundationRoute,
   fullIronmonRoute: fullIronmonRoute,
   fullRiveRoute: fullRiveRoute,
   fullSpeedrunningRoute: fullSpeedrunningRoute,
-  widgetOmnywidgetRoute: widgetOmnywidgetRoute
+  widgetOmnywidgetRoute: widgetOmnywidgetRoute,
 }
 
-export const routeTree = rootRoute._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>()
+export const routeTree = rootRoute
+  ._addFileChildren(rootRouteChildren)
+  ._addFileTypes<FileRouteTypes>()
 
 /* ROUTE_MANIFEST_START
 {
@@ -199,6 +237,7 @@ export const routeTree = rootRoute._addFileChildren(rootRouteChildren)._addFileT
       "children": [
         "/",
         "/(full)/emoterain",
+        "/(full)/flying-toasters",
         "/(full)/foundation",
         "/(full)/ironmon",
         "/(full)/rive",
@@ -211,6 +250,9 @@ export const routeTree = rootRoute._addFileChildren(rootRouteChildren)._addFileT
     },
     "/(full)/emoterain": {
       "filePath": "(full)/emoterain.tsx"
+    },
+    "/(full)/flying-toasters": {
+      "filePath": "(full)/flying-toasters.tsx"
     },
     "/(full)/foundation": {
       "filePath": "(full)/foundation.tsx"
