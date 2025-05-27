@@ -60,7 +60,7 @@ const FlyingObject = ({ config, speed, delay, startPosition, onComplete }: Flyin
       y: startPosition.y,
     },
     end: {
-      x: startPosition.x - 1600, // Exact CSS transform distance
+      x: startPosition.x - 3200, // 2:1 ratio transform distance
       y: startPosition.y + 1600,
       transition: {
         duration: speed,
@@ -243,7 +243,7 @@ export const defaultToasterConfig: SpriteConfig = {
   frameWidth: 64,
   frameHeight: 64,
   frameCount: 4,
-  speeds: [10, 16, 24], // Exact CSS durations
+  speeds: [14.14, 22.63, 33.94], // Adjusted for constant velocity with 2:1 ratio
   delays: [0, 4, 5, 8, 12, 16, 20], // Exact CSS delays
 }
 
@@ -254,7 +254,7 @@ export const toast0Config: SpriteConfig = {
   frameWidth: 64,
   frameHeight: 64,
   frameCount: 1, // Static image, no animation
-  speeds: [12, 18, 20],
+  speeds: [16.97, 25.46, 28.28],
   delays: [0, 2, 6, 10, 14]
 }
 
@@ -264,7 +264,7 @@ export const toast1Config: SpriteConfig = {
   frameWidth: 64,
   frameHeight: 64,
   frameCount: 1,
-  speeds: [12, 18, 20],
+  speeds: [16.97, 25.46, 28.28],
   delays: [0, 2, 6, 10, 14]
 }
 
@@ -274,7 +274,7 @@ export const toast2Config: SpriteConfig = {
   frameWidth: 64,
   frameHeight: 64,
   frameCount: 1,
-  speeds: [12, 18, 20],
+  speeds: [16.97, 25.46, 28.28],
   delays: [0, 2, 6, 10, 14]
 }
 
@@ -284,7 +284,7 @@ export const toast3Config: SpriteConfig = {
   frameWidth: 64,
   frameHeight: 64,
   frameCount: 1,
-  speeds: [12, 18, 20],
+  speeds: [16.97, 25.46, 28.28],
   delays: [0, 2, 6, 10, 14]
 }
 
