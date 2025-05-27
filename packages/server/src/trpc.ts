@@ -158,7 +158,7 @@ export const ironmonRouter = router({
 
     try {
       // Subscribe to all IronMON events
-      const eventTypes = ['ironmon:init', 'ironmon:seed', 'ironmon:checkpoint'] as const
+      const eventTypes = ['ironmon:init', 'ironmon:seed', 'ironmon:checkpoint', 'ironmon:location'] as const
 
       for (const eventType of eventTypes) {
         const unsubscribe = eventEmitter.on(eventType, (data) => {

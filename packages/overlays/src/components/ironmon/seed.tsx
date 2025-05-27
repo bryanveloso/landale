@@ -1,28 +1,35 @@
-import { useEffect, type FC, memo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState, type FC, memo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
-import { type SeedMessage } from '@/lib/services/ironmon'
+import { type IronmonEvent } from '@landale/server/events/ironmon/types'
 import { animate, motion, useMotionValue, useTransform } from 'framer-motion'
 
 export const Seed: FC = memo(() => {
-  const query = useQuery<SeedMessage['metadata']>({
-    queryKey: ['ironmon', 'seed'],
-    placeholderData: { count: 0 },
+  const queryClient = useQueryClient()
+  const [seedData, setSeedData] = useState<IronmonEvent['seed']['metadata'] | undefined>()
 
-    // Because we recieve this data via a websocket, we don't want to refetch it.
-    gcTime: Infinity,
-    staleTime: Infinity,
-    refetchOnMount: false,
-    refetchOnReconnect: false
-  })
+  // Subscribe to query cache updates
+  useEffect(() => {
+    // Get initial data
+    setSeedData(queryClient.getQueryData(['ironmon', 'seed']))
+
+    // Subscribe to updates
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event?.query?.queryKey?.[0] === 'ironmon' && event?.query?.queryKey?.[1] === 'seed') {
+        setSeedData(queryClient.getQueryData(['ironmon', 'seed']))
+      }
+    })
+
+    return () => unsubscribe()
+  }, [queryClient])
 
   const value = useMotionValue(0)
   const count = useTransform(value, (v) => Math.round(v))
 
   useEffect(() => {
-    const controls = animate(value, query.data?.count || 0, { duration: 2 })
+    const controls = animate(value, seedData?.count || 0, { duration: 2 })
     return controls.stop
-  }, [value, query.data?.count])
+  }, [value, seedData?.count])
 
   return <motion.span className="tabular-nums">{count}</motion.span>
 })

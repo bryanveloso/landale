@@ -1,13 +1,15 @@
 import { FC, PropsWithChildren, createContext, useContext, useState, useEffect } from 'react'
 import { useIronmonSubscription } from '@/lib/hooks/use-ironmon'
-import { useTRPCClient } from '@/lib/trpc'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface IronmonContextValue {
   isConnected: boolean
+  hasData: boolean
 }
 
 const IronmonContext = createContext<IronmonContextValue>({
-  isConnected: false
+  isConnected: false,
+  hasData: false
 })
 
 export const useIronmon = () => {
@@ -19,32 +21,33 @@ export const useIronmon = () => {
 }
 
 export const IronmonProvider: FC<PropsWithChildren> = ({ children }) => {
-  const [isConnected, setIsConnected] = useState(false)
-  const trpcClient = useTRPCClient()
+  const [isConnected] = useState(true) // Assume connected initially
+  const [hasData, setHasData] = useState(false)
+  const queryClient = useQueryClient()
 
   // Initialize IronMON subscriptions
   useIronmonSubscription()
 
-  // Monitor WebSocket connection status
+  // Monitor for data updates instead of WebSocket connection
   useEffect(() => {
-    const checkConnection = () => {
-      // Check if the WebSocket is connected by checking the client state
-      const wsTransport = (trpcClient as any).links?.[1]?.client
-      if (wsTransport?.getConnection?.()?.readyState === WebSocket.OPEN) {
-        setIsConnected(true)
-      } else {
-        setIsConnected(false)
-      }
+    const checkData = () => {
+      const checkpointData = queryClient.getQueryData(['ironmon', 'checkpoint'])
+      const seedData = queryClient.getQueryData(['ironmon', 'seed'])
+      const initData = queryClient.getQueryData(['ironmon', 'init'])
+
+      setHasData(Boolean(checkpointData || seedData || initData))
     }
 
     // Check immediately
-    checkConnection()
+    checkData()
 
-    // Set up periodic checks
-    const interval = setInterval(checkConnection, 1000)
+    // Subscribe to query cache updates
+    const unsubscribe = queryClient.getQueryCache().subscribe(() => {
+      checkData()
+    })
 
-    return () => clearInterval(interval)
-  }, [trpcClient])
+    return () => unsubscribe()
+  }, [queryClient])
 
-  return <IronmonContext.Provider value={{ isConnected }}>{children}</IronmonContext.Provider>
+  return <IronmonContext.Provider value={{ isConnected, hasData }}>{children}</IronmonContext.Provider>
 }
