@@ -1,4 +1,4 @@
-import type { Server, TCPSocketListener, Socket } from 'bun'
+import type { TCPSocketListener, Socket } from 'bun'
 import chalk from 'chalk'
 import { ironmonMessageSchema } from './types'
 import { handleCheckpoint, handleInit, handleSeed } from './handlers'
