@@ -1,49 +1,15 @@
-enum Game {
-  RubySapphire = 1,
-  Emerald,
-  FireRedLeafGreen
-}
+/**
+ * Checkpoint data for IronMON runs (FireRed/LeafGreen)
+ * Maps checkpoint IDs to their names and trainer information
+ */
 
-export type IronmonMessage = InitMessage | SeedMessage | CheckpointMessage
-
-export type InitMessage = {
-  type: 'init'
-  metadata: {
-    version: string
-    game: Game
-  }
-}
-
-export type SeedMessage = {
-  type: 'seed'
-  metadata: {
-    count: number
-  }
-}
-
-export type CheckpointMessage = {
-  type: 'checkpoint'
-  metadata: {
-    id: number
-    name: string
-    seed: number
-    next: {
-      trainer: string
-      clearRate: number
-      lastCleared: number
-    }
-  }
-}
-
-// ---
-
-type Checkpoint = {
+export type Checkpoint = {
   id: number
   slug: string
   trainers: string
 }
 
-export const checkpoints: Checkpoint[] = [
+export const FRLG_CHECKPOINTS: Readonly<Checkpoint[]> = [
   { id: 1, trainers: 'None', slug: 'LAB' },
   { id: 2, trainers: 'Rival', slug: 'RIVAL1' },
   { id: 3, trainers: 'Trainer', slug: 'FIRSTTRAINER' },
@@ -68,4 +34,25 @@ export const checkpoints: Checkpoint[] = [
   { id: 22, trainers: 'Agatha', slug: 'AGATHA' },
   { id: 23, trainers: 'Lance', slug: 'LANCE' },
   { id: 24, trainers: 'Champ', slug: 'CHAMP' }
-]
+] as const
+
+/**
+ * Get checkpoint information by ID
+ */
+export function getCheckpoint(id: number): Checkpoint | undefined {
+  return FRLG_CHECKPOINTS.find(checkpoint => checkpoint.id === id)
+}
+
+/**
+ * Get checkpoint information by slug
+ */
+export function getCheckpointBySlug(slug: string): Checkpoint | undefined {
+  return FRLG_CHECKPOINTS.find(checkpoint => checkpoint.slug === slug)
+}
+
+/**
+ * Get the total number of checkpoints
+ */
+export function getTotalCheckpoints(): number {
+  return FRLG_CHECKPOINTS.length
+}

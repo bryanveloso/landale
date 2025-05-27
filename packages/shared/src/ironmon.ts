@@ -38,9 +38,5 @@ export interface CheckpointMessage {
 
 export type IronmonMessage = InitMessage | SeedMessage | CheckpointMessage
 
-// Checkpoint data (static game data)
-export interface Checkpoint {
-  id: number
-  slug: string
-  trainers: string
-}
+// Re-export checkpoint data
+export * from './ironmon/checkpoints'

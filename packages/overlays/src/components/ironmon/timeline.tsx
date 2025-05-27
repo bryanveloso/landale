@@ -1,29 +1,36 @@
-import { CheckpointMessage } from '@/lib/services/ironmon'
-import { useQuery } from '@tanstack/react-query'
+import { type IronmonEvent } from '@landale/server/events/ironmon/types'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { type FC, Fragment, useEffect, useState } from 'react'
 
 export const Timeline: FC<{ totalCheckpoints?: number }> = ({ totalCheckpoints = 24 }) => {
   const [currentCheckpoint, setCurrentCheckpoint] = useState<number>(1)
-  const query = useQuery<CheckpointMessage['metadata']>({
-    queryKey: ['ironmon', 'checkpoint'],
-    placeholderData: { id: 1, name: 'LAB' },
+  const queryClient = useQueryClient()
+  const [checkpointData, setCheckpointData] = useState<IronmonEvent['checkpoint']['metadata'] | undefined>()
 
-    // Because we recieve this data via a websocket, we don't want to refetch it.
-    gcTime: Infinity,
-    staleTime: Infinity,
-    refetchOnMount: false,
-    refetchOnReconnect: false
-  })
+  // Subscribe to query cache updates
+  useEffect(() => {
+    // Get initial data
+    setCheckpointData(queryClient.getQueryData(['ironmon', 'checkpoint']))
+
+    // Subscribe to updates
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event?.query?.queryKey?.[0] === 'ironmon' && event?.query?.queryKey?.[1] === 'checkpoint') {
+        setCheckpointData(queryClient.getQueryData(['ironmon', 'checkpoint']))
+      }
+    })
+
+    return () => unsubscribe()
+  }, [queryClient])
 
   const checkpoints = Array.from({ length: totalCheckpoints }, (_, i) => i + 1)
 
   useEffect(() => {
-    if (!query.data) return
+    if (!checkpointData) return
 
-    console.log(query.data?.id, query.data?.name)
-    setCurrentCheckpoint(query.data?.id || 1)
-  }, [query.data])
+    console.log(checkpointData?.id, checkpointData?.name)
+    setCurrentCheckpoint(checkpointData?.id || 1)
+  }, [checkpointData])
 
   return (
     <div className="flex items-center">

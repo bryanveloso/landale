@@ -1,6 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useSubscription } from '@trpc/tanstack-react-query'
 import { useTRPC } from '@/lib/trpc'
+import type { IronmonEvent } from '@landale/server/events/ironmon/types'
+
+type IronmonMessage = IronmonEvent[keyof IronmonEvent]
 
 export function useIronmonSubscription() {
   const queryClient = useQueryClient()
@@ -10,11 +13,26 @@ export function useIronmonSubscription() {
   useSubscription(
     trpc.ironmon.onMessage.subscriptionOptions(undefined, {
       onData: (data) => {
-        // Update query cache based on message type
-        queryClient.setQueryData(['ironmon', data.type], data.metadata)
+        const message = data as IronmonMessage
+        // Handle different message types
+        switch (message.type) {
+          case 'checkpoint':
+            queryClient.setQueryData(['ironmon', 'checkpoint'], message.metadata)
+            break
+          case 'seed':
+            queryClient.setQueryData(['ironmon', 'seed'], message.metadata)
+            break
+          case 'init':
+            queryClient.setQueryData(['ironmon', 'init'], message.metadata)
+            break
+          case 'location':
+            queryClient.setQueryData(['ironmon', 'location'], message.metadata)
+            break
+        }
 
         // Log for debugging
-        console.log(`IronMON ${data.type}:`, data.metadata)
+        console.log(`IronMON ${message.type}:`, message.metadata)
+        console.log('Query cache updated with:', queryClient.getQueryData(['ironmon', message.type]))
       }
     })
   )
