@@ -5,7 +5,8 @@ import { createBunWSHandler, type CreateBunContextOptions } from 'trpc-bun-adapt
 import { env } from '@/lib/env'
 import * as Twitch from '@/events/twitch/handlers'
 import * as IronMON from '@/events/ironmon'
-import { appRouter, type AppRouter } from '@/trpc'
+import { router, twitchRouter, ironmonRouter, healthProcedure } from '@/trpc'
+import { controlRouter } from '@/router/control'
 import { createLogger } from '@/lib/logger'
 
 import { version } from '../package.json'
@@ -21,6 +22,17 @@ interface ExtendedWebSocket extends ServerWebSocket<WSData> {
 }
 
 const log = createLogger('main')
+
+// Assemble the app router to avoid circular dependencies
+const appRouter = router({
+  health: healthProcedure,
+  twitch: twitchRouter,
+  ironmon: ironmonRouter,
+  control: controlRouter
+})
+
+// Define the router type
+type AppRouter = typeof appRouter
 
 console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
 log.info(`Environment: ${env.NODE_ENV}`)

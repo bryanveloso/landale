@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { router, publicProcedure, authedProcedure } from '../trpc'
+import { router, publicProcedure } from '../trpc'
 import { TRPCError } from '@trpc/server'
 import { eventEmitter } from '../events'
 import { createLogger } from '../lib/logger'
@@ -39,7 +39,7 @@ export const controlRouter = router({
     status: publicProcedure.query(async () => {
       const uptime = process.uptime()
       const memoryUsage = process.memoryUsage()
-      
+
       return {
         status: 'online',
         timestamp: new Date().toISOString(),
@@ -57,9 +57,46 @@ export const controlRouter = router({
       }
     }),
 
+    // Subscription for real-time status updates
+    onStatusUpdate: publicProcedure.subscription(async function* (opts) {
+      try {
+        while (true) {
+          if (opts.signal?.aborted) break
+
+          const uptime = process.uptime()
+          const memoryUsage = process.memoryUsage()
+
+          yield {
+            status: 'online',
+            timestamp: new Date().toISOString(),
+            uptime: {
+              seconds: uptime,
+              formatted: formatUptime(uptime)
+            },
+            memory: {
+              rss: formatBytes(memoryUsage.rss),
+              heapTotal: formatBytes(memoryUsage.heapTotal),
+              heapUsed: formatBytes(memoryUsage.heapUsed),
+              external: formatBytes(memoryUsage.external)
+            },
+            version: process.env.npm_package_version || '0.3.0'
+          }
+
+          // Update every 5 seconds
+          await new Promise((resolve) => setTimeout(resolve, 5000))
+        }
+      } catch (error) {
+        log.error('Error in status subscription', error)
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to stream status updates'
+        })
+      }
+    }),
+
     // Get connected browser sources
     sources: publicProcedure.query(() => {
-      return Array.from(connectedSources.values()).map(source => ({
+      return Array.from(connectedSources.values()).map((source) => ({
         ...source,
         connectedAt: source.connectedAt.toISOString(),
         lastPing: source.lastPing.toISOString()
@@ -116,25 +153,68 @@ export const controlRouter = router({
     // Emote Rain configuration
     emoteRain: router({
       get: publicProcedure.query(() => overlayConfigs.emoteRain),
-      
-      update: authedProcedure
-        .input(emoteRainConfigSchema.partial())
-        .mutation(async ({ input }) => {
-          overlayConfigs.emoteRain = { ...overlayConfigs.emoteRain, ...input }
-          
-          // Notify connected emote rain overlays
-          eventEmitter.emit('config:emoteRain:updated', overlayConfigs.emoteRain)
-          log.info('Emote rain config updated', input)
-          
-          return overlayConfigs.emoteRain
-        }),
+
+      // Subscription for real-time config updates
+      onConfigUpdate: publicProcedure.subscription(async function* (opts) {
+        // Set up event listener for config updates
+        const queue: unknown[] = []
+        let resolveNext: ((value: IteratorResult<unknown>) => void) | null = null
+        let unsubscribe: (() => void) | null = null
+
+        try {
+          // Send initial config
+          yield overlayConfigs.emoteRain
+
+          unsubscribe = eventEmitter.on('config:emoteRain:updated', (config) => {
+            if (resolveNext) {
+              resolveNext({ value: config, done: false })
+              resolveNext = null
+            } else {
+              queue.push(config)
+            }
+          })
+
+          while (true) {
+            if (opts.signal?.aborted) break
+
+            if (queue.length > 0) {
+              yield queue.shift()
+            } else {
+              yield await new Promise<unknown>((resolve) => {
+                resolveNext = (result) => resolve(result.value)
+              })
+            }
+          }
+        } catch (error) {
+          log.error('Error in emote rain config subscription', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to stream config updates'
+          })
+        } finally {
+          // Clean up event listeners
+          unsubscribe?.()
+        }
+      }),
+
+      update: publicProcedure.input(emoteRainConfigSchema.partial()).mutation(async ({ input }) => {
+        overlayConfigs.emoteRain = { ...overlayConfigs.emoteRain, ...input }
+
+        // Notify connected emote rain overlays
+        eventEmitter.emit('config:emoteRain:updated', overlayConfigs.emoteRain)
+        log.info('Emote rain config updated', input)
+
+        return overlayConfigs.emoteRain
+      }),
 
       // Manual emote burst trigger
-      burst: authedProcedure
-        .input(z.object({
-          emoteId: z.string().optional(),
-          count: z.number().min(1).max(50).default(10)
-        }))
+      burst: publicProcedure
+        .input(
+          z.object({
+            emoteId: z.string().optional(),
+            count: z.number().min(1).max(50).default(10)
+          })
+        )
         .mutation(async ({ input }) => {
           eventEmitter.emit('emoteRain:burst', input)
           log.info('Manual emote burst triggered', input)
@@ -142,12 +222,11 @@ export const controlRouter = router({
         }),
 
       // Clear all emotes
-      clear: authedProcedure
-        .mutation(async () => {
-          eventEmitter.emit('emoteRain:clear', undefined)
-          log.info('Emote rain cleared')
-          return { success: true }
-        })
+      clear: publicProcedure.mutation(async () => {
+        eventEmitter.emit('emoteRain:clear', undefined)
+        log.info('Emote rain cleared')
+        return { success: true }
+      })
     })
 
     // Future overlay configs would go here
@@ -185,7 +264,7 @@ export const controlRouter = router({
         // Subscribe to relevant events
         const eventTypes = [
           'twitch:message',
-          'twitch:cheer', 
+          'twitch:cheer',
           'ironmon:init',
           'ironmon:checkpoint',
           'ironmon:seed',
@@ -289,10 +368,12 @@ export const controlRouter = router({
   // Actions
   actions: router({
     // Force reload a specific browser source
-    reloadSource: authedProcedure
-      .input(z.object({
-        sourceId: z.string()
-      }))
+    reloadSource: publicProcedure
+      .input(
+        z.object({
+          sourceId: z.string()
+        })
+      )
       .mutation(async ({ input }) => {
         eventEmitter.emit('source:reload', input.sourceId)
         log.info('Source reload requested', input)
