@@ -11,7 +11,7 @@ services:
     ports:
       - '5433:5432'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U landale -d landale"]
+      test: ['CMD-SHELL', 'pg_isready -U landale -d landale']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,7 +41,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["bun", "run", "src/index.ts"]
+    command: ['bun', 'run', 'src/index.ts']
 
   overlays:
     build:
@@ -63,7 +63,7 @@ services:
       - '8088:8088'
     depends_on:
       - server
-    command: ["bunx", "--bun", "vite"]
+    command: ['bunx', '--bun', 'vite']
 
 volumes:
   postgres_data:

@@ -10,16 +10,17 @@ const logLevel = process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info')
 const pinoLogger = pino({
   name: 'landale-server',
   level: logLevel,
-  transport: useStructuredLogging && isDevelopment
-    ? {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'HH:MM:ss',
-          ignore: 'pid,hostname'
+  transport:
+    useStructuredLogging && isDevelopment
+      ? {
+          target: 'pino-pretty',
+          options: {
+            colorize: true,
+            translateTime: 'HH:MM:ss',
+            ignore: 'pid,hostname'
+          }
         }
-      }
-    : undefined
+      : undefined
 })
 
 // Pretty console logger that maintains your existing style

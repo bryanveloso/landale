@@ -1,7 +1,7 @@
 declare global {
   interface Window {
-    queueEmote?: (emoteId: string) => void;
+    queueEmote?: (emoteId: string) => void
   }
 }
 
-export {};
+export {}

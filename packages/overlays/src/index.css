@@ -3,13 +3,13 @@
 @theme {
   /* Custom fonts */
   --font-sans: 'Inter Variable', sans-serif;
-  
+
   /* Brand colors */
   --color-avagreen: #5be058;
   --color-avablue: #1cdaf4;
   --color-avapurple: #6644e8;
   --color-avayellow: #ffdd33;
-  
+
   /* Muted variations */
   --color-muted-green: #bbf4b0;
   --color-muted-purple: #928add;
@@ -19,7 +19,7 @@
   --color-muted-lightbluegrey: #b4cbd6;
   --color-muted-dark: #0d0a11;
   --color-muted-midgrey: #939393;
-  
+
   /* Shark color scale */
   --color-shark-50: #d3dfdf;
   --color-shark-100: #c0cfd3;
@@ -32,11 +32,11 @@
   --color-shark-800: #232a2e;
   --color-shark-900: #1a1f23;
   --color-shark-950: #121517;
-  
+
   /* Custom dimensions */
   --height-canvas: 1080px;
   --width-canvas: 1920px;
-  
+
   /* Animation easings for emotes */
   --ease-spring: cubic-bezier(0.5, 1.5, 0.75, 1);
   --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
@@ -53,11 +53,21 @@
 }
 
 @keyframes glow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }

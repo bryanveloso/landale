@@ -12,7 +12,7 @@ export class DatabaseService {
    */
   async getActiveChallenge(seedId: string) {
     return prisma.challenge.findFirst({
-      where: { 
+      where: {
         seeds: {
           some: { id: parseInt(seedId) }
         }
@@ -25,11 +25,11 @@ export class DatabaseService {
             id: true,
             name: true,
             trainer: true,
-            order: true,
+            order: true
           },
-          orderBy: { order: 'asc' },
-        },
-      },
+          orderBy: { order: 'asc' }
+        }
+      }
     })
   }
 
@@ -51,7 +51,7 @@ export class DatabaseService {
           select: {
             id: true,
             seedId: true,
-            checkpointId: true,
+            checkpointId: true
           }
         })
 
@@ -72,34 +72,32 @@ export class DatabaseService {
       // Get checkpoint details
       prisma.checkpoint.findUnique({
         where: { id: checkpointId },
-        select: { 
+        select: {
           id: true,
           trainer: true,
           name: true,
-          order: true,
+          order: true
         }
       }),
-      
+
       // Get aggregated stats
       prisma.result.aggregate({
         where: { checkpointId },
         _count: { _all: true },
-        _max: { seedId: true },
-      }),
+        _max: { seedId: true }
+      })
     ])
 
     // Get total seed count (can be cached)
     const seedCount = await this.getCachedSeedCount()
 
-    const clearRate = seedCount > 0 
-      ? Math.round((stats._count._all / seedCount) * 10000) / 100 
-      : 0
+    const clearRate = seedCount > 0 ? Math.round((stats._count._all / seedCount) * 10000) / 100 : 0
 
     return {
       checkpoint,
       clearCount: stats._count._all,
       clearRate,
-      lastClearedSeed: stats._max.seedId,
+      lastClearedSeed: stats._max.seedId
     }
   }
 
@@ -107,15 +105,15 @@ export class DatabaseService {
    * Batch upsert seeds for performance
    */
   async batchUpsertSeeds(seedIds: number[], challengeId: number = 1) {
-    const seeds = seedIds.map(id => ({
+    const seeds = seedIds.map((id) => ({
       id,
-      challengeId,
+      challengeId
     }))
 
     // Use createMany with skipDuplicates for efficiency
     const result = await prisma.seed.createMany({
       data: seeds,
-      skipDuplicates: true,
+      skipDuplicates: true
     })
 
     log.debug(`Batch upserted ${result.count} seeds`)
@@ -140,10 +138,10 @@ export class DatabaseService {
           select: { id: true }
         },
         checkpoint: {
-          select: { 
-            id: true, 
+          select: {
+            id: true,
             name: true,
-            trainer: true 
+            trainer: true
           }
         }
       }
@@ -156,11 +154,8 @@ export class DatabaseService {
 
   private async getCachedSeedCount(): Promise<number> {
     const now = Date.now()
-    
-    if (
-      !this.seedCountCache || 
-      now - this.seedCountCache.timestamp > this.CACHE_DURATION
-    ) {
+
+    if (!this.seedCountCache || now - this.seedCountCache.timestamp > this.CACHE_DURATION) {
       const count = await prisma.seed.count()
       this.seedCountCache = { count, timestamp: now }
     }

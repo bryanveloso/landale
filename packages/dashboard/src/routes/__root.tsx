@@ -5,5 +5,5 @@ export const Route = createRootRoute({
     <div className="min-h-screen bg-gray-900 text-gray-100">
       <Outlet />
     </div>
-  ),
+  )
 })

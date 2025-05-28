@@ -9,23 +9,22 @@ interface SubscriptionOptions<T> {
   enabled?: boolean
 }
 
-export function useSubscription<T>(
-  path: string,
-  input: unknown = undefined,
-  options: SubscriptionOptions<T> = {}
-) {
+export function useSubscription<T>(path: string, input: unknown = undefined, options: SubscriptionOptions<T> = {}) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<Error | null>(null)
-  const [connectionState, setConnectionState] = useState<ConnectionState>({ 
-    state: 'idle' 
+  const [connectionState, setConnectionState] = useState<ConnectionState>({
+    state: 'idle'
   })
 
   const { onData, onError, onConnectionStateChange, enabled = true } = options
 
-  const updateConnectionState = useCallback((newState: ConnectionState) => {
-    setConnectionState(newState)
-    onConnectionStateChange?.(newState)
-  }, [onConnectionStateChange])
+  const updateConnectionState = useCallback(
+    (newState: ConnectionState) => {
+      setConnectionState(newState)
+      onConnectionStateChange?.(newState)
+    },
+    [onConnectionStateChange]
+  )
 
   useEffect(() => {
     if (!enabled) {
@@ -38,7 +37,7 @@ export function useSubscription<T>(
     // Get the procedure from the tRPC client using the path
     const pathParts = path.split('.')
     let procedure: any = trpcClient
-    
+
     for (const part of pathParts) {
       procedure = procedure[part]
     }
