@@ -18,6 +18,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info').optional(),
   STRUCTURED_LOGGING: z.string().transform(val => val === 'true').default('false').optional(),
+  
+  // Control API Security
+  CONTROL_API_KEY: z.string().min(16).default('landale-control-key').optional().describe('API key for control endpoints'),
 })
 
 // Parse and validate environment variables

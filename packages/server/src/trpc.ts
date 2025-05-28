@@ -2,11 +2,18 @@ import { initTRPC, TRPCError } from '@trpc/server'
 import { z, ZodError } from 'zod'
 import { eventEmitter } from './events'
 import { createLogger } from './lib/logger'
+import { controlRouter } from './router/control'
+import { env } from './lib/env'
 
 const log = createLogger('trpc')
 
+// Define context type
+interface Context {
+  req?: Request
+}
+
 // Initialize tRPC with error formatter
-const t = initTRPC.create({
+const t = initTRPC.context<Context>().create({
   errorFormatter({ shape, error }) {
     return {
       ...shape,
@@ -18,10 +25,10 @@ const t = initTRPC.create({
   }
 })
 
-const router = t.router
+export const router = t.router
 
 // Base procedure with error handling and logging
-const publicProcedure = t.procedure.use(async (opts) => {
+export const publicProcedure = t.procedure.use(async (opts) => {
   const start = Date.now()
 
   try {
@@ -42,6 +49,24 @@ const publicProcedure = t.procedure.use(async (opts) => {
     log.error('Unexpected error in procedure', { path: opts.path, type: opts.type, durationMs, error })
     throw error
   }
+})
+
+// Authenticated procedure for control API
+// Simple API key check since this is for personal use
+export const authedProcedure = publicProcedure.use(async (opts) => {
+  // Get API key from headers
+  const apiKey = opts.ctx.req?.headers?.get('x-api-key')
+
+  const expectedKey = env.CONTROL_API_KEY
+  
+  if (apiKey !== expectedKey) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'Invalid API key'
+    })
+  }
+
+  return opts.next()
 })
 
 export const twitchRouter = router({
@@ -212,7 +237,8 @@ const healthProcedure = publicProcedure.query(async () => {
 export const appRouter = router({
   health: healthProcedure,
   twitch: twitchRouter,
-  ironmon: ironmonRouter
+  ironmon: ironmonRouter,
+  control: controlRouter
 })
 
 // Define the router type
