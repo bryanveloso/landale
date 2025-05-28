@@ -8,7 +8,7 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 export default defineConfig({
   plugins: [react(), TanStackRouterVite(), tsconfigPaths(), tailwindcss()],
   server: {
-    allowedHosts: ['saya.local'],
+    allowedHosts: ['.local'],
     host: true,
     port: 8088
   }
