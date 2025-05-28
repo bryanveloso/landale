@@ -5,34 +5,20 @@ import { createBunWSHandler, type CreateBunContextOptions } from 'trpc-bun-adapt
 import { env } from '@/lib/env'
 import * as Twitch from '@/events/twitch/handlers'
 import * as IronMON from '@/events/ironmon'
-import { router, twitchRouter, ironmonRouter, healthProcedure } from '@/trpc'
-import { controlRouter } from '@/router/control'
+import { appRouter, type AppRouter } from '@/router'
 import { createLogger } from '@/lib/logger'
 
 import { version } from '../package.json'
 
-// Type for the WebSocket data context
 interface WSData {
   req: Request
 }
 
-// Extend the ServerWebSocket type to include our custom properties
 interface ExtendedWebSocket extends ServerWebSocket<WSData> {
   pingInterval?: NodeJS.Timeout
 }
 
 const log = createLogger('main')
-
-// Assemble the app router to avoid circular dependencies
-const appRouter = router({
-  health: healthProcedure,
-  twitch: twitchRouter,
-  ironmon: ironmonRouter,
-  control: controlRouter
-})
-
-// Define the router type
-type AppRouter = typeof appRouter
 
 console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
 log.info(`Environment: ${env.NODE_ENV}`)

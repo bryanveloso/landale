@@ -1,31 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
-import { useTRPC } from '../lib/trpc'
-import { MessageSquare, Zap, Settings, Gamepad2 } from 'lucide-react'
+import { useSubscription } from '@/hooks/use-subscription'
+import { MessageSquare, Zap, Settings, Gamepad2, Wifi, WifiOff } from 'lucide-react'
 
 interface ActivityItem {
   id: string
   type: string
   timestamp: string
-  data: any
+  data: unknown
 }
 
 export function ActivityFeed() {
   const [activities, setActivities] = useState<ActivityItem[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
-  const trpc = useTRPC()
 
-  // Subscribe to activity stream
-  const subscription = trpc.control.stream.activity.useSubscription(undefined, {
-    onData: (activity: any) => {
-      setActivities(prev => {
-        const newActivities = [activity as ActivityItem, ...prev].slice(0, 50) // Keep last 50
-        return newActivities
-      })
-    },
-    onError: (error) => {
-      console.error('Activity subscription error:', error)
-    },
-  })
+  const { isConnected, isError } = useSubscription<ActivityItem>(
+    'control.stream.activity',
+    undefined,
+    {
+      onData: (activity) => {
+        setActivities(prev => {
+          const newActivities = [activity, ...prev].slice(0, 50) // Keep last 50
+          return newActivities
+        })
+      }
+    }
+  )
 
   // Auto-scroll to top when new activity arrives
   useEffect(() => {
@@ -35,10 +34,10 @@ export function ActivityFeed() {
   }, [activities])
 
   const getActivityIcon = (type: string) => {
-    if (type.startsWith('twitch:')) return <MessageSquare className="w-4 h-4" />
-    if (type.startsWith('ironmon:')) return <Gamepad2 className="w-4 h-4" />
-    if (type.includes('config')) return <Settings className="w-4 h-4" />
-    return <Zap className="w-4 h-4" />
+    if (type.startsWith('twitch:')) return <MessageSquare className="w-4 h-4 text-purple-400" />
+    if (type.startsWith('ironmon:')) return <Gamepad2 className="w-4 h-4 text-blue-400" />
+    if (type.includes('config')) return <Settings className="w-4 h-4 text-green-400" />
+    return <Zap className="w-4 h-4 text-yellow-400" />
   }
 
   const formatActivityType = (type: string) => {
@@ -50,9 +49,24 @@ export function ActivityFeed() {
     return date.toLocaleTimeString()
   }
 
+  const getConnectionIndicator = () => {
+    if (isError) return <WifiOff className="w-4 h-4 text-red-500" />
+    if (isConnected) return <Wifi className="w-4 h-4 text-green-500" />
+    return <div className="w-4 h-4 bg-gray-500 rounded-full animate-pulse" />
+  }
+
   return (
     <div className="bg-gray-800 rounded-lg p-6">
-      <h2 className="text-xl font-semibold mb-4">Activity Feed</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">Activity Feed</h2>
+        {getConnectionIndicator()}
+      </div>
+      
+      {isError && (
+        <div className="text-red-400 text-sm mb-4">
+          Unable to connect to activity stream
+        </div>
+      )}
       
       <div 
         ref={containerRef}
@@ -60,7 +74,7 @@ export function ActivityFeed() {
       >
         {activities.length === 0 ? (
           <div className="text-gray-400 text-center py-8">
-            Waiting for activity...
+            {isConnected ? 'Waiting for activity...' : 'Connecting...'}
           </div>
         ) : (
           activities.map((activity) => (
@@ -68,7 +82,7 @@ export function ActivityFeed() {
               key={activity.id}
               className="flex items-start gap-3 p-3 bg-gray-700/50 rounded-md"
             >
-              <div className="text-gray-400 mt-0.5">
+              <div className="mt-0.5">
                 {getActivityIcon(activity.type)}
               </div>
               
