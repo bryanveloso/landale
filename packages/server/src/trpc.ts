@@ -2,7 +2,7 @@ import { initTRPC, TRPCError } from '@trpc/server'
 import { z, ZodError } from 'zod'
 import { eventEmitter } from './events'
 import { createLogger } from './lib/logger'
-import { controlRouter } from './router/control'
+// controlRouter will be imported later to avoid circular dependency
 import { env } from './lib/env'
 
 const log = createLogger('trpc')
@@ -69,7 +69,7 @@ export const authedProcedure = publicProcedure.use(async (opts) => {
   return opts.next()
 })
 
-export const twitchRouter = router({
+const twitchRouter = router({
   onMessage: publicProcedure.subscription(async function* (opts) {
     try {
       const stream = eventEmitter.events('twitch:message')
@@ -94,7 +94,7 @@ export const twitchRouter = router({
   })
 })
 
-export const ironmonRouter = router({
+const ironmonRouter = router({
   // Query procedures for data access
   checkpointStats: publicProcedure
     .input(z.object({ checkpointId: z.number() }))
@@ -234,12 +234,5 @@ const healthProcedure = publicProcedure.query(async () => {
   }
 })
 
-export const appRouter = router({
-  health: healthProcedure,
-  twitch: twitchRouter,
-  ironmon: ironmonRouter,
-  control: controlRouter
-})
-
-// Define the router type
-export type AppRouter = typeof appRouter
+// Export routers for assembly in index.ts to avoid circular dependencies
+export { twitchRouter, ironmonRouter, healthProcedure }
