@@ -30,7 +30,7 @@ const FlyingObject = ({ config, speed, delay, startPosition, onComplete }: Flyin
   // Sprite flapping animation - exactly matches CSS steps(4) at 0.2s
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentFrame(prev => (prev + 1) % config.frameCount)
+      setCurrentFrame((prev) => (prev + 1) % config.frameCount)
     }, 200 / config.frameCount) // 0.2s / 4 frames = 50ms per frame
 
     return () => clearInterval(interval)
@@ -42,13 +42,13 @@ const FlyingObject = ({ config, speed, delay, startPosition, onComplete }: Flyin
       // Individual frame files
       return {
         backgroundImage: `url(${config.src[currentFrame]})`,
-        backgroundPosition: '0px 0px',
+        backgroundPosition: '0px 0px'
       }
     } else {
       // Sprite sheet
       return {
         backgroundImage: `url(${config.src})`,
-        backgroundPosition: `${-currentFrame * config.frameWidth}px 0px`,
+        backgroundPosition: `${-currentFrame * config.frameWidth}px 0px`
       }
     }
   }
@@ -57,7 +57,7 @@ const FlyingObject = ({ config, speed, delay, startPosition, onComplete }: Flyin
   const flyVariants = {
     start: {
       x: startPosition.x,
-      y: startPosition.y,
+      y: startPosition.y
     },
     end: {
       x: startPosition.x - 3200, // 2:1 ratio transform distance
@@ -65,19 +65,19 @@ const FlyingObject = ({ config, speed, delay, startPosition, onComplete }: Flyin
       transition: {
         duration: speed,
         ease: 'linear', // Matches CSS linear animation
-        delay,
-      },
-    },
+        delay
+      }
+    }
   }
 
   return (
     <motion.div
-      className="absolute pointer-events-none"
+      className="pointer-events-none absolute"
       style={{
         width: config.frameWidth,
         height: config.frameHeight,
         ...getSpriteStyle(),
-        backgroundRepeat: 'no-repeat',
+        backgroundRepeat: 'no-repeat'
       }}
       variants={flyVariants}
       initial="start"
@@ -93,13 +93,15 @@ interface FlyingToastersProps {
 }
 
 const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
-  const [objects, setObjects] = useState<Array<{
-    id: string
-    config: SpriteConfig
-    speed: number
-    delay: number
-    startPosition: { x: number; y: number }
-  }>>([])
+  const [objects, setObjects] = useState<
+    Array<{
+      id: string
+      config: SpriteConfig
+      speed: number
+      delay: number
+      startPosition: { x: number; y: number }
+    }>
+  >([])
 
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -120,7 +122,7 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
     { right: -21, top: 30 },
     { right: -23, top: 50 },
     { right: -25, top: 70 },
-    
+
     // Batch 2 (-20% to -40%)
     // Top edge, from right to left
     { right: 0, top: -26 },
@@ -133,7 +135,7 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
     { right: -26, top: 10 },
     { right: -36, top: 30 },
     { right: -29, top: 50 },
-    
+
     // Batch 3 (-40% to -60%)
     // Top edge, from right to left
     { right: 0, top: -46 },
@@ -143,7 +145,7 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
     // Right side, from top to bottom
     { right: -46, top: 10 },
     { right: -56, top: 20 },
-    { right: -49, top: 30 },
+    { right: -49, top: 30 }
   ]
 
   const currentPositionIndex = useRef(0)
@@ -151,16 +153,16 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
   // Get next position from the predefined list (cycles through)
   const generateStartPosition = () => {
     if (!containerRef.current) return { x: 0, y: 0 }
-    
+
     const container = containerRef.current
     const pos = positionClasses[currentPositionIndex.current]
     currentPositionIndex.current = (currentPositionIndex.current + 1) % positionClasses.length
-    
+
     // Convert percentage-based positions to pixels
     // Note: CSS uses "right" so we need to calculate from right edge
-    const x = container.clientWidth - (container.clientWidth * pos.right / 100)
-    const y = container.clientHeight * pos.top / 100
-    
+    const x = container.clientWidth - (container.clientWidth * pos.right) / 100
+    const y = (container.clientHeight * pos.top) / 100
+
     return { x, y }
   }
 
@@ -170,16 +172,16 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
       const config = sprites[Math.floor(Math.random() * sprites.length)]
       const speed = config.speeds[Math.floor(Math.random() * config.speeds.length)]
       const delay = config.delays[Math.floor(Math.random() * config.delays.length)]
-      
+
       const newObject = {
         id: `${Date.now()}-${Math.random()}`,
         config,
         speed,
         delay,
-        startPosition: generateStartPosition(),
+        startPosition: generateStartPosition()
       }
 
-      setObjects(prev => [...prev, newObject])
+      setObjects((prev) => [...prev, newObject])
     }
 
     // Initial spawn
@@ -194,34 +196,30 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
   }, [sprites, density])
 
   const handleObjectComplete = (id: string) => {
-    setObjects(prev => prev.filter(obj => obj.id !== id))
-    
+    setObjects((prev) => prev.filter((obj) => obj.id !== id))
+
     // Spawn replacement
     setTimeout(() => {
       const config = sprites[Math.floor(Math.random() * sprites.length)]
       const speed = config.speeds[Math.floor(Math.random() * config.speeds.length)]
       const delay = config.delays[Math.floor(Math.random() * config.delays.length)]
-      
+
       const newObject = {
         id: `${Date.now()}-${Math.random()}`,
         config,
         speed,
         delay,
-        startPosition: generateStartPosition(),
+        startPosition: generateStartPosition()
       }
 
-      setObjects(prev => [...prev, newObject])
+      setObjects((prev) => [...prev, newObject])
     }, Math.random() * 2000) // Random respawn delay
   }
 
   return (
-    <div 
-      ref={containerRef}
-      className="fixed inset-0 overflow-hidden bg-black"
-      style={{ zIndex: -1 }}
-    >
+    <div ref={containerRef} className="fixed inset-0 overflow-hidden bg-black" style={{ zIndex: -1 }}>
       <AnimatePresence>
-        {objects.map(obj => (
+        {objects.map((obj) => (
           <FlyingObject
             key={obj.id}
             config={obj.config}
@@ -244,7 +242,7 @@ export const defaultToasterConfig: SpriteConfig = {
   frameHeight: 64,
   frameCount: 4,
   speeds: [14.14, 22.63, 33.94], // Adjusted for constant velocity with 2:1 ratio
-  delays: [0, 4, 5, 8, 12, 16, 20], // Exact CSS delays
+  delays: [0, 4, 5, 8, 12, 16, 20] // Exact CSS delays
 }
 
 // Create separate configs for each toast variant

@@ -7,29 +7,27 @@ import { createLogger } from '@/lib/logger'
 const log = createLogger('ironmon')
 
 export const ironmonRouter = router({
-  checkpointStats: publicProcedure
-    .input(z.object({ checkpointId: z.number() }))
-    .query(async ({ input }) => {
-      const { databaseService } = await import('@/services/database')
-      return databaseService.getCheckpointStats(input.checkpointId)
-    }),
+  checkpointStats: publicProcedure.input(z.object({ checkpointId: z.number() })).query(async ({ input }) => {
+    const { databaseService } = await import('@/services/database')
+    return databaseService.getCheckpointStats(input.checkpointId)
+  }),
 
   recentResults: publicProcedure
-    .input(z.object({ 
-      limit: z.number().min(1).max(100).default(10),
-      cursor: z.number().optional()
-    }))
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(10),
+        cursor: z.number().optional()
+      })
+    )
     .query(async ({ input }) => {
       const { databaseService } = await import('@/services/database')
       return databaseService.getRecentResults(input.limit, input.cursor)
     }),
 
-  activeChallenge: publicProcedure
-    .input(z.object({ seedId: z.string() }))
-    .query(async ({ input }) => {
-      const { databaseService } = await import('@/services/database')
-      return databaseService.getActiveChallenge(input.seedId)
-    }),
+  activeChallenge: publicProcedure.input(z.object({ seedId: z.string() })).query(async ({ input }) => {
+    const { databaseService } = await import('@/services/database')
+    return databaseService.getActiveChallenge(input.seedId)
+  }),
 
   onInit: publicProcedure.subscription(async function* (opts) {
     try {

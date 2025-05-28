@@ -21,10 +21,8 @@ export async function* createEventSubscription<T>(
     for (const eventType of config.events) {
       // Create a properly typed handler for this specific event type
       const handleEvent = (data: EventMap[keyof EventMap]) => {
-        const transformedData = config.transform 
-          ? config.transform(eventType, data) 
-          : data as T
-        
+        const transformedData = config.transform ? config.transform(eventType, data) : (data as T)
+
         if (resolveNext) {
           resolveNext({ value: transformedData, done: false })
           resolveNext = null
@@ -34,10 +32,7 @@ export async function* createEventSubscription<T>(
       }
 
       // Use type assertion for the event handler since we know it's safe
-      const unsubscribe = eventEmitter.on(
-        eventType, 
-        handleEvent as Parameters<typeof eventEmitter.on>[1]
-      )
+      const unsubscribe = eventEmitter.on(eventType, handleEvent as Parameters<typeof eventEmitter.on>[1])
       unsubscribers.push(unsubscribe)
     }
 
@@ -78,7 +73,7 @@ export async function* createPollingSubscription<T>(
       const data = await config.getData()
       yield data
 
-      await new Promise(resolve => setTimeout(resolve, config.intervalMs))
+      await new Promise((resolve) => setTimeout(resolve, config.intervalMs))
     }
   } catch (error) {
     if (config.onError) {

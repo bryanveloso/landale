@@ -25,49 +25,49 @@ import { Route as fullEmoterainImport } from './routes/(full)/emoterain'
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const widgetOmnywidgetRoute = widgetOmnywidgetImport.update({
   id: '/(widget)/omnywidget',
   path: '/omnywidget',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const fullSpeedrunningRoute = fullSpeedrunningImport.update({
   id: '/(full)/speedrunning',
   path: '/speedrunning',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const fullRiveRoute = fullRiveImport.update({
   id: '/(full)/rive',
   path: '/rive',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const fullIronmonRoute = fullIronmonImport.update({
   id: '/(full)/ironmon',
   path: '/ironmon',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const fullFoundationRoute = fullFoundationImport.update({
   id: '/(full)/foundation',
   path: '/foundation',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const fullFlyingToastersRoute = fullFlyingToastersImport.update({
   id: '/(full)/flying-toasters',
   path: '/flying-toasters',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 const fullEmoterainRoute = fullEmoterainImport.update({
   id: '/(full)/emoterain',
   path: '/emoterain',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRoute
 } as any)
 
 // Populate the FileRoutesByPath interface
@@ -181,15 +181,7 @@ export interface FileRouteTypes {
     | '/speedrunning'
     | '/omnywidget'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/emoterain'
-    | '/flying-toasters'
-    | '/foundation'
-    | '/ironmon'
-    | '/rive'
-    | '/speedrunning'
-    | '/omnywidget'
+  to: '/' | '/emoterain' | '/flying-toasters' | '/foundation' | '/ironmon' | '/rive' | '/speedrunning' | '/omnywidget'
   id:
     | '__root__'
     | '/'
@@ -222,12 +214,10 @@ const rootRouteChildren: RootRouteChildren = {
   fullIronmonRoute: fullIronmonRoute,
   fullRiveRoute: fullRiveRoute,
   fullSpeedrunningRoute: fullSpeedrunningRoute,
-  widgetOmnywidgetRoute: widgetOmnywidgetRoute,
+  widgetOmnywidgetRoute: widgetOmnywidgetRoute
 }
 
-export const routeTree = rootRoute
-  ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+export const routeTree = rootRoute._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>()
 
 /* ROUTE_MANIFEST_START
 {

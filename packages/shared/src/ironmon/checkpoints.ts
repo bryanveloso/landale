@@ -40,14 +40,14 @@ export const FRLG_CHECKPOINTS: Readonly<Checkpoint[]> = [
  * Get checkpoint information by ID
  */
 export function getCheckpoint(id: number): Checkpoint | undefined {
-  return FRLG_CHECKPOINTS.find(checkpoint => checkpoint.id === id)
+  return FRLG_CHECKPOINTS.find((checkpoint) => checkpoint.id === id)
 }
 
 /**
  * Get checkpoint information by slug
  */
 export function getCheckpointBySlug(slug: string): Checkpoint | undefined {
-  return FRLG_CHECKPOINTS.find(checkpoint => checkpoint.slug === slug)
+  return FRLG_CHECKPOINTS.find((checkpoint) => checkpoint.slug === slug)
 }
 
 /**

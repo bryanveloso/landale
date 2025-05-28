@@ -37,9 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="mb-4 text-sm text-red-200">Something went wrong. The overlay will recover automatically.</p>
             <details className="text-xs text-red-300">
               <summary className="cursor-pointer">Error details</summary>
-              <pre className="mt-2 overflow-auto rounded bg-black/50 p-2 text-left">
-                {this.state.error?.message}
-              </pre>
+              <pre className="mt-2 overflow-auto rounded bg-black/50 p-2 text-left">{this.state.error?.message}</pre>
             </details>
           </div>
         </div>

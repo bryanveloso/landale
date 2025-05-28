@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import FlyingToasters, { 
-  defaultToasterConfig, 
+import FlyingToasters, {
+  defaultToasterConfig,
   toast0Config,
   toast1Config,
   toast2Config,

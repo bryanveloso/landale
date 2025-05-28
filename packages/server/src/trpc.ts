@@ -31,22 +31,22 @@ export const publicProcedure = t.procedure.use(async (opts) => {
     const durationMs = Date.now() - start
 
     if (!result.ok) {
-      log.error('Procedure failed', { 
-        path: opts.path, 
-        type: opts.type, 
-        durationMs, 
-        error: result.error 
+      log.error('Procedure failed', {
+        path: opts.path,
+        type: opts.type,
+        durationMs,
+        error: result.error
       })
     }
 
     return result
   } catch (error) {
     const durationMs = Date.now() - start
-    log.error('Unexpected error in procedure', { 
-      path: opts.path, 
-      type: opts.type, 
-      durationMs, 
-      error 
+    log.error('Unexpected error in procedure', {
+      path: opts.path,
+      type: opts.type,
+      durationMs,
+      error
     })
     throw error
   }
@@ -55,7 +55,7 @@ export const publicProcedure = t.procedure.use(async (opts) => {
 export const authedProcedure = publicProcedure.use(async (opts) => {
   const apiKey = opts.ctx.req?.headers?.get('x-api-key')
   const expectedKey = env.CONTROL_API_KEY
-  
+
   if (apiKey !== expectedKey) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',

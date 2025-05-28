@@ -8,7 +8,7 @@ const customBagelConfig = {
   frameHeight: 48,
   frameCount: 4,
   speeds: [10, 16, 24], // Use same speeds as original
-  delays: [0, 4, 5, 8, 12, 16, 20], // Use same delays as original
+  delays: [0, 4, 5, 8, 12, 16, 20] // Use same delays as original
 }
 
 const customCatConfig = {
@@ -18,18 +18,13 @@ const customCatConfig = {
   frameHeight: 40,
   frameCount: 6, // Different frame count is fine
   speeds: [14, 18, 22], // Slightly different speeds for variety
-  delays: [0, 3, 7, 11, 15], // Different delay pattern
+  delays: [0, 3, 7, 11, 15] // Different delay pattern
 }
 
 const FlyingToastersExample = () => {
   return (
     <FlyingToasters
-      sprites={[
-        defaultToasterConfig,
-        defaultToastConfig,
-        customBagelConfig,
-        customCatConfig,
-      ]}
+      sprites={[defaultToasterConfig, defaultToastConfig, customBagelConfig, customCatConfig]}
       density={15} // Fewer objects for less chaos
     />
   )

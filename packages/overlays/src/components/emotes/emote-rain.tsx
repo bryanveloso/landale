@@ -22,15 +22,15 @@ interface EmoteBody {
 
 // Configuration options - adjust these to change behavior
 const DEFAULT_CONFIG: EmoteConfig = {
-  size: 112,              // Emote size in pixels (28, 56, 112, 168, 224)
-  lifetime: 30000,        // How long emotes stay on screen (ms)
-  gravity: 1,             // Gravity strength (0.1 - 3)
-  restitution: 0.4,       // Bounciness (0 = no bounce, 1 = perfect bounce)
-  friction: 0.3,          // Surface friction (0 = ice, 1 = sandpaper)
-  airFriction: 0.001,     // Air resistance (0 = vacuum, 0.05 = molasses)
-  spawnDelay: 100,        // Min delay between spawns (ms) - prevents spam
-  maxEmotes: 200,         // Max emotes on screen at once
-  rotationSpeed: 0.2      // Max rotation speed
+  size: 112, // Emote size in pixels (28, 56, 112, 168, 224)
+  lifetime: 30000, // How long emotes stay on screen (ms)
+  gravity: 1, // Gravity strength (0.1 - 3)
+  restitution: 0.4, // Bounciness (0 = no bounce, 1 = perfect bounce)
+  friction: 0.3, // Surface friction (0 = ice, 1 = sandpaper)
+  airFriction: 0.001, // Air resistance (0 = vacuum, 0.05 = molasses)
+  spawnDelay: 100, // Min delay between spawns (ms) - prevents spam
+  maxEmotes: 200, // Max emotes on screen at once
+  rotationSpeed: 0.2 // Max rotation speed
 }
 
 export const EmoteRain = memo(function EmoteRain() {
@@ -74,29 +74,20 @@ export const EmoteRain = memo(function EmoteRain() {
 
     // Create boundaries
     const wallThickness = 100
-    const ground = Matter.Bodies.rectangle(
-      width / 2,
-      height + wallThickness / 2,
-      width,
-      wallThickness,
-      { isStatic: true, render: { visible: false } }
-    )
-    
-    const leftWall = Matter.Bodies.rectangle(
-      -wallThickness / 2,
-      height / 2,
-      wallThickness,
-      height,
-      { isStatic: true, render: { visible: false } }
-    )
-    
-    const rightWall = Matter.Bodies.rectangle(
-      width + wallThickness / 2,
-      height / 2,
-      wallThickness,
-      height,
-      { isStatic: true, render: { visible: false } }
-    )
+    const ground = Matter.Bodies.rectangle(width / 2, height + wallThickness / 2, width, wallThickness, {
+      isStatic: true,
+      render: { visible: false }
+    })
+
+    const leftWall = Matter.Bodies.rectangle(-wallThickness / 2, height / 2, wallThickness, height, {
+      isStatic: true,
+      render: { visible: false }
+    })
+
+    const rightWall = Matter.Bodies.rectangle(width + wallThickness / 2, height / 2, wallThickness, height, {
+      isStatic: true,
+      render: { visible: false }
+    })
 
     Matter.Composite.add(engine.world, [ground, leftWall, rightWall])
 
@@ -113,19 +104,19 @@ export const EmoteRain = memo(function EmoteRain() {
       canvas.height = window.innerHeight
       render.canvas.width = window.innerWidth
       render.canvas.height = window.innerHeight
-      
+
       // Update ground position
       Matter.Body.setPosition(ground, {
         x: window.innerWidth / 2,
         y: window.innerHeight + wallThickness / 2
       })
-      
+
       // Update wall positions
       Matter.Body.setPosition(leftWall, {
         x: -wallThickness / 2,
         y: window.innerHeight / 2
       })
-      
+
       Matter.Body.setPosition(rightWall, {
         x: window.innerWidth + wallThickness / 2,
         y: window.innerHeight / 2
@@ -152,14 +143,14 @@ export const EmoteRain = memo(function EmoteRain() {
   // Method to spawn an emote from the queue
   const spawnEmoteFromQueue = () => {
     if (!engineRef.current || spawnQueueRef.current.length === 0) return
-    
+
     // Check if we've hit the max emote limit
     if (emoteBodiesRef.current.size >= config.maxEmotes) return
-    
+
     // Check spawn delay
     const now = Date.now()
     if (now - lastSpawnTimeRef.current < config.spawnDelay) return
-    
+
     const emoteId = spawnQueueRef.current.shift()!
     lastSpawnTimeRef.current = now
 
@@ -246,11 +237,5 @@ export const EmoteRain = memo(function EmoteRain() {
     }
   }, [queueEmote])
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 pointer-events-none"
-      style={{ zIndex: 9999 }}
-    />
-  )
+  return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0" style={{ zIndex: 9999 }} />
 })
