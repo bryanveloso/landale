@@ -25,8 +25,10 @@ const log = createLogger('main')
 console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
 log.info(`Environment: ${env.NODE_ENV}`)
 
-const createContext = async (_opts: CreateBunContextOptions) => {
-  return {}
+const createContext = async (opts: CreateBunContextOptions) => {
+  return {
+    req: opts.req
+  }
 }
 
 const websocket = createBunWSHandler({
