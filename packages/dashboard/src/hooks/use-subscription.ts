@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { trpcClient } from '@/lib/trpc-client'
 import type { ConnectionState } from '@/types'
 
@@ -17,6 +17,19 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
   })
 
   const { onData, onError, onConnectionStateChange, enabled = true } = options
+  
+  // Use refs to store callbacks to avoid dependency issues
+  const onDataRef = useRef(onData)
+  const onErrorRef = useRef(onError)
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onDataRef.current = onData
+  }, [onData])
+  
+  useEffect(() => {
+    onErrorRef.current = onError
+  }, [onError])
 
   const updateConnectionState = useCallback(
     (newState: ConnectionState) => {
@@ -47,12 +60,12 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
         setData(receivedData)
         setError(null)
         updateConnectionState({ state: 'connected' })
-        onData?.(receivedData)
+        onDataRef.current?.(receivedData)
       },
       onError: (err: Error) => {
         setError(err)
         updateConnectionState({ state: 'error', error: err.message })
-        onError?.(err)
+        onErrorRef.current?.(err)
       },
       onStarted: () => {
         updateConnectionState({ state: 'connected' })
@@ -66,7 +79,7 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
       subscription.unsubscribe()
       updateConnectionState({ state: 'idle' })
     }
-  }, [path, input, enabled, onData, onError, updateConnectionState])
+  }, [path, input, enabled, updateConnectionState])
 
   const reset = useCallback(() => {
     setData(null)

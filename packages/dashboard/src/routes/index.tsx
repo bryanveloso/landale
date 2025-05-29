@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { SystemStatus } from '@/components/system-status'
+import { StreamStatus } from '@/components/stream-status'
 import { EmoteRainControl } from '@/components/emote-rain-control'
+// import { OBSDashboard } from '@/components/obs-dashboard'
 // import { ActivityFeed } from '@/components/activity-feed'
 
 export const Route = createFileRoute('/')({
@@ -17,13 +19,16 @@ function Dashboard() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* System Status */}
-        <div className="lg:col-span-1">
+        <div className="space-y-6 lg:col-span-1">
           <SystemStatus />
+          <StreamStatus />
         </div>
 
         {/* Main Controls */}
         <div className="space-y-6 lg:col-span-2">
           <EmoteRainControl />
+          {/* OBS Dashboard disabled - Bun WebSocket compatibility issues */}
+          {/* <OBSDashboard /> */}
         </div>
 
         {/* Activity Feed - TODO: Fix subscriptions */}
