@@ -5,7 +5,7 @@ import { EventSubWsListener } from '@twurple/eventsub-ws'
 import { env } from '@/lib/env'
 import { createLogger } from '@/lib/logger'
 
-import { emitEvent } from '..'
+import { emitEvent } from '@/events'
 
 const logger = createLogger('twitch')
 

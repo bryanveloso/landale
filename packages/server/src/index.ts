@@ -3,8 +3,9 @@ import chalk from 'chalk'
 import { createBunWSHandler, type CreateBunContextOptions } from 'trpc-bun-adapter'
 
 import { env } from '@/lib/env'
-import * as Twitch from '@/events/twitch/handlers'
-import * as IronMON from '@/events/ironmon'
+import * as Twitch from '@/services/twitch/handlers'
+import * as IronMON from '@/services/ironmon'
+import * as OBS from '@/services/obs'
 import { appRouter } from '@/router'
 import { createLogger } from '@/lib/logger'
 
@@ -12,7 +13,7 @@ import { version } from '../package.json'
 
 // Export types for client packages
 export type { AppRouter } from './router'
-export * from './events/ironmon/types'
+export * from './services/ironmon/types'
 
 interface WSData {
   req: Request
@@ -126,6 +127,15 @@ Twitch.initialize()
     log.error('Failed to initialize Twitch EventSub integration:', error)
   })
 
+// Initialize OBS WebSocket
+OBS.initialize()
+  .then(() => {
+    log.info('OBS WebSocket initialized successfully.')
+  })
+  .catch((error) => {
+    log.error('Failed to initialize OBS WebSocket integration:', error)
+  })
+
 // Handle graceful shutdown
 const shutdown = async (signal: string) => {
   console.log(`\n  🛑 Received ${signal}, shutting down server...`)
@@ -138,6 +148,7 @@ const shutdown = async (signal: string) => {
 
   // Cleanup other services
   await IronMON.shutdown()
+  await OBS.shutdown()
 
   process.exit(0)
 }

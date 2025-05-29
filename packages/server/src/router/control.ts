@@ -6,6 +6,7 @@ import { createLogger } from '@/lib/logger'
 import { formatUptime, formatBytes } from '@/lib/utils'
 import { createEventSubscription, createPollingSubscription } from '@/lib/subscription'
 import { emoteRainConfigSchema, type SystemStatus, type ActivityEvent } from '@/types/control'
+import { obsService } from '@/services/obs'
 
 const log = createLogger('control')
 
@@ -184,6 +185,405 @@ export const controlRouter = router({
               message: 'Failed to stream IronMON updates'
             })
         })
+      })
+    })
+  }),
+
+  obs: router({
+    // Connection status
+    onConnectionUpdate: publicProcedure.subscription(async function* (opts) {
+      // Send initial state
+      yield obsService.getState().connection
+
+      // Stream updates
+      yield* createEventSubscription(opts, {
+        events: ['obs:connection:changed'],
+        onError: (_error) =>
+          new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to stream OBS connection updates'
+          })
+      })
+    }),
+
+    // Scene management
+    scenes: router({
+      onScenesUpdate: publicProcedure.subscription(async function* (opts) {
+        // Send initial state
+        yield obsService.getState().scenes
+
+        // Stream updates
+        yield* createEventSubscription(opts, {
+          events: ['obs:scenes:updated', 'obs:scene:current-changed', 'obs:scene:preview-changed', 'obs:scene:list-changed'],
+          onError: (_error) =>
+            new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to stream OBS scene updates'
+            })
+        })
+      }),
+
+      setCurrentScene: publicProcedure
+        .input(z.object({ sceneName: z.string() }))
+        .subscription(async function* ({ input, signal: _signal }) {
+          try {
+            await obsService.setCurrentScene(input.sceneName)
+            log.info('Current scene changed:', input.sceneName)
+            yield { success: true }
+          } catch (error) {
+            log.error('Failed to set current scene:', error)
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: error instanceof Error ? error.message : 'Failed to set current scene'
+            })
+          }
+        }),
+
+      setPreviewScene: publicProcedure
+        .input(z.object({ sceneName: z.string() }))
+        .subscription(async function* ({ input, signal: _signal }) {
+          try {
+            await obsService.setPreviewScene(input.sceneName)
+            log.info('Preview scene changed:', input.sceneName)
+            yield { success: true }
+          } catch (error) {
+            log.error('Failed to set preview scene:', error)
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: error instanceof Error ? error.message : 'Failed to set preview scene'
+            })
+          }
+        }),
+
+      createScene: publicProcedure
+        .input(z.object({ sceneName: z.string() }))
+        .subscription(async function* ({ input, signal: _signal }) {
+          try {
+            await obsService.createScene(input.sceneName)
+            log.info('Scene created:', input.sceneName)
+            yield { success: true }
+          } catch (error) {
+            log.error('Failed to create scene:', error)
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: error instanceof Error ? error.message : 'Failed to create scene'
+            })
+          }
+        }),
+
+      removeScene: publicProcedure
+        .input(z.object({ sceneName: z.string() }))
+        .subscription(async function* ({ input, signal: _signal }) {
+          try {
+            await obsService.removeScene(input.sceneName)
+            log.info('Scene removed:', input.sceneName)
+            yield { success: true }
+          } catch (error) {
+            log.error('Failed to remove scene:', error)
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: error instanceof Error ? error.message : 'Failed to remove scene'
+            })
+          }
+        })
+    }),
+
+    // Streaming controls
+    streaming: router({
+      onStreamingUpdate: publicProcedure.subscription(async function* (opts) {
+        // Send initial state
+        yield obsService.getState().streaming
+
+        // Stream updates
+        yield* createEventSubscription(opts, {
+          events: ['obs:streaming:updated', 'obs:stream:state-changed'],
+          onError: (_error) =>
+            new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to stream OBS streaming updates'
+            })
+        })
+      }),
+
+      start: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.startStream()
+          log.info('Stream started')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to start stream:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to start stream'
+          })
+        }
+      }),
+
+      stop: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.stopStream()
+          log.info('Stream stopped')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to stop stream:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to stop stream'
+          })
+        }
+      })
+    }),
+
+    // Recording controls
+    recording: router({
+      onRecordingUpdate: publicProcedure.subscription(async function* (opts) {
+        // Send initial state
+        yield obsService.getState().recording
+
+        // Stream updates
+        yield* createEventSubscription(opts, {
+          events: ['obs:recording:updated', 'obs:record:state-changed'],
+          onError: (_error) =>
+            new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to stream OBS recording updates'
+            })
+        })
+      }),
+
+      start: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.startRecording()
+          log.info('Recording started')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to start recording:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to start recording'
+          })
+        }
+      }),
+
+      stop: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.stopRecording()
+          log.info('Recording stopped')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to stop recording:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to stop recording'
+          })
+        }
+      }),
+
+      pause: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.pauseRecording()
+          log.info('Recording paused')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to pause recording:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to pause recording'
+          })
+        }
+      }),
+
+      resume: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.resumeRecording()
+          log.info('Recording resumed')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to resume recording:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to resume recording'
+          })
+        }
+      })
+    }),
+
+    // Studio mode controls
+    studioMode: router({
+      onStudioModeUpdate: publicProcedure.subscription(async function* (opts) {
+        // Send initial state
+        yield obsService.getState().studioMode
+
+        // Stream updates
+        yield* createEventSubscription(opts, {
+          events: ['obs:studio-mode:updated', 'obs:studio-mode:changed'],
+          onError: (_error) =>
+            new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to stream OBS studio mode updates'
+            })
+        })
+      }),
+
+      setEnabled: publicProcedure
+        .input(z.object({ enabled: z.boolean() }))
+        .subscription(async function* ({ input, signal: _signal }) {
+          try {
+            await obsService.setStudioModeEnabled(input.enabled)
+            log.info(`Studio mode ${input.enabled ? 'enabled' : 'disabled'}`)
+            yield { success: true }
+          } catch (error) {
+            log.error('Failed to set studio mode:', error)
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: error instanceof Error ? error.message : 'Failed to set studio mode'
+            })
+          }
+        }),
+
+      triggerTransition: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.triggerStudioModeTransition()
+          log.info('Studio mode transition triggered')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to trigger transition:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to trigger transition'
+          })
+        }
+      })
+    }),
+
+    // Virtual camera controls
+    virtualCam: router({
+      onVirtualCamUpdate: publicProcedure.subscription(async function* (opts) {
+        // Send initial state
+        yield obsService.getState().virtualCam || { active: false }
+
+        // Stream updates
+        yield* createEventSubscription(opts, {
+          events: ['obs:virtual-cam:updated', 'obs:virtual-cam:changed'],
+          onError: (_error) =>
+            new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to stream OBS virtual cam updates'
+            })
+        })
+      }),
+
+      start: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.startVirtualCam()
+          log.info('Virtual camera started')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to start virtual camera:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to start virtual camera'
+          })
+        }
+      }),
+
+      stop: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.stopVirtualCam()
+          log.info('Virtual camera stopped')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to stop virtual camera:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to stop virtual camera'
+          })
+        }
+      })
+    }),
+
+    // Replay buffer controls
+    replayBuffer: router({
+      onReplayBufferUpdate: publicProcedure.subscription(async function* (opts) {
+        // Send initial state
+        yield obsService.getState().replayBuffer || { active: false }
+
+        // Stream updates
+        yield* createEventSubscription(opts, {
+          events: ['obs:replay-buffer:updated', 'obs:replay-buffer:changed'],
+          onError: (_error) =>
+            new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to stream OBS replay buffer updates'
+            })
+        })
+      }),
+
+      start: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.startReplayBuffer()
+          log.info('Replay buffer started')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to start replay buffer:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to start replay buffer'
+          })
+        }
+      }),
+
+      stop: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.stopReplayBuffer()
+          log.info('Replay buffer stopped')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to stop replay buffer:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to stop replay buffer'
+          })
+        }
+      }),
+
+      save: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        try {
+          await obsService.saveReplayBuffer()
+          log.info('Replay buffer saved')
+          yield { success: true }
+        } catch (error) {
+          log.error('Failed to save replay buffer:', error)
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: error instanceof Error ? error.message : 'Failed to save replay buffer'
+          })
+        }
+      })
+    }),
+
+    // General status
+    onStateUpdate: publicProcedure.subscription(async function* (opts) {
+      // Send initial state
+      yield obsService.getState()
+
+      // Stream all OBS updates
+      yield* createEventSubscription(opts, {
+        events: [
+          'obs:connection:changed',
+          'obs:scenes:updated',
+          'obs:streaming:updated', 
+          'obs:recording:updated',
+          'obs:studio-mode:updated',
+          'obs:virtual-cam:updated',
+          'obs:replay-buffer:updated'
+        ],
+        transform: () => obsService.getState(),
+        onError: (_error) =>
+          new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to stream OBS state updates'
+          })
       })
     })
   }),
