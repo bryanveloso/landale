@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CloudRain, Sparkles, Trash2, Wifi, WifiOff } from 'lucide-react'
 import { useSubscription } from '@/hooks/use-subscription'
-import { trpc } from '@/lib/trpc'
+import { useSubscriptionAction } from '@/hooks/use-subscription-action'
 import type { EmoteRainConfig } from '@/types'
 
 export function EmoteRainControl() {
@@ -37,26 +37,38 @@ export function EmoteRainControl() {
     setIsDirty(true)
   }
 
+  const { execute: updateConfig } = useSubscriptionAction<EmoteRainConfig, EmoteRainConfig>(
+    'control.config.emoteRain.update'
+  )
+
   const handleSave = async () => {
     try {
-      await trpc.control.config.emoteRain.update.mutate(localConfig)
+      await updateConfig(localConfig)
       setIsDirty(false)
     } catch (error) {
       console.error('Failed to save config:', error)
     }
   }
 
+  const { execute: triggerBurst } = useSubscriptionAction<{ count: number }, { success: boolean }>(
+    'control.config.emoteRain.burst'
+  )
+
   const handleBurst = async () => {
     try {
-      await trpc.control.config.emoteRain.burst.mutate({ count: 20 })
+      await triggerBurst({ count: 20 })
     } catch (error) {
       console.error('Failed to trigger burst:', error)
     }
   }
 
+  const { execute: clearEmotes } = useSubscriptionAction<void, { success: boolean }>(
+    'control.config.emoteRain.clear'
+  )
+
   const handleClear = async () => {
     try {
-      await trpc.control.config.emoteRain.clear.mutate()
+      await clearEmotes()
     } catch (error) {
       console.error('Failed to clear emotes:', error)
     }

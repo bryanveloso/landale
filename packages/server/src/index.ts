@@ -5,10 +5,14 @@ import { createBunWSHandler, type CreateBunContextOptions } from 'trpc-bun-adapt
 import { env } from '@/lib/env'
 import * as Twitch from '@/events/twitch/handlers'
 import * as IronMON from '@/events/ironmon'
-import { appRouter, type AppRouter } from '@/router'
+import { appRouter } from '@/router'
 import { createLogger } from '@/lib/logger'
 
 import { version } from '../package.json'
+
+// Export types for client packages
+export type { AppRouter } from './router'
+export * from './events/ironmon/types'
 
 interface WSData {
   req: Request
@@ -140,6 +144,3 @@ const shutdown = async (signal: string) => {
 
 process.on('SIGINT', () => shutdown('SIGINT'))
 process.on('SIGTERM', () => shutdown('SIGTERM'))
-
-// Export AppRouter type for client consumption
-export type { AppRouter }

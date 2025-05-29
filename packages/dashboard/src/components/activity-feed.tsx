@@ -40,8 +40,8 @@ export function ActivityFeed() {
     return type
       .split(':')
       .slice(-1)[0]
-      .replace(/([A-Z])/g, ' $1')
-      .trim()
+      ?.replace(/([A-Z])/g, ' $1')
+      .trim() || type
   }
 
   const formatTimestamp = (timestamp: string) => {

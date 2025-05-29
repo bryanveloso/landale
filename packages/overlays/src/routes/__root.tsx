@@ -1,4 +1,4 @@
-import React, { FC, PropsWithChildren, Suspense } from 'react'
+import React, { type FC, type PropsWithChildren, Suspense } from 'react'
 import { QueryClient } from '@tanstack/react-query'
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router'
 

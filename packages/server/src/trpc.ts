@@ -5,7 +5,7 @@ import { env } from '@/lib/env'
 
 const log = createLogger('trpc')
 
-interface Context {
+export interface Context {
   req?: Request
 }
 

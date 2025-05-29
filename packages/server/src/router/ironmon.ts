@@ -3,13 +3,15 @@ import { router, publicProcedure } from '@/trpc'
 import { TRPCError } from '@trpc/server'
 import { eventEmitter } from '@/events'
 import { createLogger } from '@/lib/logger'
+import { createPollingSubscription } from '@/lib/subscription'
 
 const log = createLogger('ironmon')
 
 export const ironmonRouter = router({
-  checkpointStats: publicProcedure.input(z.object({ checkpointId: z.number() })).query(async ({ input }) => {
+  checkpointStats: publicProcedure.input(z.object({ checkpointId: z.number() })).subscription(async function* ({ input, signal: _signal }) {
     const { databaseService } = await import('@/services/database')
-    return databaseService.getCheckpointStats(input.checkpointId)
+    const stats = await databaseService.getCheckpointStats(input.checkpointId)
+    yield stats
   }),
 
   recentResults: publicProcedure
@@ -19,14 +21,30 @@ export const ironmonRouter = router({
         cursor: z.number().optional()
       })
     )
-    .query(async ({ input }) => {
+    .subscription(async function* ({ input, signal }) {
       const { databaseService } = await import('@/services/database')
-      return databaseService.getRecentResults(input.limit, input.cursor)
+      // Send initial results
+      const results = await databaseService.getRecentResults(input.limit, input.cursor)
+      yield results
+      
+      // Then poll for updates every 10 seconds
+      yield* createPollingSubscription({ signal }, {
+        getData: async () => databaseService.getRecentResults(input.limit, input.cursor),
+        intervalMs: 10000
+      })
     }),
 
-  activeChallenge: publicProcedure.input(z.object({ seedId: z.string() })).query(async ({ input }) => {
+  activeChallenge: publicProcedure.input(z.object({ seedId: z.string() })).subscription(async function* ({ input, signal }) {
     const { databaseService } = await import('@/services/database')
-    return databaseService.getActiveChallenge(input.seedId)
+    // Send initial data
+    const challenge = await databaseService.getActiveChallenge(input.seedId)
+    yield challenge
+    
+    // Then poll for updates every 5 seconds
+    yield* createPollingSubscription({ signal }, {
+      getData: async () => databaseService.getActiveChallenge(input.seedId),
+      intervalMs: 5000
+    })
   }),
 
   onInit: publicProcedure.subscription(async function* (opts) {

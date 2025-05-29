@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { SystemStatus } from '../components/system-status'
-import { EmoteRainControl } from '../components/emote-rain-control'
-// import { ActivityFeed } from '../components/activity-feed'
+import { SystemStatus } from '@/components/system-status'
+import { EmoteRainControl } from '@/components/emote-rain-control'
+// import { ActivityFeed } from '@/components/activity-feed'
 
 export const Route = createFileRoute('/')({
   component: Dashboard
