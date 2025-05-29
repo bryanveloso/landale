@@ -1,4 +1,4 @@
-import prisma from '@landale/database'
+import prisma, { type Prisma } from '@landale/database'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('database')
@@ -40,7 +40,7 @@ export class DatabaseService {
     if (checkpointId <= 0) return null
 
     try {
-      return await prisma.$transaction(async (tx) => {
+      return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         // Upsert the result
         const result = await tx.result.upsert({
           where: {
