@@ -34,6 +34,13 @@ export type OBSEvent = {
 export type EventMap = {
   'twitch:cheer': TwitchEvent['cheer']
   'twitch:message': TwitchEvent['message']
+  'twitch:follow': TwitchEvent['follow']
+  'twitch:subscription': TwitchEvent['subscription']
+  'twitch:subscription:gift': TwitchEvent['subscriptionGift']
+  'twitch:subscription:message': TwitchEvent['subscriptionMessage']
+  'twitch:redemption': TwitchEvent['redemption']
+  'twitch:stream:online': TwitchEvent['streamOnline']
+  'twitch:stream:offline': TwitchEvent['streamOffline']
   'ironmon:init': IronmonEvent['init']
   'ironmon:seed': IronmonEvent['seed']
   'ironmon:checkpoint': IronmonEvent['checkpoint']

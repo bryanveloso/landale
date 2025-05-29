@@ -13,6 +13,7 @@
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/index'
 import { Route as widgetOmnywidgetImport } from './routes/(widget)/omnywidget'
+import { Route as widgetAlertsImport } from './routes/(widget)/alerts'
 import { Route as fullSpeedrunningImport } from './routes/(full)/speedrunning'
 import { Route as fullIronmonImport } from './routes/(full)/ironmon'
 import { Route as fullFoundationImport } from './routes/(full)/foundation'
@@ -30,6 +31,12 @@ const IndexRoute = IndexImport.update({
 const widgetOmnywidgetRoute = widgetOmnywidgetImport.update({
   id: '/(widget)/omnywidget',
   path: '/omnywidget',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const widgetAlertsRoute = widgetAlertsImport.update({
+  id: '/(widget)/alerts',
+  path: '/alerts',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -109,6 +116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof fullSpeedrunningImport
       parentRoute: typeof rootRoute
     }
+    '/(widget)/alerts': {
+      id: '/(widget)/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof widgetAlertsImport
+      parentRoute: typeof rootRoute
+    }
     '/(widget)/omnywidget': {
       id: '/(widget)/omnywidget'
       path: '/omnywidget'
@@ -128,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/foundation': typeof fullFoundationRoute
   '/ironmon': typeof fullIronmonRoute
   '/speedrunning': typeof fullSpeedrunningRoute
+  '/alerts': typeof widgetAlertsRoute
   '/omnywidget': typeof widgetOmnywidgetRoute
 }
 
@@ -138,6 +153,7 @@ export interface FileRoutesByTo {
   '/foundation': typeof fullFoundationRoute
   '/ironmon': typeof fullIronmonRoute
   '/speedrunning': typeof fullSpeedrunningRoute
+  '/alerts': typeof widgetAlertsRoute
   '/omnywidget': typeof widgetOmnywidgetRoute
 }
 
@@ -149,6 +165,7 @@ export interface FileRoutesById {
   '/(full)/foundation': typeof fullFoundationRoute
   '/(full)/ironmon': typeof fullIronmonRoute
   '/(full)/speedrunning': typeof fullSpeedrunningRoute
+  '/(widget)/alerts': typeof widgetAlertsRoute
   '/(widget)/omnywidget': typeof widgetOmnywidgetRoute
 }
 
@@ -161,6 +178,7 @@ export interface FileRouteTypes {
     | '/foundation'
     | '/ironmon'
     | '/speedrunning'
+    | '/alerts'
     | '/omnywidget'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -170,6 +188,7 @@ export interface FileRouteTypes {
     | '/foundation'
     | '/ironmon'
     | '/speedrunning'
+    | '/alerts'
     | '/omnywidget'
   id:
     | '__root__'
@@ -179,6 +198,7 @@ export interface FileRouteTypes {
     | '/(full)/foundation'
     | '/(full)/ironmon'
     | '/(full)/speedrunning'
+    | '/(widget)/alerts'
     | '/(widget)/omnywidget'
   fileRoutesById: FileRoutesById
 }
@@ -190,6 +210,7 @@ export interface RootRouteChildren {
   fullFoundationRoute: typeof fullFoundationRoute
   fullIronmonRoute: typeof fullIronmonRoute
   fullSpeedrunningRoute: typeof fullSpeedrunningRoute
+  widgetAlertsRoute: typeof widgetAlertsRoute
   widgetOmnywidgetRoute: typeof widgetOmnywidgetRoute
 }
 
@@ -200,6 +221,7 @@ const rootRouteChildren: RootRouteChildren = {
   fullFoundationRoute: fullFoundationRoute,
   fullIronmonRoute: fullIronmonRoute,
   fullSpeedrunningRoute: fullSpeedrunningRoute,
+  widgetAlertsRoute: widgetAlertsRoute,
   widgetOmnywidgetRoute: widgetOmnywidgetRoute,
 }
 
@@ -219,6 +241,7 @@ export const routeTree = rootRoute
         "/(full)/foundation",
         "/(full)/ironmon",
         "/(full)/speedrunning",
+        "/(widget)/alerts",
         "/(widget)/omnywidget"
       ]
     },
@@ -239,6 +262,9 @@ export const routeTree = rootRoute
     },
     "/(full)/speedrunning": {
       "filePath": "(full)/speedrunning.tsx"
+    },
+    "/(widget)/alerts": {
+      "filePath": "(widget)/alerts.tsx"
     },
     "/(widget)/omnywidget": {
       "filePath": "(widget)/omnywidget.tsx"

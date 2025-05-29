@@ -14,6 +14,7 @@ import { version } from '../package.json'
 // Export types for client packages
 export type { AppRouter } from './router'
 export * from './services/ironmon/types'
+export type { TwitchEvent } from './services/twitch/types'
 
 interface WSData {
   req: Request

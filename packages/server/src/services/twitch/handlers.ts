@@ -91,4 +91,96 @@ const setupEventListeners = async (listener: EventSubWsListener) => {
       threadMessageUserName: e.threadMessageUserName
     })
   })
+
+  // Channel follow subscription
+  listener.onChannelFollow(userId, userId, (e) => {
+    logger.info(`New follower: ${e.userDisplayName}`)
+    emitEvent('twitch:follow', {
+      userId: e.userId,
+      userName: e.userName,
+      userDisplayName: e.userDisplayName,
+      followDate: e.followDate
+    })
+  })
+
+  // Channel subscription
+  listener.onChannelSubscription(userId, (e) => {
+    logger.info(`New subscription: ${e.userDisplayName} (${e.tier})`)
+    emitEvent('twitch:subscription', {
+      userId: e.userId,
+      userName: e.userName,
+      userDisplayName: e.userDisplayName,
+      tier: e.tier,
+      isGift: e.isGift
+    })
+  })
+
+  // Channel subscription gift
+  listener.onChannelSubscriptionGift(userId, (e) => {
+    logger.info(`Gift subscription: ${e.gifterDisplayName} gifted ${e.amount} to ${e.isAnonymous ? 'anonymous users' : 'the community'}`)
+    emitEvent('twitch:subscription:gift', {
+      gifterId: e.gifterId,
+      gifterName: e.gifterName,
+      gifterDisplayName: e.gifterDisplayName,
+      isAnonymous: e.isAnonymous,
+      amount: e.amount,
+      cumulativeAmount: e.cumulativeAmount,
+      tier: e.tier
+    })
+  })
+
+  // Channel subscription message (resub)
+  listener.onChannelSubscriptionMessage(userId, (e) => {
+    logger.info(`Resub: ${e.userDisplayName} (${e.cumulativeMonths} months)`)
+    emitEvent('twitch:subscription:message', {
+      userId: e.userId,
+      userName: e.userName,
+      userDisplayName: e.userDisplayName,
+      tier: e.tier,
+      messageText: e.messageText,
+      cumulativeMonths: e.cumulativeMonths,
+      durationMonths: e.durationMonths,
+      streakMonths: e.streakMonths
+    })
+  })
+
+  // Channel point redemption
+  listener.onChannelRedemptionAdd(userId, (e) => {
+    logger.info(`Channel point redemption: ${e.userDisplayName} redeemed "${e.rewardTitle}"`)
+    emitEvent('twitch:redemption', {
+      id: e.id,
+      userId: e.userId,
+      userName: e.userName,
+      userDisplayName: e.userDisplayName,
+      rewardId: e.rewardId,
+      rewardTitle: e.rewardTitle,
+      rewardCost: e.rewardCost,
+      input: e.input,
+      status: e.status,
+      redemptionDate: e.redemptionDate
+    })
+  })
+
+  // Stream online
+  listener.onStreamOnline(userId, (e) => {
+    logger.info(`Stream went online: ${e.broadcasterDisplayName} playing ${e.type}`)
+    emitEvent('twitch:stream:online', {
+      id: e.id,
+      broadcasterId: e.broadcasterId,
+      broadcasterName: e.broadcasterName,
+      broadcasterDisplayName: e.broadcasterDisplayName,
+      type: e.type,
+      startDate: e.startDate
+    })
+  })
+
+  // Stream offline
+  listener.onStreamOffline(userId, (e) => {
+    logger.info(`Stream went offline: ${e.broadcasterDisplayName}`)
+    emitEvent('twitch:stream:offline', {
+      broadcasterId: e.broadcasterId,
+      broadcasterName: e.broadcasterName,
+      broadcasterDisplayName: e.broadcasterDisplayName
+    })
+  })
 }

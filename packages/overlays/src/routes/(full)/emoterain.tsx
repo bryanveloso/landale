@@ -1,6 +1,6 @@
-import { useTRPC } from '@/lib/trpc'
+import { useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { useSubscription } from '@trpc/tanstack-react-query'
+import { trpcClient } from '@/lib/trpc'
 
 import { EmoteRain } from '@/components/emotes/emote-rain'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -10,10 +10,8 @@ export const Route = createFileRoute('/(full)/emoterain')({
 })
 
 function RouteComponent() {
-  const trpc = useTRPC()
-
-  useSubscription(
-    trpc.twitch.onMessage.subscriptionOptions(undefined, {
+  useEffect(() => {
+    const subscription = trpcClient.twitch.onMessage.subscribe(undefined, {
       onData: (data) => {
         // Process message parts to find emotes
         if (data.messageParts) {
@@ -28,7 +26,9 @@ function RouteComponent() {
         }
       }
     })
-  )
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   return (
     <ErrorBoundary>
