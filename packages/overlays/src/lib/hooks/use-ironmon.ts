@@ -1,17 +1,15 @@
+import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useSubscription } from '@trpc/tanstack-react-query'
-import { useTRPC } from '@/lib/trpc'
+import { trpcClient } from '@/lib/trpc'
 import type { IronmonEvent } from '@landale/server'
 
 type IronmonMessage = IronmonEvent[keyof IronmonEvent]
 
 export function useIronmonSubscription() {
   const queryClient = useQueryClient()
-  const trpc = useTRPC()
 
-  // Subscribe to all IronMON messages
-  useSubscription(
-    trpc.ironmon.onMessage.subscriptionOptions(undefined, {
+  useEffect(() => {
+    const subscription = trpcClient.ironmon.onMessage.subscribe(undefined, {
       onData: (data: unknown) => {
         const message = data as IronmonMessage
         // Handle different message types
@@ -35,35 +33,39 @@ export function useIronmonSubscription() {
         console.log('Query cache updated with:', queryClient.getQueryData(['ironmon', message.type]))
       }
     })
-  )
+
+    return () => subscription.unsubscribe()
+  }, [queryClient])
 }
 
 export function useIronmonCheckpoint() {
   const queryClient = useQueryClient()
-  const trpc = useTRPC()
 
-  useSubscription(
-    trpc.ironmon.onCheckpoint.subscriptionOptions(undefined, {
+  useEffect(() => {
+    const subscription = trpcClient.ironmon.onCheckpoint.subscribe(undefined, {
       onData: (data: unknown) => {
         queryClient.setQueryData(['ironmon', 'checkpoint'], (data as { metadata: unknown }).metadata)
       }
     })
-  )
+
+    return () => subscription.unsubscribe()
+  }, [queryClient])
 
   return queryClient.getQueryData(['ironmon', 'checkpoint'])
 }
 
 export function useIronmonSeed() {
   const queryClient = useQueryClient()
-  const trpc = useTRPC()
 
-  useSubscription(
-    trpc.ironmon.onSeed.subscriptionOptions(undefined, {
+  useEffect(() => {
+    const subscription = trpcClient.ironmon.onSeed.subscribe(undefined, {
       onData: (data: unknown) => {
         queryClient.setQueryData(['ironmon', 'seed'], (data as { metadata: unknown }).metadata)
       }
     })
-  )
+
+    return () => subscription.unsubscribe()
+  }, [queryClient])
 
   return queryClient.getQueryData(['ironmon', 'seed'])
 }

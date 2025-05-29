@@ -93,33 +93,33 @@ export interface OBSControls {
   // Connection
   connect: () => Promise<void>
   disconnect: () => Promise<void>
-  
+
   // Scenes
   setCurrentScene: (sceneName: string) => Promise<void>
   setPreviewScene: (sceneName: string) => Promise<void>
   createScene: (sceneName: string) => Promise<void>
   removeScene: (sceneName: string) => Promise<void>
   refreshScenes: () => Promise<void>
-  
+
   // Streaming
   startStream: () => Promise<void>
   stopStream: () => Promise<void>
-  
+
   // Recording
   startRecording: () => Promise<void>
   stopRecording: () => Promise<void>
   pauseRecording: () => Promise<void>
   resumeRecording: () => Promise<void>
-  
+
   // Studio Mode
   enableStudioMode: () => Promise<void>
   disableStudioMode: () => Promise<void>
   triggerTransition: () => Promise<void>
-  
+
   // Virtual Camera
   startVirtualCam: () => Promise<void>
   stopVirtualCam: () => Promise<void>
-  
+
   // Replay Buffer
   startReplayBuffer: () => Promise<void>
   stopReplayBuffer: () => Promise<void>
