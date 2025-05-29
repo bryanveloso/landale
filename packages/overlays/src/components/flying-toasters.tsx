@@ -155,7 +155,7 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
     if (!containerRef.current) return { x: 0, y: 0 }
 
     const container = containerRef.current
-    const pos = positionClasses[currentPositionIndex.current]
+    const pos = positionClasses[currentPositionIndex.current] || positionClasses[0]!
     currentPositionIndex.current = (currentPositionIndex.current + 1) % positionClasses.length
 
     // Convert percentage-based positions to pixels
@@ -169,9 +169,9 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
   // Spawn objects with exact original timing
   useEffect(() => {
     const spawnObject = () => {
-      const config = sprites[Math.floor(Math.random() * sprites.length)]
-      const speed = config.speeds[Math.floor(Math.random() * config.speeds.length)]
-      const delay = config.delays[Math.floor(Math.random() * config.delays.length)]
+      const config = sprites[Math.floor(Math.random() * sprites.length)] || sprites[0]!
+      const speed = config.speeds[Math.floor(Math.random() * config.speeds.length)] || config.speeds[0]!
+      const delay = config.delays[Math.floor(Math.random() * config.delays.length)] || config.delays[0]!
 
       const newObject = {
         id: `${Date.now()}-${Math.random()}`,
@@ -200,9 +200,9 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
 
     // Spawn replacement
     setTimeout(() => {
-      const config = sprites[Math.floor(Math.random() * sprites.length)]
-      const speed = config.speeds[Math.floor(Math.random() * config.speeds.length)]
-      const delay = config.delays[Math.floor(Math.random() * config.delays.length)]
+      const config = sprites[Math.floor(Math.random() * sprites.length)] || sprites[0]!
+      const speed = config.speeds[Math.floor(Math.random() * config.speeds.length)] || config.speeds[0]!
+      const delay = config.delays[Math.floor(Math.random() * config.delays.length)] || config.delays[0]!
 
       const newObject = {
         id: `${Date.now()}-${Math.random()}`,

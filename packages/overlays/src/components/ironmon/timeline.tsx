@@ -1,4 +1,4 @@
-import { type IronmonEvent } from '@landale/server/events/ironmon/types'
+import { type IronmonEvent } from '@landale/server'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { type FC, Fragment, useEffect, useState } from 'react'

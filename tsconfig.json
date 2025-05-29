@@ -9,8 +9,10 @@
   },
   "files": [],
   "references": [
-    { "path": "./packages/server" },
+    { "path": "./packages/dashboard" },
+    { "path": "./packages/database" },
     { "path": "./packages/overlays" },
-    { "path": "./packages/database" }
+    { "path": "./packages/server" },
+    { "path": "./packages/shared" }
   ]
 }

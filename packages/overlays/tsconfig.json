@@ -1,33 +1,19 @@
 {
+  "extends": "@landale/shared/tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
+    "composite": true,
     "noEmit": true,
     "jsx": "react-jsx",
-
-    /* Linting */
-    "strict": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-
-    /* Paths */
     "baseUrl": ".",
     "paths": {
       "+/*": ["./assets/*"],
       "@/*": ["./src/*"],
-      "~/*": ["./public/*"],
-      "@landale/server": ["../server/src"],
-      "@landale/server/*": ["../server/src/*"],
+      "~/*": ["./public/*"]
     }
   },
   "include": ["src"],

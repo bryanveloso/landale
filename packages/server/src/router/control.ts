@@ -99,13 +99,13 @@ export const controlRouter = router({
         })
       }),
 
-      update: publicProcedure.input(emoteRainConfigSchema.partial()).mutation(async ({ input }) => {
+      update: publicProcedure.input(emoteRainConfigSchema.partial()).subscription(async function* ({ input, signal: _signal }) {
         overlayConfigs.emoteRain = { ...overlayConfigs.emoteRain, ...input }
 
         eventEmitter.emit('config:emoteRain:updated', overlayConfigs.emoteRain)
         log.info('Emote rain config updated', input)
 
-        return overlayConfigs.emoteRain
+        yield overlayConfigs.emoteRain
       }),
 
       burst: publicProcedure
@@ -115,16 +115,16 @@ export const controlRouter = router({
             count: z.number().min(1).max(50).default(10)
           })
         )
-        .mutation(async ({ input }) => {
+        .subscription(async function* ({ input, signal: _signal }) {
           eventEmitter.emit('emoteRain:burst', input)
           log.info('Manual emote burst triggered', input)
-          return { success: true }
+          yield { success: true }
         }),
 
-      clear: publicProcedure.mutation(async () => {
+      clear: publicProcedure.subscription(async function* ({ signal: _signal }) {
         eventEmitter.emit('emoteRain:clear', undefined)
         log.info('Emote rain cleared')
-        return { success: true }
+        yield { success: true }
       })
     })
   }),
@@ -166,8 +166,8 @@ export const controlRouter = router({
     }),
 
     ironmon: router({
-      current: publicProcedure.query(async () => {
-        return {
+      current: publicProcedure.subscription(async function* ({ signal: _signal }) {
+        yield {
           active: false,
           seed: null,
           checkpoint: null
@@ -189,10 +189,10 @@ export const controlRouter = router({
   }),
 
   actions: router({
-    reloadSource: publicProcedure.input(z.object({ sourceId: z.string() })).mutation(async ({ input }) => {
+    reloadSource: publicProcedure.input(z.object({ sourceId: z.string() })).subscription(async function* ({ input, signal: _signal }) {
       eventEmitter.emit('source:reload', input.sourceId)
       log.info('Source reload requested', input)
-      return { success: true }
+      yield { success: true }
     })
   })
 })

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useSubscription } from '@trpc/tanstack-react-query'
 import { useTRPC } from '@/lib/trpc'
-import type { IronmonEvent } from '@landale/server/events/ironmon/types'
+import type { IronmonEvent } from '@landale/server'
 
 type IronmonMessage = IronmonEvent[keyof IronmonEvent]
 
@@ -12,7 +12,7 @@ export function useIronmonSubscription() {
   // Subscribe to all IronMON messages
   useSubscription(
     trpc.ironmon.onMessage.subscriptionOptions(undefined, {
-      onData: (data) => {
+      onData: (data: unknown) => {
         const message = data as IronmonMessage
         // Handle different message types
         switch (message.type) {
@@ -44,8 +44,8 @@ export function useIronmonCheckpoint() {
 
   useSubscription(
     trpc.ironmon.onCheckpoint.subscriptionOptions(undefined, {
-      onData: (data) => {
-        queryClient.setQueryData(['ironmon', 'checkpoint'], data.metadata)
+      onData: (data: unknown) => {
+        queryClient.setQueryData(['ironmon', 'checkpoint'], (data as { metadata: unknown }).metadata)
       }
     })
   )
@@ -59,8 +59,8 @@ export function useIronmonSeed() {
 
   useSubscription(
     trpc.ironmon.onSeed.subscriptionOptions(undefined, {
-      onData: (data) => {
-        queryClient.setQueryData(['ironmon', 'seed'], data.metadata)
+      onData: (data: unknown) => {
+        queryClient.setQueryData(['ironmon', 'seed'], (data as { metadata: unknown }).metadata)
       }
     })
   )
