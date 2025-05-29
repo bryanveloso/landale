@@ -4,7 +4,6 @@ import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 
 import { ErrorBoundary } from '@/components/error-boundary'
-import { OBSProvider } from '@/lib/providers/obs'
 import { QueryProvider } from '@/lib/providers/query'
 import { queryClient } from '@/lib/trpc'
 
@@ -30,9 +29,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryProvider>
-        <OBSProvider>
-          <RouterProvider router={router} />
-        </OBSProvider>
+        <RouterProvider router={router} />
       </QueryProvider>
     </ErrorBoundary>
   </React.StrictMode>

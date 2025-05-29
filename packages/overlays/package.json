@@ -22,7 +22,6 @@
     "@trpc/tanstack-react-query": "^11.1.4",
     "framer-motion": "^12.15.0",
     "matter-js": "^0.20.0",
-    "obs-websocket-js": "^5.0.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-use-websocket": "^4.13.0",
