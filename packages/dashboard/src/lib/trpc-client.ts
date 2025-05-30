@@ -19,8 +19,8 @@ const wsClient = createWSClient({
     console.error('[tRPC] WebSocket error:', event)
   },
   retryDelayMs: (attemptIndex): number => {
-    // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
-    const delays = [1000, 2000, 4000, 8000, 30000]
+    // Shorter delays for faster reconnection
+    const delays = [500, 1000, 2000, 4000, 8000]
     return delays[Math.min(attemptIndex, delays.length - 1)]!
   },
   lazy: {

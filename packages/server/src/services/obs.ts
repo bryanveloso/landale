@@ -291,7 +291,7 @@ class OBSService {
 
   // Public methods
   async connect() {
-    if (this.isConnecting || this.obs.identified) {
+    if (this.isConnecting || this.obs.connected) {
       return
     }
 
@@ -323,7 +323,7 @@ class OBSService {
       this.reconnectTimer = undefined
     }
 
-    if (this.obs.identified) {
+    if (this.obs.connected) {
       await this.obs.disconnect()
     }
   }
