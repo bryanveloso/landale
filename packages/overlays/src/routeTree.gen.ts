@@ -12,6 +12,7 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/index'
+import { Route as widgetStatusBarImport } from './routes/(widget)/status-bar'
 import { Route as widgetOmnywidgetImport } from './routes/(widget)/omnywidget'
 import { Route as widgetAlertsImport } from './routes/(widget)/alerts'
 import { Route as fullSpeedrunningImport } from './routes/(full)/speedrunning'
@@ -25,6 +26,12 @@ import { Route as fullEmoterainImport } from './routes/(full)/emoterain'
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const widgetStatusBarRoute = widgetStatusBarImport.update({
+  id: '/(widget)/status-bar',
+  path: '/status-bar',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -130,6 +137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof widgetOmnywidgetImport
       parentRoute: typeof rootRoute
     }
+    '/(widget)/status-bar': {
+      id: '/(widget)/status-bar'
+      path: '/status-bar'
+      fullPath: '/status-bar'
+      preLoaderRoute: typeof widgetStatusBarImport
+      parentRoute: typeof rootRoute
+    }
   }
 }
 
@@ -144,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/speedrunning': typeof fullSpeedrunningRoute
   '/alerts': typeof widgetAlertsRoute
   '/omnywidget': typeof widgetOmnywidgetRoute
+  '/status-bar': typeof widgetStatusBarRoute
 }
 
 export interface FileRoutesByTo {
@@ -155,6 +170,7 @@ export interface FileRoutesByTo {
   '/speedrunning': typeof fullSpeedrunningRoute
   '/alerts': typeof widgetAlertsRoute
   '/omnywidget': typeof widgetOmnywidgetRoute
+  '/status-bar': typeof widgetStatusBarRoute
 }
 
 export interface FileRoutesById {
@@ -167,6 +183,7 @@ export interface FileRoutesById {
   '/(full)/speedrunning': typeof fullSpeedrunningRoute
   '/(widget)/alerts': typeof widgetAlertsRoute
   '/(widget)/omnywidget': typeof widgetOmnywidgetRoute
+  '/(widget)/status-bar': typeof widgetStatusBarRoute
 }
 
 export interface FileRouteTypes {
@@ -180,6 +197,7 @@ export interface FileRouteTypes {
     | '/speedrunning'
     | '/alerts'
     | '/omnywidget'
+    | '/status-bar'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -190,6 +208,7 @@ export interface FileRouteTypes {
     | '/speedrunning'
     | '/alerts'
     | '/omnywidget'
+    | '/status-bar'
   id:
     | '__root__'
     | '/'
@@ -200,6 +219,7 @@ export interface FileRouteTypes {
     | '/(full)/speedrunning'
     | '/(widget)/alerts'
     | '/(widget)/omnywidget'
+    | '/(widget)/status-bar'
   fileRoutesById: FileRoutesById
 }
 
@@ -212,6 +232,7 @@ export interface RootRouteChildren {
   fullSpeedrunningRoute: typeof fullSpeedrunningRoute
   widgetAlertsRoute: typeof widgetAlertsRoute
   widgetOmnywidgetRoute: typeof widgetOmnywidgetRoute
+  widgetStatusBarRoute: typeof widgetStatusBarRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
@@ -223,6 +244,7 @@ const rootRouteChildren: RootRouteChildren = {
   fullSpeedrunningRoute: fullSpeedrunningRoute,
   widgetAlertsRoute: widgetAlertsRoute,
   widgetOmnywidgetRoute: widgetOmnywidgetRoute,
+  widgetStatusBarRoute: widgetStatusBarRoute,
 }
 
 export const routeTree = rootRoute
@@ -242,7 +264,8 @@ export const routeTree = rootRoute
         "/(full)/ironmon",
         "/(full)/speedrunning",
         "/(widget)/alerts",
-        "/(widget)/omnywidget"
+        "/(widget)/omnywidget",
+        "/(widget)/status-bar"
       ]
     },
     "/": {
@@ -268,6 +291,9 @@ export const routeTree = rootRoute
     },
     "/(widget)/omnywidget": {
       "filePath": "(widget)/omnywidget.tsx"
+    },
+    "/(widget)/status-bar": {
+      "filePath": "(widget)/status-bar.tsx"
     }
   }
 }

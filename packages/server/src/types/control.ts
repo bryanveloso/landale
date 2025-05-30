@@ -48,3 +48,27 @@ export interface ActivityEvent {
   timestamp: string
   data: unknown
 }
+
+export const statusBarModeSchema = z.enum([
+  'preshow',
+  'soapbox',
+  'game',
+  'outro',
+  'break',
+  'custom'
+])
+
+export type StatusBarMode = z.infer<typeof statusBarModeSchema>
+
+export const statusBarConfigSchema = z.object({
+  mode: statusBarModeSchema,
+  text: z.string().optional(),
+  isVisible: z.boolean().default(true),
+  position: z.enum(['top', 'bottom']).default('bottom')
+})
+
+export type StatusBarConfig = z.infer<typeof statusBarConfigSchema>
+
+export interface StatusBarState extends StatusBarConfig {
+  lastUpdated: string
+}
