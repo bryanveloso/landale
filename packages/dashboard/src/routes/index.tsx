@@ -2,8 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { SystemStatus } from '@/components/system-status'
 import { StreamStatus } from '@/components/stream-status'
 import { EmoteRainControl } from '@/components/emote-rain-control'
+import { ActivityFeed } from '@/components/activity-feed'
 // import { OBSDashboard } from '@/components/obs-dashboard'
-// import { ActivityFeed } from '@/components/activity-feed'
 
 export const Route = createFileRoute('/')({
   component: Dashboard
@@ -31,10 +31,10 @@ function Dashboard() {
           {/* <OBSDashboard /> */}
         </div>
 
-        {/* Activity Feed - TODO: Fix subscriptions */}
-        {/* <div className="lg:col-span-3">
+        {/* Activity Feed */}
+        <div className="lg:col-span-3">
           <ActivityFeed />
-        </div> */}
+        </div>
       </div>
     </div>
   )
