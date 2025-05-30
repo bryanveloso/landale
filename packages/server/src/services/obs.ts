@@ -1,4 +1,4 @@
-import OBSWebSocket, { EventSubscription } from 'obs-websocket-js'
+import { OBSWebSocket, EventSubscription } from '@omnypro/obs-websocket'
 import { createLogger } from '@/lib/logger'
 import { eventEmitter } from '@/events'
 import type { OBSState } from '@landale/shared'
@@ -16,8 +16,8 @@ class OBSService {
 
   // OBS connection configuration
   private config = {
-    url: process.env.OBS_WEBSOCKET_URL || 'ws://localhost:4455',
-    password: process.env.OBS_WEBSOCKET_PASSWORD || '',
+    url: process.env.OBS_WEBSOCKET_URL || 'ws://192.168.1.9:4455',
+    password: process.env.OBS_WEBSOCKET_PASSWORD || '', // yfX1E3UyKP3gTQ2e
     eventSubscriptions: EventSubscription.All
   }
 
@@ -65,6 +65,7 @@ class OBSService {
     // Connection events
     this.obs.on('ConnectionOpened', () => {
       log.info('OBS WebSocket connection opened')
+      log.debug('Current state after open:', this.state.connection)
     })
 
     this.obs.on('Identified', async (data) => {
@@ -76,7 +77,7 @@ class OBSService {
         lastConnected: new Date()
       })
       this.reconnectAttempts = 0
-      
+
       // Load initial state after successful connection
       await this.loadInitialState()
     })
@@ -165,6 +166,7 @@ class OBSService {
 
   private updateConnectionState(update: Partial<OBSState['connection']>) {
     this.state.connection = { ...this.state.connection, ...update }
+    log.debug('Updating connection state:', this.state.connection)
     eventEmitter.emit('obs:connection:changed', this.state.connection)
   }
 
@@ -280,7 +282,7 @@ class OBSService {
     const delay = this.reconnectDelay * Math.min(this.reconnectAttempts, 5) // Exponential backoff with cap
 
     log.info(`Scheduling OBS reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`)
-    
+
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined
       this.connect()
@@ -298,9 +300,10 @@ class OBSService {
 
     try {
       log.info(`Connecting to OBS at ${this.config.url}`)
-      await this.obs.connect(this.config.url, this.config.password, {
-        eventSubscriptions: this.config.eventSubscriptions
-      })
+      // Pass undefined for password when auth is disabled
+      const password = this.config.password || undefined
+      log.debug(`Using password: ${password ? 'Yes' : 'No'}`)
+      await this.obs.connect(this.config.url, password)
     } catch (error) {
       log.error('Failed to connect to OBS:', error)
       this.updateConnectionState({
