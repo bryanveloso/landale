@@ -4,8 +4,7 @@ import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 
 import { ErrorBoundary } from '@/components/error-boundary'
-import { QueryProvider } from '@/lib/providers/query'
-import { queryClient } from '@/lib/trpc'
+import { QueryProvider, queryClient } from '@/lib/providers/query'
 
 import { routeTree } from './routeTree.gen'
 
