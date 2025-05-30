@@ -215,6 +215,7 @@ export const controlRouter = router({
         // Stream updates
         yield* createEventSubscription(opts, {
           events: ['obs:scenes:updated', 'obs:scene:current-changed', 'obs:scene:preview-changed', 'obs:scene:list-changed'],
+          transform: () => obsService.getState().scenes,
           onError: (_error) =>
             new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
@@ -225,11 +226,11 @@ export const controlRouter = router({
 
       setCurrentScene: publicProcedure
         .input(z.object({ sceneName: z.string() }))
-        .subscription(async function* ({ input, signal: _signal }) {
+        .mutation(async ({ input }) => {
           try {
             await obsService.setCurrentScene(input.sceneName)
             log.info('Current scene changed:', input.sceneName)
-            yield { success: true }
+            return { success: true }
           } catch (error) {
             log.error('Failed to set current scene:', error)
             throw new TRPCError({
@@ -241,11 +242,11 @@ export const controlRouter = router({
 
       setPreviewScene: publicProcedure
         .input(z.object({ sceneName: z.string() }))
-        .subscription(async function* ({ input, signal: _signal }) {
+        .mutation(async ({ input }) => {
           try {
             await obsService.setPreviewScene(input.sceneName)
             log.info('Preview scene changed:', input.sceneName)
-            yield { success: true }
+            return { success: true }
           } catch (error) {
             log.error('Failed to set preview scene:', error)
             throw new TRPCError({
@@ -257,11 +258,11 @@ export const controlRouter = router({
 
       createScene: publicProcedure
         .input(z.object({ sceneName: z.string() }))
-        .subscription(async function* ({ input, signal: _signal }) {
+        .mutation(async ({ input }) => {
           try {
             await obsService.createScene(input.sceneName)
             log.info('Scene created:', input.sceneName)
-            yield { success: true }
+            return { success: true }
           } catch (error) {
             log.error('Failed to create scene:', error)
             throw new TRPCError({
@@ -273,11 +274,11 @@ export const controlRouter = router({
 
       removeScene: publicProcedure
         .input(z.object({ sceneName: z.string() }))
-        .subscription(async function* ({ input, signal: _signal }) {
+        .mutation(async ({ input }) => {
           try {
             await obsService.removeScene(input.sceneName)
             log.info('Scene removed:', input.sceneName)
-            yield { success: true }
+            return { success: true }
           } catch (error) {
             log.error('Failed to remove scene:', error)
             throw new TRPCError({
@@ -297,6 +298,7 @@ export const controlRouter = router({
         // Stream updates
         yield* createEventSubscription(opts, {
           events: ['obs:streaming:updated', 'obs:stream:state-changed'],
+          transform: () => obsService.getState().streaming,
           onError: (_error) =>
             new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
@@ -305,11 +307,11 @@ export const controlRouter = router({
         })
       }),
 
-      start: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      start: publicProcedure.mutation(async () => {
         try {
           await obsService.startStream()
           log.info('Stream started')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to start stream:', error)
           throw new TRPCError({
@@ -319,11 +321,11 @@ export const controlRouter = router({
         }
       }),
 
-      stop: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      stop: publicProcedure.mutation(async () => {
         try {
           await obsService.stopStream()
           log.info('Stream stopped')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to stop stream:', error)
           throw new TRPCError({
@@ -343,6 +345,7 @@ export const controlRouter = router({
         // Stream updates
         yield* createEventSubscription(opts, {
           events: ['obs:recording:updated', 'obs:record:state-changed'],
+          transform: () => obsService.getState().recording,
           onError: (_error) =>
             new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
@@ -351,11 +354,11 @@ export const controlRouter = router({
         })
       }),
 
-      start: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      start: publicProcedure.mutation(async () => {
         try {
           await obsService.startRecording()
           log.info('Recording started')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to start recording:', error)
           throw new TRPCError({
@@ -365,11 +368,11 @@ export const controlRouter = router({
         }
       }),
 
-      stop: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      stop: publicProcedure.mutation(async () => {
         try {
           await obsService.stopRecording()
           log.info('Recording stopped')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to stop recording:', error)
           throw new TRPCError({
@@ -379,11 +382,11 @@ export const controlRouter = router({
         }
       }),
 
-      pause: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      pause: publicProcedure.mutation(async () => {
         try {
           await obsService.pauseRecording()
           log.info('Recording paused')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to pause recording:', error)
           throw new TRPCError({
@@ -393,11 +396,11 @@ export const controlRouter = router({
         }
       }),
 
-      resume: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      resume: publicProcedure.mutation(async () => {
         try {
           await obsService.resumeRecording()
           log.info('Recording resumed')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to resume recording:', error)
           throw new TRPCError({
@@ -417,6 +420,7 @@ export const controlRouter = router({
         // Stream updates
         yield* createEventSubscription(opts, {
           events: ['obs:studio-mode:updated', 'obs:studio-mode:changed'],
+          transform: () => obsService.getState().studioMode,
           onError: (_error) =>
             new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
@@ -427,11 +431,11 @@ export const controlRouter = router({
 
       setEnabled: publicProcedure
         .input(z.object({ enabled: z.boolean() }))
-        .subscription(async function* ({ input, signal: _signal }) {
+        .mutation(async ({ input }) => {
           try {
             await obsService.setStudioModeEnabled(input.enabled)
             log.info(`Studio mode ${input.enabled ? 'enabled' : 'disabled'}`)
-            yield { success: true }
+            return { success: true }
           } catch (error) {
             log.error('Failed to set studio mode:', error)
             throw new TRPCError({
@@ -441,11 +445,11 @@ export const controlRouter = router({
           }
         }),
 
-      triggerTransition: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      triggerTransition: publicProcedure.mutation(async () => {
         try {
           await obsService.triggerStudioModeTransition()
           log.info('Studio mode transition triggered')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to trigger transition:', error)
           throw new TRPCError({
@@ -465,6 +469,7 @@ export const controlRouter = router({
         // Stream updates
         yield* createEventSubscription(opts, {
           events: ['obs:virtual-cam:updated', 'obs:virtual-cam:changed'],
+          transform: () => obsService.getState().virtualCam || { active: false },
           onError: (_error) =>
             new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
@@ -473,11 +478,11 @@ export const controlRouter = router({
         })
       }),
 
-      start: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      start: publicProcedure.mutation(async () => {
         try {
           await obsService.startVirtualCam()
           log.info('Virtual camera started')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to start virtual camera:', error)
           throw new TRPCError({
@@ -487,11 +492,11 @@ export const controlRouter = router({
         }
       }),
 
-      stop: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      stop: publicProcedure.mutation(async () => {
         try {
           await obsService.stopVirtualCam()
           log.info('Virtual camera stopped')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to stop virtual camera:', error)
           throw new TRPCError({
@@ -511,6 +516,7 @@ export const controlRouter = router({
         // Stream updates
         yield* createEventSubscription(opts, {
           events: ['obs:replay-buffer:updated', 'obs:replay-buffer:changed'],
+          transform: () => obsService.getState().replayBuffer || { active: false },
           onError: (_error) =>
             new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
@@ -519,11 +525,11 @@ export const controlRouter = router({
         })
       }),
 
-      start: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      start: publicProcedure.mutation(async () => {
         try {
           await obsService.startReplayBuffer()
           log.info('Replay buffer started')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to start replay buffer:', error)
           throw new TRPCError({
@@ -533,11 +539,11 @@ export const controlRouter = router({
         }
       }),
 
-      stop: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      stop: publicProcedure.mutation(async () => {
         try {
           await obsService.stopReplayBuffer()
           log.info('Replay buffer stopped')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to stop replay buffer:', error)
           throw new TRPCError({
@@ -547,11 +553,11 @@ export const controlRouter = router({
         }
       }),
 
-      save: publicProcedure.subscription(async function* ({ signal: _signal }) {
+      save: publicProcedure.mutation(async () => {
         try {
           await obsService.saveReplayBuffer()
           log.info('Replay buffer saved')
-          yield { success: true }
+          return { success: true }
         } catch (error) {
           log.error('Failed to save replay buffer:', error)
           throw new TRPCError({

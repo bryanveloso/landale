@@ -5,12 +5,12 @@ import {
   useOBSRecording,
   useOBSStudioMode,
   useOBSVirtualCam,
-  useOBSReplayBuffer
-} from '@/hooks/use-obs'
-import { useOBSControls } from '@/hooks/use-obs-controls'
+  useOBSReplayBuffer,
+  useOBSControls
+} from '@/hooks/use-obs-query'
 
 function ConnectionStatus() {
-  const connection = useOBSConnection()
+  const { connection, isConnected } = useOBSConnection()
 
   if (!connection) {
     return (
@@ -21,7 +21,6 @@ function ConnectionStatus() {
     )
   }
 
-  const isConnected = connection.connected
   const statusColor = isConnected ? 'bg-green-500' : 'bg-red-500'
   const statusText = isConnected ? 'Connected' : 'Disconnected'
 
@@ -37,8 +36,7 @@ function ConnectionStatus() {
 }
 
 function SceneControls() {
-  const { currentScene, previewScene, sceneList } = useOBSScenes()
-  const controls = useOBSControls()
+  const { currentScene, previewScene, sceneList, setCurrentScene, setPreviewScene, isSettingScene, isLoading } = useOBSScenes()
 
   return (
     <div className="rounded-lg border bg-white p-4">
@@ -62,24 +60,40 @@ function SceneControls() {
       <div className="space-y-2">
         <h4 className="font-medium">Scene List</h4>
         <div className="grid grid-cols-2 gap-2">
-          {sceneList.map((scene) => (
+          {isLoading ? (
+            <>
+              {/* Skeleton loaders to maintain layout */}
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex gap-2 animate-pulse">
+                  <div className="flex-1 rounded bg-gray-200 h-10"></div>
+                  <div className="flex-1 rounded bg-gray-200 h-10"></div>
+                </div>
+              ))}
+            </>
+          ) : sceneList && sceneList.length > 0 ? sceneList.map((scene) => (
             <div key={scene.sceneUuid || scene.sceneName} className="flex gap-2">
               <button
-                onClick={() => controls.scenes.setCurrentScene(scene.sceneName || '')}
-                className="flex-1 rounded bg-red-500 px-3 py-2 text-xs text-white hover:bg-red-600"
+                onClick={() => setCurrentScene(scene.sceneName || '')}
+                disabled={isSettingScene}
+                className="flex-1 rounded bg-red-500 px-3 py-2 text-xs text-white hover:bg-red-600 disabled:opacity-50"
                 title="Set as current scene"
               >
                 🔴 {scene.sceneName}
               </button>
               <button
-                onClick={() => controls.scenes.setPreviewScene(scene.sceneName || '')}
-                className="flex-1 rounded bg-blue-500 px-3 py-2 text-xs text-white hover:bg-blue-600"
+                onClick={() => setPreviewScene(scene.sceneName || '')}
+                disabled={isSettingScene}
+                className="flex-1 rounded bg-blue-500 px-3 py-2 text-xs text-white hover:bg-blue-600 disabled:opacity-50"
                 title="Set as preview scene"
               >
                 👁️ {scene.sceneName}
               </button>
             </div>
-          ))}
+          )) : (
+            <div className="col-span-2 text-center text-gray-500 text-sm">
+              No scenes available
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -87,10 +101,8 @@ function SceneControls() {
 }
 
 function StreamingControls() {
-  const streaming = useOBSStreaming()
+  const { streaming, isStreaming } = useOBSStreaming()
   const controls = useOBSControls()
-
-  const isStreaming = streaming?.active || false
 
   return (
     <div className="rounded-lg border bg-white p-4">
@@ -116,14 +128,14 @@ function StreamingControls() {
 
       <div className="flex gap-2">
         <button
-          onClick={controls.streaming.startStream}
+          onClick={() => void controls.streaming.startStream()}
           disabled={isStreaming}
           className="flex-1 rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:bg-gray-400"
         >
           🔴 Start Stream
         </button>
         <button
-          onClick={controls.streaming.stopStream}
+          onClick={() => void controls.streaming.stopStream()}
           disabled={!isStreaming}
           className="flex-1 rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 disabled:bg-gray-400"
         >
@@ -135,11 +147,8 @@ function StreamingControls() {
 }
 
 function RecordingControls() {
-  const recording = useOBSRecording()
+  const { recording, isRecording, isPaused } = useOBSRecording()
   const controls = useOBSControls()
-
-  const isRecording = recording?.active || false
-  const isPaused = recording?.paused || false
 
   return (
     <div className="rounded-lg border bg-white p-4">
@@ -164,28 +173,28 @@ function RecordingControls() {
 
       <div className="grid grid-cols-2 gap-2">
         <button
-          onClick={controls.recording.startRecording}
+          onClick={() => void controls.recording.startRecording()}
           disabled={isRecording}
           className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:bg-gray-400"
         >
           🔴 Start
         </button>
         <button
-          onClick={controls.recording.stopRecording}
+          onClick={() => void controls.recording.stopRecording()}
           disabled={!isRecording}
           className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 disabled:bg-gray-400"
         >
           ⏹️ Stop
         </button>
         <button
-          onClick={controls.recording.pauseRecording}
+          onClick={() => void controls.recording.pauseRecording()}
           disabled={!isRecording || isPaused}
           className="rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600 disabled:bg-gray-400"
         >
           ⏸️ Pause
         </button>
         <button
-          onClick={controls.recording.resumeRecording}
+          onClick={() => void controls.recording.resumeRecording()}
           disabled={!isRecording || !isPaused}
           className="rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600 disabled:bg-gray-400"
         >
@@ -197,10 +206,8 @@ function RecordingControls() {
 }
 
 function StudioModeControls() {
-  const studioMode = useOBSStudioMode()
+  const { isEnabled } = useOBSStudioMode()
   const controls = useOBSControls()
-
-  const isEnabled = studioMode?.enabled || false
 
   return (
     <div className="rounded-lg border bg-white p-4">
@@ -215,7 +222,7 @@ function StudioModeControls() {
 
       <div className="flex gap-2">
         <button
-          onClick={() => controls.studioMode.setStudioModeEnabled(!isEnabled)}
+          onClick={() => void controls.studioMode.setStudioModeEnabled(!isEnabled)}
           className={`flex-1 rounded px-4 py-2 text-white hover:opacity-90 ${
             isEnabled ? 'bg-red-500' : 'bg-blue-500'
           }`}
@@ -224,7 +231,7 @@ function StudioModeControls() {
         </button>
         {isEnabled && (
           <button
-            onClick={controls.studioMode.triggerTransition}
+            onClick={() => void controls.studioMode.triggerTransition()}
             className="flex-1 rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600"
           >
             🔄 Transition
@@ -236,12 +243,9 @@ function StudioModeControls() {
 }
 
 function AdditionalControls() {
-  const virtualCam = useOBSVirtualCam()
-  const replayBuffer = useOBSReplayBuffer()
+  const { isActive: isVirtualCamActive } = useOBSVirtualCam()
+  const { isActive: isReplayBufferActive } = useOBSReplayBuffer()
   const controls = useOBSControls()
-
-  const isVirtualCamActive = virtualCam?.active || false
-  const isReplayBufferActive = replayBuffer?.active || false
 
   return (
     <div className="rounded-lg border bg-white p-4">
@@ -256,14 +260,14 @@ function AdditionalControls() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={controls.virtualCam.startVirtualCam}
+              onClick={() => void controls.virtualCam.startVirtualCam()}
               disabled={isVirtualCamActive}
               className="flex-1 rounded bg-green-500 px-3 py-2 text-sm text-white hover:bg-green-600 disabled:bg-gray-400"
             >
               📹 Start
             </button>
             <button
-              onClick={controls.virtualCam.stopVirtualCam}
+              onClick={() => void controls.virtualCam.stopVirtualCam()}
               disabled={!isVirtualCamActive}
               className="flex-1 rounded bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600 disabled:bg-gray-400"
             >
@@ -280,21 +284,21 @@ function AdditionalControls() {
           </div>
           <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={controls.replayBuffer.startReplayBuffer}
+              onClick={() => void controls.replayBuffer.startReplayBuffer()}
               disabled={isReplayBufferActive}
               className="rounded bg-purple-500 px-3 py-2 text-sm text-white hover:bg-purple-600 disabled:bg-gray-400"
             >
               ⏺️ Start
             </button>
             <button
-              onClick={controls.replayBuffer.stopReplayBuffer}
+              onClick={() => void controls.replayBuffer.stopReplayBuffer()}
               disabled={!isReplayBufferActive}
               className="rounded bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600 disabled:bg-gray-400"
             >
               ⏹️ Stop
             </button>
             <button
-              onClick={controls.replayBuffer.saveReplayBuffer}
+              onClick={() => void controls.replayBuffer.saveReplayBuffer()}
               disabled={!isReplayBufferActive}
               className="rounded bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600 disabled:bg-gray-400"
             >
