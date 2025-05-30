@@ -3,7 +3,7 @@ import { SystemStatus } from '@/components/system-status'
 import { StreamStatus } from '@/components/stream-status'
 import { EmoteRainControl } from '@/components/emote-rain-control'
 import { ActivityFeed } from '@/components/activity-feed'
-// import { OBSDashboard } from '@/components/obs-dashboard'
+import { OBSDashboard } from '@/components/obs-dashboard'
 
 export const Route = createFileRoute('/')({
   component: Dashboard
@@ -27,8 +27,7 @@ function Dashboard() {
         {/* Main Controls */}
         <div className="space-y-6 lg:col-span-2">
           <EmoteRainControl />
-          {/* OBS Dashboard disabled - Bun WebSocket compatibility issues */}
-          {/* <OBSDashboard /> */}
+          <OBSDashboard />
         </div>
 
         {/* Activity Feed */}

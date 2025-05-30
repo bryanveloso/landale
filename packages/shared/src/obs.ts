@@ -1,5 +1,5 @@
-// OBS State management types that extend obs-websocket-js types
-// Uses types from obs-websocket-js package instead of redefining them
+// OBS State management types that extend @omnypro/obs-websocket types
+// Uses types from @omnypro/obs-websocket package instead of redefining them
 
 export interface OBSConnectionState {
   connected: boolean
@@ -11,12 +11,12 @@ export interface OBSConnectionState {
   lastConnected?: Date
 }
 
-// OBS WebSocket scene object - flexible to match obs-websocket-js JsonObject
+// OBS WebSocket scene object - flexible to match @omnypro/obs-websocket JsonObject
 export interface OBSScene {
   sceneName?: string
   sceneIndex?: number
   sceneUuid?: string
-  [key: string]: unknown // Matches JsonObject from obs-websocket-js
+  [key: string]: unknown // Matches JsonObject from @omnypro/obs-websocket
 }
 
 export interface OBSSceneState {
