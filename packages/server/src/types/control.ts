@@ -72,3 +72,17 @@ export type StatusBarConfig = z.infer<typeof statusBarConfigSchema>
 export interface StatusBarState extends StatusBarConfig {
   lastUpdated: string
 }
+
+export const statusTextConfigSchema = z.object({
+  text: z.string(),
+  isVisible: z.boolean().default(true),
+  position: z.enum(['top', 'bottom']).default('bottom'),
+  fontSize: z.enum(['small', 'medium', 'large']).default('medium'),
+  animation: z.enum(['none', 'fade', 'slide', 'typewriter']).default('fade')
+})
+
+export type StatusTextConfig = z.infer<typeof statusTextConfigSchema>
+
+export interface StatusTextState extends StatusTextConfig {
+  lastUpdated: string
+}

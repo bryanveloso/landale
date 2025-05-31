@@ -5,9 +5,9 @@ import { eventEmitter } from '@/events'
 import { createLogger } from '@/lib/logger'
 import { formatUptime, formatBytes } from '@/lib/utils'
 import { createEventSubscription, createPollingSubscription } from '@/lib/subscription'
-import { emoteRainConfigSchema, statusBarConfigSchema, type SystemStatus, type ActivityEvent } from '@/types/control'
+import { emoteRainConfigSchema, statusBarConfigSchema, statusTextConfigSchema, type SystemStatus, type ActivityEvent } from '@/types/control'
 import { obsService } from '@/services/obs'
-import { statusBarService } from '@/services/display'
+import { statusBarService, statusTextService } from '@/services/display'
 
 const log = createLogger('control')
 
@@ -180,6 +180,55 @@ export const controlRouter = router({
         const state = statusBarService.setVisibility(input.isVisible)
         return state
       })
+  }),
+
+  statusText: router({
+    onUpdate: publicProcedure.subscription(async function* (opts) {
+      // Send initial state
+      yield statusTextService.getState()
+
+      // Stream updates
+      yield* createEventSubscription(opts, {
+        events: ['control:statusText:update'],
+        onError: (_error) =>
+          new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to stream status text updates'
+          })
+      })
+    }),
+
+    update: publicProcedure.input(statusTextConfigSchema.partial()).mutation(async ({ input }) => {
+      try {
+        const state = statusTextService.updateConfig(input)
+        return state
+      } catch (error) {
+        log.error('Failed to update status text:', error)
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: error instanceof Error ? error.message : 'Failed to update status text'
+        })
+      }
+    }),
+
+    setText: publicProcedure
+      .input(z.object({ text: z.string() }))
+      .mutation(async ({ input }) => {
+        const state = statusTextService.setText(input.text)
+        return state
+      }),
+
+    setVisibility: publicProcedure
+      .input(z.object({ isVisible: z.boolean() }))
+      .mutation(async ({ input }) => {
+        const state = statusTextService.setVisibility(input.isVisible)
+        return state
+      }),
+
+    clear: publicProcedure.mutation(async () => {
+      const state = statusTextService.clear()
+      return state
+    })
   }),
 
   stream: router({

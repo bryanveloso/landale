@@ -1,6 +1,6 @@
 import type { TwitchEvent } from '@/services/twitch/types'
 import type { IronmonEvent } from '@/services/ironmon/types'
-import type { StatusBarState } from '@/types/control'
+import type { StatusBarState, StatusTextState } from '@/types/control'
 
 // Control API event types
 export type ControlEvent = {
@@ -12,6 +12,7 @@ export type ControlEvent = {
   emoteRainClear: void
   sourceReload: string
   statusBarUpdate: StatusBarState
+  statusTextUpdate: StatusTextState
 }
 
 // OBS event types - these match the events emitted by the OBS service
@@ -51,6 +52,7 @@ export type EventMap = {
   'control:source:disconnected': ControlEvent['sourceDisconnected']
   'control:source:ping': ControlEvent['sourcePing']
   'control:statusBar:update': ControlEvent['statusBarUpdate']
+  'control:statusText:update': ControlEvent['statusTextUpdate']
   'config:emoteRain:updated': Record<string, unknown>
   'emoteRain:burst': ControlEvent['emoteRainBurst']
   'emoteRain:clear': ControlEvent['emoteRainClear']

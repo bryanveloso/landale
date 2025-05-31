@@ -12,6 +12,7 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/index'
+import { Route as widgetStatusTextImport } from './routes/(widget)/status-text'
 import { Route as widgetStatusBarImport } from './routes/(widget)/status-bar'
 import { Route as widgetOmnywidgetImport } from './routes/(widget)/omnywidget'
 import { Route as widgetAlertsImport } from './routes/(widget)/alerts'
@@ -26,6 +27,12 @@ import { Route as fullEmoterainImport } from './routes/(full)/emoterain'
 const IndexRoute = IndexImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const widgetStatusTextRoute = widgetStatusTextImport.update({
+  id: '/(widget)/status-text',
+  path: '/status-text',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -144,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof widgetStatusBarImport
       parentRoute: typeof rootRoute
     }
+    '/(widget)/status-text': {
+      id: '/(widget)/status-text'
+      path: '/status-text'
+      fullPath: '/status-text'
+      preLoaderRoute: typeof widgetStatusTextImport
+      parentRoute: typeof rootRoute
+    }
   }
 }
 
@@ -159,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof widgetAlertsRoute
   '/omnywidget': typeof widgetOmnywidgetRoute
   '/status-bar': typeof widgetStatusBarRoute
+  '/status-text': typeof widgetStatusTextRoute
 }
 
 export interface FileRoutesByTo {
@@ -171,6 +186,7 @@ export interface FileRoutesByTo {
   '/alerts': typeof widgetAlertsRoute
   '/omnywidget': typeof widgetOmnywidgetRoute
   '/status-bar': typeof widgetStatusBarRoute
+  '/status-text': typeof widgetStatusTextRoute
 }
 
 export interface FileRoutesById {
@@ -184,6 +200,7 @@ export interface FileRoutesById {
   '/(widget)/alerts': typeof widgetAlertsRoute
   '/(widget)/omnywidget': typeof widgetOmnywidgetRoute
   '/(widget)/status-bar': typeof widgetStatusBarRoute
+  '/(widget)/status-text': typeof widgetStatusTextRoute
 }
 
 export interface FileRouteTypes {
@@ -198,6 +215,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/omnywidget'
     | '/status-bar'
+    | '/status-text'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -209,6 +227,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/omnywidget'
     | '/status-bar'
+    | '/status-text'
   id:
     | '__root__'
     | '/'
@@ -220,6 +239,7 @@ export interface FileRouteTypes {
     | '/(widget)/alerts'
     | '/(widget)/omnywidget'
     | '/(widget)/status-bar'
+    | '/(widget)/status-text'
   fileRoutesById: FileRoutesById
 }
 
@@ -233,6 +253,7 @@ export interface RootRouteChildren {
   widgetAlertsRoute: typeof widgetAlertsRoute
   widgetOmnywidgetRoute: typeof widgetOmnywidgetRoute
   widgetStatusBarRoute: typeof widgetStatusBarRoute
+  widgetStatusTextRoute: typeof widgetStatusTextRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
@@ -245,6 +266,7 @@ const rootRouteChildren: RootRouteChildren = {
   widgetAlertsRoute: widgetAlertsRoute,
   widgetOmnywidgetRoute: widgetOmnywidgetRoute,
   widgetStatusBarRoute: widgetStatusBarRoute,
+  widgetStatusTextRoute: widgetStatusTextRoute,
 }
 
 export const routeTree = rootRoute
@@ -265,7 +287,8 @@ export const routeTree = rootRoute
         "/(full)/speedrunning",
         "/(widget)/alerts",
         "/(widget)/omnywidget",
-        "/(widget)/status-bar"
+        "/(widget)/status-bar",
+        "/(widget)/status-text"
       ]
     },
     "/": {
@@ -294,6 +317,9 @@ export const routeTree = rootRoute
     },
     "/(widget)/status-bar": {
       "filePath": "(widget)/status-bar.tsx"
+    },
+    "/(widget)/status-text": {
+      "filePath": "(widget)/status-text.tsx"
     }
   }
 }
