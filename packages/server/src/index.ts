@@ -15,7 +15,7 @@ import { version } from '../package.json'
 export type { AppRouter } from './router'
 export * from './services/ironmon/types'
 export type { TwitchEvent } from './services/twitch/types'
-export type { ActivityEvent, StatusBarState, StatusBarConfig, StatusBarMode } from './types/control'
+export type { ActivityEvent, StatusBarState, StatusBarConfig, StatusBarMode, StatusTextState, StatusTextConfig } from './types/control'
 
 interface WSData {
   req: Request

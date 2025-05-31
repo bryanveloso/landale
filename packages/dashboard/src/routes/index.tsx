@@ -5,6 +5,7 @@ import { EmoteRainControl } from '@/components/emote-rain-control'
 import { ActivityFeed } from '@/components/activity-feed'
 import { OBSDashboard } from '@/components/obs-dashboard'
 import { StatusBarControls } from '@/components/status-bar-controls'
+import { StatusTextControls } from '@/components/status-text-controls'
 
 export const Route = createFileRoute('/')({
   component: Dashboard
@@ -28,6 +29,7 @@ function Dashboard() {
         {/* Main Controls */}
         <div className="space-y-6 lg:col-span-2">
           <StatusBarControls />
+          <StatusTextControls />
           <EmoteRainControl />
           <OBSDashboard />
         </div>
