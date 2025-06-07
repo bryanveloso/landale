@@ -8,6 +8,8 @@ import * as IronMON from '@/services/ironmon'
 import * as OBS from '@/services/obs'
 import { appRouter } from '@/router'
 import { createLogger } from '@/lib/logger'
+import { displayManager } from '@/services/display-manager'
+import { statusBarConfigSchema, statusTextConfigSchema } from '@/types/control'
 
 import { version } from '../package.json'
 
@@ -110,6 +112,24 @@ const server: Server = Bun.serve({
 })
 
 console.log(`  ${chalk.green('➜')}  ${chalk.bold('tRPC Server')}: ${server.hostname}:${server.port}`)
+
+// Register displays
+displayManager.register('statusBar', statusBarConfigSchema, {
+  mode: 'preshow',
+  text: undefined,
+  isVisible: true,
+  position: 'bottom'
+})
+
+displayManager.register('statusText', statusTextConfigSchema, {
+  text: '',
+  isVisible: true,
+  position: 'bottom',
+  fontSize: 'medium',
+  animation: 'fade'
+})
+
+log.info('Registered display services')
 
 // Initialize IronMON TCP Server
 IronMON.initialize()

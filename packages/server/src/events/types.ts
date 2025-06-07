@@ -72,6 +72,8 @@ export type EventMap = {
   'obs:virtual-cam:changed': OBSEvent['virtualCamChanged']
   'obs:replay-buffer:updated': OBSEvent['replayBufferUpdated']
   'obs:replay-buffer:changed': OBSEvent['replayBufferChanged']
+  // Generic display events - any string after 'display:' is allowed
+  [key: `display:${string}:update`]: any
 }
 
 export type SubscriptionData<T extends keyof EventMap> = {
