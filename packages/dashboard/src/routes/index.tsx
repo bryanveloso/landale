@@ -4,8 +4,9 @@ import { StreamStatus } from '@/components/stream-status'
 import { EmoteRainControl } from '@/components/emote-rain-control'
 import { ActivityFeed } from '@/components/activity-feed'
 import { OBSDashboard } from '@/components/obs-dashboard'
-import { StatusBarControls } from '@/components/status-bar-controls'
+import { StatusBarControls } from '@/components/status-bar-controls-new'
 import { StatusTextControls } from '@/components/status-text-controls'
+import { FollowerCountControl } from '@/components/follower-count-control'
 
 export const Route = createFileRoute('/')({
   component: Dashboard
@@ -30,6 +31,7 @@ function Dashboard() {
         <div className="space-y-6 lg:col-span-2">
           <StatusBarControls />
           <StatusTextControls />
+          <FollowerCountControl />
           <EmoteRainControl />
           <OBSDashboard />
         </div>

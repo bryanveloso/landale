@@ -10,6 +10,7 @@ import { appRouter } from '@/router'
 import { createLogger } from '@/lib/logger'
 import { displayManager } from '@/services/display-manager'
 import { statusBarConfigSchema, statusTextConfigSchema } from '@/types/control'
+import { z } from 'zod'
 
 import { version } from '../package.json'
 
@@ -127,6 +128,17 @@ displayManager.register('statusText', statusTextConfigSchema, {
   position: 'bottom',
   fontSize: 'medium',
   animation: 'fade'
+})
+
+// Example: Follower counter
+displayManager.register('followerCount', z.object({
+  current: z.number(),
+  goal: z.number(),
+  label: z.string()
+}), {
+  current: 0,
+  goal: 100,
+  label: 'Follower Goal'
 })
 
 log.info('Registered display services')
