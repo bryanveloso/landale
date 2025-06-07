@@ -5,6 +5,8 @@
 export * from './ironmon'
 export * from './twitch'
 export * from './obs'
+export * from './types/display'
+export type * from './hooks/use-display'
 
 // Common utility types
 export type DeepPartial<T> = T extends object
