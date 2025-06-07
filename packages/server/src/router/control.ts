@@ -5,9 +5,8 @@ import { eventEmitter } from '@/events'
 import { createLogger } from '@/lib/logger'
 import { formatUptime, formatBytes } from '@/lib/utils'
 import { createEventSubscription, createPollingSubscription } from '@/lib/subscription'
-import { emoteRainConfigSchema, statusBarConfigSchema, statusTextConfigSchema, type SystemStatus, type ActivityEvent } from '@/types/control'
+import { emoteRainConfigSchema, type SystemStatus, type ActivityEvent } from '@/types/control'
 import { obsService } from '@/services/obs'
-import { statusBarService, statusTextService } from '@/services/display'
 
 const log = createLogger('control')
 
@@ -128,106 +127,6 @@ export const controlRouter = router({
         log.info('Emote rain cleared')
         yield { success: true }
       })
-    })
-  }),
-
-  statusBar: router({
-    onUpdate: publicProcedure.subscription(async function* (opts) {
-      // Send initial state
-      yield statusBarService.getState()
-
-      // Stream updates
-      yield* createEventSubscription(opts, {
-        events: ['control:statusBar:update'],
-        onError: (_error) =>
-          new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to stream status bar updates'
-          })
-      })
-    }),
-
-    update: publicProcedure.input(statusBarConfigSchema.partial()).mutation(async ({ input }) => {
-      try {
-        const state = statusBarService.updateConfig(input)
-        return state
-      } catch (error) {
-        log.error('Failed to update status bar:', error)
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: error instanceof Error ? error.message : 'Failed to update status bar'
-        })
-      }
-    }),
-
-    setMode: publicProcedure
-      .input(z.object({ mode: statusBarConfigSchema.shape.mode }))
-      .mutation(async ({ input }) => {
-        const state = statusBarService.setMode(input.mode)
-        return state
-      }),
-
-    setText: publicProcedure
-      .input(z.object({ text: z.string().optional() }))
-      .mutation(async ({ input }) => {
-        const state = statusBarService.setText(input.text)
-        return state
-      }),
-
-    setVisibility: publicProcedure
-      .input(z.object({ isVisible: z.boolean() }))
-      .mutation(async ({ input }) => {
-        const state = statusBarService.setVisibility(input.isVisible)
-        return state
-      })
-  }),
-
-  statusText: router({
-    onUpdate: publicProcedure.subscription(async function* (opts) {
-      // Send initial state
-      yield statusTextService.getState()
-
-      // Stream updates
-      yield* createEventSubscription(opts, {
-        events: ['control:statusText:update'],
-        onError: (_error) =>
-          new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to stream status text updates'
-          })
-      })
-    }),
-
-    update: publicProcedure.input(statusTextConfigSchema.partial()).mutation(async ({ input }) => {
-      try {
-        const state = statusTextService.updateConfig(input)
-        return state
-      } catch (error) {
-        log.error('Failed to update status text:', error)
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: error instanceof Error ? error.message : 'Failed to update status text'
-        })
-      }
-    }),
-
-    setText: publicProcedure
-      .input(z.object({ text: z.string() }))
-      .mutation(async ({ input }) => {
-        const state = statusTextService.setText(input.text)
-        return state
-      }),
-
-    setVisibility: publicProcedure
-      .input(z.object({ isVisible: z.boolean() }))
-      .mutation(async ({ input }) => {
-        const state = statusTextService.setVisibility(input.isVisible)
-        return state
-      }),
-
-    clear: publicProcedure.mutation(async () => {
-      const state = statusTextService.clear()
-      return state
     })
   }),
 

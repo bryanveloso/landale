@@ -4,7 +4,7 @@ import { StreamStatus } from '@/components/stream-status'
 import { EmoteRainControl } from '@/components/emote-rain-control'
 import { ActivityFeed } from '@/components/activity-feed'
 import { OBSDashboard } from '@/components/obs-dashboard'
-import { StatusBarControls } from '@/components/status-bar-controls-new'
+import { StatusBarControls } from '@/components/status-bar-controls'
 import { StatusTextControls } from '@/components/status-text-controls'
 import { FollowerCountControl } from '@/components/follower-count-control'
 

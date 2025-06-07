@@ -8,7 +8,7 @@ interface FollowerCountData {
 }
 
 export function FollowerCountControl() {
-  const { data, isConnected, update } = useDisplay<FollowerCountData>('followerCount')
+  const { data, update } = useDisplay<FollowerCountData>('followerCount')
 
   if (!data) return null
 
