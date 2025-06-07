@@ -15,7 +15,7 @@ function FlyingToastersRoute() {
   return (
     <FlyingToasters
       sprites={[defaultToasterConfig, toast0Config, toast1Config, toast2Config, toast3Config]}
-      density={10}
+      density={5}
     />
   )
 }
