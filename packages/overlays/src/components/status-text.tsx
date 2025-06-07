@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
-import { trpcClient } from '@/lib/trpc'
-import type { StatusTextState } from '@landale/server'
+import { useDisplay } from '@/hooks/use-display'
+
+interface StatusTextData {
+  text: string
+  position: 'top' | 'bottom'
+  fontSize: 'small' | 'medium' | 'large'
+  animation: 'none' | 'fade' | 'slide' | 'typewriter'
+}
 
 interface StatusTextProps {
   className?: string
@@ -13,40 +19,26 @@ const fontSizeClasses = {
 }
 
 export function StatusText({ className }: StatusTextProps) {
-  const [state, setState] = useState<StatusTextState | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
+  const { data, isVisible } = useDisplay<StatusTextData>('statusText')
   const [displayText, setDisplayText] = useState('')
   const [isAnimating, setIsAnimating] = useState(false)
 
   useEffect(() => {
-    const subscription = trpcClient.control.statusText.onUpdate.subscribe(undefined, {
-      onData: (data) => {
-        setState(data)
-        setIsConnected(true)
-        
-        // Handle animation
-        if (data.animation !== 'none' && data.text !== displayText) {
-          setIsAnimating(true)
-          setTimeout(() => {
-            setDisplayText(data.text)
-            setIsAnimating(false)
-          }, data.animation === 'fade' ? 150 : 0)
-        } else {
-          setDisplayText(data.text)
-        }
-      },
-      onError: (error) => {
-        console.error('[StatusText] Subscription error:', error)
-        setIsConnected(false)
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
+    if (!data) return
+    
+    // Handle animation
+    if (data.animation !== 'none' && data.text !== displayText) {
+      setIsAnimating(true)
+      setTimeout(() => {
+        setDisplayText(data.text)
+        setIsAnimating(false)
+      }, data.animation === 'fade' ? 150 : 0)
+    } else {
+      setDisplayText(data.text)
     }
-  }, [displayText])
+  }, [data?.text, data?.animation])
 
-  if (!state || !state.isVisible || !displayText) {
+  if (!data || !isVisible || !displayText) {
     return null
   }
 
@@ -60,11 +52,11 @@ export function StatusText({ className }: StatusTextProps) {
   return (
     <div
       className={`absolute inset-x-0 ${
-        state.position === 'top' ? 'top-0' : 'bottom-0'
+        data.position === 'top' ? 'top-0' : 'bottom-0'
       } ${className || ''}`}
     >
       <div className="px-6 py-4">
-        <div className={`text-white ${fontSizeClasses[state.fontSize]} ${animationClasses[state.animation]}`}>
+        <div className={`text-white ${fontSizeClasses[data.fontSize]} ${animationClasses[data.animation]}`}>
           {displayText}
         </div>
       </div>

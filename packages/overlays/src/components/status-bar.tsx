@@ -1,12 +1,18 @@
-import { useEffect, useState } from 'react'
-import { trpcClient } from '@/lib/trpc'
-import type { StatusBarState } from '@landale/server'
+import { useDisplay } from '@/hooks/use-display'
+
+type StatusBarMode = 'preshow' | 'soapbox' | 'game' | 'outro' | 'break' | 'custom'
+
+interface StatusBarData {
+  mode: StatusBarMode
+  text?: string
+  position: 'top' | 'bottom'
+}
 
 interface StatusBarProps {
   className?: string
 }
 
-const modeLabels: Record<StatusBarState['mode'], string> = {
+const modeLabels: Record<StatusBarMode, string> = {
   preshow: 'Pre-Show',
   soapbox: 'Soapbox',
   game: 'Gaming',
@@ -16,36 +22,18 @@ const modeLabels: Record<StatusBarState['mode'], string> = {
 }
 
 export function StatusBar({ className }: StatusBarProps) {
-  const [state, setState] = useState<StatusBarState | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
+  const { data, isConnected, isVisible } = useDisplay<StatusBarData>('statusBar')
 
-  useEffect(() => {
-    const subscription = trpcClient.control.statusBar.onUpdate.subscribe(undefined, {
-      onData: (data) => {
-        setState(data)
-        setIsConnected(true)
-      },
-      onError: (error) => {
-        console.error('[StatusBar] Subscription error:', error)
-        setIsConnected(false)
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  if (!state || !state.isVisible) {
+  if (!data || !isVisible) {
     return null
   }
 
-  const displayText = state.text || (state.mode !== 'custom' ? modeLabels[state.mode] : '')
+  const displayText = data.text || (data.mode !== 'custom' ? modeLabels[data.mode] : '')
 
   return (
     <div
       className={`absolute inset-x-0 bg-gray-900/95 backdrop-blur-sm border-gray-800 ${
-        state.position === 'top' ? 'top-0 border-b' : 'bottom-0 border-t'
+        data.position === 'top' ? 'top-0 border-b' : 'bottom-0 border-t'
       } ${className || ''}`}
     >
       <div className="flex items-center justify-between px-6 py-3">

@@ -1,8 +1,13 @@
 import { useState } from 'react'
-import { useSubscription } from '@/hooks/use-subscription'
-import { trpcClient } from '@/lib/trpc-client'
-import type { StatusTextState, StatusTextConfig } from '@landale/server'
+import { useDisplay } from '@/hooks/use-display'
 import { Wifi, WifiOff, Eye, EyeOff, Type, Trash2 } from 'lucide-react'
+
+interface StatusTextData {
+  text: string
+  position: 'top' | 'bottom'
+  fontSize: 'small' | 'medium' | 'large'
+  animation: 'none' | 'fade' | 'slide' | 'typewriter'
+}
 
 const presetMessages = [
   { label: 'Typing...', text: 'Typing a message...' },
@@ -14,46 +19,19 @@ const presetMessages = [
 ]
 
 export function StatusTextControls() {
-  const { data: state, isConnected } = useSubscription<StatusTextState>('control.statusText.onUpdate')
+  const { data, isConnected, isVisible, update, setVisibility, clear } = useDisplay<StatusTextData>('statusText')
   const [customText, setCustomText] = useState('')
 
+  if (!data) return null
+
   const handleSetText = async (text: string) => {
-    try {
-      await trpcClient.control.statusText.setText.mutate({ text })
-    } catch (error) {
-      console.error('Failed to set text:', error)
-    }
-  }
-
-  const handleVisibilityToggle = async () => {
-    try {
-      await trpcClient.control.statusText.setVisibility.mutate({ isVisible: !state?.isVisible })
-    } catch (error) {
-      console.error('Failed to toggle visibility:', error)
-    }
-  }
-
-  const handleClear = async () => {
-    try {
-      await trpcClient.control.statusText.clear.mutate()
-      setCustomText('')
-    } catch (error) {
-      console.error('Failed to clear text:', error)
-    }
+    await update({ text })
   }
 
   const handleCustomTextSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (customText.trim()) {
       await handleSetText(customText)
-    }
-  }
-
-  const handleConfigUpdate = async (config: Partial<StatusTextConfig>) => {
-    try {
-      await trpcClient.control.statusText.update.mutate(config)
-    } catch (error) {
-      console.error('Failed to update config:', error)
     }
   }
 
@@ -75,14 +53,14 @@ export function StatusTextControls() {
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-100">Show Status Text</span>
           <button
-            onClick={handleVisibilityToggle}
+            onClick={() => setVisibility(!isVisible)}
             className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
-              state?.isVisible 
+              isVisible 
                 ? 'bg-green-600 text-white hover:bg-green-700' 
                 : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
             }`}
           >
-            {state?.isVisible ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+            {isVisible ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
           </button>
         </div>
 
@@ -124,7 +102,7 @@ export function StatusTextControls() {
             </button>
             <button 
               type="button"
-              onClick={handleClear}
+              onClick={clear}
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700"
             >
               <Trash2 className="h-4 w-4" />
@@ -139,9 +117,9 @@ export function StatusTextControls() {
           {/* Position */}
           <div className="flex gap-2">
             <button
-              onClick={() => handleConfigUpdate({ position: 'top' })}
+              onClick={() => update({ position: 'top' })}
               className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                state?.position === 'top'
+                data.position === 'top'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
@@ -149,9 +127,9 @@ export function StatusTextControls() {
               Top
             </button>
             <button
-              onClick={() => handleConfigUpdate({ position: 'bottom' })}
+              onClick={() => update({ position: 'bottom' })}
               className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                state?.position === 'bottom'
+                data.position === 'bottom'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
@@ -167,9 +145,9 @@ export function StatusTextControls() {
               {(['small', 'medium', 'large'] as const).map((size) => (
                 <button
                   key={size}
-                  onClick={() => handleConfigUpdate({ fontSize: size })}
+                  onClick={() => update({ fontSize: size })}
                   className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium capitalize transition-colors ${
-                    state?.fontSize === size
+                    data.fontSize === size
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
@@ -187,9 +165,9 @@ export function StatusTextControls() {
               {(['none', 'fade', 'slide', 'typewriter'] as const).map((animation) => (
                 <button
                   key={animation}
-                  onClick={() => handleConfigUpdate({ animation })}
+                  onClick={() => update({ animation })}
                   className={`rounded-lg px-3 py-2 text-sm font-medium capitalize transition-colors ${
-                    state?.animation === animation
+                    data.animation === animation
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
@@ -202,14 +180,11 @@ export function StatusTextControls() {
         </div>
 
         {/* Current State Display */}
-        {state && (
-          <div className="border-t border-gray-700 pt-4">
-            <div className="space-y-1 text-xs text-gray-400">
-              <p>Current: {state.text || '(empty)'}</p>
-              <p>Updated: {new Date(state.lastUpdated).toLocaleTimeString()}</p>
-            </div>
+        <div className="border-t border-gray-700 pt-4">
+          <div className="space-y-1 text-xs text-gray-400">
+            <p>Current: {data.text || '(empty)'}</p>
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
