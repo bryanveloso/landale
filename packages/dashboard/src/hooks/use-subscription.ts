@@ -31,13 +31,22 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
     onErrorRef.current = onError
   }, [onError])
 
+  // Use ref for onConnectionStateChange to avoid dependency issues
+  const onConnectionStateChangeRef = useRef(onConnectionStateChange)
+  useEffect(() => {
+    onConnectionStateChangeRef.current = onConnectionStateChange
+  }, [onConnectionStateChange])
+
   const updateConnectionState = useCallback(
     (newState: ConnectionState) => {
       setConnectionState(newState)
-      onConnectionStateChange?.(newState)
+      onConnectionStateChangeRef.current?.(newState)
     },
-    [onConnectionStateChange]
+    []
   )
+
+  // Stringify input for stable comparison
+  const inputKey = JSON.stringify(input)
 
   useEffect(() => {
     if (!enabled) {
@@ -79,7 +88,7 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
       subscription.unsubscribe()
       updateConnectionState({ state: 'idle' })
     }
-  }, [path, input, enabled, updateConnectionState])
+  }, [path, inputKey, enabled, updateConnectionState])
 
   const reset = useCallback(() => {
     setData(null)
