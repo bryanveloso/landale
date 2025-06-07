@@ -10,6 +10,8 @@ import { appRouter } from '@/router'
 import { createLogger } from '@/lib/logger'
 import { displayManager } from '@/services/display-manager'
 import { statusBarConfigSchema, statusTextConfigSchema } from '@/types/control'
+import { rainwaveService, rainwaveNowPlayingSchema } from '@/services/rainwave'
+import { eventEmitter } from '@/events'
 import { z } from 'zod'
 
 import { version } from '../package.json'
@@ -142,7 +144,23 @@ displayManager.register('followerCount', z.object({
   label: 'Follower Goal'
 })
 
+// Rainwave now playing
+displayManager.register('rainwave', rainwaveNowPlayingSchema, {
+  stationId: 3, // Covers station by default
+  isEnabled: false,
+  apiKey: 'vYyXHv30AT',
+  userId: '53109'
+}, {
+  displayName: 'Rainwave Now Playing',
+  category: 'music'
+})
+
 log.info('Registered display services')
+
+// Handle display updates for Rainwave
+eventEmitter.on('display:rainwave:update', (display) => {
+  rainwaveService.updateConfig(display.data)
+})
 
 // Initialize IronMON TCP Server
 IronMON.initialize()
@@ -169,6 +187,15 @@ OBS.initialize()
   })
   .catch((error) => {
     log.error('Failed to initialize OBS WebSocket integration:', error)
+  })
+
+// Initialize Rainwave service
+rainwaveService.init()
+  .then(() => {
+    log.info('Rainwave service initialized successfully.')
+  })
+  .catch((error) => {
+    log.error('Failed to initialize Rainwave service:', error)
   })
 
 // Handle graceful shutdown

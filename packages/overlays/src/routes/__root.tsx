@@ -37,10 +37,10 @@ const RootDocument: FC<PropsWithChildren> = ({ children }) => {
   return (
     <>
       {children}
-      <Suspense>
+      {/* <Suspense>
         <ReactQueryDevtools />
         <TanStackRouterDevtools />
-      </Suspense>
+      </Suspense> */}
     </>
   )
 }

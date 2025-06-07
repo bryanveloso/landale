@@ -1,6 +1,7 @@
 import type { TwitchEvent } from '@/services/twitch/types'
 import type { IronmonEvent } from '@/services/ironmon/types'
 import type { StatusBarState, StatusTextState } from '@/types/control'
+import type { RainwaveNowPlaying } from '@landale/shared'
 
 // Control API event types
 export type ControlEvent = {
@@ -72,6 +73,7 @@ export type EventMap = {
   'obs:virtual-cam:changed': OBSEvent['virtualCamChanged']
   'obs:replay-buffer:updated': OBSEvent['replayBufferUpdated']
   'obs:replay-buffer:changed': OBSEvent['replayBufferChanged']
+  'rainwave:update': RainwaveNowPlaying
   // Generic display events - any string after 'display:' is allowed
   [key: `display:${string}:update`]: any
 }

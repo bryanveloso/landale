@@ -11,6 +11,7 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as NowPlayingImport } from './routes/now-playing'
 import { Route as IndexImport } from './routes/index'
 import { Route as widgetStatusTextImport } from './routes/(widget)/status-text'
 import { Route as widgetStatusBarImport } from './routes/(widget)/status-bar'
@@ -23,6 +24,12 @@ import { Route as fullFlyingToastersImport } from './routes/(full)/flying-toaste
 import { Route as fullEmoterainImport } from './routes/(full)/emoterain'
 
 // Create/Update Routes
+
+const NowPlayingRoute = NowPlayingImport.update({
+  id: '/now-playing',
+  path: '/now-playing',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const IndexRoute = IndexImport.update({
   id: '/',
@@ -95,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/now-playing': {
+      id: '/now-playing'
+      path: '/now-playing'
+      fullPath: '/now-playing'
+      preLoaderRoute: typeof NowPlayingImport
+      parentRoute: typeof rootRoute
+    }
     '/(full)/emoterain': {
       id: '/(full)/emoterain'
       path: '/emoterain'
@@ -165,6 +179,7 @@ declare module '@tanstack/react-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/now-playing': typeof NowPlayingRoute
   '/emoterain': typeof fullEmoterainRoute
   '/flying-toasters': typeof fullFlyingToastersRoute
   '/foundation': typeof fullFoundationRoute
@@ -178,6 +193,7 @@ export interface FileRoutesByFullPath {
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/now-playing': typeof NowPlayingRoute
   '/emoterain': typeof fullEmoterainRoute
   '/flying-toasters': typeof fullFlyingToastersRoute
   '/foundation': typeof fullFoundationRoute
@@ -192,6 +208,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/now-playing': typeof NowPlayingRoute
   '/(full)/emoterain': typeof fullEmoterainRoute
   '/(full)/flying-toasters': typeof fullFlyingToastersRoute
   '/(full)/foundation': typeof fullFoundationRoute
@@ -207,6 +224,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/now-playing'
     | '/emoterain'
     | '/flying-toasters'
     | '/foundation'
@@ -219,6 +237,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/now-playing'
     | '/emoterain'
     | '/flying-toasters'
     | '/foundation'
@@ -231,6 +250,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/now-playing'
     | '/(full)/emoterain'
     | '/(full)/flying-toasters'
     | '/(full)/foundation'
@@ -245,6 +265,7 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  NowPlayingRoute: typeof NowPlayingRoute
   fullEmoterainRoute: typeof fullEmoterainRoute
   fullFlyingToastersRoute: typeof fullFlyingToastersRoute
   fullFoundationRoute: typeof fullFoundationRoute
@@ -258,6 +279,7 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  NowPlayingRoute: NowPlayingRoute,
   fullEmoterainRoute: fullEmoterainRoute,
   fullFlyingToastersRoute: fullFlyingToastersRoute,
   fullFoundationRoute: fullFoundationRoute,
@@ -280,6 +302,7 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/",
+        "/now-playing",
         "/(full)/emoterain",
         "/(full)/flying-toasters",
         "/(full)/foundation",
@@ -293,6 +316,9 @@ export const routeTree = rootRoute
     },
     "/": {
       "filePath": "index.tsx"
+    },
+    "/now-playing": {
+      "filePath": "now-playing.tsx"
     },
     "/(full)/emoterain": {
       "filePath": "(full)/emoterain.tsx"

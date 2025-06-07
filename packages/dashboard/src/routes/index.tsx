@@ -7,6 +7,7 @@ import { OBSDashboard } from '@/components/obs-dashboard'
 import { StatusBarControls } from '@/components/status-bar-controls'
 import { StatusTextControls } from '@/components/status-text-controls'
 import { FollowerCountControl } from '@/components/follower-count-control'
+import { RainwaveControl } from '@/components/rainwave-control'
 
 export const Route = createFileRoute('/')({
   component: Dashboard
@@ -32,6 +33,7 @@ function Dashboard() {
           <StatusBarControls />
           <StatusTextControls />
           <FollowerCountControl />
+          <RainwaveControl />
           <EmoteRainControl />
           <OBSDashboard />
         </div>

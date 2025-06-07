@@ -6,6 +6,7 @@ export * from './ironmon'
 export * from './twitch'
 export * from './obs'
 export * from './types/display'
+export * from './types/music'
 export type * from './hooks/use-display'
 
 // Common utility types
