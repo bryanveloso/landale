@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.landale.apple-music-monitor</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/node</string>
+        <string>/Users/Avalonstar/Code/bryanveloso/landale/packages/monitors/apple-music-monitor.js</string>
+    </array>
+    
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>LANDALE_SERVER_URL</key>
+        <string>ws://localhost:7175</string>
+        <key>POLL_INTERVAL</key>
+        <string>1000</string>
+    </dict>
+    
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <key>KeepAlive</key>
+    <true/>
+    
+    <key>StandardOutPath</key>
+    <string>/tmp/landale-apple-music.log</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/tmp/landale-apple-music.error.log</string>
+    
+    <key>WorkingDirectory</key>
+    <string>/Users/Avalonstar/Code/bryanveloso/landale/packages/monitors</string>
+</dict>
+</plist>

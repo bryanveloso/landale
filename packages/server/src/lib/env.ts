@@ -29,7 +29,12 @@ const envSchema = z.object({
     .min(16)
     .default('landale-control-key')
     .optional()
-    .describe('API key for control endpoints')
+    .describe('API key for control endpoints'),
+    
+  // Apple Music (optional)
+  APPLE_TEAM_ID: z.string().optional().describe('Apple Developer Team ID'),
+  APPLE_KEY_ID: z.string().optional().describe('Apple Music Key ID'),
+  APPLE_PRIVATE_KEY: z.string().optional().describe('Base64 encoded .p8 private key')
 })
 
 // Parse and validate environment variables

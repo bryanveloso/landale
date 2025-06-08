@@ -11,6 +11,7 @@ import { createLogger } from '@/lib/logger'
 import { displayManager } from '@/services/display-manager'
 import { statusBarConfigSchema, statusTextConfigSchema } from '@/types/control'
 import { rainwaveService, rainwaveNowPlayingSchema } from '@/services/rainwave'
+import { appleMusicService, appleMusicNowPlayingSchema } from '@/services/apple-music'
 import { eventEmitter } from '@/events'
 import { z } from 'zod'
 
@@ -155,11 +156,25 @@ displayManager.register('rainwave', rainwaveNowPlayingSchema, {
   category: 'music'
 })
 
+// Apple Music now playing
+displayManager.register('appleMusic', appleMusicNowPlayingSchema, {
+  isEnabled: true,
+  isAuthorized: true
+}, {
+  displayName: 'Apple Music Now Playing',
+  category: 'music'
+})
+
 log.info('Registered display services')
 
 // Handle display updates for Rainwave
 eventEmitter.on('display:rainwave:update', (display) => {
   rainwaveService.updateConfig(display.data)
+})
+
+// Handle display updates for Apple Music
+eventEmitter.on('display:appleMusic:update', (display) => {
+  appleMusicService.updateConfig(display.data)
 })
 
 // Initialize IronMON TCP Server
@@ -196,6 +211,15 @@ rainwaveService.init()
   })
   .catch((error) => {
     log.error('Failed to initialize Rainwave service:', error)
+  })
+
+// Initialize Apple Music service (host-based)
+appleMusicService.init()
+  .then(() => {
+    log.info('Apple Music service initialized successfully.')
+  })
+  .catch((error) => {
+    log.error('Failed to initialize Apple Music service:', error)
   })
 
 // Handle graceful shutdown
