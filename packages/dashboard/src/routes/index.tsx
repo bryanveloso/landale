@@ -8,6 +8,7 @@ import { StatusBarControls } from '@/components/status-bar-controls'
 import { StatusTextControls } from '@/components/status-text-controls'
 import { FollowerCountControl } from '@/components/follower-count-control'
 import { RainwaveControl } from '@/components/rainwave-control'
+import { AppleMusicControl } from '@/components/apple-music-control'
 
 export const Route = createFileRoute('/')({
   component: Dashboard
@@ -34,6 +35,7 @@ function Dashboard() {
           <StatusTextControls />
           <FollowerCountControl />
           <RainwaveControl />
+          <AppleMusicControl />
           <EmoteRainControl />
           <OBSDashboard />
         </div>
