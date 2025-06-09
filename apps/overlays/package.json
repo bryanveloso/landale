@@ -1,0 +1,51 @@
+{
+  "name": "@landale/overlays",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bunx --bun vite",
+    "build": "tsc && bunx --bun vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "preview": "bunx --bun vite preview"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.2.5",
+    "@landale/server": "workspace:*",
+    "@landale/shared": "workspace:*",
+    "@rive-app/react-canvas": "^4.21.1",
+    "@tailwindcss/vite": "^4.1.8",
+    "@tanstack/react-query": "^5.79.0",
+    "@tanstack/react-query-devtools": "^5.79.0",
+    "@tanstack/react-router": "^1.120.12",
+    "@trpc/client": "^11.1.4",
+    "framer-motion": "^12.15.0",
+    "matter-js": "^0.20.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-use-websocket": "^4.13.0",
+    "tailwindcss": "^4.1.8",
+    "vite-tsconfig-paths": "^5.1.4"
+  },
+  "devDependencies": {
+    "@landale/eslint": "workspace:*",
+    "@landale/prettier": "workspace:*",
+    "@landale/typescript": "workspace:*",
+    "@tanstack/react-router-devtools": "^1.120.12",
+    "@tanstack/router-vite-plugin": "^1.120.12",
+    "@trpc/server": "^11.1.4",
+    "@types/matter-js": "^0.19.8",
+    "@types/node": "^22.15.24",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react-swc": "^3.10.0",
+    "eslint": "^9.27.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-arm64-gnu": "^4.41.1"
+  }
+}
