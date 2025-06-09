@@ -20,7 +20,9 @@ export const Timeline: FC<{ totalCheckpoints?: number }> = ({ totalCheckpoints =
       }
     })
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+    }
   }, [queryClient])
 
   const checkpoints = Array.from({ length: totalCheckpoints }, (_, i) => i + 1)

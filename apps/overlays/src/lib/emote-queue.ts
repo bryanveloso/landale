@@ -1,11 +1,10 @@
-import { EventEmitter } from 'events'
+type EmoteListener = (emoteId: string) => void
 
-class EmoteQueue extends EventEmitter {
-  private static instance: EmoteQueue
+class EmoteQueue {
+  private static instance: EmoteQueue | undefined
+  private listeners: Set<EmoteListener> = new Set()
 
-  private constructor() {
-    super()
-  }
+  private constructor() {}
 
   static getInstance(): EmoteQueue {
     if (!EmoteQueue.instance) {
@@ -14,8 +13,18 @@ class EmoteQueue extends EventEmitter {
     return EmoteQueue.instance
   }
 
+  on(_event: 'emote', listener: EmoteListener) {
+    this.listeners.add(listener)
+  }
+
+  off(_event: 'emote', listener: EmoteListener) {
+    this.listeners.delete(listener)
+  }
+
   queueEmote(emoteId: string) {
-    this.emit('emote', emoteId)
+    this.listeners.forEach((listener) => {
+      listener(emoteId)
+    })
   }
 }
 

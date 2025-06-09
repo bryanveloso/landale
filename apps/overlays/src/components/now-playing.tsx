@@ -100,7 +100,9 @@ function MusicWidget({ service }: { service: MusicService }) {
 
     // Update every second
     const interval = setInterval(updateProgress, 1000)
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+    }
   }, [data, service])
 
   if (!isVisible || !musicData.isEnabled || !musicData.currentSong) {

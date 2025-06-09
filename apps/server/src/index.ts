@@ -163,8 +163,8 @@ displayManager.register(
   {
     stationId: 3, // Covers station by default
     isEnabled: false,
-    apiKey: 'vYyXHv30AT',
-    userId: '53109'
+    apiKey: env.RAINWAVE_API_KEY || '',
+    userId: env.RAINWAVE_USER_ID || ''
   },
   {
     displayName: 'Rainwave Now Playing',

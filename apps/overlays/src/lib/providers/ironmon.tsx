@@ -46,7 +46,9 @@ export const IronmonProvider: FC<PropsWithChildren> = ({ children }) => {
       checkData()
     })
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+    }
   }, [queryClient])
 
   return <IronmonContext.Provider value={{ isConnected, hasData }}>{children}</IronmonContext.Provider>

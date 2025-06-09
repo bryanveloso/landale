@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { trpcClient } from '@/lib/trpc'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 export const Route = createFileRoute('/(widget)/alerts')({
   component: AlertsOverlay
@@ -85,7 +86,9 @@ function AlertsOverlay() {
     ]
 
     return () => {
-      subscriptions.forEach((sub) => sub.unsubscribe())
+      subscriptions.forEach((sub) => {
+        sub.unsubscribe()
+      })
     }
   }, [])
 
@@ -103,38 +106,42 @@ function AlertsOverlay() {
       const timer = setTimeout(() => {
         setCurrentAlert(null)
       }, 5000)
-      return () => clearTimeout(timer)
+      return () => {
+        clearTimeout(timer)
+      }
     }
     return undefined
   }, [currentAlert])
 
   return (
-    <div className="pointer-events-none fixed inset-0">
-      <AnimatePresence>
-        {currentAlert && (
-          <motion.div
-            key={currentAlert.id}
-            initial={{ opacity: 0, y: -50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            transition={{ duration: 0.3, type: 'spring', stiffness: 200 }}
-            className="pointer-events-auto absolute top-8 left-1/2 -translate-x-1/2">
-            <div
-              className={`rounded-lg px-8 py-4 shadow-2xl backdrop-blur-md ${currentAlert.type === 'follow' ? 'bg-purple-500/90' : ''} ${currentAlert.type === 'subscription' ? 'bg-blue-500/90' : ''} ${currentAlert.type === 'gift' ? 'bg-green-500/90' : ''} ${currentAlert.type === 'resub' ? 'bg-indigo-500/90' : ''} ${currentAlert.type === 'redemption' ? 'bg-yellow-500/90' : ''} `}>
-              <p className="text-center text-xl font-bold text-white">{currentAlert.message}</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <ErrorBoundary>
+      <div className="pointer-events-none fixed inset-0">
+        <AnimatePresence>
+          {currentAlert && (
+            <motion.div
+              key={currentAlert.id}
+              initial={{ opacity: 0, y: -50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 50, scale: 0.9 }}
+              transition={{ duration: 0.3, type: 'spring', stiffness: 200 }}
+              className="pointer-events-auto absolute top-8 left-1/2 -translate-x-1/2">
+              <div
+                className={`rounded-lg px-8 py-4 shadow-2xl backdrop-blur-md ${currentAlert.type === 'follow' ? 'bg-purple-500/90' : ''} ${currentAlert.type === 'subscription' ? 'bg-blue-500/90' : ''} ${currentAlert.type === 'gift' ? 'bg-green-500/90' : ''} ${currentAlert.type === 'resub' ? 'bg-indigo-500/90' : ''} ${currentAlert.type === 'redemption' ? 'bg-yellow-500/90' : ''} `}>
+                <p className="text-center text-xl font-bold text-white">{currentAlert.message}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* Alert queue indicator */}
-      {alerts.length > 0 && (
-        <div className="absolute top-4 right-4 rounded-full bg-white/10 px-3 py-1 backdrop-blur-sm">
-          <p className="text-sm text-white">
-            {alerts.length} alert{alerts.length !== 1 ? 's' : ''} queued
-          </p>
-        </div>
-      )}
-    </div>
+        {/* Alert queue indicator */}
+        {alerts.length > 0 && (
+          <div className="absolute top-4 right-4 rounded-full bg-white/10 px-3 py-1 backdrop-blur-sm">
+            <p className="text-sm text-white">
+              {alerts.length} alert{alerts.length !== 1 ? 's' : ''} queued
+            </p>
+          </div>
+        )}
+      </div>
+    </ErrorBoundary>
   )
 }

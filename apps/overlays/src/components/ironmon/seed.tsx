@@ -20,7 +20,9 @@ export const Seed: FC = memo(() => {
       }
     })
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+    }
   }, [queryClient])
 
   const value = useMotionValue(0)

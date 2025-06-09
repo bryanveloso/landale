@@ -18,7 +18,9 @@ export const Statistics: FC = memo(() => {
       }
     })
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+    }
   }, [queryClient])
 
   return (

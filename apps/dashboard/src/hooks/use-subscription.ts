@@ -67,10 +67,12 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
 
   // Create stable input key using a more efficient method
   const inputKey = useRef<unknown>(undefined)
-  const hasInputChanged = inputKey.current !== input && 
-    (input === undefined || inputKey.current === undefined || 
-     JSON.stringify(input) !== JSON.stringify(inputKey.current))
-  
+  const hasInputChanged =
+    inputKey.current !== input &&
+    (input === undefined ||
+      inputKey.current === undefined ||
+      JSON.stringify(input) !== JSON.stringify(inputKey.current))
+
   if (hasInputChanged) {
     inputKey.current = input
   }
@@ -90,27 +92,24 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
 
   const scheduleRetry = useCallback(() => {
     if (retryCountRef.current >= maxRetries) {
-      updateConnectionState({ 
-        state: 'error', 
-        error: `Failed to connect after ${String(maxRetries)} attempts` 
+      updateConnectionState({
+        state: 'error',
+        error: `Failed to connect after ${String(maxRetries)} attempts`
       })
       return
     }
 
     const delay = Math.min(retryDelayRef.current, maxRetryDelay)
-    
-    updateConnectionState({ 
-      state: 'reconnecting', 
+
+    updateConnectionState({
+      state: 'reconnecting',
       retryCount: retryCountRef.current + 1,
-      nextRetryIn: delay 
+      nextRetryIn: delay
     })
 
     retryTimeoutRef.current = window.setTimeout(() => {
       retryCountRef.current++
-      retryDelayRef.current = Math.min(
-        retryDelayRef.current * retryMultiplier,
-        maxRetryDelay
-      )
+      retryDelayRef.current = Math.min(retryDelayRef.current * retryMultiplier, maxRetryDelay)
       // Trigger reconnection
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe()
@@ -153,14 +152,17 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
     try {
       // Type assertion is safe here because we know the path leads to a subscription procedure
       const subscribe = procedure as {
-        subscribe: (input: unknown, opts: {
-          onData: (data: T) => void
-          onError: (err: Error) => void
-          onStarted: () => void
-          onStopped: () => void
-        }) => { unsubscribe: () => void }
+        subscribe: (
+          input: unknown,
+          opts: {
+            onData: (data: T) => void
+            onError: (err: Error) => void
+            onStarted: () => void
+            onStopped: () => void
+          }
+        ) => { unsubscribe: () => void }
       }
-      
+
       const subscription = subscribe.subscribe(inputKey.current, {
         onData: (receivedData: T) => {
           setData(receivedData)

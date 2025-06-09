@@ -105,7 +105,7 @@ class RainwaveService {
           continue
         }
 
-        const data = await response.json() as any
+        const data = (await response.json()) as any
 
         // Check if user is listening to this station
         if (data.user && data.user.id && data.user.id.toString() === this.currentData.userId) {
