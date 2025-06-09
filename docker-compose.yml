@@ -20,14 +20,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: ${DOCKER_TARGET:-development}
     restart: unless-stopped
     working_dir: /app/apps/server
     volumes:
-      - ./:/app
+      # Only mount source directories, not the entire project
+      - ./apps/server/src:/app/apps/server/src
+      - ./packages:/app/packages
+      # Exclude node_modules from being overwritten by host
       - /app/node_modules
+      - /app/apps/server/node_modules
     environment:
       DATABASE_URL: postgres://landale:landale@db:5432/landale
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV:-development}
     env_file:
       - .env
     ports:
@@ -38,19 +43,32 @@ services:
       db:
         condition: service_healthy
     command: ['bun', 'run', 'src/index.ts']
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -z 0.0.0.0 7175 || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   overlays:
     build:
       context: .
       dockerfile: Dockerfile
+      target: ${DOCKER_TARGET:-development}
     restart: unless-stopped
     working_dir: /app/apps/overlays
     volumes:
-      - ./:/app
+      # Only mount source directories
+      - ./apps/overlays/src:/app/apps/overlays/src
+      - ./apps/overlays/public:/app/apps/overlays/public
+      - ./packages:/app/packages
+      # Exclude node_modules
       - /app/node_modules
+      - /app/apps/overlays/node_modules
+      # Persistent emote cache
       - emotes_cache:/app/apps/overlays/public/emotes
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV:-development}
     ports:
       - '8008:8008'
     depends_on:
