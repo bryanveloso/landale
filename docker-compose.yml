@@ -21,14 +21,10 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    working_dir: /app/packages/server
+    working_dir: /app/apps/server
     volumes:
       - ./:/app
       - /app/node_modules
-      - /app/packages/server/node_modules
-      - /app/packages/database/node_modules
-      - /app/packages/overlays/node_modules
-      - /app/packages/shared/node_modules
     environment:
       DATABASE_URL: postgres://landale:landale@db:5432/landale
       NODE_ENV: development
@@ -48,15 +44,11 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    working_dir: /app/packages/overlays
+    working_dir: /app/apps/overlays
     volumes:
       - ./:/app
       - /app/node_modules
-      - /app/packages/server/node_modules
-      - /app/packages/database/node_modules
-      - /app/packages/overlays/node_modules
-      - /app/packages/shared/node_modules
-      - emotes_cache:/app/packages/overlays/public/emotes
+      - emotes_cache:/app/apps/overlays/public/emotes
     environment:
       NODE_ENV: development
     ports:

@@ -181,4 +181,7 @@ dist
 twitch-token.json
 
 # Cached emotes
-packages/overlays/public/emotes/
+apps/overlays/public/emotes/
+
+# Turborepo
+.turbo
