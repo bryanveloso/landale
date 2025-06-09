@@ -27,6 +27,8 @@ export interface EmoteRainConfig {
 }
 
 export interface ConnectionState {
-  state: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error'
+  state: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'reconnecting' | 'error'
   error?: string
+  retryCount?: number
+  nextRetryIn?: number
 }
