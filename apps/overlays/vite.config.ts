@@ -10,6 +10,6 @@ export default defineConfig({
   server: {
     allowedHosts: ['.local'],
     host: true,
-    port: 8088
+    port: 8008
   }
 })

@@ -52,7 +52,7 @@ services:
     environment:
       NODE_ENV: development
     ports:
-      - '8088:8088'
+      - '8008:8008'
     depends_on:
       - server
     command: ['bunx', '--bun', 'vite']
