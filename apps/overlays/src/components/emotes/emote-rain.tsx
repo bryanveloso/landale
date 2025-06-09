@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, memo, useCallback } from 'react'
 import Matter from 'matter-js'
+import { emoteQueue } from '@/lib/emote-queue'
 
 interface EmoteConfig {
   size: number
@@ -29,7 +30,7 @@ const DEFAULT_CONFIG: EmoteConfig = {
   friction: 0.3, // Surface friction (0 = ice, 1 = sandpaper)
   airFriction: 0.001, // Air resistance (0 = vacuum, 0.05 = molasses)
   spawnDelay: 100, // Min delay between spawns (ms) - prevents spam
-  maxEmotes: 200, // Max emotes on screen at once
+  maxEmotes: 100, // Max emotes on screen at once (reduced for 60fps)
   rotationSpeed: 0.2 // Max rotation speed
 }
 
@@ -41,6 +42,7 @@ export const EmoteRain = memo(function EmoteRain() {
   const spawnQueueRef = useRef<string[]>([])
   const lastSpawnTimeRef = useRef<number>(0)
   const [config] = useState<EmoteConfig>(DEFAULT_CONFIG)
+  const resizeTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!canvasRef.current) return
@@ -98,29 +100,37 @@ export const EmoteRain = memo(function EmoteRain() {
     const runner = Matter.Runner.create()
     Matter.Runner.run(runner, engine)
 
-    // Handle window resize
+    // Handle window resize with throttling
     const handleResize = () => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
-      render.canvas.width = window.innerWidth
-      render.canvas.height = window.innerHeight
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current)
+      }
+      
+      resizeTimeoutRef.current = window.setTimeout(() => {
+        canvas.width = window.innerWidth
+        canvas.height = window.innerHeight
+        render.canvas.width = window.innerWidth
+        render.canvas.height = window.innerHeight
 
-      // Update ground position
-      Matter.Body.setPosition(ground, {
-        x: window.innerWidth / 2,
-        y: window.innerHeight + wallThickness / 2
-      })
+        // Update ground position
+        Matter.Body.setPosition(ground, {
+          x: window.innerWidth / 2,
+          y: window.innerHeight + wallThickness / 2
+        })
 
-      // Update wall positions
-      Matter.Body.setPosition(leftWall, {
-        x: -wallThickness / 2,
-        y: window.innerHeight / 2
-      })
+        // Update wall positions
+        Matter.Body.setPosition(leftWall, {
+          x: -wallThickness / 2,
+          y: window.innerHeight / 2
+        })
 
-      Matter.Body.setPosition(rightWall, {
-        x: window.innerWidth + wallThickness / 2,
-        y: window.innerHeight / 2
-      })
+        Matter.Body.setPosition(rightWall, {
+          x: window.innerWidth + wallThickness / 2,
+          y: window.innerHeight / 2
+        })
+        
+        resizeTimeoutRef.current = null
+      }, 250)
     }
 
     window.addEventListener('resize', handleResize)
@@ -128,9 +138,17 @@ export const EmoteRain = memo(function EmoteRain() {
     // Cleanup function
     return () => {
       window.removeEventListener('resize', handleResize)
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current)
+      }
       Matter.Render.stop(render)
       Matter.Runner.stop(runner)
       Matter.Engine.clear(engine)
+      
+      // Ensure all bodies are removed
+      emoteBodiesRef.current.forEach((emoteBody) => {
+        Matter.Composite.remove(engine.world, emoteBody.body)
+      })
       emoteBodiesRef.current.clear()
     }
   }, [config.gravity])
@@ -141,7 +159,7 @@ export const EmoteRain = memo(function EmoteRain() {
   }, [])
 
   // Method to spawn an emote from the queue
-  const spawnEmoteFromQueue = () => {
+  const spawnEmoteFromQueue = useCallback(() => {
     if (!engineRef.current || spawnQueueRef.current.length === 0) return
 
     // Check if we've hit the max emote limit
@@ -192,10 +210,10 @@ export const EmoteRain = memo(function EmoteRain() {
     setTimeout(() => {
       removeEmote(emoteBody.id)
     }, config.lifetime)
-  }
+  }, [config])
 
   // Method to remove an emote with falling effect
-  const removeEmote = (id: string) => {
+  const removeEmote = useCallback((id: string) => {
     const emoteBody = emoteBodiesRef.current.get(id)
     if (!emoteBody || !engineRef.current) return
 
@@ -218,7 +236,7 @@ export const EmoteRain = memo(function EmoteRain() {
         Matter.Composite.remove(engineRef.current.world, emoteBody.body)
       }
     }, 3000)
-  }
+  }, [])
 
   // Process spawn queue
   useEffect(() => {
@@ -227,13 +245,32 @@ export const EmoteRain = memo(function EmoteRain() {
     }, 50) // Check queue every 50ms
 
     return () => clearInterval(interval)
-  }, [])
+  }, [spawnEmoteFromQueue])
 
-  // Expose queue method for external use
+  // Remove emotes that have been on screen too long
   useEffect(() => {
-    window.queueEmote = queueEmote
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now()
+      emoteBodiesRef.current.forEach((emoteBody, id) => {
+        if (now - emoteBody.createdAt > config.lifetime) {
+          removeEmote(id)
+        }
+      })
+    }, 5000) // Check every 5 seconds
+
+    return () => clearInterval(cleanupInterval)
+  }, [config.lifetime, removeEmote])
+
+  // Listen for emote events
+  useEffect(() => {
+    const handleEmote = (emoteId: string) => {
+      queueEmote(emoteId)
+    }
+
+    emoteQueue.on('emote', handleEmote)
+
     return () => {
-      delete window.queueEmote
+      emoteQueue.off('emote', handleEmote)
     }
   }, [queueEmote])
 
