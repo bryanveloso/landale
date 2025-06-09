@@ -1,7 +1,6 @@
 import { router, publicProcedure } from '@/trpc'
 import { z } from 'zod'
 import { appleMusicService } from '@/services/apple-music'
-import { logger } from '@/lib/logger'
 
 export const appleMusicRouter = router({
   // Receive updates from host service

@@ -24,17 +24,16 @@ const envSchema = z.object({
     .optional(),
 
   // Control API Security
-  CONTROL_API_KEY: z
-    .string()
-    .min(16)
-    .default('landale-control-key')
-    .optional()
-    .describe('API key for control endpoints'),
+  CONTROL_API_KEY: z.string().min(32).optional().describe('API key for control endpoints (min 32 chars)'),
 
   // Apple Music (optional)
   APPLE_TEAM_ID: z.string().optional().describe('Apple Developer Team ID'),
   APPLE_KEY_ID: z.string().optional().describe('Apple Music Key ID'),
-  APPLE_PRIVATE_KEY: z.string().optional().describe('Base64 encoded .p8 private key')
+  APPLE_PRIVATE_KEY: z.string().optional().describe('Base64 encoded .p8 private key'),
+
+  // Rainwave (optional)
+  RAINWAVE_API_KEY: z.string().optional().describe('Rainwave API key'),
+  RAINWAVE_USER_ID: z.string().optional().describe('Rainwave user ID')
 })
 
 // Parse and validate environment variables

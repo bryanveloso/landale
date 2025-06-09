@@ -3,38 +3,9 @@
  * Instead of sending full state, send specific change events
  */
 
-import { z } from 'zod'
 import { router, publicProcedure } from '@/trpc'
 import { createEventSubscription } from '@/lib/subscription'
 import { obsService } from '@/services/obs'
-
-// Event types that describe what changed
-const obsEventSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('sceneChanged'),
-    scene: z.string(),
-    previousScene: z.string().nullable()
-  }),
-  z.object({
-    type: z.literal('scenesListUpdated'),
-    scenes: z.array(
-      z.object({
-        sceneName: z.string(),
-        sceneUuid: z.string(),
-        sceneIndex: z.number()
-      })
-    )
-  }),
-  z.object({
-    type: z.literal('streamingStateChanged'),
-    active: z.boolean(),
-    timecode: z.string().optional()
-  }),
-  z.object({
-    type: z.literal('studioModeToggled'),
-    enabled: z.boolean()
-  })
-])
 
 export const obsEventsRouter = router({
   // Single subscription for all OBS events

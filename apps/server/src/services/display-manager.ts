@@ -1,4 +1,3 @@
-import { z } from 'zod'
 import type { ZodSchema } from 'zod'
 import { eventEmitter } from '@/events'
 import { logger } from '@/lib/logger'
@@ -58,7 +57,7 @@ export class DisplayManager {
     display.lastUpdated = new Date().toISOString()
 
     // Emit update event
-    eventEmitter.emit(`display:${id}:update` as any, display)
+    eventEmitter.emit(`display:${id}:update`, display)
 
     logger.debug(`[DisplayManager] Updated display: ${id}`, { data: validated })
 
@@ -77,7 +76,7 @@ export class DisplayManager {
     display.isVisible = isVisible
     display.lastUpdated = new Date().toISOString()
 
-    eventEmitter.emit(`display:${id}:update` as any, display)
+    eventEmitter.emit(`display:${id}:update`, display)
 
     return display
   }

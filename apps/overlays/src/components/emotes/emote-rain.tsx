@@ -105,7 +105,7 @@ export const EmoteRain = memo(function EmoteRain() {
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current)
       }
-      
+
       resizeTimeoutRef.current = window.setTimeout(() => {
         canvas.width = window.innerWidth
         canvas.height = window.innerHeight
@@ -128,7 +128,7 @@ export const EmoteRain = memo(function EmoteRain() {
           x: window.innerWidth + wallThickness / 2,
           y: window.innerHeight / 2
         })
-        
+
         resizeTimeoutRef.current = null
       }, 250)
     }
@@ -144,18 +144,45 @@ export const EmoteRain = memo(function EmoteRain() {
       Matter.Render.stop(render)
       Matter.Runner.stop(runner)
       Matter.Engine.clear(engine)
-      
+
       // Ensure all bodies are removed
-      emoteBodiesRef.current.forEach((emoteBody) => {
+      const emoteBodies = emoteBodiesRef.current
+      emoteBodies.forEach((emoteBody) => {
         Matter.Composite.remove(engine.world, emoteBody.body)
       })
-      emoteBodiesRef.current.clear()
+      emoteBodies.clear()
     }
   }, [config.gravity])
 
   // Method to queue an emote for spawning
   const queueEmote = useCallback((emoteId: string) => {
     spawnQueueRef.current.push(emoteId)
+  }, [])
+
+  // Method to remove an emote with falling effect
+  const removeEmote = useCallback((id: string) => {
+    const emoteBody = emoteBodiesRef.current.get(id)
+    if (!emoteBody || !engineRef.current) return
+
+    // Remove collision by setting it to a different category
+    emoteBody.body.collisionFilter.category = 0x0002
+    emoteBody.body.collisionFilter.mask = 0x0000
+
+    // Apply downward force to make it fall through the bottom
+    Matter.Body.applyForce(emoteBody.body, emoteBody.body.position, {
+      x: 0,
+      y: 0.1
+    })
+
+    // Remove from tracking
+    emoteBodiesRef.current.delete(id)
+
+    // Remove from world after it's off screen
+    setTimeout(() => {
+      if (engineRef.current?.world) {
+        Matter.Composite.remove(engineRef.current.world, emoteBody.body)
+      }
+    }, 3000)
   }, [])
 
   // Method to spawn an emote from the queue
@@ -169,7 +196,8 @@ export const EmoteRain = memo(function EmoteRain() {
     const now = Date.now()
     if (now - lastSpawnTimeRef.current < config.spawnDelay) return
 
-    const emoteId = spawnQueueRef.current.shift()!
+    const emoteId = spawnQueueRef.current.shift()
+    if (!emoteId) return
     lastSpawnTimeRef.current = now
 
     const x = Math.random() * window.innerWidth
@@ -199,7 +227,7 @@ export const EmoteRain = memo(function EmoteRain() {
 
     // Track the emote
     const emoteBody: EmoteBody = {
-      id: `${emoteId}-${Date.now()}-${Math.random()}`,
+      id: `${emoteId}-${String(Date.now())}-${String(Math.random())}`,
       emoteId,
       body,
       createdAt: Date.now()
@@ -210,33 +238,7 @@ export const EmoteRain = memo(function EmoteRain() {
     setTimeout(() => {
       removeEmote(emoteBody.id)
     }, config.lifetime)
-  }, [config])
-
-  // Method to remove an emote with falling effect
-  const removeEmote = useCallback((id: string) => {
-    const emoteBody = emoteBodiesRef.current.get(id)
-    if (!emoteBody || !engineRef.current) return
-
-    // Remove collision by setting it to a different category
-    emoteBody.body.collisionFilter.category = 0x0002
-    emoteBody.body.collisionFilter.mask = 0x0000
-
-    // Apply downward force to make it fall through the bottom
-    Matter.Body.applyForce(emoteBody.body, emoteBody.body.position, {
-      x: 0,
-      y: 0.1
-    })
-
-    // Remove from tracking
-    emoteBodiesRef.current.delete(id)
-
-    // Remove from world after it's off screen
-    setTimeout(() => {
-      if (engineRef.current?.world) {
-        Matter.Composite.remove(engineRef.current.world, emoteBody.body)
-      }
-    }, 3000)
-  }, [])
+  }, [config, removeEmote])
 
   // Process spawn queue
   useEffect(() => {
@@ -244,7 +246,9 @@ export const EmoteRain = memo(function EmoteRain() {
       spawnEmoteFromQueue()
     }, 50) // Check queue every 50ms
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+    }
   }, [spawnEmoteFromQueue])
 
   // Remove emotes that have been on screen too long
@@ -258,7 +262,9 @@ export const EmoteRain = memo(function EmoteRain() {
       })
     }, 5000) // Check every 5 seconds
 
-    return () => clearInterval(cleanupInterval)
+    return () => {
+      clearInterval(cleanupInterval)
+    }
   }, [config.lifetime, removeEmote])
 
   // Listen for emote events

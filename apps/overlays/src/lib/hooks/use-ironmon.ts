@@ -34,7 +34,9 @@ export function useIronmonSubscription() {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [queryClient])
 }
 
@@ -48,7 +50,9 @@ export function useIronmonCheckpoint() {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [queryClient])
 
   return queryClient.getQueryData(['ironmon', 'checkpoint'])
@@ -64,7 +68,9 @@ export function useIronmonSeed() {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [queryClient])
 
   return queryClient.getQueryData(['ironmon', 'seed'])

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { trpcClient } from '@/lib/trpc'
+import { emoteQueue } from '@/lib/emote-queue'
 
 import { EmoteRain } from '@/components/emotes/emote-rain'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -18,16 +19,16 @@ function RouteComponent() {
           data.messageParts.forEach((part) => {
             if (part.type === 'emote' && part.emote) {
               // Queue the emote
-              if (window.queueEmote) {
-                window.queueEmote(part.emote.id)
-              }
+              emoteQueue.queueEmote(part.emote.id)
             }
           })
         }
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   return (

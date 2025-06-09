@@ -33,7 +33,9 @@ const FlyingObject = ({ config, speed, delay, startPosition, onComplete }: Flyin
       setCurrentFrame((prev) => (prev + 1) % config.frameCount)
     }, 200 / config.frameCount) // 0.2s / 4 frames = 50ms per frame
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+    }
   }, [config.frameCount])
 
   // Handle both sprite sheet and individual frame images
@@ -192,7 +194,9 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
     // Continuous spawning
     const interval = setInterval(spawnObject, 3000) // New object every 3 seconds
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+    }
   }, [sprites, density])
 
   const handleObjectComplete = (id: string) => {
@@ -226,7 +230,9 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
             speed={obj.speed}
             delay={obj.delay}
             startPosition={obj.startPosition}
-            onComplete={() => handleObjectComplete(obj.id)}
+            onComplete={() => {
+              handleObjectComplete(obj.id)
+            }}
           />
         ))}
       </AnimatePresence>
