@@ -1,0 +1,43 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local"],
+  "globalEnv": [
+    "DATABASE_URL",
+    "TWITCH_CLIENT_ID",
+    "TWITCH_CLIENT_SECRET",
+    "TWITCH_EVENTSUB_SECRET",
+    "TWITCH_USER_ID",
+    "NODE_ENV"
+  ],
+  "tasks": {
+    "generate": {
+      "dependsOn": ["^generate"],
+      "cache": false
+    },
+    "build": {
+      "dependsOn": ["^build", "generate"],
+      "outputs": ["dist/**"],
+      "env": ["NODE_ENV"]
+    },
+    "dev": {
+      "dependsOn": ["generate"],
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "outputs": [],
+      "cache": false
+    },
+    "typecheck": {
+      "dependsOn": ["generate"],
+      "outputs": [],
+      "cache": false
+    },
+    "db:push": {
+      "cache": false
+    },
+    "db:migrate:dev": {
+      "cache": false
+    }
+  }
+}

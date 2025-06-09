@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { $ } from 'bun'
 
-const EMOTES_DIR = new URL('../packages/overlays/public/emotes/', import.meta.url).pathname
+const EMOTES_DIR = new URL('../apps/overlays/public/emotes/', import.meta.url).pathname
 const MANIFEST_PATH = `${EMOTES_DIR}manifest.json`
 
 interface EmoteManifest {
