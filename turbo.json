@@ -16,7 +16,7 @@
     },
     "build": {
       "dependsOn": ["^build", "generate"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "outputs": ["dist/**"],
       "env": ["NODE_ENV"]
     },
     "dev": {

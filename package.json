@@ -9,7 +9,10 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
-    "cache-emotes": "bun run scripts/cache-emotes.ts"
+    "cache-emotes": "bun run scripts/cache-emotes.ts",
+    "dev:server": "cd apps/server && bun dev",
+    "dev:overlays": "cd apps/overlays && bun dev",
+    "dev:dashboard": "cd apps/dashboard && bun dev"
   },
   "type": "module",
   "workspaces": [
