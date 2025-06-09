@@ -18,7 +18,7 @@ RUN bun install
 RUN cd packages/database && bunx prisma generate
 
 # Expose ports
-EXPOSE 7175 8080 8081 8088
+EXPOSE 7175 8080 8081 8008
 
 # Default to development mode
 ENV NODE_ENV=development
