@@ -23,7 +23,6 @@
     "@eslint/eslintrc": "^3.3.1",
     "@landale/database": "workspace:*",
     "@landale/eslint": "workspace:*",
-    "@landale/prettier": "workspace:*",
     "@landale/typescript": "workspace:*",
     "@types/bun": "latest",
     "@types/jsonwebtoken": "^9.0.8",

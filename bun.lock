@@ -60,7 +60,6 @@
       },
       "devDependencies": {
         "@landale/eslint": "workspace:*",
-        "@landale/prettier": "workspace:*",
         "@landale/typescript": "workspace:*",
         "@tanstack/react-router-devtools": "^1.120.12",
         "@tanstack/router-vite-plugin": "^1.120.12",
@@ -105,7 +104,6 @@
         "@eslint/eslintrc": "^3.3.1",
         "@landale/database": "workspace:*",
         "@landale/eslint": "workspace:*",
-        "@landale/prettier": "workspace:*",
         "@landale/typescript": "workspace:*",
         "@types/bun": "latest",
         "@types/jsonwebtoken": "^9.0.8",
@@ -148,16 +146,6 @@
       "peerDependencies": {
         "eslint": "^9.0.0",
         "typescript": "^5.0.0",
-      },
-    },
-    "packages/prettier": {
-      "name": "@landale/prettier",
-      "version": "0.1.0",
-      "dependencies": {
-        "prettier-plugin-tailwindcss": "^0.6.11",
-      },
-      "peerDependencies": {
-        "prettier": "^3.0.0",
       },
     },
     "packages/shared": {
@@ -340,8 +328,6 @@
     "@landale/eslint": ["@landale/eslint@workspace:packages/eslint"],
 
     "@landale/overlays": ["@landale/overlays@workspace:apps/overlays"],
-
-    "@landale/prettier": ["@landale/prettier@workspace:packages/prettier"],
 
     "@landale/server": ["@landale/server@workspace:apps/server"],
 

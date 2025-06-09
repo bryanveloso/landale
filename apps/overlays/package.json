@@ -29,7 +29,6 @@
   },
   "devDependencies": {
     "@landale/eslint": "workspace:*",
-    "@landale/prettier": "workspace:*",
     "@landale/typescript": "workspace:*",
     "@tanstack/react-router-devtools": "^1.120.12",
     "@tanstack/router-vite-plugin": "^1.120.12",
