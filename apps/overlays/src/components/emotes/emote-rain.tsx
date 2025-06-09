@@ -23,7 +23,7 @@ interface EmoteBody {
 
 // Configuration options - adjust these to change behavior
 const DEFAULT_CONFIG: EmoteConfig = {
-  size: 112, // Emote size in pixels (28, 56, 112, 168, 224)
+  size: 56, // Emote size in pixels (28, 56, 112, 168, 224)
   lifetime: 30000, // How long emotes stay on screen (ms)
   gravity: 1, // Gravity strength (0.1 - 3)
   restitution: 0.4, // Bounciness (0 = no bounce, 1 = perfect bounce)
