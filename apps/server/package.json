@@ -17,7 +17,9 @@
     "start": "bun run dist/index.js",
     "lint": "eslint --ext .ts .",
     "typecheck": "tsc --noEmit",
-    "postinstall": "tsc || true"
+    "postinstall": "tsc || true",
+    "test": "vitest",
+    "test:watch": "vitest --watch"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
