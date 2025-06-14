@@ -2,7 +2,7 @@
   "name": "landale",
   "version": "0.1.0",
   "module": "index.ts",
-  "packageManager": "bun@1.2.15",
+  "packageManager": "bun@1.2.16",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
