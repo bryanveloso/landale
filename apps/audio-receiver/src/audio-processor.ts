@@ -30,7 +30,7 @@ export class AudioProcessor {
   
   private isRunning = false
   private transcribing = false
-  private readonly BUFFER_DURATION_MS = 3000 // 3 seconds of audio
+  private readonly BUFFER_DURATION_MS = 1500 // 1.5 seconds for lower latency
   private readonly MAX_BUFFER_SIZE = 10 * 1024 * 1024 // 10MB max
   private processTimer?: Timer
   private whisperService?: WhisperService
@@ -121,7 +121,7 @@ export class AudioProcessor {
   }
 
   private startProcessingLoop() {
-    // Process buffer every 3 seconds
+    // Process buffer at the configured interval
     this.processTimer = setInterval(async () => {
       if (this.shouldProcessBuffer()) {
         await this.processBuffer()
