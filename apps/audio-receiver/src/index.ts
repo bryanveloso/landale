@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { WebSocketServer, WebSocket as WSWebSocket } from 'ws'
 import { logger } from './logger'
 import { AudioProcessor } from './audio-processor'
@@ -30,6 +31,8 @@ export class AudioReceiver {
   private wss: WebSocketServer
   private processor: AudioProcessor
   private clients = new Set<WSWebSocket>()
+  private headerLogged = false
+  private packetCounter = 0
 
   constructor() {
     this.processor = new AudioProcessor()
@@ -47,8 +50,49 @@ export class AudioReceiver {
         try {
           // Check if it's binary data
           if (data instanceof Buffer) {
-            // Handle raw binary audio data
-            const timestamp = Date.now() * 1000 // microseconds
+            // Minimum size check
+            if (data.length < 28) {
+              logger.error('Binary message too small for header:', data.length)
+              return
+            }
+            
+            // Parse OBS plugin binary format
+            let offset = 0
+            
+            // Parse header (28 bytes)
+            const timestamp = data.readBigUInt64LE(offset); offset += 8
+            const sampleRate = data.readUInt32LE(offset); offset += 4
+            const channels = data.readUInt32LE(offset); offset += 4
+            const bitDepth = data.readUInt32LE(offset); offset += 4
+            const sourceIdLen = data.readUInt32LE(offset); offset += 4
+            const sourceNameLen = data.readUInt32LE(offset); offset += 4
+            
+            // Only log header once per connection
+            if (!this.headerLogged) {
+              logger.debug(`Header: timestamp=${timestamp}, rate=${sampleRate}, ch=${channels}, sourceIdLen=${sourceIdLen}, sourceNameLen=${sourceNameLen}`)
+              this.headerLogged = true
+            }
+            
+            // Parse strings
+            const sourceId = data.toString('utf8', offset, offset + sourceIdLen)
+            offset += sourceIdLen
+            const sourceName = data.toString('utf8', offset, offset + sourceNameLen)
+            offset += sourceNameLen
+            
+            // Extract audio data (rest of buffer)
+            const audioData = data.subarray(offset)
+            
+            // Log every 100th packet to reduce spam
+            if (!this.packetCounter) this.packetCounter = 0
+            if (this.packetCounter++ % 100 === 0) {
+              logger.debug(`Audio packet: ${sampleRate}Hz, ${channels}ch, ${bitDepth}bit, ${audioData.length} bytes from ${sourceName}`)
+            }
+            
+            // Validate header values
+            if (sampleRate > 192000 || channels > 8 || bitDepth > 32) {
+              logger.error('Invalid header values, skipping packet')
+              return
+            }
             
             // Auto-start processor if not running
             if (!this.processor.isReceiving()) {
@@ -58,22 +102,22 @@ export class AudioReceiver {
             
             // Process the audio chunk
             await this.processor.processChunk({
-              timestamp,
+              timestamp: Number(timestamp) / 1000, // Convert nanoseconds to microseconds
               format: {
-                sampleRate: 48000, // Standard OBS sample rate
-                channels: 2,       // Stereo
-                bitDepth: 16       // 16-bit PCM
+                sampleRate,
+                channels,
+                bitDepth
               },
-              data: data,
-              sourceId: 'obs_audio'
+              data: audioData,
+              sourceId
             })
             
             // Emit event for monitoring
             eventEmitter.emit('audio:chunk', {
-              timestamp,
-              sourceId: 'obs_audio',
-              sourceName: 'OBS Audio Stream',
-              size: data.length
+              timestamp: Number(timestamp) / 1000,
+              sourceId,
+              sourceName,
+              size: audioData.length
             })
             
             return
