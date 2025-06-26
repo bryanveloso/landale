@@ -256,7 +256,7 @@ const receiver = new Phononmaser()
 // Health check endpoint
 const healthServer = Bun.serve({
   port: PORT + 1,
-  fetch(request) {
+  fetch(_request) {
     return new Response(JSON.stringify({
       status: 'healthy',
       service: 'phononmaser',
