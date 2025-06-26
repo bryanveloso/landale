@@ -14,22 +14,6 @@
         "vitest": "^3.2.3",
       },
     },
-    "apps/audio-receiver": {
-      "name": "@landale/audio-receiver",
-      "version": "0.1.0",
-      "dependencies": {
-        "@landale/shared": "workspace:*",
-        "dotenv": "^16.5.0",
-        "pino": "^8.19.0",
-        "ws": "^8.16.0",
-        "zod": "^3.22.4",
-      },
-      "devDependencies": {
-        "@types/bun": "latest",
-        "@types/ws": "^8.5.10",
-        "typescript": "^5.4.0",
-      },
-    },
     "apps/dashboard": {
       "name": "@landale/dashboard",
       "version": "0.1.0",
@@ -99,6 +83,22 @@
       },
       "optionalDependencies": {
         "@rollup/rollup-linux-arm64-gnu": "^4.43.0",
+      },
+    },
+    "apps/phononmaser": {
+      "name": "@landale/phononmaser",
+      "version": "0.1.0",
+      "dependencies": {
+        "@landale/shared": "workspace:*",
+        "dotenv": "^16.5.0",
+        "pino": "^8.19.0",
+        "ws": "^8.16.0",
+        "zod": "^3.22.4",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "@types/ws": "^8.5.10",
+        "typescript": "^5.4.0",
       },
     },
     "apps/server": {
@@ -369,8 +369,6 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.25", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ=="],
 
-    "@landale/audio-receiver": ["@landale/audio-receiver@workspace:apps/audio-receiver"],
-
     "@landale/dashboard": ["@landale/dashboard@workspace:apps/dashboard"],
 
     "@landale/database": ["@landale/database@workspace:packages/database"],
@@ -378,6 +376,8 @@
     "@landale/eslint": ["@landale/eslint@workspace:packages/eslint"],
 
     "@landale/overlays": ["@landale/overlays@workspace:apps/overlays"],
+
+    "@landale/phononmaser": ["@landale/phononmaser@workspace:apps/phononmaser"],
 
     "@landale/server": ["@landale/server@workspace:apps/server"],
 
