@@ -11,6 +11,7 @@ Landale is a personal streaming overlay system built with Bun, featuring real-ti
 - **Backend**: tRPC, WebSocket, TCP sockets, Twitch EventSub/API
 - **Database**: PostgreSQL with Prisma v6 (beta)
 - **Development**: TypeScript (strict mode), ESLint, Prettier, Docker Compose
+- **Testing**: Vitest, Testing Library, Coverage reporting
 - **Hosting**: Local Mac Mini with Docker, accessed only via local network
 - **Monitoring**: Health check endpoints, structured logging with Pino
 - **Shared Types**: Monorepo with shared types package
@@ -22,6 +23,10 @@ Landale is a personal streaming overlay system built with Bun, featuring real-ti
 - `bun dev` - Start all workspaces in development mode
 - `bun run cache-emotes` - Cache Twitch emotes
 - `docker compose up` - Run services in Docker
+- `bun test` - Run all tests
+- `bun test:watch` - Run tests in watch mode
+- `bun test:coverage` - Run tests with coverage reporting
+- `bun run dev:audio` - Start audio receiver service
 
 ### Database Package
 
@@ -32,19 +37,22 @@ Landale is a personal streaming overlay system built with Bun, featuring real-ti
 
 ### Overlays Package
 
-- `bun --cwd packages/overlays dev` - Start Vite development server
-- `bun --cwd packages/overlays build` - Build for production
-- `bun --cwd packages/overlays preview` - Preview production build
-- `bun --cwd packages/overlays lint` - Run ESLint
-- `bun --cwd packages/overlays typecheck` - Run TypeScript type checking
+- `bun --cwd apps/overlays dev` - Start Vite development server
+- `bun --cwd apps/overlays build` - Build for production
+- `bun --cwd apps/overlays preview` - Preview production build
+- `bun --cwd apps/overlays lint` - Run ESLint
+- `bun --cwd apps/overlays typecheck` - Run TypeScript type checking
+- `bun --cwd apps/overlays test` - Run tests
 
 ### Server Package
 
-- `bun --cwd packages/server dev` - Start server with hot reload
-- `bun --cwd packages/server build` - Build server for production
-- `bun --cwd packages/server start` - Start production server
-- `bun --cwd packages/server lint` - Run ESLint check
-- `bun --cwd packages/server typecheck` - Run TypeScript type checking
+- `bun --cwd apps/server dev` - Start server with hot reload
+- `bun --cwd apps/server build` - Build server for production
+- `bun --cwd apps/server start` - Start production server
+- `bun --cwd apps/server lint` - Run ESLint check
+- `bun --cwd apps/server typecheck` - Run TypeScript type checking
+- `bun --cwd apps/server test` - Run tests
+- `bunx vitest run` - Run tests with Vitest (from app directory)
 
 ## Code Style
 
@@ -85,6 +93,16 @@ Landale is a personal streaming overlay system built with Bun, featuring real-ti
   - **TCP Socket Server**: IronMON game data ingestion (port 8080)
   - **Twitch Integration**: EventSub webhooks and API client
   - **Health Check**: HTTP endpoint at `/health` for monitoring
+
+### Audio Receiver Package
+
+- **Purpose**: Receive audio from OBS for AI transcription
+- **WebSocket Server**: Port 8889 for raw PCM audio streaming
+- **Features**:
+  - Accepts binary PCM audio (16-bit, 48kHz)
+  - Buffers audio in 3-second windows
+  - Emits events for transcription processing
+  - Health check endpoint on port 8890
 - **Event System**:
   - Built on Emittery for type-safe event handling
   - Domain-based event organization (Twitch, IronMON)
@@ -142,6 +160,25 @@ Landale is a personal streaming overlay system built with Bun, featuring real-ti
 - **Security Model**: Relies on local network security, not exposed to internet
 - **Git Ignored Files**: `twitch-token.json` and other sensitive files are properly gitignored
 
+## Testing
+
+- **Test Framework**: Vitest with Testing Library
+- **Test Structure**: Tests in `__tests__` directories mirroring source structure
+- **Coverage**: Run `bun test:coverage` to generate coverage reports
+- **Mocking**: Use `vi.mock()` for external dependencies
+- **Path Aliases**: Each app has its own `vitest.config.ts` with proper alias resolution
+
+## Recent Improvements (June 2025)
+
+- **Code Review**: Completed comprehensive senior developer review
+- **Type Safety**: Removed all `any` types, enabled strict TypeScript
+- **Performance**: Optimized for 60fps streaming (reduced emote count, added throttling)
+- **Security**: Secured API keys, removed hardcoded credentials
+- **Docker**: Optimized with multi-stage builds and layer caching
+- **Testing**: Set up Vitest with example tests for all app types
+
 ## Project Memories
 
 - Please remember that this overlay is used within an Open Broadcaster System (OBS) context.
+- When running lint/typecheck commands, check for the correct app paths (apps/* not packages/*)
+- Use `bunx vitest` instead of `bun test` when running from app directories due to mock support
