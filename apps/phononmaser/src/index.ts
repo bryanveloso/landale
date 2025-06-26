@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket as WSWebSocket } from 'ws'
 import { logger } from './logger'
 import { AudioProcessor } from './audio-processor'
 import { eventEmitter } from './events'
+import { LMStudioService } from './lm-studio-service'
 import { z } from 'zod'
 
 // Message schemas
@@ -25,11 +26,12 @@ const ControlMessageSchema = z.object({
 })
 
 // Environment configuration
-const PORT = process.env.AUDIO_RECEIVER_PORT ? parseInt(process.env.AUDIO_RECEIVER_PORT) : 8889
+const PORT = process.env.PHONONMASER_PORT ? parseInt(process.env.PHONONMASER_PORT) : 8889
 
-export class AudioReceiver {
+export class Phononmaser {
   private wss: WebSocketServer
   private processor: AudioProcessor
+  private lmStudioService?: LMStudioService
   private clients = new Set<WSWebSocket>()
   private headerLogged = false
   private packetCounter = 0
@@ -38,7 +40,29 @@ export class AudioReceiver {
     this.processor = new AudioProcessor()
     this.wss = new WebSocketServer({ port: PORT })
     this.setupWebSocket()
-    logger.info(`Audio receiver started on port ${PORT}`)
+    this.initializeLMStudio()
+    logger.info(`Phononmaser started on port ${PORT}`)
+  }
+
+  private initializeLMStudio() {
+    try {
+      // Check if LM Studio is configured
+      const lmStudioUrl = process.env.LM_STUDIO_API_URL
+      const lmStudioModel = process.env.LM_STUDIO_MODEL
+      
+      if (lmStudioUrl) {
+        this.lmStudioService = new LMStudioService({
+          apiUrl: lmStudioUrl,
+          model: lmStudioModel || 'local-model'
+        })
+        
+        logger.info('LM Studio integration enabled')
+      } else {
+        logger.info('LM Studio not configured, AI analysis disabled')
+      }
+    } catch (error) {
+      logger.error('Failed to initialize LM Studio:', error)
+    }
   }
 
   private setupWebSocket() {
@@ -215,10 +239,19 @@ export class AudioReceiver {
       }
     }
   }
+
+  public async stop() {
+    logger.info('Stopping phononmaser...')
+    this.processor.stop()
+    if (this.lmStudioService) {
+      await this.lmStudioService.stop()
+    }
+    this.wss.close()
+  }
 }
 
 // Start the service
-const receiver = new AudioReceiver()
+const receiver = new Phononmaser()
 
 // Health check endpoint
 const healthServer = Bun.serve({
@@ -226,7 +259,7 @@ const healthServer = Bun.serve({
   fetch(request) {
     return new Response(JSON.stringify({
       status: 'healthy',
-      service: 'audio-receiver',
+      service: 'phononmaser',
       timestamp: Date.now()
     }), {
       headers: { 'Content-Type': 'application/json' }
@@ -237,8 +270,9 @@ const healthServer = Bun.serve({
 logger.info(`Health check available at http://localhost:${PORT + 1}`)
 
 // Graceful shutdown
-process.on('SIGINT', () => {
-  logger.info('Shutting down audio receiver...')
+process.on('SIGINT', async () => {
+  logger.info('Shutting down phononmaser...')
+  await receiver.stop()
   healthServer.stop()
   process.exit(0)
 })

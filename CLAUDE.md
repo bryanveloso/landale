@@ -26,7 +26,7 @@ Landale is a personal streaming overlay system built with Bun, featuring real-ti
 - `bun test` - Run all tests
 - `bun test:watch` - Run tests in watch mode
 - `bun test:coverage` - Run tests with coverage reporting
-- `bun run dev:audio` - Start audio receiver service
+- `bun run dev:phononmaser` - Start phononmaser service
 
 ### Database Package
 
@@ -94,7 +94,7 @@ Landale is a personal streaming overlay system built with Bun, featuring real-ti
   - **Twitch Integration**: EventSub webhooks and API client
   - **Health Check**: HTTP endpoint at `/health` for monitoring
 
-### Audio Receiver Package
+### Phononmaser Package
 
 - **Purpose**: Receive audio from OBS for AI transcription
 - **WebSocket Server**: Port 8889 for raw PCM audio streaming
