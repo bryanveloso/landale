@@ -8,29 +8,18 @@ export const createEventName = <T extends keyof ExtendedEvents>(event: T): T => 
 
 // Event categories for filtering
 export const EventCategories = {
-  audio: [
-    'audio:started',
-    'audio:stopped',
-    'audio:chunk',
-    'audio:buffer_ready',
-    'audio:transcription'
-  ] as const,
-  
-  lmStudio: [
-    'lm:analysis_started',
-    'lm:analysis_completed',
-    'lm:pattern_detected',
-    'lm:error'
-  ] as const
+  audio: ['audio:started', 'audio:stopped', 'audio:chunk', 'audio:buffer_ready', 'audio:transcription'] as const,
+
+  lmStudio: ['lm:analysis_started', 'lm:analysis_completed', 'lm:pattern_detected', 'lm:error'] as const
 } as const
 
 // Type-safe event subscription helper
 export function subscribeToCategory<K extends keyof typeof EventCategories>(
   category: K,
-  callback: (event: typeof EventCategories[K][number], data: unknown) => void
+  callback: (event: (typeof EventCategories)[K][number], data: unknown) => void
 ) {
   const events = EventCategories[category]
-  events.forEach(event => {
+  events.forEach((event) => {
     eventEmitter.on(event as any, (data: unknown) => {
       callback(event, data)
     })

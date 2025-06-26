@@ -134,6 +134,7 @@ Landale is a personal streaming overlay system built with Bun, featuring real-ti
 ## Environment Variables
 
 ### Required
+
 - `DATABASE_URL`: PostgreSQL connection string
 - `TWITCH_CLIENT_ID`: Twitch application client ID
 - `TWITCH_CLIENT_SECRET`: Twitch application client secret
@@ -141,6 +142,7 @@ Landale is a personal streaming overlay system built with Bun, featuring real-ti
 - `TWITCH_USER_ID`: Twitch user ID for channel subscriptions
 
 ### Optional
+
 - `NODE_ENV`: Environment (development/production)
 - `LOG_LEVEL`: Logging level (error/warn/info/debug)
 - `STRUCTURED_LOGGING`: Enable JSON logging (true/false)
@@ -180,5 +182,5 @@ Landale is a personal streaming overlay system built with Bun, featuring real-ti
 ## Project Memories
 
 - Please remember that this overlay is used within an Open Broadcaster System (OBS) context.
-- When running lint/typecheck commands, check for the correct app paths (apps/* not packages/*)
+- When running lint/typecheck commands, check for the correct app paths (apps/_ not packages/_)
 - Use `bunx vitest` instead of `bun test` when running from app directories due to mock support

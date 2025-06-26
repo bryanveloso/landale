@@ -26,14 +26,17 @@ export class WhisperService {
       threads: 4,
       ...options
     }
-    
+
     logger.info('Whisper service initialized', {
       model: this.options.model,
       language: this.options.language
     })
   }
 
-  async transcribe(audioBuffer: Buffer, format: { sampleRate: number; channels: number; bitDepth: number }): Promise<string> {
+  async transcribe(
+    audioBuffer: Buffer,
+    format: { sampleRate: number; channels: number; bitDepth: number }
+  ): Promise<string> {
     if (this.isProcessing) {
       logger.warn('Whisper is already processing, skipping this buffer')
       return ''
@@ -68,7 +71,11 @@ export class WhisperService {
     }
   }
 
-  private async saveAsWav(buffer: Buffer, format: { sampleRate: number; channels: number; bitDepth: number }, filepath: string) {
+  private async saveAsWav(
+    buffer: Buffer,
+    format: { sampleRate: number; channels: number; bitDepth: number },
+    filepath: string
+  ) {
     // Create WAV header
     const dataSize = buffer.length
     const header = Buffer.alloc(44)
@@ -101,14 +108,18 @@ export class WhisperService {
     return new Promise((resolve, reject) => {
       const vadModelPath = process.env.WHISPER_VAD_MODEL_PATH
       const args = [
-        '-m', this.modelPath,
-        '-f', audioFile,
-        '-t', this.options.threads!.toString(),
-        '-l', this.options.language!,
+        '-m',
+        this.modelPath,
+        '-f',
+        audioFile,
+        '-t',
+        this.options.threads!.toString(),
+        '-l',
+        this.options.language!,
         '--no-timestamps',
         '-otxt'
       ]
-      
+
       // Add VAD if model is available
       if (vadModelPath) {
         args.push('--vad', '--vad-model', vadModelPath)
@@ -132,15 +143,15 @@ export class WhisperService {
         if (error) {
           logger.debug('Whisper stderr:', error.substring(0, 500))
         }
-        
+
         if (code === 0) {
           // Extract the transcription from output
           const lines = output.split('\n')
           const transcription = lines
-            .filter(line => !line.startsWith('[') && line.trim() !== '')
+            .filter((line) => !line.startsWith('[') && line.trim() !== '')
             .join(' ')
             .trim()
-          
+
           logger.debug(`Whisper output: "${output.substring(0, 200)}"`)
           resolve(transcription)
         } else {

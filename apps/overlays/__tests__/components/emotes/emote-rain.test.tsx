@@ -7,7 +7,7 @@ import { emoteQueue } from '@/lib/emote-queue'
 vi.mock('matter-js', () => ({
   default: {
     Engine: {
-      create: vi.fn(() => ({ 
+      create: vi.fn(() => ({
         world: { bodies: [] },
         timing: { timestamp: 0 }
       })),
@@ -34,12 +34,12 @@ vi.mock('matter-js', () => ({
       clear: vi.fn()
     },
     Bodies: {
-      rectangle: vi.fn((x, y, w, h, opts) => ({ 
+      rectangle: vi.fn((x, y, w, h, opts) => ({
         id: Math.random(),
         position: { x, y },
         ...opts
       })),
-      circle: vi.fn((x, y, r, opts) => ({ 
+      circle: vi.fn((x, y, r, opts) => ({
         id: Math.random(),
         position: { x, y },
         ...opts
@@ -85,18 +85,18 @@ describe('EmoteRain', () => {
 
   it('should subscribe to emote queue on mount', () => {
     render(<EmoteRain />)
-    
+
     // Check that we subscribed to the emote queue
     expect(emoteQueue.on).toHaveBeenCalledWith('emote', expect.any(Function))
   })
 
   it('should handle window resize with throttling', async () => {
     const { container } = render(<EmoteRain />)
-    
+
     // Trigger multiple resize events rapidly
     for (let i = 0; i < 10; i++) {
       window.dispatchEvent(new Event('resize'))
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
     }
 
     // Should not crash and canvas should still exist
@@ -106,13 +106,13 @@ describe('EmoteRain', () => {
 
   it('should clean up resources on unmount', () => {
     const { unmount } = render(<EmoteRain />)
-    
+
     // Get the handler that was registered
     const handler = vi.mocked(emoteQueue.on).mock.calls[0][1]
-    
+
     // Unmount
     unmount()
-    
+
     // Should unsubscribe with the same handler
     expect(emoteQueue.off).toHaveBeenCalledWith('emote', handler)
   })
@@ -120,7 +120,7 @@ describe('EmoteRain', () => {
   it('should apply correct styles to container', () => {
     const { container } = render(<EmoteRain />)
     const wrapper = container.firstChild as HTMLElement
-    
+
     expect(wrapper.className).toContain('fixed')
     expect(wrapper.className).toContain('inset-0')
     expect(wrapper.className).toContain('pointer-events-none')

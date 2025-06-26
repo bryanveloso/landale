@@ -45,6 +45,7 @@ LM_STUDIO_SYSTEM_PROMPT="You are an AI assistant monitoring a live stream..."
 ### Emitted Events
 
 - **`lm:analysis_started`**: Analysis began
+
   ```typescript
   {
     timestamp: number
@@ -53,6 +54,7 @@ LM_STUDIO_SYSTEM_PROMPT="You are an AI assistant monitoring a live stream..."
   ```
 
 - **`lm:analysis_completed`**: Analysis finished
+
   ```typescript
   {
     timestamp: number
@@ -63,6 +65,7 @@ LM_STUDIO_SYSTEM_PROMPT="You are an AI assistant monitoring a live stream..."
   ```
 
 - **`lm:pattern_detected`**: Specific pattern identified
+
   ```typescript
   {
     timestamp: number
@@ -138,24 +141,30 @@ const duration = lmStudioService.getContextDuration()
 ## Features
 
 ### Automatic Analysis
+
 - Runs every 30 seconds when transcriptions are available
 - Minimum 10-second cooldown between analyses
 
 ### Immediate Triggers
+
 Certain keywords trigger immediate analysis:
+
 - Error/bug mentions
 - Help requests
 - Excitement indicators
 - Multiple punctuation marks
 
 ### Pattern Detection
+
 Built-in patterns:
+
 - Technical Discussion
 - Viewer Interaction
 - Emotional Moment
 - Game Event
 
 ### Context Management
+
 - Time-based window (default: 5 minutes)
 - Count-based limit (default: 10 transcriptions)
 - Automatic cleanup of old entries

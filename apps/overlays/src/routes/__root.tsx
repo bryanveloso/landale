@@ -22,14 +22,14 @@ const RootDocument: FC<PropsWithChildren> = ({ children }) => {
 
 function RootComponent() {
   const obsInfo = useOBS()
-  
+
   return (
     <RootDocument>
       <Outlet />
-      
+
       {/* Development indicator - only shows in browser */}
       {!obsInfo.isOBS && (
-        <div className="fixed bottom-4 right-4 bg-yellow-500 text-black px-2 py-1 rounded text-xs font-bold z-[10001]">
+        <div className="fixed right-4 bottom-4 z-[10001] rounded bg-yellow-500 px-2 py-1 text-xs font-bold text-black">
           DEV MODE
         </div>
       )}

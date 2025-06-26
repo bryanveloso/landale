@@ -45,9 +45,7 @@ describe('useSubscription', () => {
 
     ;(trpcClient.health.check.subscribe as any) = mockSubscribe
 
-    const { result } = renderHook(() => 
-      useSubscription('health.check', undefined)
-    )
+    const { result } = renderHook(() => useSubscription('health.check', undefined))
 
     expect(result.current.isConnected).toBe(false)
     expect(result.current.data).toBeNull()
@@ -56,7 +54,7 @@ describe('useSubscription', () => {
     act(() => {
       vi.advanceTimersByTime(20)
     })
-    
+
     expect(result.current.data).toEqual(mockData)
     expect(result.current.isConnected).toBe(true)
   })
@@ -71,7 +69,7 @@ describe('useSubscription', () => {
 
     ;(trpcClient.health.check.subscribe as any) = mockSubscribe
 
-    const { result } = renderHook(() => 
+    const { result } = renderHook(() =>
       useSubscription('health.check', undefined, {
         maxRetries: 0 // Disable retries for simplicity
       })
@@ -95,9 +93,7 @@ describe('useSubscription', () => {
     const mockSubscribe = vi.fn(() => ({ unsubscribe: mockUnsubscribe }))
     ;(trpcClient.health.check.subscribe as any) = mockSubscribe
 
-    const { unmount } = renderHook(() => 
-      useSubscription('health.check', undefined)
-    )
+    const { unmount } = renderHook(() => useSubscription('health.check', undefined))
 
     expect(mockSubscribe).toHaveBeenCalledTimes(1)
 
@@ -114,16 +110,15 @@ describe('useSubscription', () => {
 
     ;(trpcClient.twitch.onMessage.subscribe as any) = mockSubscribe
 
-    const { result, rerender } = renderHook(
-      ({ channel }) => useSubscription('twitch.onMessage', { channel }),
-      { initialProps: { channel: 'channel1' } }
-    )
+    const { result, rerender } = renderHook(({ channel }) => useSubscription('twitch.onMessage', { channel }), {
+      initialProps: { channel: 'channel1' }
+    })
 
     // Advance timers to deliver the data
     act(() => {
       vi.advanceTimersByTime(20)
     })
-    
+
     expect(result.current.data).toEqual({ input: { channel: 'channel1' } })
 
     // Change input
@@ -133,12 +128,12 @@ describe('useSubscription', () => {
     expect(mockUnsubscribe).toHaveBeenCalled()
     // Check that we have more than initial call (React strict mode may cause extra calls)
     expect(mockSubscribe.mock.calls.length).toBeGreaterThan(1)
-    
+
     // Advance timers for new data
     act(() => {
       vi.advanceTimersByTime(20)
     })
-    
+
     expect(result.current.data).toEqual({ input: { channel: 'channel2' } })
   })
 
@@ -150,10 +145,12 @@ describe('useSubscription', () => {
 
     ;(trpcClient.health.check.subscribe as any) = mockSubscribe
 
-    const { result } = renderHook(() => useSubscription('health.check', undefined, {
-      initialRetryDelay: 1000,
-      maxRetries: 3
-    }))
+    const { result } = renderHook(() =>
+      useSubscription('health.check', undefined, {
+        initialRetryDelay: 1000,
+        maxRetries: 3
+      })
+    )
 
     // Initial subscription
     expect(mockSubscribe).toHaveBeenCalledTimes(1)

@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import { WebSocketServer, WebSocket as WSWebSocket } from 'ws'
 import { logger } from './logger'
 import { AudioProcessor } from './audio-processor'
@@ -49,13 +48,13 @@ export class Phononmaser {
       // Check if LM Studio is configured
       const lmStudioUrl = process.env.LM_STUDIO_API_URL
       const lmStudioModel = process.env.LM_STUDIO_MODEL
-      
+
       if (lmStudioUrl) {
         this.lmStudioService = new LMStudioService({
           apiUrl: lmStudioUrl,
           model: lmStudioModel || 'local-model'
         })
-        
+
         logger.info('LM Studio integration enabled')
       } else {
         logger.info('LM Studio not configured, AI analysis disabled')
@@ -79,51 +78,61 @@ export class Phononmaser {
               logger.error('Binary message too small for header:', data.length)
               return
             }
-            
+
             // Parse OBS plugin binary format
             let offset = 0
-            
+
             // Parse header (28 bytes)
-            const timestamp = data.readBigUInt64LE(offset); offset += 8
-            const sampleRate = data.readUInt32LE(offset); offset += 4
-            const channels = data.readUInt32LE(offset); offset += 4
-            const bitDepth = data.readUInt32LE(offset); offset += 4
-            const sourceIdLen = data.readUInt32LE(offset); offset += 4
-            const sourceNameLen = data.readUInt32LE(offset); offset += 4
-            
+            const timestamp = data.readBigUInt64LE(offset)
+            offset += 8
+            const sampleRate = data.readUInt32LE(offset)
+            offset += 4
+            const channels = data.readUInt32LE(offset)
+            offset += 4
+            const bitDepth = data.readUInt32LE(offset)
+            offset += 4
+            const sourceIdLen = data.readUInt32LE(offset)
+            offset += 4
+            const sourceNameLen = data.readUInt32LE(offset)
+            offset += 4
+
             // Only log header once per connection
             if (!this.headerLogged) {
-              logger.debug(`Header: timestamp=${timestamp}, rate=${sampleRate}, ch=${channels}, sourceIdLen=${sourceIdLen}, sourceNameLen=${sourceNameLen}`)
+              logger.debug(
+                `Header: timestamp=${timestamp}, rate=${sampleRate}, ch=${channels}, sourceIdLen=${sourceIdLen}, sourceNameLen=${sourceNameLen}`
+              )
               this.headerLogged = true
             }
-            
+
             // Parse strings
             const sourceId = data.toString('utf8', offset, offset + sourceIdLen)
             offset += sourceIdLen
             const sourceName = data.toString('utf8', offset, offset + sourceNameLen)
             offset += sourceNameLen
-            
+
             // Extract audio data (rest of buffer)
             const audioData = data.subarray(offset)
-            
+
             // Log every 100th packet to reduce spam
             if (!this.packetCounter) this.packetCounter = 0
             if (this.packetCounter++ % 100 === 0) {
-              logger.debug(`Audio packet: ${sampleRate}Hz, ${channels}ch, ${bitDepth}bit, ${audioData.length} bytes from ${sourceName}`)
+              logger.debug(
+                `Audio packet: ${sampleRate}Hz, ${channels}ch, ${bitDepth}bit, ${audioData.length} bytes from ${sourceName}`
+              )
             }
-            
+
             // Validate header values
             if (sampleRate > 192000 || channels > 8 || bitDepth > 32) {
               logger.error('Invalid header values, skipping packet')
               return
             }
-            
+
             // Auto-start processor if not running
             if (!this.processor.isReceiving()) {
               logger.info('Auto-starting audio processor')
               this.processor.start()
             }
-            
+
             // Process the audio chunk
             await this.processor.processChunk({
               timestamp: Number(timestamp) / 1000, // Convert nanoseconds to microseconds
@@ -135,7 +144,7 @@ export class Phononmaser {
               data: audioData,
               sourceId
             })
-            
+
             // Emit event for monitoring
             eventEmitter.emit('audio:chunk', {
               timestamp: Number(timestamp) / 1000,
@@ -143,13 +152,13 @@ export class Phononmaser {
               sourceName,
               size: audioData.length
             })
-            
+
             return
           }
-          
+
           // Parse JSON message
           const message = JSON.parse(data.toString())
-          
+
           if (message.type === 'audio_data') {
             await this.handleAudioData(message)
           } else if (['start', 'stop', 'heartbeat'].includes(message.type)) {
@@ -182,7 +191,7 @@ export class Phononmaser {
   private async handleAudioData(message: z.infer<typeof AudioDataMessageSchema>) {
     // Decode base64 data
     const audioBuffer = Buffer.from(message.data, 'base64')
-    
+
     // Process audio chunk
     await this.processor.processChunk({
       timestamp: message.timestamp,
@@ -207,13 +216,13 @@ export class Phononmaser {
         this.processor.start()
         eventEmitter.emit('audio:started')
         break
-      
+
       case 'stop':
         logger.info('Audio streaming stopped')
         this.processor.stop()
         eventEmitter.emit('audio:stopped')
         break
-      
+
       case 'heartbeat':
         // Keep connection alive
         break
@@ -228,7 +237,7 @@ export class Phononmaser {
       bufferSize: this.processor.getBufferSize(),
       transcribing: this.processor.isTranscribing()
     }
-    
+
     ws.send(JSON.stringify(status))
   }
 
@@ -257,13 +266,16 @@ const receiver = new Phononmaser()
 const healthServer = Bun.serve({
   port: PORT + 1,
   fetch(_request) {
-    return new Response(JSON.stringify({
-      status: 'healthy',
-      service: 'phononmaser',
-      timestamp: Date.now()
-    }), {
-      headers: { 'Content-Type': 'application/json' }
-    })
+    return new Response(
+      JSON.stringify({
+        status: 'healthy',
+        service: 'phononmaser',
+        timestamp: Date.now()
+      }),
+      {
+        headers: { 'Content-Type': 'application/json' }
+      }
+    )
   }
 })
 

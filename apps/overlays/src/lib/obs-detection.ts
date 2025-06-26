@@ -17,20 +17,20 @@ export interface OBSInfo {
  */
 export function detectOBS(): OBSInfo {
   const userAgent = navigator.userAgent
-  
+
   // OBS Studio pattern: "... OBS/version ..."
   const obsMatch = userAgent.match(/OBS\/(\S+)/)
-  
+
   if (obsMatch) {
     // Extract Chrome/CEF version if available
     const chromeMatch = userAgent.match(/Chrome\/(\S+)/)
-    
+
     // Extract platform
     let platform: string | undefined
     if (userAgent.includes('Windows')) platform = 'windows'
     else if (userAgent.includes('Mac')) platform = 'mac'
     else if (userAgent.includes('Linux')) platform = 'linux'
-    
+
     return {
       isOBS: true,
       version: obsMatch[1],
@@ -38,7 +38,7 @@ export function detectOBS(): OBSInfo {
       browserVersion: chromeMatch?.[1]
     }
   }
-  
+
   return { isOBS: false }
 }
 
@@ -47,11 +47,11 @@ export function detectOBS(): OBSInfo {
  */
 export function useOBS(): OBSInfo {
   const [obsInfo, setOBSInfo] = useState<OBSInfo>({ isOBS: false })
-  
+
   useEffect(() => {
     setOBSInfo(detectOBS())
   }, [])
-  
+
   return obsInfo
 }
 
