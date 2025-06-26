@@ -100,16 +100,20 @@ export class WhisperService {
 
   private runWhisper(audioFile: string): Promise<string> {
     return new Promise((resolve, reject) => {
+      const vadModelPath = process.env.WHISPER_VAD_MODEL_PATH
       const args = [
         '-m', this.modelPath,
         '-f', audioFile,
         '-t', this.options.threads!.toString(),
         '-l', this.options.language!,
         '--no-timestamps',
-        '-otxt',
-        '--vad-thold', '0.6',  // Voice activity detection threshold
-        '--no-fallback'         // Don't try slower decoders
+        '-otxt'
       ]
+      
+      // Add VAD if model is available
+      if (vadModelPath) {
+        args.push('--vad', '--vad-model', vadModelPath)
+      }
 
       logger.info(`Spawning whisper: ${this.whisperPath} ${args.join(' ')}`)
 
@@ -126,7 +130,9 @@ export class WhisperService {
       })
 
       whisper.on('close', (code) => {
-        logger.info('Whisper process closed', { code, output: output.substring(0, 100), error: error.substring(0, 200) })
+        if (error) {
+          logger.debug('Whisper stderr:', error.substring(0, 500))
+        }
         
         if (code === 0) {
           // Extract the transcription from output
@@ -136,6 +142,7 @@ export class WhisperService {
             .join(' ')
             .trim()
           
+          logger.debug(`Whisper output: "${output.substring(0, 200)}"`)
           resolve(transcription)
         } else {
           reject(new Error(`Whisper exited with code ${code}: ${error}`))
