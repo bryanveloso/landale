@@ -6,7 +6,7 @@ import { LMStudioService } from './lm-studio-service'
 import { z } from 'zod'
 
 // Message schemas
-const AudioDataMessageSchema = z.object({
+const _AudioDataMessageSchema = z.object({
   type: z.literal('audio_data'),
   timestamp: z.number(),
   format: z.object({
@@ -19,10 +19,13 @@ const AudioDataMessageSchema = z.object({
   sourceName: z.string()
 })
 
-const ControlMessageSchema = z.object({
+const _ControlMessageSchema = z.object({
   type: z.enum(['start', 'stop', 'heartbeat']),
   timestamp: z.number()
 })
+
+type AudioDataMessage = z.infer<typeof _AudioDataMessageSchema>
+type ControlMessage = z.infer<typeof _ControlMessageSchema>
 
 // Environment configuration
 const PORT = process.env.PHONONMASER_PORT ? parseInt(process.env.PHONONMASER_PORT) : 8889
@@ -40,7 +43,7 @@ export class Phononmaser {
     this.wss = new WebSocketServer({ port: PORT })
     this.setupWebSocket()
     this.initializeLMStudio()
-    logger.info(`Phononmaser started on port ${PORT}`)
+    logger.info(`Phononmaser started on port ${PORT.toString()}`)
   }
 
   private initializeLMStudio() {
@@ -69,7 +72,7 @@ export class Phononmaser {
       logger.info('New audio source connected')
       this.clients.add(ws)
 
-      ws.on('message', async (data) => {
+      ws.on('message', (data) => {
         try {
           // Check if it's binary data
           if (data instanceof Buffer) {
@@ -99,7 +102,7 @@ export class Phononmaser {
             // Only log header once per connection
             if (!this.headerLogged) {
               logger.debug(
-                `Header: timestamp=${timestamp}, rate=${sampleRate}, ch=${channels}, sourceIdLen=${sourceIdLen}, sourceNameLen=${sourceNameLen}`
+                `Header: timestamp=${timestamp.toString()}, rate=${sampleRate.toString()}, ch=${channels.toString()}, sourceIdLen=${sourceIdLen.toString()}, sourceNameLen=${sourceNameLen.toString()}`
               )
               this.headerLogged = true
             }
@@ -117,7 +120,7 @@ export class Phononmaser {
             if (!this.packetCounter) this.packetCounter = 0
             if (this.packetCounter++ % 100 === 0) {
               logger.debug(
-                `Audio packet: ${sampleRate}Hz, ${channels}ch, ${bitDepth}bit, ${audioData.length} bytes from ${sourceName}`
+                `Audio packet: ${sampleRate.toString()}Hz, ${channels.toString()}ch, ${bitDepth.toString()}bit, ${audioData.length.toString()} bytes from ${sourceName}`
               )
             }
 
@@ -134,7 +137,7 @@ export class Phononmaser {
             }
 
             // Process the audio chunk
-            await this.processor.processChunk({
+            this.processor.processChunk({
               timestamp: Number(timestamp) / 1000, // Convert nanoseconds to microseconds
               format: {
                 sampleRate,
@@ -157,20 +160,47 @@ export class Phononmaser {
           }
 
           // Parse JSON message
-          const message = JSON.parse(data.toString())
-
-          if (message.type === 'audio_data') {
-            await this.handleAudioData(message)
-          } else if (['start', 'stop', 'heartbeat'].includes(message.type)) {
-            await this.handleControlMessage(message)
-          }
-        } catch (error) {
-          logger.error('Error processing message:', error)
-          logger.error('Message type:', typeof data)
-          logger.error('Message preview:', data.toString().substring(0, 200))
+          let dataStr: string
           if (data instanceof Buffer) {
-            logger.error('Binary data size:', data.length, 'bytes')
+            dataStr = data.toString('utf8')
+          } else if (data instanceof ArrayBuffer) {
+            dataStr = Buffer.from(data).toString('utf8')
+          } else if (typeof data === 'string') {
+            dataStr = data
+          } else {
+            logger.error('Unsupported data type for JSON parsing')
+            return
           }
+          const message = JSON.parse(dataStr) as unknown
+          
+          // Validate message type
+          if (typeof message === 'object' && message !== null && 'type' in message) {
+            const msgType = (message as { type: unknown }).type
+            
+            if (msgType === 'audio_data') {
+              const result = _AudioDataMessageSchema.safeParse(message)
+              if (result.success) {
+                this.handleAudioData(result.data)
+              } else {
+                logger.error('Invalid audio data message:', result.error)
+              }
+            } else if (msgType === 'start' || msgType === 'stop' || msgType === 'heartbeat') {
+              const result = _ControlMessageSchema.safeParse(message)
+              if (result.success) {
+                this.handleControlMessage(result.data)
+              } else {
+                logger.error('Invalid control message:', result.error)
+              }
+            }
+          }
+          } catch (error) {
+            logger.error('Error processing message:', error)
+            logger.error('Message type:', typeof data)
+            const preview = data instanceof Buffer ? data.toString('utf8', 0, Math.min(200, data.length)) : 'Non-buffer data'
+            logger.error('Message preview:', preview)
+            if (data instanceof Buffer) {
+              logger.error('Binary data size:', data.length, 'bytes')
+            }
         }
       })
 
@@ -188,12 +218,12 @@ export class Phononmaser {
     })
   }
 
-  private async handleAudioData(message: z.infer<typeof AudioDataMessageSchema>) {
+  private handleAudioData(message: AudioDataMessage) {
     // Decode base64 data
     const audioBuffer = Buffer.from(message.data, 'base64')
 
     // Process audio chunk
-    await this.processor.processChunk({
+    this.processor.processChunk({
       timestamp: message.timestamp,
       format: message.format,
       data: audioBuffer,
@@ -209,7 +239,7 @@ export class Phononmaser {
     })
   }
 
-  private async handleControlMessage(message: z.infer<typeof ControlMessageSchema>) {
+  private handleControlMessage(message: ControlMessage) {
     switch (message.type) {
       case 'start':
         logger.info('Audio streaming started')
@@ -249,11 +279,11 @@ export class Phononmaser {
     }
   }
 
-  public async stop() {
+  public stop() {
     logger.info('Stopping phononmaser...')
     this.processor.stop()
     if (this.lmStudioService) {
-      await this.lmStudioService.stop()
+      this.lmStudioService.stop()
     }
     this.wss.close()
   }
@@ -279,12 +309,12 @@ const healthServer = Bun.serve({
   }
 })
 
-logger.info(`Health check available at http://localhost:${PORT + 1}`)
+logger.info(`Health check available at http://localhost:${(PORT + 1).toString()}`)
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
+process.on('SIGINT', () => {
   logger.info('Shutting down phononmaser...')
-  await receiver.stop()
-  healthServer.stop()
+  receiver.stop()
+  void healthServer.stop()
   process.exit(0)
 })

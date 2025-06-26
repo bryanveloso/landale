@@ -1,4 +1,5 @@
-import { AudioEvents, LMStudioEvents, eventEmitter } from './events'
+import type { AudioEvents, LMStudioEvents } from './events'
+import { eventEmitter } from './events'
 
 // Extended event interface that includes both audio and LM Studio events
 export interface ExtendedEvents extends AudioEvents, LMStudioEvents {}
@@ -20,7 +21,7 @@ export function subscribeToCategory<K extends keyof typeof EventCategories>(
 ) {
   const events = EventCategories[category]
   events.forEach((event) => {
-    eventEmitter.on(event as any, (data: unknown) => {
+    eventEmitter.on(event as keyof ExtendedEvents, (data: ExtendedEvents[keyof ExtendedEvents]) => {
       callback(event, data)
     })
   })

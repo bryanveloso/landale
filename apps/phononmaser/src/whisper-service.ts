@@ -47,7 +47,7 @@ export class WhisperService {
 
     try {
       // Create temporary WAV file
-      const tempFile = join(tmpdir(), `audio_${Date.now()}.wav`)
+      const tempFile = join(tmpdir(), `audio_${Date.now().toString()}.wav`)
       await this.saveAsWav(audioBuffer, format, tempFile)
 
       // Run whisper.cpp
@@ -57,7 +57,7 @@ export class WhisperService {
       await unlink(tempFile).catch(() => {})
 
       const duration = Date.now() - startTime
-      logger.info(`Transcription completed in ${duration}ms`)
+      logger.info(`Transcription completed in ${duration.toString()}ms`)
 
       return result
     } catch (error) {
@@ -113,9 +113,9 @@ export class WhisperService {
         '-f',
         audioFile,
         '-t',
-        this.options.threads!.toString(),
+        (this.options.threads ?? 4).toString(),
         '-l',
-        this.options.language!,
+        this.options.language ?? 'en',
         '--no-timestamps',
         '-otxt'
       ]
@@ -131,11 +131,11 @@ export class WhisperService {
       let output = ''
       let error = ''
 
-      whisper.stdout.on('data', (data) => {
+      whisper.stdout.on('data', (data: Buffer) => {
         output += data.toString()
       })
 
-      whisper.stderr.on('data', (data) => {
+      whisper.stderr.on('data', (data: Buffer) => {
         error += data.toString()
       })
 
@@ -155,7 +155,7 @@ export class WhisperService {
           logger.debug(`Whisper output: "${output.substring(0, 200)}"`)
           resolve(transcription)
         } else {
-          reject(new Error(`Whisper exited with code ${code}: ${error}`))
+          reject(new Error(`Whisper exited with code ${code?.toString() ?? 'unknown'}: ${error}`))
         }
       })
 
