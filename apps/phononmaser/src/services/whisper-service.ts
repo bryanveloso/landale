@@ -1,5 +1,5 @@
 import { spawn } from 'child_process'
-import { logger } from './logger'
+import { logger } from '@lib/logger'
 import { writeFile, unlink } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'

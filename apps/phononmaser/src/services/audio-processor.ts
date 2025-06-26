@@ -1,6 +1,6 @@
-import { logger } from './logger'
-import { eventEmitter } from './events'
-import { WhisperService } from './whisper-service'
+import { logger } from '@lib/logger'
+import { eventEmitter } from '@events'
+import { WhisperService } from '@services/whisper-service'
 
 interface AudioChunk {
   timestamp: number

@@ -1,8 +1,8 @@
 import { WebSocketServer, WebSocket as WSWebSocket } from 'ws'
-import { logger } from './logger'
-import { AudioProcessor } from './audio-processor'
-import { eventEmitter } from './events'
-import { LMStudioService } from './lm-studio-service'
+import { logger } from '@lib/logger'
+import { AudioProcessor } from '@services/audio-processor'
+import { eventEmitter } from '@events'
+import { LMStudioService } from '@services/lm-studio-service'
 import { z } from 'zod'
 
 // Message schemas
