@@ -227,7 +227,7 @@ Respond with a JSON object in this exact format:
         throw new Error(`LM Studio API error: ${response.status}`)
       }
 
-      const data = await response.json()
+      const data = await response.json() as { choices: Array<{ message: { content: string } }> }
       const content = data.choices[0]?.message?.content
 
       if (!content) {

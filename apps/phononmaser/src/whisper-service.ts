@@ -1,6 +1,5 @@
-import { spawn, ChildProcessWithoutNullStreams } from 'child_process'
+import { spawn } from 'child_process'
 import { logger } from './logger'
-import { eventEmitter } from './events'
 import { writeFile, unlink } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
