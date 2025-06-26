@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events'
 
 export interface AudioEvents {
-  'audio:started': void
-  'audio:stopped': void
+  'audio:started': undefined
+  'audio:stopped': undefined
   'audio:chunk': {
     timestamp: number
     sourceId: string
@@ -67,20 +67,29 @@ export interface LMStudioEvents {
 export type AllEvents = AudioEvents & LMStudioEvents
 
 class TypedEventEmitter extends EventEmitter {
-  emit<K extends keyof AllEvents>(event: K, ...args: AllEvents[K] extends void ? [] : [AllEvents[K]]): boolean {
+  emit<K extends keyof AllEvents>(event: K, ...args: AllEvents[K] extends undefined ? [] : [AllEvents[K]]): boolean {
     return super.emit(event, ...args)
   }
 
-  on<K extends keyof AllEvents>(event: K, listener: (arg: AllEvents[K]) => void): this {
-    return super.on(event, listener)
+  on<K extends keyof AllEvents>(
+    event: K, 
+    listener: AllEvents[K] extends undefined ? () => void : (arg: AllEvents[K]) => void
+  ): this {
+    return super.on(event, listener as (...args: unknown[]) => void)
   }
 
-  once<K extends keyof AllEvents>(event: K, listener: (arg: AllEvents[K]) => void): this {
-    return super.once(event, listener)
+  once<K extends keyof AllEvents>(
+    event: K, 
+    listener: AllEvents[K] extends undefined ? () => void : (arg: AllEvents[K]) => void
+  ): this {
+    return super.once(event, listener as (...args: unknown[]) => void)
   }
 
-  off<K extends keyof AllEvents>(event: K, listener: (arg: AllEvents[K]) => void): this {
-    return super.off(event, listener)
+  off<K extends keyof AllEvents>(
+    event: K, 
+    listener: AllEvents[K] extends undefined ? () => void : (arg: AllEvents[K]) => void
+  ): this {
+    return super.off(event, listener as (...args: unknown[]) => void)
   }
 }
 

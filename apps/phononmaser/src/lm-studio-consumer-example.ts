@@ -49,7 +49,7 @@ export class LMStudioEventForwarder {
     })
   }
 
-  private broadcast(data: any) {
+  private broadcast(data: Record<string, unknown>) {
     const message = JSON.stringify(data)
     for (const client of this.wsClients) {
       if (client.readyState === WebSocket.OPEN) {
@@ -82,9 +82,9 @@ export class LMStudioInsightStorage {
   }
 
   private setupEventListeners() {
-    eventEmitter.on('lm:analysis_completed', async (event) => {
+    eventEmitter.on('lm:analysis_completed', (event) => {
       // Store analysis for historical tracking
-      await this.storeAnalysis({
+      this.storeAnalysis({
         timestamp: event.timestamp,
         sentiment: event.analysis.sentiment,
         patterns: event.analysis.patterns,
@@ -93,18 +93,24 @@ export class LMStudioInsightStorage {
       })
     })
 
-    eventEmitter.on('lm:pattern_detected', async (event) => {
+    eventEmitter.on('lm:pattern_detected', (event) => {
       // Track pattern occurrences
-      await this.incrementPatternCount(event.pattern, event.confidence)
+      this.incrementPatternCount(event.pattern, event.confidence)
     })
   }
 
-  private async storeAnalysis(data: any) {
+  private storeAnalysis(data: {
+    timestamp: number
+    sentiment: 'positive' | 'negative' | 'neutral'
+    patterns: Record<string, number>
+    topics: string[]
+    context: string
+  }) {
     // Database storage logic here
     logger.info('Storing AI analysis', { sentiment: data.sentiment })
   }
 
-  private async incrementPatternCount(pattern: string, confidence: number) {
+  private incrementPatternCount(pattern: string, confidence: number) {
     // Pattern tracking logic here
     logger.info('Pattern detected', { pattern, confidence })
   }

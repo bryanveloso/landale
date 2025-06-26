@@ -40,7 +40,7 @@ export class AudioProcessor {
     this.initializeWhisper()
   }
 
-  private async initializeWhisper() {
+  private initializeWhisper() {
     try {
       // Check if whisper is configured
       const whisperPath = process.env.WHISPER_CPP_PATH
@@ -81,7 +81,7 @@ export class AudioProcessor {
     }
   }
 
-  async processChunk(chunk: AudioChunk) {
+  processChunk(chunk: AudioChunk) {
     if (!this.isRunning) {
       logger.warn('Audio processor not running, dropping chunk')
       return
@@ -122,9 +122,9 @@ export class AudioProcessor {
 
   private startProcessingLoop() {
     // Process buffer at the configured interval
-    this.processTimer = setInterval(async () => {
+    this.processTimer = setInterval(() => {
       if (this.shouldProcessBuffer()) {
-        await this.processBuffer()
+        void this.processBuffer()
       }
     }, this.BUFFER_DURATION_MS)
   }
@@ -170,7 +170,7 @@ export class AudioProcessor {
 
       const durationSeconds = (processingBuffer.endTimestamp - processingBuffer.startTimestamp) / 1000000
       logger.info(
-        `Processing ${durationSeconds.toFixed(1)}s of audio (${format.sampleRate}Hz, ${format.channels}ch, ${format.bitDepth}bit)...`
+        `Processing ${durationSeconds.toFixed(1)}s of audio (${format.sampleRate.toString()}Hz, ${format.channels.toString()}ch, ${format.bitDepth.toString()}bit)...`
       )
 
       // Transcribe if Whisper is available
