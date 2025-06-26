@@ -284,22 +284,23 @@ export const EmoteRain = memo(function EmoteRain() {
   return (
     <>
       <canvas ref={canvasRef} className="pointer-events-none fixed inset-0" style={{ zIndex: 9999 }} />
-      
+
       {/* Debug controls - only show in browser for development */}
       {!isOBS() && (
-        <div className="fixed top-4 right-4 bg-black/80 text-white p-3 rounded text-xs space-y-2 z-[10000]">
+        <div className="fixed top-4 right-4 z-[10000] space-y-2 rounded bg-black/80 p-3 text-xs text-white">
           <div className="font-bold text-yellow-400">Emote Rain Debug</div>
-          <div>Active: {emoteBodiesRef.current.size}/{config.maxEmotes}</div>
+          <div>
+            Active: {emoteBodiesRef.current.size}/{config.maxEmotes}
+          </div>
           <div>Queue: {spawnQueueRef.current.length}</div>
-          <button 
-            className="bg-blue-600 px-2 py-1 rounded hover:bg-blue-700"
+          <button
+            className="rounded bg-blue-600 px-2 py-1 hover:bg-blue-700"
             onClick={() => {
               // Test spawn 5 random emotes
               for (let i = 0; i < 5; i++) {
                 emoteQueue.queueEmote(`test-${Date.now()}-${i}`)
               }
-            }}
-          >
+            }}>
             Spawn Test Emotes
           </button>
         </div>

@@ -27,7 +27,7 @@ export class AudioProcessor {
     endTimestamp: 0,
     totalSize: 0
   }
-  
+
   private isRunning = false
   private transcribing = false
   private readonly BUFFER_DURATION_MS = 1500 // 1.5 seconds for lower latency
@@ -45,19 +45,19 @@ export class AudioProcessor {
       // Check if whisper is configured
       const whisperPath = process.env.WHISPER_CPP_PATH
       const modelPath = process.env.WHISPER_MODEL_PATH
-      
+
       if (!whisperPath || !modelPath) {
         logger.warn('Whisper not configured in environment variables')
         return
       }
-      
+
       this.whisperService = new WhisperService(whisperPath, {
         modelPath,
         model: 'large', // Using large-v3-turbo
         language: 'en',
         threads: 8 // Use more threads on Mac Studio
       })
-      
+
       if (this.whisperService.isAvailable()) {
         logger.info('Whisper transcription service initialized')
       } else {
@@ -111,9 +111,9 @@ export class AudioProcessor {
 
     // Log buffer status at meaningful intervals (every second of audio)
     const duration = this.getBufferDuration()
-    const lastLoggedSecond = Math.floor((this.lastLoggedDuration || 0))
+    const lastLoggedSecond = Math.floor(this.lastLoggedDuration || 0)
     const currentSecond = Math.floor(duration)
-    
+
     if (currentSecond > lastLoggedSecond) {
       logger.info(`Buffer: ${duration.toFixed(1)}s of audio (${(this.buffer.totalSize / 1024 / 1024).toFixed(1)}MB)`)
       this.lastLoggedDuration = duration
@@ -132,7 +132,7 @@ export class AudioProcessor {
   private shouldProcessBuffer(): boolean {
     if (this.buffer.chunks.length === 0) return false
     if (this.transcribing) return false
-    
+
     const duration = this.buffer.endTimestamp - this.buffer.startTimestamp
     return duration >= this.BUFFER_DURATION_MS * 1000 // Convert to microseconds
   }
@@ -142,7 +142,7 @@ export class AudioProcessor {
 
     this.transcribing = true
     const processingBuffer = { ...this.buffer }
-    
+
     // Reset buffer for new chunks
     this.buffer = {
       chunks: [],
@@ -155,9 +155,9 @@ export class AudioProcessor {
     try {
       // Combine all chunks into single PCM buffer
       const pcmData = this.combineChunks(processingBuffer.chunks)
-      
+
       const format = processingBuffer.chunks[0]?.format || { sampleRate: 48000, channels: 2, bitDepth: 16 }
-      
+
       // Emit buffer ready event
       eventEmitter.emit('audio:buffer_ready', {
         startTimestamp: processingBuffer.startTimestamp,
@@ -169,19 +169,21 @@ export class AudioProcessor {
       })
 
       const durationSeconds = (processingBuffer.endTimestamp - processingBuffer.startTimestamp) / 1000000
-      logger.info(`Processing ${durationSeconds.toFixed(1)}s of audio (${format.sampleRate}Hz, ${format.channels}ch, ${format.bitDepth}bit)...`)
+      logger.info(
+        `Processing ${durationSeconds.toFixed(1)}s of audio (${format.sampleRate}Hz, ${format.channels}ch, ${format.bitDepth}bit)...`
+      )
 
       // Transcribe if Whisper is available
       if (this.whisperService) {
         const transcription = await this.whisperService.transcribe(pcmData, format)
-        
+
         if (transcription) {
           eventEmitter.emit('audio:transcription', {
             timestamp: processingBuffer.startTimestamp,
             duration: durationSeconds,
             text: transcription
           })
-          
+
           logger.info(`📝 "${transcription}"`)
         } else {
           logger.debug('No speech detected in buffer')
@@ -197,13 +199,13 @@ export class AudioProcessor {
   private combineChunks(chunks: AudioChunk[]): Buffer {
     const totalSize = chunks.reduce((sum, chunk) => sum + chunk.data.length, 0)
     const combined = Buffer.allocUnsafe(totalSize)
-    
+
     let offset = 0
     for (const chunk of chunks) {
       chunk.data.copy(combined, offset)
       offset += chunk.data.length
     }
-    
+
     return combined
   }
 

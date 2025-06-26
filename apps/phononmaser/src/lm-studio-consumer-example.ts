@@ -30,12 +30,12 @@ export class LMStudioEventForwarder {
           confidence: event.confidence,
           actions: event.suggestedActions
         })
-        
+
         // Example: Trigger emote rain on high excitement
         if (event.pattern === 'excitement' && event.confidence > 0.9) {
           this.triggerEmoteRain('hype')
         }
-        
+
         // Example: Show support message on viewer interaction
         if (event.pattern === 'viewer_interaction') {
           this.showSupportMessage()
@@ -116,10 +116,8 @@ export function integrateWithExistingServices() {
   eventEmitter.on('audio:transcription', (event) => {
     // Could check for game-specific terms here
     const gameTerms = ['pokemon', 'battle', 'catch', 'trainer']
-    const hasGameContext = gameTerms.some(term => 
-      event.text.toLowerCase().includes(term)
-    )
-    
+    const hasGameContext = gameTerms.some((term) => event.text.toLowerCase().includes(term))
+
     if (hasGameContext) {
       logger.info('Game context detected in transcription')
     }

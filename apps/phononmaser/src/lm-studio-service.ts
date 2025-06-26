@@ -46,7 +46,7 @@ export class LMStudioService {
       contextWindowSize: 10,
       contextWindowDuration: 120, // 2 minutes
       analysisInterval: 30, // analyze every 30 seconds
-      triggerKeywords: ['game over', 'let\'s go', 'what\'s that', 'thank you', 'gg', 'nice'],
+      triggerKeywords: ['game over', "let's go", "what's that", 'thank you', 'gg', 'nice'],
       ...config
     }
 
@@ -56,7 +56,7 @@ export class LMStudioService {
   private initialize() {
     // Subscribe to transcription events
     eventEmitter.on('audio:transcription', this.handleTranscription.bind(this))
-    
+
     // Start periodic analysis
     this.analysisTimer = setInterval(() => {
       this.performAnalysis()
@@ -83,14 +83,12 @@ export class LMStudioService {
     }
 
     // Trim context window by time
-    const cutoffTime = Date.now() - (this.config.contextWindowDuration * 1000)
-    this.contextWindow = this.contextWindow.filter(ctx => ctx.timestamp > cutoffTime)
+    const cutoffTime = Date.now() - this.config.contextWindowDuration * 1000
+    this.contextWindow = this.contextWindow.filter((ctx) => ctx.timestamp > cutoffTime)
 
     // Check for trigger keywords
     const lowerText = event.text.toLowerCase()
-    const hasKeyword = this.config.triggerKeywords.some(keyword => 
-      lowerText.includes(keyword.toLowerCase())
-    )
+    const hasKeyword = this.config.triggerKeywords.some((keyword) => lowerText.includes(keyword.toLowerCase()))
 
     if (hasKeyword) {
       logger.info(`Trigger keyword detected in: "${event.text}"`)
@@ -107,7 +105,8 @@ export class LMStudioService {
     // Apply cooldown unless immediate
     if (!immediate) {
       const timeSinceLastAnalysis = Date.now() - this.lastAnalysisTime
-      if (timeSinceLastAnalysis < 10000) { // 10 second cooldown
+      if (timeSinceLastAnalysis < 10000) {
+        // 10 second cooldown
         return
       }
     }
@@ -123,15 +122,13 @@ export class LMStudioService {
       })
 
       // Prepare context for LM Studio
-      const contextText = this.contextWindow
-        .map(ctx => ctx.text)
-        .join(' ')
+      const contextText = this.contextWindow.map((ctx) => ctx.text).join(' ')
 
       const prompt = this.buildAnalysisPrompt(contextText)
-      
+
       // Send to LM Studio
       const result = await this.callLMStudio(prompt)
-      
+
       if (result) {
         // Emit analysis completed event
         eventEmitter.emit('lm:analysis_completed', {
@@ -227,7 +224,7 @@ Respond with a JSON object in this exact format:
         throw new Error(`LM Studio API error: ${response.status}`)
       }
 
-      const data = await response.json() as { choices: Array<{ message: { content: string } }> }
+      const data = (await response.json()) as { choices: Array<{ message: { content: string } }> }
       const content = data.choices[0]?.message?.content
 
       if (!content) {
@@ -236,7 +233,7 @@ Respond with a JSON object in this exact format:
 
       // Parse the JSON response
       const result = JSON.parse(content) as AnalysisResult
-      
+
       // Validate the response structure
       if (!result.patterns || !result.sentiment) {
         throw new Error('Invalid response structure from LM Studio')

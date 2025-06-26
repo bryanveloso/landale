@@ -36,10 +36,10 @@ describe('DisplayManager', () => {
 
     it('should not overwrite when registering duplicate display', () => {
       const schema = z.object({ value: z.number() })
-      
+
       displayManager.register('duplicate', schema, { value: 1 })
       displayManager.register('duplicate', schema, { value: 2 })
-      
+
       // Should keep the first value
       const display = displayManager.get('duplicate')
       expect(display?.data.value).toBe(1)
@@ -125,8 +125,8 @@ describe('DisplayManager', () => {
 
       const displays = displayManager.list()
       expect(displays).toHaveLength(2)
-      expect(displays.map(d => d.id)).toContain('display1')
-      expect(displays.map(d => d.id)).toContain('display2')
+      expect(displays.map((d) => d.id)).toContain('display1')
+      expect(displays.map((d) => d.id)).toContain('display2')
     })
   })
 })
