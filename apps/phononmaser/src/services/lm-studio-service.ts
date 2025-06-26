@@ -1,6 +1,6 @@
-import { logger } from './logger'
-import { eventEmitter } from './events'
-import type { AudioEvents } from './events'
+import { logger } from '@lib/logger'
+import { eventEmitter } from '@events'
+import type { AudioEvents } from '@events'
 
 interface LMStudioConfig {
   apiUrl: string

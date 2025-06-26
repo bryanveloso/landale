@@ -3,7 +3,17 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "types": ["bun-types"]
+    "types": ["bun-types"],
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["./*"],
+      "@events": ["./events"],
+      "@events/*": ["./events/*"],
+      "@lib/*": ["./lib/*"],
+      "@services": ["./services"],
+      "@services/*": ["./services/*"],
+      "@types/*": ["./types/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

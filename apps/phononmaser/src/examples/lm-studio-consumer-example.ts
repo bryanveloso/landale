@@ -1,6 +1,6 @@
 // Example of how to consume LM Studio events in other services
-import { eventEmitter } from './events'
-import { logger } from './logger'
+import { eventEmitter } from '@events'
+import { logger } from '@lib/logger'
 
 // Example: WebSocket service to forward events to overlays
 export class LMStudioEventForwarder {
