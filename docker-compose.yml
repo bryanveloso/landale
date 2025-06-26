@@ -75,6 +75,27 @@ services:
       - server
     command: ['bunx', '--bun', 'vite']
 
+  audio-receiver:
+    build:
+      context: .
+      dockerfile: apps/audio-receiver/Dockerfile
+    restart: unless-stopped
+    working_dir: /app/apps/audio-receiver
+    volumes:
+      - ./apps/audio-receiver/src:/app/apps/audio-receiver/src
+      - ./packages:/app/packages
+      - /app/node_modules
+      - /app/apps/audio-receiver/node_modules
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      AUDIO_RECEIVER_PORT: 8889
+    ports:
+      - '8889:8889'
+      - '8890:8890'
+    depends_on:
+      - server
+    command: ['bun', 'run', 'dev']
+
 volumes:
   postgres_data:
   emotes_cache:

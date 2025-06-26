@@ -15,7 +15,8 @@
     "test:coverage": "turbo run test -- --coverage",
     "dev:server": "cd apps/server && bun dev",
     "dev:overlays": "cd apps/overlays && bun dev",
-    "dev:dashboard": "cd apps/dashboard && bun dev"
+    "dev:dashboard": "cd apps/dashboard && bun dev",
+    "dev:audio": "cd apps/audio-receiver && bun dev"
   },
   "type": "module",
   "workspaces": [
