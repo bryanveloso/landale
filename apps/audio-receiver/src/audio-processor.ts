@@ -1,5 +1,6 @@
 import { logger } from './logger'
 import { eventEmitter } from './events'
+import { WhisperService } from './whisper-service'
 
 interface AudioChunk {
   timestamp: number
@@ -32,6 +33,41 @@ export class AudioProcessor {
   private readonly BUFFER_DURATION_MS = 3000 // 3 seconds of audio
   private readonly MAX_BUFFER_SIZE = 10 * 1024 * 1024 // 10MB max
   private processTimer?: Timer
+  private whisperService?: WhisperService
+  private lastLoggedDuration = 0
+
+  constructor() {
+    this.initializeWhisper()
+  }
+
+  private async initializeWhisper() {
+    try {
+      // Check if whisper is configured
+      const whisperPath = process.env.WHISPER_CPP_PATH
+      const modelPath = process.env.WHISPER_MODEL_PATH
+      
+      if (!whisperPath || !modelPath) {
+        logger.warn('Whisper not configured in environment variables')
+        return
+      }
+      
+      this.whisperService = new WhisperService(whisperPath, {
+        modelPath,
+        model: 'large', // Using large-v3-turbo
+        language: 'en',
+        threads: 8 // Use more threads on Mac Studio
+      })
+      
+      if (this.whisperService.isAvailable()) {
+        logger.info('Whisper transcription service initialized')
+      } else {
+        logger.warn('Whisper binary not found, transcription disabled')
+        this.whisperService = undefined
+      }
+    } catch (error) {
+      logger.error('Failed to initialize Whisper:', error)
+    }
+  }
 
   start() {
     this.isRunning = true
@@ -46,11 +82,15 @@ export class AudioProcessor {
   }
 
   async processChunk(chunk: AudioChunk) {
-    if (!this.isRunning) return
+    if (!this.isRunning) {
+      logger.warn('Audio processor not running, dropping chunk')
+      return
+    }
 
     // Initialize buffer timestamp if empty
     if (this.buffer.chunks.length === 0) {
       this.buffer.startTimestamp = chunk.timestamp
+      logger.info('Starting new audio buffer')
     }
 
     // Add chunk to buffer
@@ -69,9 +109,14 @@ export class AudioProcessor {
       }
     }
 
-    // Only log every 10th chunk to reduce spam
-    if (this.buffer.chunks.length % 10 === 0) {
-      logger.info(`Buffer: ${this.buffer.chunks.length} chunks, ${(this.buffer.totalSize / 1024).toFixed(1)}KB, ${(this.getBufferDuration()).toFixed(1)}s`)
+    // Log buffer status at meaningful intervals (every second of audio)
+    const duration = this.getBufferDuration()
+    const lastLoggedSecond = Math.floor((this.lastLoggedDuration || 0))
+    const currentSecond = Math.floor(duration)
+    
+    if (currentSecond > lastLoggedSecond) {
+      logger.info(`Buffer: ${duration.toFixed(1)}s of audio (${(this.buffer.totalSize / 1024 / 1024).toFixed(1)}MB)`)
+      this.lastLoggedDuration = duration
     }
   }
 
@@ -105,23 +150,43 @@ export class AudioProcessor {
       endTimestamp: 0,
       totalSize: 0
     }
+    this.lastLoggedDuration = 0
 
     try {
       // Combine all chunks into single PCM buffer
       const pcmData = this.combineChunks(processingBuffer.chunks)
       
-      // TODO: Send to Whisper for transcription
-      // For now, emit the raw audio data
+      const format = processingBuffer.chunks[0]?.format || { sampleRate: 48000, channels: 2, bitDepth: 16 }
+      
+      // Emit buffer ready event
       eventEmitter.emit('audio:buffer_ready', {
         startTimestamp: processingBuffer.startTimestamp,
         endTimestamp: processingBuffer.endTimestamp,
         duration: (processingBuffer.endTimestamp - processingBuffer.startTimestamp) / 1000000, // Convert to seconds
-        format: processingBuffer.chunks[0]?.format || { sampleRate: 48000, channels: 2, bitDepth: 16 },
+        format,
         pcmData,
         size: pcmData.length
       })
 
-      logger.info(`Audio buffer ready for transcription: ${pcmData.length} bytes, ${processingBuffer.chunks.length} chunks`)
+      const durationSeconds = (processingBuffer.endTimestamp - processingBuffer.startTimestamp) / 1000000
+      logger.info(`Processing ${durationSeconds.toFixed(1)}s of audio (${format.sampleRate}Hz, ${format.channels}ch, ${format.bitDepth}bit)...`)
+
+      // Transcribe if Whisper is available
+      if (this.whisperService) {
+        const transcription = await this.whisperService.transcribe(pcmData, format)
+        
+        if (transcription) {
+          eventEmitter.emit('audio:transcription', {
+            timestamp: processingBuffer.startTimestamp,
+            duration: durationSeconds,
+            text: transcription
+          })
+          
+          logger.info(`📝 "${transcription}"`)
+        } else {
+          logger.debug('No speech detected in buffer')
+        }
+      }
     } catch (error) {
       logger.error('Error processing audio buffer:', error)
     } finally {
