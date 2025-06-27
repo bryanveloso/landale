@@ -25,9 +25,9 @@ function AlertsOverlay() {
       trpcClient.twitch.onFollow.subscribe(undefined, {
         onData: (data) => {
           const alert: Alert = {
-            id: `follow-${Date.now()}`,
+            id: `follow-${Date.now().toString()}`,
             type: 'follow',
-            message: `${data.userDisplayName} just followed!`,
+            message: `${data.userDisplayName ?? 'Someone'} just followed!`,
             timestamp: Date.now()
           }
           setAlerts((prev) => [...prev, alert])
@@ -37,9 +37,9 @@ function AlertsOverlay() {
       trpcClient.twitch.onSubscription.subscribe(undefined, {
         onData: (data) => {
           const alert: Alert = {
-            id: `sub-${Date.now()}`,
+            id: `sub-${Date.now().toString()}`,
             type: 'subscription',
-            message: `${data.userDisplayName} just subscribed${data.tier ? ` (Tier ${data.tier})` : ''}!`,
+            message: `${data.userDisplayName ?? 'Someone'} just subscribed${data.tier ? ` (Tier ${data.tier})` : ''}!`,
             timestamp: Date.now()
           }
           setAlerts((prev) => [...prev, alert])
@@ -49,11 +49,11 @@ function AlertsOverlay() {
       trpcClient.twitch.onSubscriptionGift.subscribe(undefined, {
         onData: (data) => {
           const alert: Alert = {
-            id: `gift-${Date.now()}`,
+            id: `gift-${Date.now().toString()}`,
             type: 'gift',
             message: data.isAnonymous
-              ? `An anonymous user gifted ${data.amount || 1} sub${(data.amount || 1) > 1 ? 's' : ''}!`
-              : `${data.gifterDisplayName} gifted ${data.amount || 1} sub${(data.amount || 1) > 1 ? 's' : ''}!`,
+              ? `An anonymous user gifted ${(data.amount ?? 1).toString()} sub${(data.amount ?? 1) > 1 ? 's' : ''}!`
+              : `${data.gifterDisplayName ?? 'Someone'} gifted ${(data.amount ?? 1).toString()} sub${(data.amount ?? 1) > 1 ? 's' : ''}!`,
             timestamp: Date.now()
           }
           setAlerts((prev) => [...prev, alert])
@@ -63,9 +63,9 @@ function AlertsOverlay() {
       trpcClient.twitch.onSubscriptionMessage.subscribe(undefined, {
         onData: (data) => {
           const alert: Alert = {
-            id: `resub-${Date.now()}`,
+            id: `resub-${Date.now().toString()}`,
             type: 'resub',
-            message: `${data.userDisplayName} resubscribed for ${data.cumulativeMonths} months!${data.messageText ? ` "${data.messageText}"` : ''}`,
+            message: `${data.userDisplayName ?? 'Someone'} resubscribed for ${(data.cumulativeMonths ?? 0).toString()} months!${data.messageText ? ` "${data.messageText}"` : ''}`,
             timestamp: Date.now()
           }
           setAlerts((prev) => [...prev, alert])
@@ -75,9 +75,9 @@ function AlertsOverlay() {
       trpcClient.twitch.onRedemption.subscribe(undefined, {
         onData: (data) => {
           const alert: Alert = {
-            id: `redemption-${Date.now()}`,
+            id: `redemption-${Date.now().toString()}`,
             type: 'redemption',
-            message: `${data.userDisplayName} redeemed ${data.rewardTitle}${data.input ? `: ${data.input}` : ''}`,
+            message: `${data.userDisplayName ?? 'Someone'} redeemed ${data.rewardTitle ?? 'a reward'}${data.input ? `: ${data.input}` : ''}`,
             timestamp: Date.now()
           }
           setAlerts((prev) => [...prev, alert])

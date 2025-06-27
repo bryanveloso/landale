@@ -31,7 +31,7 @@ export function FollowerCountControl() {
           <div className="h-4 w-full rounded-full bg-gray-700">
             <div
               className="h-4 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500"
-              style={{ width: `${Math.min(percentage, 100)}%` }}
+              style={{ width: `${Math.min(percentage, 100).toString()}%` }}
             />
           </div>
           <p className="mt-2 text-center text-sm text-gray-400">{percentage.toFixed(1)}% complete</p>

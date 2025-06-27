@@ -19,7 +19,7 @@ export const obsKeys = {
 /**
  * Hook to sync WebSocket subscriptions with React Query cache
  */
-function useOBSSubscription<T>(
+function useOBSSubscription(
   key: readonly string[],
   subscribeFn: (onData: (data: T) => void) => { unsubscribe: () => void }
 ) {
@@ -30,8 +30,10 @@ function useOBSSubscription<T>(
       queryClient.setQueryData(key, data)
     })
 
-    return () => subscription.unsubscribe()
-  }, [queryClient, subscribeFn])
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [queryClient, subscribeFn, key])
 }
 
 /**

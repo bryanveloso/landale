@@ -39,7 +39,7 @@ export function StatusText({ className }: StatusTextProps) {
     } else {
       setDisplayText(data.text)
     }
-  }, [data?.text, data?.animation])
+  }, [data?.text, data?.animation, data, displayText])
 
   if (!data || !isVisible || !displayText) {
     return null

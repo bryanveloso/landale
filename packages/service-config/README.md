@@ -8,10 +8,10 @@ Centralized service configuration using Tailscale hostnames.
 import { services } from '@landale/service-config'
 
 // Get a service URL
-const serverUrl = services.getUrl('server')  // http://saya:7175
+const serverUrl = services.getUrl('server') // http://saya:7175
 
 // Get WebSocket URL
-const wsUrl = services.getWebSocketUrl('phononmaser')  // ws://zelan:8889
+const wsUrl = services.getWebSocketUrl('phononmaser') // ws://zelan:8889
 
 // Check if service is reachable
 const isHealthy = await services.healthCheck('server')

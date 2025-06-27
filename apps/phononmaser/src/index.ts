@@ -72,13 +72,18 @@ export class Phononmaser {
     this.wss.on('connection', (ws) => {
       const sessionId = generateCorrelationId()
       const clientLogger = wsLogger.child({ sessionId })
-      
+
       clientLogger.info('New audio source connected')
       this.clients.add(ws)
-      
+
       // Store logger on WebSocket for consistent correlation
-      ;(ws as any).logger = clientLogger
-      ;(ws as any).sessionId = sessionId
+      interface ExtendedWebSocket extends WSWebSocket {
+        logger?: typeof clientLogger
+        sessionId?: string
+      }
+      const extWs = ws as ExtendedWebSocket
+      extWs.logger = clientLogger
+      extWs.sessionId = sessionId
 
       ws.on('message', (data) => {
         try {
@@ -194,11 +199,11 @@ export class Phononmaser {
             return
           }
           const message = JSON.parse(dataStr) as unknown
-          
+
           // Validate message type
           if (typeof message === 'object' && message !== null && 'type' in message) {
             const msgType = (message as { type: unknown }).type
-            
+
             if (msgType === 'audio_data') {
               const result = _AudioDataMessageSchema.safeParse(message)
               if (result.success) {
@@ -215,16 +220,17 @@ export class Phononmaser {
               }
             }
           }
-          } catch (error) {
-            const preview = data instanceof Buffer ? data.toString('utf8', 0, Math.min(200, data.length)) : 'Non-buffer data'
-            clientLogger.error('Error processing message', {
-              error: error as Error,
-              metadata: {
-                messageType: typeof data,
-                preview,
-                size: data instanceof Buffer ? data.length : undefined
-              }
-            })
+        } catch (error) {
+          const preview =
+            data instanceof Buffer ? data.toString('utf8', 0, Math.min(200, data.length)) : 'Non-buffer data'
+          clientLogger.error('Error processing message', {
+            error: error as Error,
+            metadata: {
+              messageType: typeof data,
+              preview,
+              size: data instanceof Buffer ? data.length : undefined
+            }
+          })
         }
       })
 
@@ -234,7 +240,7 @@ export class Phononmaser {
       })
 
       ws.on('error', (error) => {
-        clientLogger.error('WebSocket error', { error: error as Error })
+        clientLogger.error('WebSocket error', { error })
       })
 
       // Send initial status

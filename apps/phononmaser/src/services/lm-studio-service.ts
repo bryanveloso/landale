@@ -65,9 +65,11 @@ export class LMStudioService {
     }, this.config.analysisInterval * 1000)
 
     logger.info('LM Studio service initialized', {
-      apiUrl: this.config.apiUrl,
-      model: this.config.model,
-      analysisInterval: this.config.analysisInterval
+      metadata: {
+        apiUrl: this.config.apiUrl,
+        model: this.config.model,
+        analysisInterval: this.config.analysisInterval
+      }
     })
   }
 
@@ -152,12 +154,14 @@ export class LMStudioService {
         }
 
         logger.info('LM Studio analysis completed', {
-          patterns: result.patterns,
-          sentiment: result.sentiment
+          metadata: {
+            patterns: result.patterns,
+            sentiment: result.sentiment
+          }
         })
       }
     } catch (error) {
-      logger.error('LM Studio analysis error:', error)
+      logger.error('LM Studio analysis error', { error: error as Error })
       eventEmitter.emit('lm:error', {
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: Date.now()
@@ -242,7 +246,7 @@ Respond with a JSON object in this exact format:
 
       return result
     } catch (error) {
-      logger.error('Failed to call LM Studio:', error)
+      logger.error('Failed to call LM Studio', { error: error as Error })
       return null
     }
   }

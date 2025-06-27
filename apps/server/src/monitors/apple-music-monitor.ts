@@ -86,7 +86,7 @@ async function getCurrentTrack(): Promise<TrackInfo | null> {
     }
 
     return {
-      playbackState: parts[0]!,
+      playbackState: parts[0] as string,
       currentSong: {
         title: parts[1] || 'Unknown',
         artist: parts[2] || 'Unknown',
@@ -150,7 +150,7 @@ function connectWebSocket(): void {
 
   ws.on('message', (data: Buffer) => {
     // Handle any messages from server if needed
-    const message = JSON.parse(data.toString())
+    const message = JSON.parse(data.toString()) as { id?: number; method?: string; result?: unknown }
     if (message.id && message.id === 1) {
       // This is the subscription confirmation
       console.log('📡 Subscription confirmed')
@@ -169,7 +169,7 @@ function sendUpdate(data: TrackInfo | { playbackState: string }): void {
     method: 'mutation',
     params: {
       path: 'appleMusic.updateFromHost',
-      input: data || { playbackState: 'stopped' }
+      input: data
     }
   }
 
@@ -203,16 +203,18 @@ function startMonitoring(): void {
   console.log('🎵 Starting Apple Music monitoring...')
 
   // Initial check
-  monitor()
+  void monitor()
 
   // Start monitoring
-  monitorInterval = setInterval(monitor, POLL_INTERVAL)
+  monitorInterval = setInterval(() => {
+    void monitor()
+  }, POLL_INTERVAL)
 }
 
 // Startup
 console.log('🎵 Apple Music Monitor starting...')
 console.log(`Server URL: ${SERVER_URL}`)
-console.log(`Poll interval: ${POLL_INTERVAL}ms`)
+console.log(`Poll interval: ${POLL_INTERVAL.toString()}ms`)
 
 // Connect to WebSocket
 connectWebSocket()

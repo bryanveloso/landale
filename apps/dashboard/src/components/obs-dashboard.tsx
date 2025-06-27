@@ -65,18 +65,22 @@ function SceneControls() {
                 </div>
               ))}
             </>
-          ) : sceneList && sceneList.length > 0 ? (
+          ) : sceneList.length > 0 ? (
             sceneList.map((scene) => (
               <div key={scene.sceneUuid || scene.sceneName} className="flex gap-2">
                 <button
-                  onClick={() => setCurrentScene(scene.sceneName || '')}
+                  onClick={() => {
+                    setCurrentScene(scene.sceneName || '')
+                  }}
                   disabled={isSettingScene}
                   className="flex-1 rounded bg-red-500 px-3 py-2 text-xs text-white hover:bg-red-600 disabled:opacity-50"
                   title="Set as current scene">
                   🔴 {scene.sceneName}
                 </button>
                 <button
-                  onClick={() => setPreviewScene(scene.sceneName || '')}
+                  onClick={() => {
+                    setPreviewScene(scene.sceneName || '')
+                  }}
                   disabled={isSettingScene}
                   className="flex-1 rounded bg-blue-500 px-3 py-2 text-xs text-white hover:bg-blue-600 disabled:opacity-50"
                   title="Set as preview scene">
@@ -121,13 +125,17 @@ function StreamingControls() {
 
       <div className="flex gap-2">
         <button
-          onClick={() => void controls.streaming.startStream()}
+          onClick={() => {
+            controls.streaming.startStream()
+          }}
           disabled={isStreaming}
           className="flex-1 rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:bg-gray-400">
           🔴 Start Stream
         </button>
         <button
-          onClick={() => void controls.streaming.stopStream()}
+          onClick={() => {
+            controls.streaming.stopStream()
+          }}
           disabled={!isStreaming}
           className="flex-1 rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 disabled:bg-gray-400">
           ⏹️ Stop Stream
@@ -163,25 +171,33 @@ function RecordingControls() {
 
       <div className="grid grid-cols-2 gap-2">
         <button
-          onClick={() => void controls.recording.startRecording()}
+          onClick={() => {
+            controls.recording.startRecording()
+          }}
           disabled={isRecording}
           className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:bg-gray-400">
           🔴 Start
         </button>
         <button
-          onClick={() => void controls.recording.stopRecording()}
+          onClick={() => {
+            controls.recording.stopRecording()
+          }}
           disabled={!isRecording}
           className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600 disabled:bg-gray-400">
           ⏹️ Stop
         </button>
         <button
-          onClick={() => void controls.recording.pauseRecording()}
+          onClick={() => {
+            controls.recording.pauseRecording()
+          }}
           disabled={!isRecording || isPaused}
           className="rounded bg-yellow-500 px-4 py-2 text-white hover:bg-yellow-600 disabled:bg-gray-400">
           ⏸️ Pause
         </button>
         <button
-          onClick={() => void controls.recording.resumeRecording()}
+          onClick={() => {
+            controls.recording.resumeRecording()
+          }}
           disabled={!isRecording || !isPaused}
           className="rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600 disabled:bg-gray-400">
           ▶️ Resume
@@ -208,7 +224,9 @@ function StudioModeControls() {
 
       <div className="flex gap-2">
         <button
-          onClick={() => void controls.studioMode.setStudioModeEnabled(!isEnabled)}
+          onClick={() => {
+            controls.studioMode.setStudioModeEnabled(!isEnabled)
+          }}
           className={`flex-1 rounded px-4 py-2 text-white hover:opacity-90 ${
             isEnabled ? 'bg-red-500' : 'bg-blue-500'
           }`}>
@@ -216,7 +234,9 @@ function StudioModeControls() {
         </button>
         {isEnabled && (
           <button
-            onClick={() => void controls.studioMode.triggerTransition()}
+            onClick={() => {
+              controls.studioMode.triggerTransition()
+            }}
             className="flex-1 rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600">
             🔄 Transition
           </button>
@@ -244,13 +264,17 @@ function AdditionalControls() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => void controls.virtualCam.startVirtualCam()}
+              onClick={() => {
+                controls.virtualCam.startVirtualCam()
+              }}
               disabled={isVirtualCamActive}
               className="flex-1 rounded bg-green-500 px-3 py-2 text-sm text-white hover:bg-green-600 disabled:bg-gray-400">
               📹 Start
             </button>
             <button
-              onClick={() => void controls.virtualCam.stopVirtualCam()}
+              onClick={() => {
+                controls.virtualCam.stopVirtualCam()
+              }}
               disabled={!isVirtualCamActive}
               className="flex-1 rounded bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600 disabled:bg-gray-400">
               ⏹️ Stop
@@ -266,19 +290,25 @@ function AdditionalControls() {
           </div>
           <div className="grid grid-cols-3 gap-2">
             <button
-              onClick={() => void controls.replayBuffer.startReplayBuffer()}
+              onClick={() => {
+                controls.replayBuffer.startReplayBuffer()
+              }}
               disabled={isReplayBufferActive}
               className="rounded bg-purple-500 px-3 py-2 text-sm text-white hover:bg-purple-600 disabled:bg-gray-400">
               ⏺️ Start
             </button>
             <button
-              onClick={() => void controls.replayBuffer.stopReplayBuffer()}
+              onClick={() => {
+                controls.replayBuffer.stopReplayBuffer()
+              }}
               disabled={!isReplayBufferActive}
               className="rounded bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600 disabled:bg-gray-400">
               ⏹️ Stop
             </button>
             <button
-              onClick={() => void controls.replayBuffer.saveReplayBuffer()}
+              onClick={() => {
+                controls.replayBuffer.saveReplayBuffer()
+              }}
               disabled={!isReplayBufferActive}
               className="rounded bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600 disabled:bg-gray-400">
               💾 Save

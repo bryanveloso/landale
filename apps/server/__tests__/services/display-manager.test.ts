@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { z } from 'zod'
 import { DisplayManager } from '@/services/display-manager'
-import { eventEmitter } from '@/events'
 
 // Mock the event emitter
+const mockEmit = vi.fn(() => Promise.resolve())
 vi.mock('@/events', () => ({
   eventEmitter: {
-    emit: vi.fn()
+    emit: mockEmit
   }
 }))
 
@@ -30,8 +30,8 @@ describe('DisplayManager', () => {
 
       const display = displayManager.get('testDisplay')
       expect(display).toBeDefined()
-      expect(display.id).toBe('testDisplay')
-      expect(display.data).toEqual(defaultData)
+      expect(display?.id).toBe('testDisplay')
+      expect(display?.data).toEqual(defaultData)
     })
 
     it('should not overwrite when registering duplicate display', () => {
@@ -42,7 +42,7 @@ describe('DisplayManager', () => {
 
       // Should keep the first value
       const display = displayManager.get('duplicate')
-      expect(display?.data.value).toBe(1)
+      expect((display?.data as { value: number }).value).toBe(1)
     })
 
     it('should validate default data against schema', () => {
@@ -70,7 +70,7 @@ describe('DisplayManager', () => {
       const display = displayManager.get('counter')
       expect(display.data.count).toBe(5)
       expect(display.data.label).toBe('Test') // Unchanged
-      expect(eventEmitter.emit).toHaveBeenCalledWith('display:counter:update', display)
+      expect(mockEmit).toHaveBeenCalledWith('display:counter:update', display)
     })
 
     it('should validate updates against schema', () => {

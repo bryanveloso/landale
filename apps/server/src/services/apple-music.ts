@@ -28,7 +28,7 @@ class AppleMusicService {
     isAuthorized: true // Always authorized with AppleScript approach
   }
 
-  async init() {
+  init() {
     log.info('Initializing Apple Music service (host-based)')
     // Don't update display manager here - it's already initialized in index.ts
   }
@@ -47,8 +47,10 @@ class AppleMusicService {
     displayManager.update('appleMusic', this.currentData)
 
     log.debug('Apple Music update from host', {
-      playbackState: data.playbackState,
-      song: data.currentSong?.title
+      metadata: {
+        playbackState: data.playbackState,
+        song: data.currentSong?.title
+      }
     })
   }
 

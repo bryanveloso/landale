@@ -44,16 +44,25 @@ function validateEnv() {
   if (!parsed.success) {
     const errors = parsed.error.format()
     const errorDetails: Record<string, string[]> = {}
-    
+
     Object.entries(errors).forEach(([key, value]) => {
-      if (key !== '_errors' && value && '_errors' in value) {
-        errorDetails[key] = value._errors
+      if (key === '_errors') return
+
+      if (
+        value && // eslint-disable-line @typescript-eslint/no-unnecessary-condition
+        typeof value === 'object' &&
+        '_errors' in value
+      ) {
+        const errorValue = value as Record<string, unknown>
+        if (Array.isArray(errorValue._errors)) {
+          errorDetails[key] = errorValue._errors as string[]
+        }
       }
     })
-    
-    log.error('Environment validation failed', { 
-      errors: errorDetails,
-      message: 'Please check your .env file or environment configuration'
+
+    log.error('Environment validation failed', {
+      error: new Error('Please check your .env file or environment configuration'),
+      metadata: { errors: errorDetails }
     })
     process.exit(1)
   }

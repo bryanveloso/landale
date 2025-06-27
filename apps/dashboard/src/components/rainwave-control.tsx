@@ -14,7 +14,7 @@ export function RainwaveControl() {
   const { data, display, isConnected, update, setVisibility } = useDisplay<RainwaveNowPlaying>('rainwave')
 
   const handleToggle = () => {
-    update({ isEnabled: !data?.isEnabled })
+    void update({ isEnabled: !data?.isEnabled })
   }
 
   return (
@@ -69,7 +69,7 @@ export function RainwaveControl() {
           <div className="rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-gray-100">
             {data?.stationName || STATIONS.find((s) => s.id === data?.stationId)?.name || 'Not listening'}
           </div>
-          <p className="mt-1 text-xs text-gray-500">Automatically detects which station you're listening to</p>
+          <p className="mt-1 text-xs text-gray-500">Automatically detects which station you&apos;re listening to</p>
         </div>
 
         {/* Current song info */}
@@ -86,7 +86,7 @@ export function RainwaveControl() {
         <div className="rounded-md bg-gray-700/30 p-3 text-xs text-gray-400">
           <p>API Key: {data?.apiKey ? '••••••••' + data.apiKey.slice(-2) : 'Not configured'}</p>
           <p>User ID: {data?.userId || 'Not configured'}</p>
-          <p className="mt-1 text-gray-500">Widget only appears when you're actively listening</p>
+          <p className="mt-1 text-gray-500">Widget only appears when you&apos;re actively listening</p>
         </div>
       </div>
     </div>

@@ -14,9 +14,8 @@ const IronmonContext = createContext<IronmonContextValue>({
 
 export const useIronmon = () => {
   const context = useContext(IronmonContext)
-  if (!context) {
-    throw new Error('useIronmon must be used within IronmonProvider')
-  }
+  // Context is always defined since we provide a default value
+  // No need to check for it
   return context
 }
 

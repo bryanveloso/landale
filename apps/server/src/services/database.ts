@@ -56,11 +56,11 @@ export class DatabaseService {
           }
         })
 
-        log.debug('Recorded checkpoint clear', { seedId, checkpointId })
+        log.debug('Recorded checkpoint clear', { metadata: { seedId, checkpointId } })
         return result
       })
     } catch (error) {
-      log.error('Failed to record checkpoint clear', { error })
+      log.error('Failed to record checkpoint clear', { error: error as Error })
       throw error
     }
   }
@@ -117,7 +117,7 @@ export class DatabaseService {
       skipDuplicates: true
     })
 
-    log.debug('Batch upserted seeds', { count: result.count })
+    log.debug('Batch upserted seeds', { metadata: { count: result.count } })
     return result
   }
 

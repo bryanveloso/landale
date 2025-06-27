@@ -4,7 +4,7 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 
 interface SpriteConfig {
   name: string
@@ -43,14 +43,14 @@ const FlyingObject = ({ config, speed, delay, startPosition, onComplete }: Flyin
     if (Array.isArray(config.src)) {
       // Individual frame files
       return {
-        backgroundImage: `url(${config.src[currentFrame]})`,
+        backgroundImage: `url(${config.src[currentFrame] ?? ''})`,
         backgroundPosition: '0px 0px'
       }
     } else {
       // Sprite sheet
       return {
         backgroundImage: `url(${config.src})`,
-        backgroundPosition: `${-currentFrame * config.frameWidth}px 0px`
+        backgroundPosition: `${(-currentFrame * config.frameWidth).toString()}px 0px`
       }
     }
   }
@@ -66,7 +66,7 @@ const FlyingObject = ({ config, speed, delay, startPosition, onComplete }: Flyin
       y: startPosition.y + 1600,
       transition: {
         duration: speed,
-        ease: 'linear', // Matches CSS linear animation
+        ease: 'linear' as const, // Matches CSS linear animation
         delay
       }
     }
@@ -108,56 +108,59 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Original positioning system - reverse "L" shaped batches
-  const positionClasses = [
-    // Batch 1 (-10% to -20%)
-    // Top edge, from right to left
-    { right: -2, top: -17 },
-    { right: 10, top: -19 },
-    { right: 20, top: -18 },
-    { right: 30, top: -20 },
-    { right: 40, top: -21 },
-    { right: 50, top: -18 },
-    { right: 60, top: -20 },
-    // Right side, from top to bottom
-    { right: -17, top: 10 },
-    { right: -19, top: 20 },
-    { right: -21, top: 30 },
-    { right: -23, top: 50 },
-    { right: -25, top: 70 },
+  const positionClasses = useMemo(
+    () => [
+      // Batch 1 (-10% to -20%)
+      // Top edge, from right to left
+      { right: -2, top: -17 },
+      { right: 10, top: -19 },
+      { right: 20, top: -18 },
+      { right: 30, top: -20 },
+      { right: 40, top: -21 },
+      { right: 50, top: -18 },
+      { right: 60, top: -20 },
+      // Right side, from top to bottom
+      { right: -17, top: 10 },
+      { right: -19, top: 20 },
+      { right: -21, top: 30 },
+      { right: -23, top: 50 },
+      { right: -25, top: 70 },
 
-    // Batch 2 (-20% to -40%)
-    // Top edge, from right to left
-    { right: 0, top: -26 },
-    { right: 10, top: -20 },
-    { right: 20, top: -36 },
-    { right: 30, top: -24 },
-    { right: 40, top: -33 },
-    { right: 60, top: -40 },
-    // Right side, from top to bottom
-    { right: -26, top: 10 },
-    { right: -36, top: 30 },
-    { right: -29, top: 50 },
+      // Batch 2 (-20% to -40%)
+      // Top edge, from right to left
+      { right: 0, top: -26 },
+      { right: 10, top: -20 },
+      { right: 20, top: -36 },
+      { right: 30, top: -24 },
+      { right: 40, top: -33 },
+      { right: 60, top: -40 },
+      // Right side, from top to bottom
+      { right: -26, top: 10 },
+      { right: -36, top: 30 },
+      { right: -29, top: 50 },
 
-    // Batch 3 (-40% to -60%)
-    // Top edge, from right to left
-    { right: 0, top: -46 },
-    { right: 10, top: -56 },
-    { right: 20, top: -49 },
-    { right: 30, top: -60 },
-    // Right side, from top to bottom
-    { right: -46, top: 10 },
-    { right: -56, top: 20 },
-    { right: -49, top: 30 }
-  ]
+      // Batch 3 (-40% to -60%)
+      // Top edge, from right to left
+      { right: 0, top: -46 },
+      { right: 10, top: -56 },
+      { right: 20, top: -49 },
+      { right: 30, top: -60 },
+      // Right side, from top to bottom
+      { right: -46, top: 10 },
+      { right: -56, top: 20 },
+      { right: -49, top: 30 }
+    ],
+    []
+  )
 
   const currentPositionIndex = useRef(0)
 
   // Get next position from the predefined list (cycles through)
-  const generateStartPosition = () => {
+  const generateStartPosition = useCallback(() => {
     if (!containerRef.current) return { x: 0, y: 0 }
 
     const container = containerRef.current
-    const pos = positionClasses[currentPositionIndex.current] || positionClasses[0]!
+    const pos = positionClasses[currentPositionIndex.current] ?? positionClasses[0] ?? { right: 0, top: 0 }
     currentPositionIndex.current = (currentPositionIndex.current + 1) % positionClasses.length
 
     // Convert percentage-based positions to pixels
@@ -166,17 +169,18 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
     const y = (container.clientHeight * pos.top) / 100
 
     return { x, y }
-  }
+  }, [positionClasses])
 
   // Spawn objects with exact original timing
   useEffect(() => {
     const spawnObject = () => {
-      const config = sprites[Math.floor(Math.random() * sprites.length)] || sprites[0]!
-      const speed = config.speeds[Math.floor(Math.random() * config.speeds.length)] || config.speeds[0]!
-      const delay = config.delays[Math.floor(Math.random() * config.delays.length)] || config.delays[0]!
+      const config = sprites[Math.floor(Math.random() * sprites.length)] ?? sprites[0]
+      if (!config) return
+      const speed = config.speeds[Math.floor(Math.random() * config.speeds.length)] ?? config.speeds[0] ?? 14.14
+      const delay = config.delays[Math.floor(Math.random() * config.delays.length)] ?? config.delays[0] ?? 0
 
       const newObject = {
-        id: `${Date.now()}-${Math.random()}`,
+        id: `${Date.now().toString()}-${Math.random().toString()}`,
         config,
         speed,
         delay,
@@ -197,19 +201,20 @@ const FlyingToasters = ({ sprites, density = 20 }: FlyingToastersProps) => {
     return () => {
       clearInterval(interval)
     }
-  }, [sprites, density])
+  }, [sprites, density, generateStartPosition])
 
   const handleObjectComplete = (id: string) => {
     setObjects((prev) => prev.filter((obj) => obj.id !== id))
 
     // Spawn replacement
     setTimeout(() => {
-      const config = sprites[Math.floor(Math.random() * sprites.length)] || sprites[0]!
-      const speed = config.speeds[Math.floor(Math.random() * config.speeds.length)] || config.speeds[0]!
-      const delay = config.delays[Math.floor(Math.random() * config.delays.length)] || config.delays[0]!
+      const config = sprites[Math.floor(Math.random() * sprites.length)] ?? sprites[0]
+      if (!config) return
+      const speed = config.speeds[Math.floor(Math.random() * config.speeds.length)] ?? config.speeds[0] ?? 14.14
+      const delay = config.delays[Math.floor(Math.random() * config.delays.length)] ?? config.delays[0] ?? 0
 
       const newObject = {
-        id: `${Date.now()}-${Math.random()}`,
+        id: `${Date.now().toString()}-${Math.random().toString()}`,
         config,
         speed,
         delay,

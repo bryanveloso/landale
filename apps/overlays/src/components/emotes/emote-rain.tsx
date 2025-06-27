@@ -54,6 +54,9 @@ export const EmoteRain = memo(function EmoteRain() {
     canvas.width = width
     canvas.height = height
 
+    // Capture the ref value to use in cleanup
+    const emoteBodiesMap = emoteBodiesRef.current
+
     // Create Matter.js engine
     const engine = Matter.Engine.create({
       gravity: { x: 0, y: config.gravity }
@@ -147,11 +150,10 @@ export const EmoteRain = memo(function EmoteRain() {
       Matter.Engine.clear(engine)
 
       // Ensure all bodies are removed
-      const emoteBodies = emoteBodiesRef.current
-      emoteBodies.forEach((emoteBody) => {
+      emoteBodiesMap.forEach((emoteBody) => {
         Matter.Composite.remove(engine.world, emoteBody.body)
       })
-      emoteBodies.clear()
+      emoteBodiesMap.clear()
     }
   }, [config.gravity])
 
@@ -228,7 +230,7 @@ export const EmoteRain = memo(function EmoteRain() {
 
     // Track the emote
     const emoteBody: EmoteBody = {
-      id: `${emoteId}-${String(Date.now())}-${String(Math.random())}`,
+      id: `${emoteId}-${Date.now().toString()}-${Math.random().toString()}`,
       emoteId,
       body,
       createdAt: Date.now()
@@ -298,7 +300,7 @@ export const EmoteRain = memo(function EmoteRain() {
             onClick={() => {
               // Test spawn 5 random emotes
               for (let i = 0; i < 5; i++) {
-                emoteQueue.queueEmote(`test-${Date.now()}-${i}`)
+                emoteQueue.queueEmote(`test-${Date.now().toString()}-${i.toString()}`)
               }
             }}>
             Spawn Test Emotes

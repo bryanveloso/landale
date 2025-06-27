@@ -37,14 +37,14 @@ export async function* createEventSubscription<T>(
     }
 
     // Process events
-    while (true) {
-      if (opts.signal?.aborted) break
-
+    while (!opts.signal?.aborted) {
       if (queue.length > 0) {
-        yield queue.shift()!
+        yield queue.shift() as T
       } else {
         yield await new Promise<T>((resolve) => {
-          resolveNext = (result) => resolve(result.value)
+          resolveNext = (result: IteratorResult<T>) => {
+            resolve(result.value as T)
+          }
         })
       }
     }
@@ -54,7 +54,9 @@ export async function* createEventSubscription<T>(
     }
     throw error
   } finally {
-    unsubscribers.forEach((fn) => fn())
+    unsubscribers.forEach((fn) => {
+      fn()
+    })
   }
 }
 
@@ -67,9 +69,7 @@ export async function* createPollingSubscription<T>(
   }
 ): AsyncGenerator<T, void, unknown> {
   try {
-    while (true) {
-      if (opts.signal?.aborted) break
-
+    while (!opts.signal?.aborted) {
       const data = await config.getData()
       yield data
 

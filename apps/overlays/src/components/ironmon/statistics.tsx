@@ -13,7 +13,11 @@ export const Statistics: FC = memo(() => {
 
     // Subscribe to updates
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      if (event?.query?.queryKey?.[0] === 'ironmon' && event?.query?.queryKey?.[1] === 'checkpoint') {
+      if (
+        event.query.queryKey &&
+        (event.query.queryKey as string[])[0] === 'ironmon' &&
+        (event.query.queryKey as string[])[1] === 'checkpoint'
+      ) {
         setCheckpointData(queryClient.getQueryData(['ironmon', 'checkpoint']))
       }
     })

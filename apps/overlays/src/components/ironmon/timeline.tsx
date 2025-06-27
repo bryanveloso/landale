@@ -15,7 +15,11 @@ export const Timeline: FC<{ totalCheckpoints?: number }> = ({ totalCheckpoints =
 
     // Subscribe to updates
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      if (event?.query?.queryKey?.[0] === 'ironmon' && event?.query?.queryKey?.[1] === 'checkpoint') {
+      if (
+        event.query.queryKey &&
+        (event.query.queryKey as string[])[0] === 'ironmon' &&
+        (event.query.queryKey as string[])[1] === 'checkpoint'
+      ) {
         setCheckpointData(queryClient.getQueryData(['ironmon', 'checkpoint']))
       }
     })
@@ -30,8 +34,8 @@ export const Timeline: FC<{ totalCheckpoints?: number }> = ({ totalCheckpoints =
   useEffect(() => {
     if (!checkpointData) return
 
-    console.log(checkpointData?.id, checkpointData?.name)
-    setCurrentCheckpoint(checkpointData?.id || 1)
+    console.log(checkpointData.id, checkpointData.name)
+    setCurrentCheckpoint(checkpointData.id || 1)
   }, [checkpointData])
 
   return (

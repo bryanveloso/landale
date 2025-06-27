@@ -15,7 +15,11 @@ export const Seed: FC = memo(() => {
 
     // Subscribe to updates
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      if (event?.query?.queryKey?.[0] === 'ironmon' && event?.query?.queryKey?.[1] === 'seed') {
+      if (
+        event.query.queryKey &&
+        (event.query.queryKey as string[])[0] === 'ironmon' &&
+        (event.query.queryKey as string[])[1] === 'seed'
+      ) {
         setSeedData(queryClient.getQueryData(['ironmon', 'seed']))
       }
     })

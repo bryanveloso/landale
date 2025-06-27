@@ -1,42 +1,27 @@
 import pino from 'pino'
-import { 
-  LoggerConfig, 
-  LogContext, 
-  LogLevel,
+import {
+  type Logger,
+  type LoggerConfig,
+  type LogContext,
+  type LogLevel,
   getLoggerConfig,
-  serializeError,
-  measurePerformance
+  serializeError
 } from './config'
 
 export * from './config'
 
 // Custom log method types
 type LogMethod = (message: string, context?: LogContext) => void
-type ChildLoggerOptions = { 
+type ChildLoggerOptions = {
   module?: string
   correlationId?: string
-  [key: string]: unknown 
-}
-
-export interface Logger {
-  fatal: LogMethod
-  error: LogMethod
-  warn: LogMethod
-  info: LogMethod
-  debug: LogMethod
-  trace: LogMethod
-  child: (options: ChildLoggerOptions) => Logger
-  
-  // Helper methods
-  time: (label: string) => () => void
-  measure: <T>(label: string, fn: () => T) => T
-  measureAsync: <T>(label: string, fn: () => Promise<T>) => Promise<T>
+  [key: string]: unknown
 }
 
 // Create base Pino logger with configuration
 function createPinoLogger(config: LoggerConfig): pino.Logger {
-  const redactPaths = config.redact.map(field => `*.${field}`)
-  
+  const redactPaths = config.redact.map((field) => `*.${field}`)
+
   const pinoConfig: pino.LoggerOptions = {
     level: config.level,
     base: {
@@ -64,7 +49,7 @@ function createPinoLogger(config: LoggerConfig): pino.Logger {
       censor: '[REDACTED]'
     }
   }
-  
+
   // Add pretty printing in development
   if (config.pretty) {
     return pino({
@@ -81,24 +66,24 @@ function createPinoLogger(config: LoggerConfig): pino.Logger {
       }
     })
   }
-  
+
   return pino(pinoConfig)
 }
 
 // Wrap Pino logger with our interface
 function wrapLogger(pinoLogger: pino.Logger, config: LoggerConfig): Logger {
   const timers = new Map<string, number>()
-  
+
   // Sample rate check
   const shouldLog = () => Math.random() <= config.sampleRate
-  
+
   // Create log method
   const createLogMethod = (level: LogLevel): LogMethod => {
     return (message: string, context?: LogContext) => {
       if (!shouldLog()) return
-      
+
       const logData: Record<string, unknown> = {}
-      
+
       if (context) {
         // Add standard fields
         if (context.correlationId) logData.correlationId = context.correlationId
@@ -108,27 +93,27 @@ function wrapLogger(pinoLogger: pino.Logger, config: LoggerConfig): Logger {
         if (context.operation) logData.operation = context.operation
         if (context.duration !== undefined) logData.duration = context.duration
         if (context.status) logData.status = context.status
-        
+
         // Add error with proper serialization
         if (context.error) {
           logData.error = context.error
         }
-        
+
         // Add performance metrics
         if (context.performance) {
           logData.performance = context.performance
         }
-        
+
         // Add custom metadata
         if (context.metadata) {
           Object.assign(logData, context.metadata)
         }
       }
-      
+
       pinoLogger[level](logData, message)
     }
   }
-  
+
   return {
     fatal: createLogMethod('fatal'),
     error: createLogMethod('error'),
@@ -136,23 +121,23 @@ function wrapLogger(pinoLogger: pino.Logger, config: LoggerConfig): Logger {
     info: createLogMethod('info'),
     debug: createLogMethod('debug'),
     trace: createLogMethod('trace'),
-    
+
     child: (options: ChildLoggerOptions) => {
       const childPino = pinoLogger.child(options)
       return wrapLogger(childPino, config)
     },
-    
+
     time: (label: string) => {
       const start = Date.now()
       timers.set(label, start)
-      
+
       return () => {
         const duration = Date.now() - start
         timers.delete(label)
         pinoLogger.debug({ operation: label, duration }, `Operation completed: ${label}`)
       }
     },
-    
+
     measure: <T>(label: string, fn: () => T): T => {
       const start = Date.now()
       try {
@@ -162,16 +147,19 @@ function wrapLogger(pinoLogger: pino.Logger, config: LoggerConfig): Logger {
         return result
       } catch (error) {
         const duration = Date.now() - start
-        pinoLogger.error({ 
-          operation: label, 
-          duration, 
-          status: 'failure',
-          error: serializeError(error)
-        }, `Operation failed: ${label}`)
+        pinoLogger.error(
+          {
+            operation: label,
+            duration,
+            status: 'failure',
+            error: serializeError(error)
+          },
+          `Operation failed: ${label}`
+        )
         throw error
       }
     },
-    
+
     measureAsync: async <T>(label: string, fn: () => Promise<T>): Promise<T> => {
       const start = Date.now()
       try {
@@ -181,12 +169,15 @@ function wrapLogger(pinoLogger: pino.Logger, config: LoggerConfig): Logger {
         return result
       } catch (error) {
         const duration = Date.now() - start
-        pinoLogger.error({ 
-          operation: label, 
-          duration, 
-          status: 'failure',
-          error: serializeError(error)
-        }, `Operation failed: ${label}`)
+        pinoLogger.error(
+          {
+            operation: label,
+            duration,
+            status: 'failure',
+            error: serializeError(error)
+          },
+          `Operation failed: ${label}`
+        )
         throw error
       }
     }
@@ -202,7 +193,7 @@ export function createLogger(config: Partial<LoggerConfig> & { service: string }
 
 // Correlation ID generator
 export function generateCorrelationId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  return `${Date.now().toString()}-${Math.random().toString(36).substring(2, 11)}`
 }
 
 // Request context helper

@@ -9,16 +9,16 @@ const log = logger.child({ module: 'ironmon' })
 
 const tcpServer = new IronmonTCPServer()
 
-export async function initialize() {
+export function initialize() {
   try {
-    await tcpServer.start()
+    tcpServer.start()
     return tcpServer
   } catch (error) {
-    log.error('Error initializing IronMON TCP Server', { error })
+    log.error('Error initializing IronMON TCP Server', { error: error as Error })
     throw error
   }
 }
 
-export async function shutdown() {
-  await tcpServer.stop()
+export function shutdown() {
+  tcpServer.stop()
 }

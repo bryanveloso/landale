@@ -4,7 +4,7 @@ import { createPollingSubscription } from '@/lib/subscription'
 export const healthRouter = router({
   check: publicProcedure.subscription(async function* (opts) {
     yield* createPollingSubscription(opts, {
-      getData: async () => ({
+      getData: () => ({
         status: 'ok',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),

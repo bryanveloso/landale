@@ -49,7 +49,9 @@ export function StatusTextControls() {
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-100">Show Status Text</span>
           <button
-            onClick={() => setVisibility(!isVisible)}
+            onClick={() => {
+              void setVisibility(!isVisible)
+            }}
             className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
               isVisible ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
             }`}>
@@ -64,7 +66,9 @@ export function StatusTextControls() {
             {presetMessages.map((preset) => (
               <button
                 key={preset.label}
-                onClick={() => handleSetText(preset.text)}
+                onClick={() => {
+                  void handleSetText(preset.text)
+                }}
                 className="rounded-lg bg-gray-700 px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-600">
                 {preset.label}
               </button>
@@ -82,7 +86,9 @@ export function StatusTextControls() {
               id="custom-text"
               type="text"
               value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
+              onChange={(e) => {
+                setCustomText(e.target.value)
+              }}
               placeholder="Enter custom status text..."
               className="flex-1 rounded-lg bg-gray-700 px-4 py-2 text-sm text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />

@@ -16,7 +16,7 @@ export const twitchRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in Twitch message subscription', { error })
+      log.error('Error in Twitch message subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream Twitch messages',
@@ -36,7 +36,7 @@ export const twitchRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in Twitch follow subscription', { error })
+      log.error('Error in Twitch follow subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream Twitch follows',
@@ -54,7 +54,7 @@ export const twitchRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in Twitch subscription subscription', { error })
+      log.error('Error in Twitch subscription subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream Twitch subscriptions',
@@ -72,7 +72,7 @@ export const twitchRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in Twitch gift subscription subscription', { error })
+      log.error('Error in Twitch gift subscription subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream Twitch gift subscriptions',
@@ -90,7 +90,7 @@ export const twitchRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in Twitch resub subscription', { error })
+      log.error('Error in Twitch resub subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream Twitch resubs',
@@ -108,7 +108,7 @@ export const twitchRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in Twitch redemption subscription', { error })
+      log.error('Error in Twitch redemption subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream Twitch redemptions',
@@ -126,7 +126,7 @@ export const twitchRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in Twitch stream online subscription', { error })
+      log.error('Error in Twitch stream online subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream Twitch online events',
@@ -144,7 +144,7 @@ export const twitchRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in Twitch stream offline subscription', { error })
+      log.error('Error in Twitch stream offline subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream Twitch offline events',

@@ -27,8 +27,8 @@ const logger = createLogger({
 })
 
 // Basic logging
-logger.info('Server started', { 
-  metadata: { port: 3000 } 
+logger.info('Server started', {
+  metadata: { port: 3000 }
 })
 
 // Error logging with automatic serialization
@@ -84,6 +84,7 @@ logger.error('WebSocket connection failed', {
 ### Log Levels
 
 From highest to lowest priority:
+
 - `fatal` - System is unusable
 - `error` - Error conditions
 - `warn` - Warning conditions
@@ -94,6 +95,7 @@ From highest to lowest priority:
 ### Standard Fields
 
 Every log entry includes:
+
 - `timestamp` - ISO 8601 timestamp
 - `level` - Log level
 - `service` - Service name
@@ -123,15 +125,17 @@ Every log entry includes:
 ```typescript
 export const loggingMiddleware = middleware(async ({ ctx, next, path }) => {
   const correlationId = generateCorrelationId()
-  const logger = ctx.logger.child({ 
+  const logger = ctx.logger.child({
     correlationId,
-    procedure: path 
+    procedure: path
   })
-  
-  const result = await logger.measureAsync(path, () => next({ 
-    ctx: { ...ctx, logger, correlationId } 
-  }))
-  
+
+  const result = await logger.measureAsync(path, () =>
+    next({
+      ctx: { ...ctx, logger, correlationId }
+    })
+  )
+
   return result
 })
 ```
@@ -142,13 +146,13 @@ export const loggingMiddleware = middleware(async ({ ctx, next, path }) => {
 wss.on('connection', (ws) => {
   const sessionId = generateCorrelationId()
   const wsLogger = logger.child({ sessionId, module: 'websocket' })
-  
+
   wsLogger.info('Client connected')
-  
+
   ws.on('error', (error) => {
     wsLogger.error('WebSocket error', { error })
   })
-  
+
   ws.on('close', () => {
     wsLogger.info('Client disconnected')
   })

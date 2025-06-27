@@ -15,7 +15,7 @@ export function DebugPanel() {
       <div className="font-bold text-yellow-400">Debug Panel (Browser Only)</div>
 
       <div className="space-y-1">
-        <div>Environment: {obsInfo.isOBS ? 'OBS' : 'Browser'}</div>
+        <div>Environment: Browser</div>
         <div>OBS Version: {obsInfo.version || 'N/A'}</div>
         <div>Platform: {obsInfo.platform || 'Unknown'}</div>
         <div>Connected: {isConnected ? 'Yes' : 'No'}</div>

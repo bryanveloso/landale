@@ -62,7 +62,9 @@ export function EmoteRainControl() {
     }
   }
 
-  const { execute: clearEmotes } = useSubscriptionAction<void, { success: boolean }>('control.config.emoteRain.clear')
+  const { execute: clearEmotes } = useSubscriptionAction<undefined, { success: boolean }>(
+    'control.config.emoteRain.clear'
+  )
 
   const handleClear = async () => {
     try {
@@ -123,7 +125,9 @@ export function EmoteRainControl() {
             max="224"
             step="28"
             value={localConfig.size}
-            onChange={(e) => handleChange('size', Number(e.target.value))}
+            onChange={(e) => {
+              handleChange('size', Number(e.target.value))
+            }}
             className="w-full"
           />
           <div className="mt-1 text-sm text-gray-400">{localConfig.size}px</div>
@@ -137,7 +141,9 @@ export function EmoteRainControl() {
             max="60000"
             step="1000"
             value={localConfig.lifetime}
-            onChange={(e) => handleChange('lifetime', Number(e.target.value))}
+            onChange={(e) => {
+              handleChange('lifetime', Number(e.target.value))
+            }}
             className="w-full"
           />
           <div className="mt-1 text-sm text-gray-400">{(localConfig.lifetime / 1000).toFixed(0)}s</div>
@@ -151,7 +157,9 @@ export function EmoteRainControl() {
             max="3"
             step="0.1"
             value={localConfig.gravity}
-            onChange={(e) => handleChange('gravity', Number(e.target.value))}
+            onChange={(e) => {
+              handleChange('gravity', Number(e.target.value))
+            }}
             className="w-full"
           />
           <div className="mt-1 text-sm text-gray-400">{localConfig.gravity.toFixed(1)}</div>
@@ -165,7 +173,9 @@ export function EmoteRainControl() {
             max="1"
             step="0.1"
             value={localConfig.restitution}
-            onChange={(e) => handleChange('restitution', Number(e.target.value))}
+            onChange={(e) => {
+              handleChange('restitution', Number(e.target.value))
+            }}
             className="w-full"
           />
           <div className="mt-1 text-sm text-gray-400">{localConfig.restitution.toFixed(1)}</div>
@@ -179,7 +189,9 @@ export function EmoteRainControl() {
             max="500"
             step="10"
             value={localConfig.maxEmotes}
-            onChange={(e) => handleChange('maxEmotes', Number(e.target.value))}
+            onChange={(e) => {
+              handleChange('maxEmotes', Number(e.target.value))
+            }}
             className="w-full"
           />
           <div className="mt-1 text-sm text-gray-400">{localConfig.maxEmotes}</div>
@@ -193,7 +205,9 @@ export function EmoteRainControl() {
             max="1000"
             step="50"
             value={localConfig.spawnDelay}
-            onChange={(e) => handleChange('spawnDelay', Number(e.target.value))}
+            onChange={(e) => {
+              handleChange('spawnDelay', Number(e.target.value))
+            }}
             className="w-full"
           />
           <div className="mt-1 text-sm text-gray-400">{localConfig.spawnDelay}ms</div>

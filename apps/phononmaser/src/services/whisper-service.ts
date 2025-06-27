@@ -28,8 +28,10 @@ export class WhisperService {
     }
 
     logger.info('Whisper service initialized', {
-      model: this.options.model,
-      language: this.options.language
+      metadata: {
+        model: this.options.model,
+        language: this.options.language
+      }
     })
   }
 
@@ -138,7 +140,7 @@ export class WhisperService {
 
       whisper.on('close', (code) => {
         if (error) {
-          logger.debug('Whisper stderr:', error.substring(0, 500))
+          logger.debug('Whisper stderr', { metadata: { stderr: error.substring(0, 500) } })
         }
 
         if (code === 0) {
@@ -157,7 +159,7 @@ export class WhisperService {
       })
 
       whisper.on('error', (err) => {
-        logger.error('Whisper spawn error', { error: err as Error })
+        logger.error('Whisper spawn error', { error: err })
         reject(err)
       })
     })

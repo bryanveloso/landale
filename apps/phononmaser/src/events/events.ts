@@ -67,26 +67,29 @@ export interface LMStudioEvents {
 export type AllEvents = AudioEvents & LMStudioEvents
 
 class TypedEventEmitter extends EventEmitter {
-  emit<K extends keyof AllEvents>(event: K, ...args: AllEvents[K] extends undefined ? [] : [AllEvents[K]]): boolean {
+  override emit<K extends keyof AllEvents>(
+    event: K,
+    ...args: AllEvents[K] extends undefined ? [] : [AllEvents[K]]
+  ): boolean {
     return super.emit(event, ...args)
   }
 
-  on<K extends keyof AllEvents>(
-    event: K, 
+  override on<K extends keyof AllEvents>(
+    event: K,
     listener: AllEvents[K] extends undefined ? () => void : (arg: AllEvents[K]) => void
   ): this {
     return super.on(event, listener as (...args: unknown[]) => void)
   }
 
-  once<K extends keyof AllEvents>(
-    event: K, 
+  override once<K extends keyof AllEvents>(
+    event: K,
     listener: AllEvents[K] extends undefined ? () => void : (arg: AllEvents[K]) => void
   ): this {
     return super.once(event, listener as (...args: unknown[]) => void)
   }
 
-  off<K extends keyof AllEvents>(
-    event: K, 
+  override off<K extends keyof AllEvents>(
+    event: K,
     listener: AllEvents[K] extends undefined ? () => void : (arg: AllEvents[K]) => void
   ): this {
     return super.off(event, listener as (...args: unknown[]) => void)
