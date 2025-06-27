@@ -1,7 +1,7 @@
-import react from '@landale/eslint/react'
+import { reactConfig } from '../../eslint.config.mjs'
 
 export default [
-  ...react,
+  ...reactConfig,
   {
     languageOptions: {
       parserOptions: {
