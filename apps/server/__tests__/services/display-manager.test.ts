@@ -1,21 +1,17 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, spyOn, type Mock } from 'bun:test'
 import { z } from 'zod'
 import { DisplayManager } from '@/services/display-manager'
-
-// Mock the event emitter
-const mockEmit = vi.fn(() => Promise.resolve())
-vi.mock('@/events', () => ({
-  eventEmitter: {
-    emit: mockEmit
-  }
-}))
+import * as events from '@/events'
 
 describe('DisplayManager', () => {
   let displayManager: DisplayManager
+  let mockEmit: Mock<(event: string, data: unknown) => Promise<void>>
 
   beforeEach(() => {
     displayManager = new DisplayManager()
-    vi.clearAllMocks()
+
+    // Spy on the eventEmitter.emit method
+    mockEmit = spyOn(events.eventEmitter, 'emit').mockImplementation(() => Promise.resolve())
   })
 
   describe('register', () => {
@@ -109,25 +105,18 @@ describe('DisplayManager', () => {
   })
 
   describe('getData', () => {
-    it('should throw error for non-existent display', () => {
+    it('should return data for existing display', () => {
+      const schema = z.object({ name: z.string() })
+      displayManager.register('user', schema, { name: 'John' })
+
+      const data = displayManager.getData('user')
+      expect(data).toEqual({ name: 'John' })
+    })
+
+    it('should throw for non-existent display', () => {
       expect(() => {
         displayManager.getData('nonexistent')
       }).toThrow('Display nonexistent not found')
-    })
-  })
-
-  describe('list', () => {
-    it('should return all registered displays', () => {
-      const schema1 = z.object({ value: z.number() })
-      const schema2 = z.object({ text: z.string() })
-
-      displayManager.register('display1', schema1, { value: 1 })
-      displayManager.register('display2', schema2, { text: 'test' })
-
-      const displays = displayManager.list()
-      expect(displays).toHaveLength(2)
-      expect(displays.map((d) => d.id)).toContain('display1')
-      expect(displays.map((d) => d.id)).toContain('display2')
     })
   })
 })

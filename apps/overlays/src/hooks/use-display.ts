@@ -12,14 +12,14 @@ export function useDisplay<T = unknown>(displayId: string, options?: UseDisplayO
     const subscription = trpcClient.displays.subscribe.subscribe(
       { id: displayId },
       {
-        onData: (data) => {
-          setDisplay(data as Display<T>)
+        onData: (data: Display<T>) => {
+          setDisplay(data)
           setIsConnected(true)
-          options?.onData?.((data as Display<T>).data)
+          options?.onData?.(data.data)
         },
-        onError: (error) => {
+        onError: (error: Error) => {
           wsLogger.error('Display subscription error', {
-            error: error as Error,
+            error,
             metadata: { displayId }
           })
           setIsConnected(false)
