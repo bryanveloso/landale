@@ -2,6 +2,7 @@
  * @landale/shared - Shared types and utilities for the Landale overlay system
  */
 
+export * from './emotes'
 export * from './ironmon'
 export * from './twitch'
 export * from './obs'
