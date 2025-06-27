@@ -1,7 +1,7 @@
 # Use specific version for reproducibility
 FROM oven/bun:1.2.14-alpine AS base
 
-# Install OpenSSL for Prisma
+# Install OpenSSL for Prisma for Prisma generate
 RUN apk add --no-cache openssl
 
 WORKDIR /app
@@ -9,14 +9,22 @@ WORKDIR /app
 # Development stage
 FROM base AS development
 
-# Copy dependency manifests first for better caching
+# Copy package files for better layer caching
 COPY package.json bun.lock turbo.json ./
 
-# Install dependencies - cached layer if lockfile unchanged  
+# Copy ONLY package.json files to preserve layer cache
+COPY apps/overlays/package.json ./apps/overlays/
+COPY apps/server/package.json ./apps/server/
+COPY packages/database/package.json packages/database/prisma ./packages/database/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/logger/package.json ./packages/logger/
+
+# Install dependencies - this layer is cached if package.json files don't change
 RUN bun install
 
-# Copy entire workspace
-COPY . .
+# NOW copy source code - changes here won't invalidate the dependency cache
+COPY apps apps
+COPY packages packages
 
 # Generate Prisma client
 RUN cd packages/database && bunx prisma generate
