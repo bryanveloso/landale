@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events'
-import type { EmoteAnalysis } from '@landale/shared'
 
 export interface AudioEvents {
   'audio:started': undefined
@@ -30,50 +29,8 @@ export interface AudioEvents {
   }
 }
 
-export interface LMStudioEvents {
-  'lm:analysis_started': {
-    contextSize: number
-    immediate: boolean
-  }
-  'lm:analysis_completed': {
-    timestamp: number
-    analysis: {
-      patterns: {
-        technical_discussion: number
-        excitement: number
-        frustration: number
-        game_event: number
-        viewer_interaction: number
-        question: number
-      }
-      suggestedActions: string[]
-      sentiment: 'positive' | 'negative' | 'neutral'
-      topics: string[]
-      context: string
-    }
-    contextSize: number
-  }
-  'lm:pattern_detected': {
-    pattern: string
-    confidence: number
-    context: string
-    suggestedActions: string[]
-  }
-  'lm:error': {
-    error: string
-    timestamp: number
-  }
-  'lm:emote_suggestion': {
-    timestamp: number
-    analysis: EmoteAnalysis
-    suggestedEmotes: string[]
-    aiEmotes: string[]
-    keywordEmotes: string[]
-    transcription: string
-  }
-}
 
-export type AllEvents = AudioEvents & LMStudioEvents
+export type AllEvents = AudioEvents
 
 class TypedEventEmitter extends EventEmitter {
   override emit<K extends keyof AllEvents>(

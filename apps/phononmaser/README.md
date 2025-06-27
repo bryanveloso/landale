@@ -1,19 +1,18 @@
 # Phononmaser
 
-A real-time audio processing service for the Landale streaming overlay system. Named after the weapon from Phantasy Star IV, Phononmaser captures audio from OBS, transcribes it using Whisper, and performs AI analysis for intelligent overlay reactions.
+A real-time audio processing service for the Landale streaming overlay system. Named after the weapon from Phantasy Star IV, Phononmaser captures audio from OBS and transcribes it using Whisper.
 
 ## Features
 
 - WebSocket server for receiving audio from OBS plugin
 - Real-time PCM audio processing and buffering
 - Whisper.cpp integration for speech-to-text transcription
-- LM Studio integration for AI-powered pattern detection
-- Event-driven architecture for reactive overlays
+- Event-driven architecture for downstream services
 
 ## Architecture
 
 ```
-OBS Plugin → WebSocket → Phononmaser → Whisper → LM Studio → Events → Overlays
+OBS Plugin → WebSocket → Phononmaser → Whisper → Transcription Events
 ```
 
 ## Setup
@@ -33,10 +32,6 @@ OBS Plugin → WebSocket → Phononmaser → Whisper → LM Studio → Events �
    # Whisper Configuration
    WHISPER_CPP_PATH=/usr/local/bin/whisper
    WHISPER_MODEL_PATH=/path/to/whisper/models/ggml-large-v3-turbo-q8_0.bin
-
-   # LM Studio Configuration (optional)
-   LM_STUDIO_API_URL=http://localhost:1234/v1
-   LM_STUDIO_MODEL=local-model
    ```
 
 3. Start the service:
