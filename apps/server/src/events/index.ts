@@ -1,10 +1,27 @@
 import Emittery from 'emittery'
+import { nanoid } from 'nanoid'
 import { type EventMap } from './types'
 
 export const eventEmitter = new Emittery<EventMap>()
 
 export function emitEvent<T extends keyof EventMap>(event: T, data: EventMap[T]): Promise<void> {
   return eventEmitter.emit(event, data)
+}
+
+export function emitEventWithCorrelation<T extends keyof EventMap>(
+  event: T,
+  data: EventMap[T],
+  correlationId?: string
+): Promise<void> {
+  const eventData = Object.assign(
+    data as Record<string, unknown>,
+    {
+      correlationId: correlationId || nanoid(),
+      timestamp: new Date().toISOString()
+    }
+  ) as EventMap[T]
+  
+  return eventEmitter.emit(event, eventData)
 }
 
 export function createEventStream<T extends keyof EventMap>(event: T) {
