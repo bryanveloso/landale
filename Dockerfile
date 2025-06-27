@@ -11,6 +11,7 @@ FROM base AS development
 
 # Copy package files for better layer caching
 COPY package.json bun.lock turbo.json ./
+COPY tsconfig.*.json ./
 
 # Copy ONLY package.json files to preserve layer cache
 COPY apps/overlays/package.json ./apps/overlays/
