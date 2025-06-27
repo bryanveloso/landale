@@ -13,7 +13,7 @@ FROM base AS development
 COPY package.json bun.lock turbo.json ./
 
 # Install dependencies - cached layer if lockfile unchanged  
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy entire workspace
 COPY . .
