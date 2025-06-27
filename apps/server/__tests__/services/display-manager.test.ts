@@ -68,8 +68,9 @@ describe('DisplayManager', () => {
       displayManager.update('counter', { count: 5 })
 
       const display = displayManager.get('counter')
-      expect(display.data.count).toBe(5)
-      expect(display.data.label).toBe('Test') // Unchanged
+      expect(display?.data).toBeDefined()
+      expect((display?.data as { count: number; label: string }).count).toBe(5)
+      expect((display?.data as { count: number; label: string }).label).toBe('Test') // Unchanged
       expect(mockEmit).toHaveBeenCalledWith('display:counter:update', display)
     })
 
@@ -96,7 +97,7 @@ describe('DisplayManager', () => {
       displayManager.update('position', { x: 10 })
 
       const display = displayManager.get('position')
-      expect(display.data).toEqual({ x: 10, y: 0, label: 'Origin' })
+      expect(display?.data).toEqual({ x: 10, y: 0, label: 'Origin' })
     })
   })
 
