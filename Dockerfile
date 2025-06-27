@@ -15,10 +15,10 @@ COPY package.json bun.lock turbo.json ./
 # Copy ONLY package.json files to preserve layer cache
 COPY apps/overlays/package.json ./apps/overlays/
 COPY apps/server/package.json ./apps/server/
+COPY apps/phononmaser/package.json ./apps/phononmaser/
 COPY packages/database/package.json packages/database/prisma ./packages/database/
 COPY packages/shared/package.json ./packages/shared/
-COPY packages/eslint/package.json packages/eslint/*.js ./packages/eslint/
-COPY packages/typescript/package.json packages/typescript/*.json ./packages/typescript/
+COPY packages/logger/package.json ./packages/logger/
 
 # Install dependencies - this layer is cached if package.json files don't change
 RUN bun install
