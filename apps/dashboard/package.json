@@ -24,8 +24,6 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@landale/eslint": "workspace:*",
-    "@landale/typescript": "workspace:*",
     "@tanstack/router-vite-plugin": "^1.121.12",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

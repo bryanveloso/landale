@@ -24,8 +24,6 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@landale/database": "workspace:*",
-    "@landale/eslint": "workspace:*",
-    "@landale/typescript": "workspace:*",
     "@types/bun": "latest",
     "@types/jsonwebtoken": "^9.0.9",
     "eslint": "^9.29.0",

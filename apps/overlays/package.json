@@ -31,8 +31,6 @@
     "vite-tsconfig-paths": "^5.1.4"
   },
   "devDependencies": {
-    "@landale/eslint": "workspace:*",
-    "@landale/typescript": "workspace:*",
     "@tanstack/react-router-devtools": "^1.121.12",
     "@tanstack/router-vite-plugin": "^1.121.12",
     "@trpc/server": "^11.4.1",

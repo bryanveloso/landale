@@ -1,5 +1,5 @@
 {
-  "extends": "@landale/typescript/node.json",
+  "extends": "../../tsconfig.node.json",
   "compilerOptions": {
     "jsx": "react-jsx",
     "noEmit": false,

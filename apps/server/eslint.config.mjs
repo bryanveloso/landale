@@ -1,7 +1,7 @@
-import base from '@landale/eslint/base'
+import { baseConfig } from '../../eslint.config.mjs'
 
 export default [
-  ...base,
+  ...baseConfig,
   {
     languageOptions: {
       parserOptions: {
