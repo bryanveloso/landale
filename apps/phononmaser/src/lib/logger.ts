@@ -10,4 +10,3 @@ export const logger = createLogger({
 export const wsLogger = logger.child({ module: 'websocket' })
 export const audioLogger = logger.child({ module: 'audio-processor' })
 export const whisperLogger = logger.child({ module: 'whisper' })
-export const lmLogger = logger.child({ module: 'lm-studio' })

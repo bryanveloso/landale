@@ -2,7 +2,6 @@ import { WebSocketServer, WebSocket as WSWebSocket } from 'ws'
 import { logger, wsLogger } from '@lib/logger'
 import { AudioProcessor } from '@services/audio-processor'
 import { eventEmitter } from '@events'
-import { LMStudioService } from '@services/lm-studio-service'
 import { z } from 'zod'
 import { generateCorrelationId } from '@landale/logger'
 
@@ -34,7 +33,6 @@ const PORT = process.env.PHONONMASER_PORT ? parseInt(process.env.PHONONMASER_POR
 export class Phononmaser {
   private wss: WebSocketServer
   private processor: AudioProcessor
-  private lmStudioService?: LMStudioService
   private clients = new Set<WSWebSocket>()
   private headerLogged = false
   private packetCounter = 0
@@ -43,29 +41,25 @@ export class Phononmaser {
     this.processor = new AudioProcessor()
     this.wss = new WebSocketServer({ port: PORT })
     this.setupWebSocket()
-    this.initializeLMStudio()
+    this.setupEventListeners()
     logger.info(`Phononmaser started on port ${PORT.toString()}`)
   }
 
-  private initializeLMStudio() {
-    try {
-      // Check if LM Studio is configured
-      const lmStudioUrl = process.env.LM_STUDIO_API_URL
-      const lmStudioModel = process.env.LM_STUDIO_MODEL
-
-      if (lmStudioUrl) {
-        this.lmStudioService = new LMStudioService({
-          apiUrl: lmStudioUrl,
-          model: lmStudioModel || 'local-model'
-        })
-
-        logger.info('LM Studio integration enabled')
-      } else {
-        logger.info('LM Studio not configured, AI analysis disabled')
+  private setupEventListeners() {
+    // Forward transcription events to WebSocket clients
+    eventEmitter.on('audio:transcription', (data) => {
+      const message = JSON.stringify({
+        type: 'audio:transcription',
+        ...data
+      })
+      
+      // Broadcast to all connected clients
+      for (const client of this.clients) {
+        if (client.readyState === WSWebSocket.OPEN) {
+          client.send(message)
+        }
       }
-    } catch (error) {
-      logger.error('Failed to initialize LM Studio', { error: error as Error })
-    }
+    })
   }
 
   private setupWebSocket() {
@@ -313,9 +307,6 @@ export class Phononmaser {
   public stop() {
     logger.info('Stopping phononmaser...')
     this.processor.stop()
-    if (this.lmStudioService) {
-      this.lmStudioService.stop()
-    }
     this.wss.close()
   }
 }

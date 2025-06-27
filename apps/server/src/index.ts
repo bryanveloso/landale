@@ -17,6 +17,7 @@ import { eventEmitter } from '@/events'
 import { z } from 'zod'
 import { performanceMonitor } from '@/lib/performance'
 import { auditLogger, AuditAction, AuditCategory } from '@/lib/audit'
+import { eventBroadcaster } from '@/services/event-broadcaster'
 
 import { version } from '../package.json'
 
@@ -37,10 +38,12 @@ export type { Display } from './services/display-manager'
 interface WSData {
   req: Request
   correlationId: string
+  type: 'trpc' | 'events'
 }
 
 interface ExtendedWebSocket extends ServerWebSocket<WSData> {
   pingInterval?: NodeJS.Timeout
+  eventClient?: any
 }
 
 const logger = createLogger({ service: 'landale-server' })
@@ -110,9 +113,17 @@ const server: Server = Bun.serve({
       )
     }
 
-    // WebSocket upgrade
+    // Raw event WebSocket endpoint
+    if (url.pathname === '/events') {
+      const correlationId = request.headers.get('x-correlation-id') || nanoid()
+      if (server.upgrade(request, { data: { req: request, correlationId, type: 'events' } })) {
+        return
+      }
+    }
+    
+    // tRPC WebSocket upgrade
     const correlationId = request.headers.get('x-correlation-id') || nanoid()
-    if (server.upgrade(request, { data: { req: request, correlationId } })) {
+    if (server.upgrade(request, { data: { req: request, correlationId, type: 'trpc' } })) {
       return
     }
 
@@ -123,11 +134,13 @@ const server: Server = Bun.serve({
     open(ws) {
       const extWs = ws as unknown as ExtendedWebSocket
       const correlationId = extWs.data.correlationId
+      const connectionType = extWs.data.type
 
       log.info('WebSocket connection opened', {
         metadata: {
           remoteAddress: extWs.remoteAddress,
-          correlationId
+          correlationId,
+          type: connectionType
         }
       })
 
@@ -142,7 +155,14 @@ const server: Server = Bun.serve({
       // Store interval ID on the websocket instance
       extWs.pingInterval = pingInterval
 
-      void websocket.open?.(ws)
+      // Route to appropriate handler
+      if (connectionType === 'events') {
+        // Handle raw event WebSocket
+        extWs.eventClient = eventBroadcaster.handleConnection(ws, correlationId)
+      } else {
+        // Handle tRPC WebSocket
+        void websocket.open?.(ws)
+      }
     },
     close(ws, code, reason) {
       const extWs = ws as unknown as ExtendedWebSocket
@@ -162,14 +182,32 @@ const server: Server = Bun.serve({
         extWs.pingInterval = undefined
       }
 
-      void websocket.close?.(ws, code, reason)
+      // Handle event client disconnect
+      if (extWs.data.type === 'events' && extWs.eventClient) {
+        eventBroadcaster.handleDisconnect(extWs.eventClient.id)
+      } else {
+        void websocket.close?.(ws, code, reason)
+      }
     },
-    message: websocket.message.bind(websocket)
+    message(ws, message) {
+      const extWs = ws as unknown as ExtendedWebSocket
+      
+      if (extWs.data.type === 'events' && extWs.eventClient) {
+        // Handle event WebSocket messages
+        eventBroadcaster.handleMessage(extWs.eventClient, message.toString())
+      } else {
+        // Handle tRPC WebSocket messages
+        websocket.message(ws, message)
+      }
+    }
   }
 })
 
 console.log(
   `  ${chalk.green('➜')}  ${chalk.bold('tRPC Server')}: ${server.hostname ?? 'localhost'}:${server.port?.toString() ?? '7175'}`
+)
+console.log(
+  `  ${chalk.green('➜')}  ${chalk.bold('Event Stream')}: ${server.hostname ?? 'localhost'}:${server.port?.toString() ?? '7175'}/events`
 )
 
 // Register displays
