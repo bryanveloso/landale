@@ -185,3 +185,6 @@ apps/overlays/public/emotes/
 
 # Turborepo
 .turbo
+
+# Claude
+.claude

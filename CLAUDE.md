@@ -1,186 +1,180 @@
-# Landale Project Guidelines
+# CLAUDE.md - Landale Project Assistant
 
-## Project Overview
+## Core Principles
 
-Landale is a personal streaming overlay system built with Bun, featuring real-time Twitch integration, game data processing, and animated overlays. This project is designed for local hosting on a home server (Mac Mini) and uses bleeding-edge technologies for experimentation and personal use. The system is designed to work within Open Broadcaster Software (OBS) as browser sources.
+1. **Verify Before Suggesting**: Always use available tools (file reading, searching, etc.) to understand the current state before proposing changes.
+2. **Be Direct**: Skip pleasantries. Get straight to solutions.
+3. **Code First**: Show working code rather than explaining what to do.
+4. **Respect Existing Patterns**: Match the project's style and conventions exactly.
 
-## Tech Stack
+## Critical Rules
 
-- **Runtime**: Bun (latest)
-- **Frontend**: React 19 (RC), TanStack Router/Query, Vite, Tailwind CSS v4 (beta), Framer Motion, Matter.js, Rive
-- **Backend**: tRPC, WebSocket, TCP sockets, Twitch EventSub/API
-- **Database**: PostgreSQL with Prisma v6 (beta)
-- **Development**: TypeScript (strict mode), ESLint, Prettier, Docker Compose
-- **Testing**: Vitest, Testing Library, Coverage reporting
-- **Hosting**: Local Mac Mini with Docker, accessed only via local network
-- **Monitoring**: Health check endpoints, structured logging with Pino
-- **Shared Types**: Monorepo with shared types package
+### Commit Messages
 
-## Commands
+- **ALWAYS** end the first line with a period.
+- Format: `<type>: <description>.`
+- Examples:
+  - ✅ `fix: Resolve WebSocket reconnection issue.`
+  - ❌ `fix: Resolve WebSocket reconnection issue`
 
-### Root
+### Problem Solving
 
-- `bun dev` - Start all workspaces in development mode
-- `bun run cache-emotes` - Cache Twitch emotes
-- `docker compose up` - Run services in Docker
-- `bun test` - Run all tests
-- `bun test:watch` - Run tests in watch mode
-- `bun test:coverage` - Run tests with coverage reporting
-- `bun run dev:phononmaser` - Start phononmaser service
+1. **Read First**: Check existing code/files before suggesting solutions
+2. **Test Assumptions**: Verify package versions, APIs, and configurations
+3. **No Guessing**: If unsure, say so and ask for clarification
+4. **Incremental Changes**: Small, testable modifications over large rewrites
 
-### Database Package
+### Code Standards
 
-- `bun --cwd packages/database db:migrate:dev` - Run Prisma migrations
-- `bun --cwd packages/database db:push` - Push schema changes without migration
-- `bun --cwd packages/database studio` - Launch Prisma Studio
-- `bun --cwd packages/database generate` - Generate Prisma client
+- Runtime: Bun (not Node.js)
+- Frontend: React 19 RC with TypeScript strict mode
+- Testing: `bun test` (not Jest/Vitest)
+- Building: `bun build` (not webpack/esbuild)
+- Package management: `bun install` (not npm/yarn/pnpm)
+- Paths: Use configured aliases (@/_, +/_, ~/\*)
 
-### Overlays Package
+### Quick Reference
 
-- `bun --cwd apps/overlays dev` - Start Vite development server
-- `bun --cwd apps/overlays build` - Build for production
-- `bun --cwd apps/overlays preview` - Preview production build
-- `bun --cwd apps/overlays lint` - Run ESLint
-- `bun --cwd apps/overlays typecheck` - Run TypeScript type checking
-- `bun --cwd apps/overlays test` - Run tests
-
-### Server Package
-
-- `bun --cwd apps/server dev` - Start server with hot reload
-- `bun --cwd apps/server build` - Build server for production
-- `bun --cwd apps/server start` - Start production server
-- `bun --cwd apps/server lint` - Run ESLint check
-- `bun --cwd apps/server typecheck` - Run TypeScript type checking
-- `bun --cwd apps/server test` - Run tests
-- `bunx vitest run` - Run tests with Vitest (from app directory)
-
-## Code Style
-
-- **TypeScript**: Strict mode enabled across all packages
-- **React**: Functional components with TypeScript interfaces/types
-- **Styling**: Tailwind CSS v4 with PostCSS, organized with prettier-plugin-tailwindcss
-- **Formatting**: Prettier with single quotes, 2-space indentation, arrow parens as-needed
-- **Linting**: ESLint with TypeScript and React plugins
-- **Imports**: Path aliases configured:
-  - `@/*` → src directory
-  - `+/*` → assets directory
-  - `~/*` → public directory
-- **Naming Conventions**:
-  - PascalCase: Components, types, interfaces
-  - camelCase: Functions, variables, methods
-  - kebab-case: File names for components
-- **Error Handling**: Structured try/catch blocks with proper logging
-
-## Architecture
-
-### Shared Package
-
-- **Purpose**: Shared types and utilities across all packages
-- **Contents**: IronMON types, Twitch types, common utilities
-- **Benefits**: Type consistency, reduced duplication
-
-### Database Package
-
-- **Technology**: Prisma ORM with PostgreSQL
-- **Models**: Challenge, Checkpoint, Seed, Result (with performance indexes)
-- **Purpose**: Shared database schema and client for all packages
-
-### Server Package
-
-- **Core Services**:
-  - **tRPC Server**: Type-safe API with WebSocket subscriptions
-  - **WebSocket Server**: Real-time client communication (port 7175) with auto-reconnection
-  - **TCP Socket Server**: IronMON game data ingestion (port 8080)
-  - **Twitch Integration**: EventSub webhooks and API client
-  - **Health Check**: HTTP endpoint at `/health` for monitoring
-
-### Phononmaser Package
-
-- **Purpose**: Receive audio from OBS for AI transcription
-- **WebSocket Server**: Port 8889 for raw PCM audio streaming
-- **Features**:
-  - Accepts binary PCM audio (16-bit, 48kHz)
-  - Buffers audio in 3-second windows
-  - Emits events for transcription processing
-  - Health check endpoint on port 8890
-- **Event System**:
-  - Built on Emittery for type-safe event handling
-  - Domain-based event organization (Twitch, IronMON)
-  - Subscription helpers for categorized events
-- **Key Features**:
-  - Environment variable validation with Zod
-  - Structured logging with Pino (optional)
-  - Real-time Twitch chat processing
-  - Emote data management and caching
-  - Game state synchronization
-  - Error handling with proper logging
-
-### Overlays Package
-
-- **Framework**: React 19 with Vite
-- **Routing**: TanStack Router with type-safe routes
-- **State Management**: TanStack Query for server state
-- **Real-time**: tRPC WebSocket subscriptions with auto-reconnection
-- **Animations**: Framer Motion, Matter.js physics, Rive animations
-- **Key Features**:
-  - Error boundaries to prevent stream crashes
-  - React performance optimizations (memo, cleanup)
-  - Dynamic overlay components
-  - Real-time emote rain effects with physics
-  - Game state visualization (IronMON)
-  - Responsive layouts with Tailwind CSS v4
-  - OBS browser source compatible
-
-## Environment Variables
-
-### Required
-
-- `DATABASE_URL`: PostgreSQL connection string
-- `TWITCH_CLIENT_ID`: Twitch application client ID
-- `TWITCH_CLIENT_SECRET`: Twitch application client secret
-- `TWITCH_EVENTSUB_SECRET`: Secret for EventSub webhook validation
-- `TWITCH_USER_ID`: Twitch user ID for channel subscriptions
-
-### Optional
-
-- `NODE_ENV`: Environment (development/production)
-- `LOG_LEVEL`: Logging level (error/warn/info/debug)
-- `STRUCTURED_LOGGING`: Enable JSON logging (true/false)
-
-## Docker Support
-
-- `docker-compose.yml`: Orchestrates PostgreSQL and application services for local deployment
-- `Dockerfile`: Build configuration for local Docker deployment
-- Scripts adapted for Docker environment (e.g., `docker-cache-emotes.sh`)
-- Designed for local network access only - no external hosting required
+| Task             | Use                  | Don't Use                             |
+| ---------------- | -------------------- | ------------------------------------- |
+| Run TypeScript   | `bun file.ts`        | `node file.js`, `ts-node file.ts`     |
+| Install packages | `bun install`        | `npm install`, `yarn`, `pnpm install` |
+| Run tests        | `bun test`           | `jest`, `vitest`, `mocha`             |
+| Build/Bundle     | `bun build`          | `webpack`, `esbuild`, `vite build`    |
+| HTTP server      | `Bun.serve()`        | `express`, `koa`, `fastify`           |
+| WebSockets       | Built-in `WebSocket` | `ws`, `socket.io`                     |
+| File operations  | `Bun.file()`         | `fs.readFile`, `fs.writeFile`         |
+| Shell commands   | `Bun.$\`cmd\``       | `execa`, `child_process`              |
+| SQLite           | `bun:sqlite`         | `better-sqlite3`, `sqlite3`           |
+| PostgreSQL       | `Bun.sql`            | `pg`, `postgres.js`                   |
+| Redis            | `Bun.redis`          | `ioredis`, `redis`                    |
+| Env vars         | Automatic            | `dotenv`, `process.env`               |
 
 ## Project Context
 
-- **Personal Project**: Designed specifically for personal streaming setup
-- **Local Hosting**: Runs on home Mac Mini server, not intended for cloud deployment
-- **Bleeding Edge**: Intentionally uses latest/beta versions for experimentation
-- **Security Model**: Relies on local network security, not exposed to internet
-- **Git Ignored Files**: `twitch-token.json` and other sensitive files are properly gitignored
+**What**: Personal streaming overlay system for OBS
+**Where**: Local Mac Mini server (not cloud)
+**Stack**: Bun, React 19, tRPC, PostgreSQL, Tailwind v4
+**Ports**: WebSocket (7175), TCP (8080), Phononmaser (8889)
 
-## Testing
+## Commands Reference
 
-- **Test Framework**: Vitest with Testing Library
-- **Test Structure**: Tests in `__tests__` directories mirroring source structure
-- **Coverage**: Run `bun test:coverage` to generate coverage reports
-- **Mocking**: Use `vi.mock()` for external dependencies
-- **Path Aliases**: Each app has its own `vitest.config.ts` with proper alias resolution
+```bash
+# Development
+bun dev                                    # Start all workspaces
+bun run dev:phononmaser                    # Start audio service
+bun --hot ./index.ts                       # Hot reload server
 
-## Recent Improvements (June 2025)
+# Database
+bun --cwd packages/database db:push        # Push schema changes
+bun --cwd packages/database studio         # Prisma Studio
 
-- **Code Review**: Completed comprehensive senior developer review
-- **Type Safety**: Removed all `any` types, enabled strict TypeScript
-- **Performance**: Optimized for 60fps streaming (reduced emote count, added throttling)
-- **Security**: Secured API keys, removed hardcoded credentials
-- **Docker**: Optimized with multi-stage builds and layer caching
-- **Testing**: Set up Vitest with example tests for all app types
+# Testing
+bun test                                   # Run all tests
+bun test:watch                             # Watch mode
+bun test:coverage                          # Coverage report
 
-## Project Memories
+# Building
+bun build ./src/index.ts --outdir ./dist   # Build TypeScript
+bun build ./src/index.html                 # Build with HTML entry
 
-- Please remember that this overlay is used within an Open Broadcaster System (OBS) context.
-- When running lint/typecheck commands, check for the correct app paths (apps/_ not packages/_)
-- Use `bunx vitest` instead of `bun test` when running from app directories due to mock support
+# Docker
+docker compose up                          # Run services
+```
+
+## Bun-First Development
+
+**Always use Bun's built-in features:**
+
+- `Bun.serve()` for servers (not Express)
+- `Bun.test()` for testing (not Jest/Vitest)
+- `Bun.file()` for file operations (not fs)
+- `Bun.# CLAUDE.md - Landale Project Assistant
+
+## Core Principles
+
+1. **Verify Before Suggesting**: Always use available tools (file reading, searching, etc.) to understand the current state before proposing changes.
+2. **Be Direct**: Skip pleasantries. Get straight to solutions.
+3. **Code First**: Show working code rather than explaining what to do.
+4. **Respect Existing Patterns**: Match the project's style and conventions exactly.
+
+## Critical Rules
+
+### Commit Messages
+
+- **ALWAYS** end the first line with a period.
+- Format: `<type>: <description>.`
+- Examples:
+  - ✅ `fix: Resolve WebSocket reconnection issue.`
+  - ❌ `fix: Resolve WebSocket reconnection issue`
+
+### Problem Solving
+
+1. **Read First**: Check existing code/files before suggesting solutions
+2. **Test Assumptions**: Verify package versions, APIs, and configurations
+3. **No Guessing**: If unsure, say so and ask for clarification
+4. **Incremental Changes**: Small, testable modifications over large rewrites
+
+### Code Standards
+
+- Runtime: Bun (not Node.js)
+- Frontend: React 19 RC with TypeScript strict mode
+- Testing: Bun test (not Jest/Vitest)
+- Paths: Use configured aliases (@/_, +/_, ~/\*)
+- Imports: Always use Bun APIs over Node.js equivalents
+
+## Project Context
+
+**What**: Personal streaming overlay system for OBS
+**Where**: Local Mac Mini server (not cloud)
+**Stack**: Bun, React 19, tRPC, PostgreSQL, Tailwind v4
+**Ports**: WebSocket (7175), TCP (8080), Phononmaser (8889)
+
+## Commands Reference
+
+```bash
+# Development
+bun dev                    # Start all workspaces
+bun run dev:phononmaser   # Start audio service
+
+# Database
+bun --cwd packages/database db:push     # Push schema changes
+bun --cwd packages/database studio      # Prisma Studio
+
+# Testing
+bun test                 # Run all tests
+bun test:watch          # Watch mode
+bun test:coverage       # Coverage report
+
+# Docker
+docker compose up        # Run services
+```
+
+for shell commands (not execa)
+
+- `bun:sqlite` for SQLite (not better-sqlite3)
+- WebSocket is built-in (not ws package)
+- `.env` loads automatically (not dotenv)
+
+## When Helping
+
+1. **Check First**: Read the actual file/code before suggesting changes
+2. **Match Style**: Follow existing patterns exactly
+3. **Be Specific**: Reference exact file paths and line numbers
+4. **Stay Focused**: Address only what was asked
+5. **Verify Commands**: Test that suggested commands work with the current setup
+
+## Don't
+
+- Use `node`, `ts-node`, `npm`, `yarn`, or `pnpm` commands
+- Import `express`, `ws`, `dotenv`, `execa`, `better-sqlite3`, `ioredis`, `pg`, or `postgres.js`
+- Use `webpack`, `esbuild`, `jest`, or `vitest`
+- Import from `node:fs` when `Bun.file` would work
+- Create separate bundler configs - Bun handles bundling automatically
+- Add test runners - use `bun test`
+- Forget the period in commit messages
+- Make assumptions without checking actual files first
+
+# Supplimentary Documentation
+
+@docs
