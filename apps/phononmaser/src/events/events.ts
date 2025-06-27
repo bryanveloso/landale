@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events'
+import type { EmoteAnalysis } from '@landale/shared'
 
 export interface AudioEvents {
   'audio:started': undefined
@@ -61,6 +62,14 @@ export interface LMStudioEvents {
   'lm:error': {
     error: string
     timestamp: number
+  }
+  'lm:emote_suggestion': {
+    timestamp: number
+    analysis: EmoteAnalysis
+    suggestedEmotes: string[]
+    aiEmotes: string[]
+    keywordEmotes: string[]
+    transcription: string
   }
 }
 
