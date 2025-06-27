@@ -15,6 +15,8 @@ import { rainwaveService, rainwaveNowPlayingSchema } from '@/services/rainwave'
 import { appleMusicService, appleMusicNowPlayingSchema } from '@/services/apple-music'
 import { eventEmitter } from '@/events'
 import { z } from 'zod'
+import { performanceMonitor } from '@/lib/performance'
+import { auditLogger, AuditAction, AuditCategory } from '@/lib/audit'
 
 import { version } from '../package.json'
 
@@ -47,6 +49,15 @@ const log = logger.child({ module: 'main' })
 console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
 log.info('Server starting', { metadata: { environment: env.NODE_ENV, version } })
 
+// Log service startup
+void auditLogger.log({
+  action: AuditAction.SERVICE_START,
+  category: AuditCategory.SERVICE,
+  resource: { type: 'service', name: 'landale-server' },
+  result: 'success',
+  metadata: { version, environment: env.NODE_ENV }
+})
+
 const createContext = (opts: CreateBunContextOptions) => {
   // For WebSocket connections, correlation ID is already in the data
   let correlationId: string
@@ -56,7 +67,7 @@ const createContext = (opts: CreateBunContextOptions) => {
     // For HTTP requests, extract from headers
     correlationId = opts.req.headers.get('x-correlation-id') || nanoid()
   }
-  
+
   const contextLogger = logger.child({ correlationId })
 
   return {
@@ -112,14 +123,14 @@ const server: Server = Bun.serve({
     open(ws) {
       const extWs = ws as unknown as ExtendedWebSocket
       const correlationId = extWs.data.correlationId
-      
-      log.info('WebSocket connection opened', { 
-        metadata: { 
+
+      log.info('WebSocket connection opened', {
+        metadata: {
           remoteAddress: extWs.remoteAddress,
-          correlationId 
-        } 
+          correlationId
+        }
       })
-      
+
       // Send a ping every 30 seconds to keep connection alive
       const pingInterval = setInterval(() => {
         if (extWs.readyState === 1) {
@@ -136,15 +147,15 @@ const server: Server = Bun.serve({
     close(ws, code, reason) {
       const extWs = ws as unknown as ExtendedWebSocket
       const correlationId = extWs.data.correlationId
-      
-      log.info('WebSocket connection closed', { 
-        metadata: { 
-          code, 
+
+      log.info('WebSocket connection closed', {
+        metadata: {
+          code,
           reason,
-          correlationId 
-        } 
+          correlationId
+        }
       })
-      
+
       // Clear the ping interval
       if (extWs.pingInterval) {
         clearInterval(extWs.pingInterval)
@@ -279,8 +290,17 @@ try {
 }
 
 // Handle graceful shutdown
-const shutdown = (signal: string) => {
+const shutdown = async (signal: string) => {
   log.info('Shutting down server', { metadata: { signal } })
+
+  // Log service shutdown
+  await auditLogger.log({
+    action: AuditAction.SERVICE_STOP,
+    category: AuditCategory.SERVICE,
+    resource: { type: 'service', name: 'landale-server' },
+    result: 'success',
+    metadata: { signal }
+  })
 
   // Notify all connected clients to reconnect
   log.info('Broadcasting reconnection notification to all clients')
@@ -292,12 +312,16 @@ const shutdown = (signal: string) => {
   IronMON.shutdown()
   OBS.shutdown()
 
+  // Shutdown monitoring services
+  performanceMonitor.shutdown()
+  await auditLogger.shutdown()
+
   process.exit(0)
 }
 
 process.on('SIGINT', () => {
-  shutdown('SIGINT')
+  void shutdown('SIGINT')
 })
 process.on('SIGTERM', () => {
-  shutdown('SIGTERM')
+  void shutdown('SIGTERM')
 })

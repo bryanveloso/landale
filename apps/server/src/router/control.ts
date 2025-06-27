@@ -7,7 +7,6 @@ import { createEventSubscription, createPollingSubscription } from '@/lib/subscr
 import { emoteRainConfigSchema, type SystemStatus, type ActivityEvent } from '@/types/control'
 import { obsService } from '@/services/obs'
 
-
 // In-memory storage
 const overlayConfigs = {
   emoteRain: emoteRainConfigSchema.parse({})
@@ -100,7 +99,7 @@ export const controlRouter = router({
 
       update: publicProcedure.input(emoteRainConfigSchema.partial()).subscription(async function* ({ input, ctx }) {
         const log = ctx.logger.child({ module: 'control-router', subscription: 'emoteRain.update' })
-        
+
         overlayConfigs.emoteRain = { ...overlayConfigs.emoteRain, ...input }
 
         void emitEventWithCorrelation('config:emoteRain:updated', overlayConfigs.emoteRain, ctx.correlationId)
@@ -118,7 +117,7 @@ export const controlRouter = router({
         )
         .subscription(async function* ({ input, ctx }) {
           const log = ctx.logger.child({ module: 'control-router', subscription: 'emoteRain.burst' })
-          
+
           void emitEventWithCorrelation('emoteRain:burst', input, ctx.correlationId)
           log.info('Manual emote burst triggered', { metadata: { emoteId: input.emoteId, count: input.count } })
           yield { success: true }
@@ -126,7 +125,7 @@ export const controlRouter = router({
 
       clear: publicProcedure.subscription(async function* ({ ctx }) {
         const log = ctx.logger.child({ module: 'control-router', subscription: 'emoteRain.clear' })
-        
+
         void emitEventWithCorrelation('emoteRain:clear', undefined, ctx.correlationId)
         log.info('Emote rain cleared')
         yield { success: true }
@@ -234,12 +233,14 @@ export const controlRouter = router({
       }),
 
       setCurrentScene: publicProcedure.input(z.object({ sceneName: z.string() })).mutation(async ({ input, ctx }) => {
+        const log = ctx.logger.child({ module: 'control-router', method: 'setCurrentScene' })
+
         try {
-          await obsService.setCurrentScene(input.sceneName)
-          ctx.logger.info('Current scene changed', { metadata: { sceneName: input.sceneName } })
+          await obsService.setCurrentScene(input.sceneName, ctx.correlationId)
+          log.info('Current scene changed', { metadata: { sceneName: input.sceneName } })
           return { success: true }
         } catch (error) {
-          ctx.logger.error('Failed to set current scene', { error: error as Error })
+          log.error('Failed to set current scene', { error: error as Error })
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: error instanceof Error ? error.message : 'Failed to set current scene'
@@ -248,12 +249,14 @@ export const controlRouter = router({
       }),
 
       setPreviewScene: publicProcedure.input(z.object({ sceneName: z.string() })).mutation(async ({ input, ctx }) => {
+        const log = ctx.logger.child({ module: 'control-router', method: 'setPreviewScene' })
+
         try {
-          await obsService.setPreviewScene(input.sceneName)
-          ctx.logger.info('Preview scene changed', { metadata: { sceneName: input.sceneName } })
+          await obsService.setPreviewScene(input.sceneName, ctx.correlationId)
+          log.info('Preview scene changed', { metadata: { sceneName: input.sceneName } })
           return { success: true }
         } catch (error) {
-          ctx.logger.error('Failed to set preview scene', { error: error as Error })
+          log.error('Failed to set preview scene', { error: error as Error })
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: error instanceof Error ? error.message : 'Failed to set preview scene'
@@ -262,12 +265,14 @@ export const controlRouter = router({
       }),
 
       createScene: publicProcedure.input(z.object({ sceneName: z.string() })).mutation(async ({ input, ctx }) => {
+        const log = ctx.logger.child({ module: 'control-router', method: 'createScene' })
+
         try {
-          await obsService.createScene(input.sceneName)
-          ctx.logger.info('Scene created', { metadata: { sceneName: input.sceneName } })
+          await obsService.createScene(input.sceneName, ctx.correlationId)
+          log.info('Scene created', { metadata: { sceneName: input.sceneName } })
           return { success: true }
         } catch (error) {
-          ctx.logger.error('Failed to create scene', { error: error as Error })
+          log.error('Failed to create scene', { error: error as Error })
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: error instanceof Error ? error.message : 'Failed to create scene'
@@ -309,12 +314,14 @@ export const controlRouter = router({
       }),
 
       start: publicProcedure.mutation(async ({ ctx }) => {
+        const log = ctx.logger.child({ module: 'control-router', method: 'streaming.start' })
+
         try {
-          await obsService.startStream()
-          ctx.logger.info('Stream started')
+          await obsService.startStream(ctx.correlationId)
+          log.info('Stream started')
           return { success: true }
         } catch (error) {
-          ctx.logger.error('Failed to start stream', { error: error as Error })
+          log.error('Failed to start stream', { error: error as Error })
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: error instanceof Error ? error.message : 'Failed to start stream'
@@ -323,12 +330,14 @@ export const controlRouter = router({
       }),
 
       stop: publicProcedure.mutation(async ({ ctx }) => {
+        const log = ctx.logger.child({ module: 'control-router', method: 'streaming.stop' })
+
         try {
-          await obsService.stopStream()
-          ctx.logger.info('Stream stopped')
+          await obsService.stopStream(ctx.correlationId)
+          log.info('Stream stopped')
           return { success: true }
         } catch (error) {
-          ctx.logger.error('Failed to stop stream', { error: error as Error })
+          log.error('Failed to stop stream', { error: error as Error })
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: error instanceof Error ? error.message : 'Failed to stop stream'
@@ -356,12 +365,14 @@ export const controlRouter = router({
       }),
 
       start: publicProcedure.mutation(async ({ ctx }) => {
+        const log = ctx.logger.child({ module: 'control-router', method: 'recording.start' })
+
         try {
-          await obsService.startRecording()
-          ctx.logger.info('Recording started')
+          await obsService.startRecording(ctx.correlationId)
+          log.info('Recording started')
           return { success: true }
         } catch (error) {
-          ctx.logger.error('Failed to start recording', { error: error as Error })
+          log.error('Failed to start recording', { error: error as Error })
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: error instanceof Error ? error.message : 'Failed to start recording'
@@ -370,12 +381,14 @@ export const controlRouter = router({
       }),
 
       stop: publicProcedure.mutation(async ({ ctx }) => {
+        const log = ctx.logger.child({ module: 'control-router', method: 'recording.stop' })
+
         try {
-          await obsService.stopRecording()
-          ctx.logger.info('Recording stopped')
+          await obsService.stopRecording(ctx.correlationId)
+          log.info('Recording stopped')
           return { success: true }
         } catch (error) {
-          ctx.logger.error('Failed to stop recording', { error: error as Error })
+          log.error('Failed to stop recording', { error: error as Error })
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: error instanceof Error ? error.message : 'Failed to stop recording'
@@ -384,9 +397,11 @@ export const controlRouter = router({
       }),
 
       pause: publicProcedure.mutation(async ({ ctx }) => {
+        const log = ctx.logger.child({ module: 'control-router', method: 'recording.pause' })
+
         try {
-          await obsService.pauseRecording()
-          ctx.logger.info('Recording paused')
+          await obsService.pauseRecording(ctx.correlationId)
+          log.info('Recording paused')
           return { success: true }
         } catch (error) {
           ctx.logger.error('Failed to pause recording', { error: error as Error })
@@ -594,7 +609,10 @@ export const controlRouter = router({
   }),
 
   actions: router({
-    reloadSource: publicProcedure.input(z.object({ sourceId: z.string() })).subscription(async function* ({ input, ctx }) {
+    reloadSource: publicProcedure.input(z.object({ sourceId: z.string() })).subscription(async function* ({
+      input,
+      ctx
+    }) {
       void emitEventWithCorrelation('source:reload', input.sourceId, ctx.correlationId)
       ctx.logger.info('Source reload requested', { metadata: input })
       yield { success: true }

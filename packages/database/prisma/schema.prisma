@@ -55,3 +55,29 @@ model Result {
   @@index([result])
   @@map("results")
 }
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  timestamp     DateTime @default(now())
+  correlationId String?
+  action        String
+  category      String
+  actorType     String?
+  actorId       String?
+  actorIp       String?
+  resourceType  String?
+  resourceId    String?
+  resourceName  String?
+  changesBefore String?  @db.Text
+  changesAfter  String?  @db.Text
+  result        String
+  error         String?
+  metadata      String?  @db.Text
+
+  @@index([timestamp])
+  @@index([correlationId])
+  @@index([category])
+  @@index([action])
+  @@index([result])
+  @@map("audit_logs")
+}

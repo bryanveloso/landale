@@ -29,7 +29,7 @@ export const router = t.router
 
 const correlationMiddleware = t.middleware(async (opts) => {
   const correlationId = opts.ctx.req?.headers.get('x-correlation-id') || nanoid()
-  const procedureLogger = logger.child({ 
+  const procedureLogger = logger.child({
     correlationId,
     module: 'trpc'
   })
@@ -81,11 +81,11 @@ export const authedProcedure = publicProcedure.use(async (opts) => {
   const expectedKey = env.CONTROL_API_KEY
 
   if (apiKey !== expectedKey) {
-    log.warn('Unauthorized API access attempt', { 
-      metadata: { 
+    log.warn('Unauthorized API access attempt', {
+      metadata: {
         path: opts.path,
-        type: opts.type 
-      } 
+        type: opts.type
+      }
     })
     throw new TRPCError({
       code: 'UNAUTHORIZED',
