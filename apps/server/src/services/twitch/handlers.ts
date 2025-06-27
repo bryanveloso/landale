@@ -3,11 +3,12 @@ import { RefreshingAuthProvider } from '@twurple/auth'
 import { EventSubWsListener } from '@twurple/eventsub-ws'
 
 import { env } from '@/lib/env'
-import { createLogger } from '@/lib/logger'
+import { createLogger } from '@landale/logger'
 
 import { emitEvent } from '@/events'
 
-const logger = createLogger('twitch')
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'twitch' })
 
 const clientId = env.TWITCH_CLIENT_ID
 const clientSecret = env.TWITCH_CLIENT_SECRET
@@ -29,22 +30,22 @@ export async function initialize() {
     const apiClient = new ApiClient({ authProvider })
 
     // Clean up broken subscriptions to avoid hitting limits
-    logger.info('Cleaning up broken EventSub subscriptions...')
+    log.info('Cleaning up broken EventSub subscriptions')
     await apiClient.eventSub.deleteBrokenSubscriptions()
-    logger.info('Subscription cleanup completed.')
+    log.info('Subscription cleanup completed')
 
     const listener = new EventSubWsListener({ apiClient })
 
     // Add error handler to prevent retries on subscription failures
     listener.onSubscriptionDeleteFailure((error) => {
-      logger.warn('Subscription deletion failed', error)
+      log.warn('Subscription deletion failed', { error })
     })
 
     listener.start()
     setupEventListeners(listener)
     return listener
   } catch (error) {
-    logger.error('Error initializing Twitch API.', error)
+    log.error('Error initializing Twitch API', { error })
     throw error
   }
 }
@@ -52,7 +53,10 @@ export async function initialize() {
 const setupEventListeners = async (listener: EventSubWsListener) => {
   // Channel cheer subscription
   listener.onChannelCheer(userId, (e) => {
-    logger.debug(`Received cheer: ${e.bits} bits from ${e.userDisplayName}`)
+    log.debug('Received cheer', { 
+      bits: e.bits, 
+      userDisplayName: e.userDisplayName 
+    })
     emitEvent('twitch:cheer', {
       bits: e.bits,
       isAnonymous: e.isAnonymous,
@@ -65,7 +69,10 @@ const setupEventListeners = async (listener: EventSubWsListener) => {
 
   // Channel message subscription
   listener.onChannelChatMessage(userId, userId, (e) => {
-    logger.debug(`Received message from ${e.chatterDisplayName}: ${e.messageText}`)
+    log.debug('Received message', { 
+      chatterDisplayName: e.chatterDisplayName, 
+      messageText: e.messageText 
+    })
     emitEvent('twitch:message', {
       badges: e.badges,
       bits: e.bits,
@@ -94,7 +101,7 @@ const setupEventListeners = async (listener: EventSubWsListener) => {
 
   // Channel follow subscription
   listener.onChannelFollow(userId, userId, (e) => {
-    logger.info(`New follower: ${e.userDisplayName}`)
+    log.info('New follower', { userDisplayName: e.userDisplayName })
     emitEvent('twitch:follow', {
       userId: e.userId,
       userName: e.userName,
@@ -105,7 +112,10 @@ const setupEventListeners = async (listener: EventSubWsListener) => {
 
   // Channel subscription
   listener.onChannelSubscription(userId, (e) => {
-    logger.info(`New subscription: ${e.userDisplayName} (${e.tier})`)
+    log.info('New subscription', { 
+      userDisplayName: e.userDisplayName, 
+      tier: e.tier 
+    })
     emitEvent('twitch:subscription', {
       userId: e.userId,
       userName: e.userName,
@@ -117,9 +127,11 @@ const setupEventListeners = async (listener: EventSubWsListener) => {
 
   // Channel subscription gift
   listener.onChannelSubscriptionGift(userId, (e) => {
-    logger.info(
-      `Gift subscription: ${e.gifterDisplayName} gifted ${e.amount} to ${e.isAnonymous ? 'anonymous users' : 'the community'}`
-    )
+    log.info('Gift subscription', { 
+      gifterDisplayName: e.gifterDisplayName, 
+      amount: e.amount, 
+      recipient: e.isAnonymous ? 'anonymous users' : 'the community' 
+    })
     emitEvent('twitch:subscription:gift', {
       gifterId: e.gifterId,
       gifterName: e.gifterName,
@@ -133,7 +145,10 @@ const setupEventListeners = async (listener: EventSubWsListener) => {
 
   // Channel subscription message (resub)
   listener.onChannelSubscriptionMessage(userId, (e) => {
-    logger.info(`Resub: ${e.userDisplayName} (${e.cumulativeMonths} months)`)
+    log.info('Resub', { 
+      userDisplayName: e.userDisplayName, 
+      cumulativeMonths: e.cumulativeMonths 
+    })
     emitEvent('twitch:subscription:message', {
       userId: e.userId,
       userName: e.userName,
@@ -148,7 +163,10 @@ const setupEventListeners = async (listener: EventSubWsListener) => {
 
   // Channel point redemption
   listener.onChannelRedemptionAdd(userId, (e) => {
-    logger.info(`Channel point redemption: ${e.userDisplayName} redeemed "${e.rewardTitle}"`)
+    log.info('Channel point redemption', { 
+      userDisplayName: e.userDisplayName, 
+      rewardTitle: e.rewardTitle 
+    })
     emitEvent('twitch:redemption', {
       id: e.id,
       userId: e.userId,
@@ -165,7 +183,10 @@ const setupEventListeners = async (listener: EventSubWsListener) => {
 
   // Stream online
   listener.onStreamOnline(userId, (e) => {
-    logger.info(`Stream went online: ${e.broadcasterDisplayName} playing ${e.type}`)
+    log.info('Stream went online', { 
+      broadcasterDisplayName: e.broadcasterDisplayName, 
+      type: e.type 
+    })
     emitEvent('twitch:stream:online', {
       id: e.id,
       broadcasterId: e.broadcasterId,
@@ -178,7 +199,9 @@ const setupEventListeners = async (listener: EventSubWsListener) => {
 
   // Stream offline
   listener.onStreamOffline(userId, (e) => {
-    logger.info(`Stream went offline: ${e.broadcasterDisplayName}`)
+    log.info('Stream went offline', { 
+      broadcasterDisplayName: e.broadcasterDisplayName 
+    })
     emitEvent('twitch:stream:offline', {
       broadcasterId: e.broadcasterId,
       broadcasterName: e.broadcasterName,

@@ -1,4 +1,4 @@
-import { logger } from '@lib/logger'
+import { audioLogger as logger } from '@lib/logger'
 import { eventEmitter } from '@events'
 import { WhisperService } from '@services/whisper-service'
 
@@ -90,7 +90,7 @@ export class AudioProcessor {
     // Initialize buffer timestamp if empty
     if (this.buffer.chunks.length === 0) {
       this.buffer.startTimestamp = chunk.timestamp
-      logger.info('Starting new audio buffer')
+      logger.debug('Starting new audio buffer')
     }
 
     // Add chunk to buffer
@@ -115,7 +115,7 @@ export class AudioProcessor {
     const currentSecond = Math.floor(duration)
 
     if (currentSecond > lastLoggedSecond) {
-      logger.info(`Buffer: ${duration.toFixed(1)}s of audio (${(this.buffer.totalSize / 1024 / 1024).toFixed(1)}MB)`)
+      logger.debug(`Buffer: ${duration.toFixed(1)}s of audio (${(this.buffer.totalSize / 1024 / 1024).toFixed(1)}MB)`)
       this.lastLoggedDuration = duration
     }
   }
@@ -169,7 +169,7 @@ export class AudioProcessor {
       })
 
       const durationSeconds = (processingBuffer.endTimestamp - processingBuffer.startTimestamp) / 1000000
-      logger.info(
+      logger.debug(
         `Processing ${durationSeconds.toFixed(1)}s of audio (${format.sampleRate.toString()}Hz, ${format.channels.toString()}ch, ${format.bitDepth.toString()}bit)...`
       )
 
@@ -184,9 +184,9 @@ export class AudioProcessor {
             text: transcription
           })
 
-          logger.info(`📝 "${transcription}"`)
+          logger.info(`Transcription: "${transcription}"`)
         } else {
-          logger.debug('No speech detected in buffer')
+          logger.trace('No speech detected in buffer')
         }
       }
     } catch (error) {

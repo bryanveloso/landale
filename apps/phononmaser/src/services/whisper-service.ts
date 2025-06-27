@@ -1,5 +1,5 @@
 import { spawn } from 'child_process'
-import { logger } from '@lib/logger'
+import { whisperLogger as logger } from '@lib/logger'
 import { writeFile, unlink } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
@@ -57,14 +57,11 @@ export class WhisperService {
       await unlink(tempFile).catch(() => {})
 
       const duration = Date.now() - startTime
-      logger.info(`Transcription completed in ${duration.toString()}ms`)
+      logger.debug(`Transcription completed in ${duration.toString()}ms`)
 
       return result
     } catch (error) {
-      logger.error('Transcription error:', error)
-      if (error instanceof Error) {
-        logger.error(`Error message: ${error.message}`)
-      }
+      logger.error('Transcription error', { error: error as Error })
       return ''
     } finally {
       this.isProcessing = false
@@ -125,7 +122,7 @@ export class WhisperService {
         args.push('--vad', '--vad-model', vadModelPath)
       }
 
-      logger.info(`Spawning whisper: ${this.whisperPath} ${args.join(' ')}`)
+      logger.debug(`Spawning whisper: ${this.whisperPath} ${args.join(' ')}`)
 
       const whisper = spawn(this.whisperPath, args)
       let output = ''
@@ -160,7 +157,7 @@ export class WhisperService {
       })
 
       whisper.on('error', (err) => {
-        logger.error('Whisper spawn error:', err)
+        logger.error('Whisper spawn error', { error: err as Error })
         reject(err)
       })
     })

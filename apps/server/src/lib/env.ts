@@ -1,7 +1,8 @@
 import { z } from 'zod'
-import { createLogger } from './logger'
+import { createLogger } from '@landale/logger'
 
-const log = createLogger('env')
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'env' })
 
 // Define the environment schema
 const envSchema = z.object({
@@ -41,17 +42,19 @@ function validateEnv() {
   const parsed = envSchema.safeParse(process.env)
 
   if (!parsed.success) {
-    log.error('❌ Environment validation failed!')
-    console.error('\nMissing or invalid environment variables:')
-
     const errors = parsed.error.format()
+    const errorDetails: Record<string, string[]> = {}
+    
     Object.entries(errors).forEach(([key, value]) => {
       if (key !== '_errors' && value && '_errors' in value) {
-        console.error(`  ${key}: ${value._errors.join(', ')}`)
+        errorDetails[key] = value._errors
       }
     })
-
-    console.error('\nPlease check your .env file or environment configuration.\n')
+    
+    log.error('Environment validation failed', { 
+      errors: errorDetails,
+      message: 'Please check your .env file or environment configuration'
+    })
     process.exit(1)
   }
 

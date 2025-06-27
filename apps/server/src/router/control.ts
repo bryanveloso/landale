@@ -2,13 +2,14 @@ import { z } from 'zod'
 import { router, publicProcedure } from '@/trpc'
 import { TRPCError } from '@trpc/server'
 import { eventEmitter } from '@/events'
-import { createLogger } from '@/lib/logger'
+import { createLogger } from '@landale/logger'
 import { formatUptime, formatBytes } from '@/lib/utils'
 import { createEventSubscription, createPollingSubscription } from '@/lib/subscription'
 import { emoteRainConfigSchema, type SystemStatus, type ActivityEvent } from '@/types/control'
 import { obsService } from '@/services/obs'
 
-const log = createLogger('control')
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'control' })
 
 // In-memory storage
 const overlayConfigs = {
@@ -107,7 +108,7 @@ export const controlRouter = router({
         overlayConfigs.emoteRain = { ...overlayConfigs.emoteRain, ...input }
 
         eventEmitter.emit('config:emoteRain:updated', overlayConfigs.emoteRain)
-        log.info('Emote rain config updated', input)
+        log.info('Emote rain config updated', { config: input })
 
         yield overlayConfigs.emoteRain
       }),
@@ -121,7 +122,7 @@ export const controlRouter = router({
         )
         .subscription(async function* ({ input, signal: _signal }) {
           eventEmitter.emit('emoteRain:burst', input)
-          log.info('Manual emote burst triggered', input)
+          log.info('Manual emote burst triggered', { emoteId: input.emoteId, count: input.count })
           yield { success: true }
         }),
 

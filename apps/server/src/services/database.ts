@@ -1,7 +1,8 @@
 import prisma, { type Prisma } from '@landale/database'
-import { createLogger } from '@/lib/logger'
+import { createLogger } from '@landale/logger'
 
-const log = createLogger('database')
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'database' })
 
 /**
  * Optimized database service with query patterns
@@ -55,11 +56,11 @@ export class DatabaseService {
           }
         })
 
-        log.debug(`Recorded checkpoint clear: seed=${seedId}, checkpoint=${checkpointId}`)
+        log.debug('Recorded checkpoint clear', { seedId, checkpointId })
         return result
       })
     } catch (error) {
-      log.error('Failed to record checkpoint clear', error)
+      log.error('Failed to record checkpoint clear', { error })
       throw error
     }
   }
@@ -116,7 +117,7 @@ export class DatabaseService {
       skipDuplicates: true
     })
 
-    log.debug(`Batch upserted ${result.count} seeds`)
+    log.debug('Batch upserted seeds', { count: result.count })
     return result
   }
 

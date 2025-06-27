@@ -1,7 +1,10 @@
 import { z } from 'zod'
-import { logger } from '@/lib/logger'
+import { createLogger } from '@landale/logger'
 import { displayManager } from '@/services/display-manager'
 import type { RainwaveNowPlaying } from '@landale/shared'
+
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'rainwave' })
 
 // Rainwave station IDs
 export const RAINWAVE_STATIONS = {
@@ -41,7 +44,7 @@ class RainwaveService {
   }
 
   async init() {
-    logger.info('🎵 Initializing Rainwave service')
+    log.info('Initializing Rainwave service')
   }
 
   async start(stationId: number = RAINWAVE_STATIONS.COVERS) {
@@ -60,7 +63,7 @@ class RainwaveService {
       this.fetchNowPlaying()
     }, 10000)
 
-    logger.info(`🎵 Started Rainwave polling for station ${stationId}`)
+    log.info('Started Rainwave polling', { stationId })
   }
 
   stop() {
@@ -73,7 +76,7 @@ class RainwaveService {
     this.currentData.currentSong = undefined
     displayManager.update('rainwave', this.currentData)
 
-    logger.info('🎵 Stopped Rainwave polling')
+    log.info('Stopped Rainwave polling')
   }
 
   private async fetchNowPlaying() {
@@ -118,7 +121,7 @@ class RainwaveService {
       // If user is not listening to any station, clear the current song
       if (!activeStation || !activeData) {
         this.currentData.currentSong = undefined
-        logger.debug('User is not currently listening to Rainwave')
+        log.debug('User is not currently listening to Rainwave')
         displayManager.update('rainwave', this.currentData)
         return
       }
@@ -126,7 +129,7 @@ class RainwaveService {
       // Update the station if it changed
       if (activeStation !== this.currentData.stationId) {
         this.currentData.stationId = activeStation
-        logger.info(`User switched to station ${activeStation}`)
+        log.info('User switched station', { stationId: activeStation })
       }
 
       const data = activeData
@@ -160,13 +163,13 @@ class RainwaveService {
       } else {
         // User is not listening, clear the current song
         this.currentData.currentSong = undefined
-        logger.debug('User is not currently listening to Rainwave')
+        log.debug('User is not currently listening to Rainwave')
       }
 
       // Update display manager directly
       displayManager.update('rainwave', this.currentData)
     } catch (error) {
-      logger.error('Failed to fetch Rainwave data:', error)
+      log.error('Failed to fetch Rainwave data', { error })
     }
   }
 

@@ -2,10 +2,11 @@ import { z } from 'zod'
 import { router, publicProcedure } from '@/trpc'
 import { TRPCError } from '@trpc/server'
 import { eventEmitter } from '@/events'
-import { createLogger } from '@/lib/logger'
+import { createLogger } from '@landale/logger'
 import { createPollingSubscription } from '@/lib/subscription'
 
-const log = createLogger('ironmon')
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'ironmon-router' })
 
 export const ironmonRouter = router({
   checkpointStats: publicProcedure.input(z.object({ checkpointId: z.number() })).subscription(async function* ({
@@ -68,7 +69,7 @@ export const ironmonRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in IronMON init subscription', error)
+      log.error('Error in IronMON init subscription', { error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream IronMON init events'
@@ -85,7 +86,7 @@ export const ironmonRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in IronMON seed subscription', error)
+      log.error('Error in IronMON seed subscription', { error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream IronMON seed events'
@@ -102,7 +103,7 @@ export const ironmonRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in IronMON checkpoint subscription', error)
+      log.error('Error in IronMON checkpoint subscription', { error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream IronMON checkpoint events'
@@ -142,7 +143,7 @@ export const ironmonRouter = router({
         }
       }
     } catch (error) {
-      log.error('Error in combined IronMON subscription', error)
+      log.error('Error in combined IronMON subscription', { error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream IronMON events'
