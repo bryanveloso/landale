@@ -1,6 +1,7 @@
 import type { Server, ServerWebSocket } from 'bun'
 import chalk from 'chalk'
 import { createBunWSHandler, type CreateBunContextOptions } from 'trpc-bun-adapter'
+import { nanoid } from 'nanoid'
 
 import { env } from '@/lib/env'
 import * as Twitch from '@/services/twitch/handlers'
@@ -46,8 +47,13 @@ console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
 log.info('Server starting', { metadata: { environment: env.NODE_ENV, version } })
 
 const createContext = (opts: CreateBunContextOptions) => {
+  const correlationId = opts.req.headers.get('x-correlation-id') || nanoid()
+  const contextLogger = logger.child({ correlationId })
+
   return {
-    req: opts.req
+    req: opts.req,
+    correlationId,
+    logger: contextLogger
   }
 }
 
