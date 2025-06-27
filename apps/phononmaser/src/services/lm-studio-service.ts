@@ -1,6 +1,7 @@
 import { lmLogger as logger } from '@lib/logger'
 import { eventEmitter } from '@events'
 import type { AudioEvents } from '@events'
+import { avalonstarEmoteRepository, type EmoteAnalysis } from '@landale/shared'
 
 interface LMStudioConfig {
   apiUrl: string
@@ -41,8 +42,8 @@ export class LMStudioService {
 
   constructor(config?: Partial<LMStudioConfig>) {
     this.config = {
-      apiUrl: process.env.LM_STUDIO_API_URL || 'http://localhost:1234/v1',
-      model: process.env.LM_STUDIO_MODEL || 'local-model',
+      apiUrl: process.env.LM_STUDIO_API_URL || 'http://zelan:1234/v1',
+      model: process.env.LM_STUDIO_MODEL || 'dolphin-2.9.3-llama-3-8b',
       contextWindowSize: 10,
       contextWindowDuration: 120, // 2 minutes
       analysisInterval: 30, // analyze every 30 seconds
@@ -153,6 +154,9 @@ export class LMStudioService {
           }
         }
 
+        // Run emote analysis in parallel
+        void this.analyzeForEmotes(contextText)
+
         logger.info('LM Studio analysis completed', {
           metadata: {
             patterns: result.patterns,
@@ -201,6 +205,27 @@ Respond with a JSON object in this exact format:
 }`
   }
 
+  private buildEmoteAnalysisPrompt(context: string): string {
+    return `You are analyzing a streamer's spoken words to suggest appropriate emotes for their Twitch channel.
+
+Transcription: "${context}"
+
+Analyze the emotional content and suggest emotes. Consider:
+- Overall emotion (excited, frustrated, confused, happy, sad, neutral, hype, thinking)
+- Intensity level (1-10 scale)
+- Context and meaning
+
+Respond with a JSON object in this exact format:
+{
+  "emotion": "excited" | "frustrated" | "confused" | "happy" | "sad" | "neutral" | "hype" | "thinking",
+  "intensity": 1-10,
+  "triggers": ["suggested_emote_names"],
+  "shouldTrigger": true/false,
+  "confidence": 0.0-1.0,
+  "context": "brief explanation of why these emotes fit"
+}`
+  }
+
   private async callLMStudio(prompt: string): Promise<AnalysisResult | null> {
     try {
       const response = await fetch(`${this.config.apiUrl}/chat/completions`, {
@@ -221,8 +246,7 @@ Respond with a JSON object in this exact format:
             }
           ],
           temperature: 0.7,
-          max_tokens: 500,
-          response_format: { type: 'json_object' }
+          max_tokens: 500
         })
       })
 
@@ -241,13 +265,96 @@ Respond with a JSON object in this exact format:
       // Parse the JSON response
       const result = JSON.parse(content) as AnalysisResult
 
-      // Validate the response structure - no need to check as the structure is always valid after parsing
-      // The JSON.parse will throw if invalid JSON, and TypeScript ensures the type
-
       return result
     } catch (error) {
       logger.error('Failed to call LM Studio', { error: error as Error })
       return null
+    }
+  }
+
+  private async analyzeForEmotes(context: string): Promise<void> {
+    try {
+      const prompt = this.buildEmoteAnalysisPrompt(context)
+      
+      const response = await fetch(`${this.config.apiUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are analyzing streaming content for emote suggestions. Always respond with valid JSON.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 300
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`LM Studio API error: ${response.status.toString()}`)
+      }
+
+      const data = (await response.json()) as { choices: Array<{ message: { content: string } }> }
+      const firstChoice = data.choices[0]
+      const content = firstChoice ? firstChoice.message.content : undefined
+
+      if (!content) {
+        throw new Error('No content in LM Studio response')
+      }
+
+      const emoteAnalysis = JSON.parse(content) as EmoteAnalysis
+
+      if (emoteAnalysis.shouldTrigger && emoteAnalysis.confidence > 0.6) {
+        // Get emotes based on AI's emotion/intensity analysis
+        const aiSuggestedEmotes = avalonstarEmoteRepository.selectEmotesForEmotion(
+          emoteAnalysis.emotion, 
+          emoteAnalysis.intensity
+        )
+
+        // Also check for keyword matches in the transcription
+        const keywordMatches = avalonstarEmoteRepository.matchEmotesToText(context)
+        const keywordEmotes = keywordMatches.map(match => match.name)
+
+        // Combine and deduplicate
+        const allSuggestedEmotes = [...new Set([...aiSuggestedEmotes, ...keywordEmotes])]
+        
+        // Filter to only include available emotes
+        const availableEmotes = avalonstarEmoteRepository.filterAvailableEmotes(allSuggestedEmotes)
+
+        // Log the emote analysis
+        logger.info('🎭 Emote analysis completed', {
+          metadata: {
+            emotion: emoteAnalysis.emotion,
+            intensity: emoteAnalysis.intensity,
+            confidence: emoteAnalysis.confidence,
+            context: emoteAnalysis.context,
+            aiSuggested: aiSuggestedEmotes.slice(0, 3),
+            keywordMatched: keywordEmotes.slice(0, 3),
+            finalSelection: availableEmotes.slice(0, 5),
+            transcription: context.slice(0, 100) + (context.length > 100 ? '...' : '')
+          }
+        })
+
+        // Emit emote suggestion event
+        eventEmitter.emit('lm:emote_suggestion', {
+          timestamp: Date.now(),
+          analysis: emoteAnalysis,
+          suggestedEmotes: availableEmotes,
+          aiEmotes: aiSuggestedEmotes,
+          keywordEmotes: keywordEmotes,
+          transcription: context
+        })
+      }
+    } catch (error) {
+      logger.error('Failed to analyze for emotes', { error: error as Error })
     }
   }
 

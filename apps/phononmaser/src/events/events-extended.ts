@@ -11,7 +11,7 @@ export const createEventName = <T extends keyof ExtendedEvents>(event: T): T => 
 export const EventCategories = {
   audio: ['audio:started', 'audio:stopped', 'audio:chunk', 'audio:buffer_ready', 'audio:transcription'] as const,
 
-  lmStudio: ['lm:analysis_started', 'lm:analysis_completed', 'lm:pattern_detected', 'lm:error'] as const
+  lmStudio: ['lm:analysis_started', 'lm:analysis_completed', 'lm:pattern_detected', 'lm:error', 'lm:emote_suggestion'] as const
 } as const
 
 // Type-safe event subscription helper
