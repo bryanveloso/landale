@@ -14,7 +14,8 @@ export function emitEventWithCorrelation<T extends keyof EventMap>(
   correlationId?: string
 ): Promise<void> {
   const eventData = Object.assign(
-    data as Record<string, unknown>,
+    {},
+    data || {},
     {
       correlationId: correlationId || nanoid(),
       timestamp: new Date().toISOString()
