@@ -81,6 +81,12 @@ export const authedProcedure = publicProcedure.use(async (opts) => {
   const expectedKey = env.CONTROL_API_KEY
 
   if (apiKey !== expectedKey) {
+    log.warn('Unauthorized API access attempt', { 
+      metadata: { 
+        path: opts.path,
+        type: opts.type 
+      } 
+    })
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'Invalid API key'
