@@ -13,16 +13,16 @@
     "test": "vitest"
   },
   "dependencies": {
-    "pino": "^9.5.0",
+    "pino": "^9.7.0",
     "pino-pretty": "^11.3.0"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "typescript": "^5.4.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "eslint": "^8.56.0",
-    "vitest": "^2.0.0"
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.1",
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.9"
   },
   "peerDependencies": {
     "zod": "^3.22.4"
