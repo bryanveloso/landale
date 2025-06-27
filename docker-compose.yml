@@ -23,6 +23,8 @@ services:
       target: ${DOCKER_TARGET:-development}
     restart: unless-stopped
     working_dir: /app/apps/server
+    volumes:
+      - twitch_tokens:/app/apps/server/src/services/twitch
     environment:
       DATABASE_URL: postgres://landale:landale@db:5432/landale
       NODE_ENV: ${NODE_ENV:-development}
@@ -63,3 +65,4 @@ services:
 volumes:
   postgres_data:
   emotes_cache:
+  twitch_tokens:
