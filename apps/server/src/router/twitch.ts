@@ -1,18 +1,17 @@
 import { router, publicProcedure } from '@/trpc'
 import { TRPCError } from '@trpc/server'
 import { eventEmitter } from '@/events'
-import { createLogger } from '@landale/logger'
-
-const logger = createLogger({ service: 'landale-server' })
-const log = logger.child({ module: 'twitch-router' })
 
 export const twitchRouter = router({
-  onMessage: publicProcedure.subscription(async function* (opts) {
+  onMessage: publicProcedure.subscription(async function* ({ signal, ctx }) {
+    const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onMessage' })
+    
     try {
+      log.debug('Starting Twitch message subscription')
       const stream = eventEmitter.events('twitch:message')
 
       for await (const data of stream) {
-        if (opts.signal?.aborted) break
+        if (signal?.aborted) break
         yield data
       }
     } catch (error) {
@@ -27,12 +26,15 @@ export const twitchRouter = router({
     }
   }),
 
-  onFollow: publicProcedure.subscription(async function* (opts) {
+  onFollow: publicProcedure.subscription(async function* ({ signal, ctx }) {
+    const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onFollow' })
+    
     try {
+      log.debug('Starting Twitch follow subscription')
       const stream = eventEmitter.events('twitch:follow')
 
       for await (const data of stream) {
-        if (opts.signal?.aborted) break
+        if (signal?.aborted) break
         yield data
       }
     } catch (error) {
@@ -42,15 +44,20 @@ export const twitchRouter = router({
         message: 'Failed to stream Twitch follows',
         cause: error
       })
+    } finally {
+      log.debug('Twitch follow subscription ended')
     }
   }),
 
-  onSubscription: publicProcedure.subscription(async function* (opts) {
+  onSubscription: publicProcedure.subscription(async function* ({ signal, ctx }) {
+    const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onSubscription' })
+    
     try {
+      log.debug('Starting Twitch subscription subscription')
       const stream = eventEmitter.events('twitch:subscription')
 
       for await (const data of stream) {
-        if (opts.signal?.aborted) break
+        if (signal?.aborted) break
         yield data
       }
     } catch (error) {
@@ -60,15 +67,20 @@ export const twitchRouter = router({
         message: 'Failed to stream Twitch subscriptions',
         cause: error
       })
+    } finally {
+      log.debug('Twitch subscription subscription ended')
     }
   }),
 
-  onSubscriptionGift: publicProcedure.subscription(async function* (opts) {
+  onSubscriptionGift: publicProcedure.subscription(async function* ({ signal, ctx }) {
+    const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onSubscriptionGift' })
+    
     try {
+      log.debug('Starting Twitch gift subscription subscription')
       const stream = eventEmitter.events('twitch:subscription:gift')
 
       for await (const data of stream) {
-        if (opts.signal?.aborted) break
+        if (signal?.aborted) break
         yield data
       }
     } catch (error) {
@@ -78,15 +90,20 @@ export const twitchRouter = router({
         message: 'Failed to stream Twitch gift subscriptions',
         cause: error
       })
+    } finally {
+      log.debug('Twitch gift subscription subscription ended')
     }
   }),
 
-  onSubscriptionMessage: publicProcedure.subscription(async function* (opts) {
+  onSubscriptionMessage: publicProcedure.subscription(async function* ({ signal, ctx }) {
+    const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onSubscriptionMessage' })
+    
     try {
+      log.debug('Starting Twitch resub subscription')
       const stream = eventEmitter.events('twitch:subscription:message')
 
       for await (const data of stream) {
-        if (opts.signal?.aborted) break
+        if (signal?.aborted) break
         yield data
       }
     } catch (error) {
@@ -96,15 +113,20 @@ export const twitchRouter = router({
         message: 'Failed to stream Twitch resubs',
         cause: error
       })
+    } finally {
+      log.debug('Twitch resub subscription ended')
     }
   }),
 
-  onRedemption: publicProcedure.subscription(async function* (opts) {
+  onRedemption: publicProcedure.subscription(async function* ({ signal, ctx }) {
+    const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onRedemption' })
+    
     try {
+      log.debug('Starting Twitch redemption subscription')
       const stream = eventEmitter.events('twitch:redemption')
 
       for await (const data of stream) {
-        if (opts.signal?.aborted) break
+        if (signal?.aborted) break
         yield data
       }
     } catch (error) {
@@ -114,15 +136,20 @@ export const twitchRouter = router({
         message: 'Failed to stream Twitch redemptions',
         cause: error
       })
+    } finally {
+      log.debug('Twitch redemption subscription ended')
     }
   }),
 
-  onStreamOnline: publicProcedure.subscription(async function* (opts) {
+  onStreamOnline: publicProcedure.subscription(async function* ({ signal, ctx }) {
+    const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onStreamOnline' })
+    
     try {
+      log.debug('Starting Twitch stream online subscription')
       const stream = eventEmitter.events('twitch:stream:online')
 
       for await (const data of stream) {
-        if (opts.signal?.aborted) break
+        if (signal?.aborted) break
         yield data
       }
     } catch (error) {
@@ -132,15 +159,20 @@ export const twitchRouter = router({
         message: 'Failed to stream Twitch online events',
         cause: error
       })
+    } finally {
+      log.debug('Twitch stream online subscription ended')
     }
   }),
 
-  onStreamOffline: publicProcedure.subscription(async function* (opts) {
+  onStreamOffline: publicProcedure.subscription(async function* ({ signal, ctx }) {
+    const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onStreamOffline' })
+    
     try {
+      log.debug('Starting Twitch stream offline subscription')
       const stream = eventEmitter.events('twitch:stream:offline')
 
       for await (const data of stream) {
-        if (opts.signal?.aborted) break
+        if (signal?.aborted) break
         yield data
       }
     } catch (error) {
@@ -150,6 +182,8 @@ export const twitchRouter = router({
         message: 'Failed to stream Twitch offline events',
         cause: error
       })
+    } finally {
+      log.debug('Twitch stream offline subscription ended')
     }
   })
 })

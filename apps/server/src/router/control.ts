@@ -99,10 +99,12 @@ export const controlRouter = router({
       }),
 
       update: publicProcedure.input(emoteRainConfigSchema.partial()).subscription(async function* ({ input, ctx }) {
+        const log = ctx.logger.child({ module: 'control-router', subscription: 'emoteRain.update' })
+        
         overlayConfigs.emoteRain = { ...overlayConfigs.emoteRain, ...input }
 
         void emitEventWithCorrelation('config:emoteRain:updated', overlayConfigs.emoteRain, ctx.correlationId)
-        ctx.logger.info('Emote rain config updated', { metadata: { config: input } })
+        log.info('Emote rain config updated', { metadata: { config: input } })
 
         yield overlayConfigs.emoteRain
       }),
@@ -115,14 +117,18 @@ export const controlRouter = router({
           })
         )
         .subscription(async function* ({ input, ctx }) {
+          const log = ctx.logger.child({ module: 'control-router', subscription: 'emoteRain.burst' })
+          
           void emitEventWithCorrelation('emoteRain:burst', input, ctx.correlationId)
-          ctx.logger.info('Manual emote burst triggered', { metadata: { emoteId: input.emoteId, count: input.count } })
+          log.info('Manual emote burst triggered', { metadata: { emoteId: input.emoteId, count: input.count } })
           yield { success: true }
         }),
 
       clear: publicProcedure.subscription(async function* ({ ctx }) {
+        const log = ctx.logger.child({ module: 'control-router', subscription: 'emoteRain.clear' })
+        
         void emitEventWithCorrelation('emoteRain:clear', undefined, ctx.correlationId)
-        ctx.logger.info('Emote rain cleared')
+        log.info('Emote rain cleared')
         yield { success: true }
       })
     })

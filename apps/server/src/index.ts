@@ -34,6 +34,7 @@ export type { Display } from './services/display-manager'
 
 interface WSData {
   req: Request
+  correlationId: string
 }
 
 interface ExtendedWebSocket extends ServerWebSocket<WSData> {
@@ -47,7 +48,15 @@ console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
 log.info('Server starting', { metadata: { environment: env.NODE_ENV, version } })
 
 const createContext = (opts: CreateBunContextOptions) => {
-  const correlationId = opts.req.headers.get('x-correlation-id') || nanoid()
+  // For WebSocket connections, correlation ID is already in the data
+  let correlationId: string
+  if ('data' in opts && opts.data && typeof opts.data === 'object' && 'correlationId' in opts.data) {
+    correlationId = opts.data.correlationId as string
+  } else {
+    // For HTTP requests, extract from headers
+    correlationId = opts.req.headers.get('x-correlation-id') || nanoid()
+  }
+  
   const contextLogger = logger.child({ correlationId })
 
   return {
@@ -91,7 +100,8 @@ const server: Server = Bun.serve({
     }
 
     // WebSocket upgrade
-    if (server.upgrade(request, { data: { req: request } })) {
+    const correlationId = request.headers.get('x-correlation-id') || nanoid()
+    if (server.upgrade(request, { data: { req: request, correlationId } })) {
       return
     }
 
@@ -101,7 +111,15 @@ const server: Server = Bun.serve({
     ...websocket,
     open(ws) {
       const extWs = ws as unknown as ExtendedWebSocket
-      log.info('WebSocket connection opened', { metadata: { remoteAddress: extWs.remoteAddress } })
+      const correlationId = extWs.data.correlationId
+      
+      log.info('WebSocket connection opened', { 
+        metadata: { 
+          remoteAddress: extWs.remoteAddress,
+          correlationId 
+        } 
+      })
+      
       // Send a ping every 30 seconds to keep connection alive
       const pingInterval = setInterval(() => {
         if (extWs.readyState === 1) {
@@ -117,7 +135,16 @@ const server: Server = Bun.serve({
     },
     close(ws, code, reason) {
       const extWs = ws as unknown as ExtendedWebSocket
-      log.info('WebSocket connection closed', { metadata: { code, reason } })
+      const correlationId = extWs.data.correlationId
+      
+      log.info('WebSocket connection closed', { 
+        metadata: { 
+          code, 
+          reason,
+          correlationId 
+        } 
+      })
+      
       // Clear the ping interval
       if (extWs.pingInterval) {
         clearInterval(extWs.pingInterval)
