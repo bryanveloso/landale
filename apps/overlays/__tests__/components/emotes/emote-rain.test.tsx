@@ -34,15 +34,15 @@ vi.mock('matter-js', () => ({
       clear: vi.fn()
     },
     Bodies: {
-      rectangle: vi.fn((x, y, w, h, opts) => ({
+      rectangle: vi.fn((_x: number, _y: number, _w: number, _h: number, opts?: unknown) => ({
         id: Math.random(),
-        position: { x, y },
-        ...opts
+        position: { x: _x, y: _y },
+        ...((opts ?? {}) as object)
       })),
-      circle: vi.fn((x, y, r, opts) => ({
+      circle: vi.fn((_x: number, _y: number, _r: number, opts?: unknown) => ({
         id: Math.random(),
-        position: { x, y },
-        ...opts
+        position: { x: _x, y: _y },
+        ...((opts ?? {}) as object)
       }))
     },
     Body: {
@@ -87,7 +87,9 @@ describe('EmoteRain', () => {
     render(<EmoteRain />)
 
     // Check that we subscribed to the emote queue
-    expect(emoteQueue.on).toHaveBeenCalledWith('emote', expect.any(Function))
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const mockedOn = vi.mocked(emoteQueue).on
+    expect(mockedOn).toHaveBeenCalledWith('emote', expect.any(Function))
   })
 
   it('should handle window resize with throttling', async () => {
@@ -108,13 +110,15 @@ describe('EmoteRain', () => {
     const { unmount } = render(<EmoteRain />)
 
     // Get the handler that was registered
-    const handler = vi.mocked(emoteQueue.on).mock.calls[0][1]
+    const handler = vi.mocked(emoteQueue).on.mock.calls[0]?.[1]
 
     // Unmount
     unmount()
 
     // Should unsubscribe with the same handler
-    expect(emoteQueue.off).toHaveBeenCalledWith('emote', handler)
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const mockedOff = vi.mocked(emoteQueue).off
+    expect(mockedOff).toHaveBeenCalledWith('emote', handler)
   })
 
   it('should apply correct styles to container', () => {

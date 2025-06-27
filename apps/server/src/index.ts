@@ -43,9 +43,9 @@ const logger = createLogger({ service: 'landale-server' })
 const log = logger.child({ module: 'main' })
 
 console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
-log.info('Server starting', { environment: env.NODE_ENV, version })
+log.info('Server starting', { metadata: { environment: env.NODE_ENV, version } })
 
-const createContext = async (opts: CreateBunContextOptions) => {
+const createContext = (opts: CreateBunContextOptions) => {
   return {
     req: opts.req
   }
@@ -55,7 +55,7 @@ const websocket = createBunWSHandler({
   router: appRouter,
   createContext,
   onError: (error: unknown) => {
-    log.error('tRPC error occurred', { error })
+    log.error('tRPC error occurred', { error: error as Error })
   },
   batching: { enabled: true },
   // Enable WebSocket ping/pong for connection health
@@ -95,7 +95,7 @@ const server: Server = Bun.serve({
     ...websocket,
     open(ws) {
       const extWs = ws as unknown as ExtendedWebSocket
-      log.info('WebSocket connection opened', { remoteAddress: extWs.remoteAddress })
+      log.info('WebSocket connection opened', { metadata: { remoteAddress: extWs.remoteAddress } })
       // Send a ping every 30 seconds to keep connection alive
       const pingInterval = setInterval(() => {
         if (extWs.readyState === 1) {
@@ -107,24 +107,26 @@ const server: Server = Bun.serve({
       // Store interval ID on the websocket instance
       extWs.pingInterval = pingInterval
 
-      websocket.open?.(ws)
+      void websocket.open?.(ws)
     },
     close(ws, code, reason) {
       const extWs = ws as unknown as ExtendedWebSocket
-      log.info('WebSocket connection closed', { code, reason })
+      log.info('WebSocket connection closed', { metadata: { code, reason } })
       // Clear the ping interval
       if (extWs.pingInterval) {
         clearInterval(extWs.pingInterval)
         extWs.pingInterval = undefined
       }
 
-      websocket.close?.(ws, code, reason)
+      void websocket.close?.(ws, code, reason)
     },
-    message: websocket.message
+    message: websocket.message.bind(websocket)
   }
 })
 
-console.log(`  ${chalk.green('➜')}  ${chalk.bold('tRPC Server')}: ${server.hostname}:${server.port}`)
+console.log(
+  `  ${chalk.green('➜')}  ${chalk.bold('tRPC Server')}: ${server.hostname ?? 'localhost'}:${server.port?.toString() ?? '7175'}`
+)
 
 // Register displays
 displayManager.register('statusBar', statusBarConfigSchema, {
@@ -187,83 +189,82 @@ displayManager.register(
   }
 )
 
-log.info('Registered display services', { 
-  displays: ['statusBar', 'statusText', 'followerCount', 'rainwave', 'appleMusic']
+log.info('Registered display services', {
+  metadata: { displays: ['statusBar', 'statusText', 'followerCount', 'rainwave', 'appleMusic'] }
 })
 
 // Handle display updates for Rainwave
-eventEmitter.on('display:rainwave:update', (display) => {
-  rainwaveService.updateConfig(display.data)
+eventEmitter.on('display:rainwave:update', (display: unknown) => {
+  rainwaveService.updateConfig((display as { data: Parameters<typeof rainwaveService.updateConfig>[0] }).data)
 })
 
 // Handle display updates for Apple Music
-eventEmitter.on('display:appleMusic:update', (display) => {
-  appleMusicService.updateConfig(display.data)
+eventEmitter.on('display:appleMusic:update', (display: unknown) => {
+  appleMusicService.updateConfig((display as { data: Parameters<typeof appleMusicService.updateConfig>[0] }).data)
 })
 
 // Initialize IronMON TCP Server
-IronMON.initialize()
-  .then(() => {
-    log.info('IronMON TCP Server initialized successfully')
-  })
-  .catch((error) => {
-    log.error('Failed to initialize IronMON TCP Server', { error })
-  })
+try {
+  IronMON.initialize()
+  log.info('IronMON TCP Server initialized successfully')
+} catch (error) {
+  log.error('Failed to initialize IronMON TCP Server', { error: error as Error })
+}
 
 // Initialize Twitch EventSub
-Twitch.initialize()
+void Twitch.initialize()
   .then(() => {
     log.info('Twitch EventSub initialized successfully')
   })
-  .catch((error) => {
-    log.error('Failed to initialize Twitch EventSub integration', { error })
+  .catch((error: unknown) => {
+    log.error('Failed to initialize Twitch EventSub integration', { error: error as Error })
   })
 
 // Initialize OBS WebSocket
-OBS.initialize()
+void OBS.initialize()
   .then(() => {
     log.info('OBS WebSocket initialized successfully')
   })
-  .catch((error) => {
-    log.error('Failed to initialize OBS WebSocket integration', { error })
+  .catch((error: unknown) => {
+    log.error('Failed to initialize OBS WebSocket integration', { error: error as Error })
   })
 
 // Initialize Rainwave service
-rainwaveService
-  .init()
-  .then(() => {
-    log.info('Rainwave service initialized successfully')
-  })
-  .catch((error) => {
-    log.error('Failed to initialize Rainwave service', { error })
-  })
+try {
+  rainwaveService.init()
+  log.info('Rainwave service initialized successfully')
+} catch (error) {
+  log.error('Failed to initialize Rainwave service', { error: error as Error })
+}
 
 // Initialize Apple Music service (host-based)
-appleMusicService
-  .init()
-  .then(() => {
-    log.info('Apple Music service initialized successfully')
-  })
-  .catch((error) => {
-    log.error('Failed to initialize Apple Music service', { error })
-  })
+try {
+  appleMusicService.init()
+  log.info('Apple Music service initialized successfully')
+} catch (error) {
+  log.error('Failed to initialize Apple Music service', { error: error as Error })
+}
 
 // Handle graceful shutdown
-const shutdown = async (signal: string) => {
-  log.info('Shutting down server', { signal })
+const shutdown = (signal: string) => {
+  log.info('Shutting down server', { metadata: { signal } })
 
   // Notify all connected clients to reconnect
   log.info('Broadcasting reconnection notification to all clients')
 
   // Stop accepting new connections
-  server.stop()
+  void server.stop()
 
   // Cleanup other services
-  await IronMON.shutdown()
-  await OBS.shutdown()
+  IronMON.shutdown()
+  OBS.shutdown()
 
   process.exit(0)
 }
 
-process.on('SIGINT', () => shutdown('SIGINT'))
-process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => {
+  shutdown('SIGINT')
+})
+process.on('SIGTERM', () => {
+  shutdown('SIGTERM')
+})

@@ -8,22 +8,22 @@ module.exports = {
       cwd: './apps/phononmaser',
       instances: 1,
       exec_mode: 'fork',
-      
+
       // Memory management (higher for AI workloads)
       max_memory_restart: '4G',
-      
+
       // Restart behavior
       max_restarts: 10,
       min_uptime: '10s',
       restart_delay: 4000,
       exp_backoff_restart_delay: 100,
-      
+
       // Logging
       error_file: './logs/phononmaser-error.log',
       out_file: './logs/phononmaser-out.log',
       merge_logs: true,
       time: true,
-      
+
       // Environment
       env: {
         NODE_ENV: 'production',

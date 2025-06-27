@@ -69,7 +69,7 @@ export const ironmonRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in IronMON init subscription', { error })
+      log.error('Error in IronMON init subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream IronMON init events'
@@ -86,7 +86,7 @@ export const ironmonRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in IronMON seed subscription', { error })
+      log.error('Error in IronMON seed subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream IronMON seed events'
@@ -103,7 +103,7 @@ export const ironmonRouter = router({
         yield data
       }
     } catch (error) {
-      log.error('Error in IronMON checkpoint subscription', { error })
+      log.error('Error in IronMON checkpoint subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream IronMON checkpoint events'
@@ -131,25 +131,27 @@ export const ironmonRouter = router({
         unsubscribers.push(unsubscribe)
       }
 
-      while (true) {
-        if (opts.signal?.aborted) break
-
+      while (!opts.signal?.aborted) {
         if (queue.length > 0) {
           yield queue.shift()
         } else {
           yield await new Promise<unknown>((resolve) => {
-            resolveNext = (result) => resolve(result.value)
+            resolveNext = (result) => {
+              resolve(result.value)
+            }
           })
         }
       }
     } catch (error) {
-      log.error('Error in combined IronMON subscription', { error })
+      log.error('Error in combined IronMON subscription', { error: error as Error })
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to stream IronMON events'
       })
     } finally {
-      unsubscribers.forEach((fn) => fn())
+      unsubscribers.forEach((fn) => {
+        fn()
+      })
       log.debug('Combined IronMON subscription ended')
     }
   })

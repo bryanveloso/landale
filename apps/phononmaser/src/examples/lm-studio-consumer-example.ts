@@ -45,7 +45,7 @@ export class LMStudioEventForwarder {
 
     // Monitor errors
     eventEmitter.on('lm:error', (event) => {
-      logger.error('LM Studio error:', event.error)
+      logger.error('LM Studio error', { metadata: { error: event.error } })
     })
   }
 
@@ -107,12 +107,12 @@ export class LMStudioInsightStorage {
     context: string
   }) {
     // Database storage logic here
-    logger.info('Storing AI analysis', { sentiment: data.sentiment })
+    logger.info('Storing AI analysis', { metadata: { sentiment: data.sentiment } })
   }
 
   private incrementPatternCount(pattern: string, confidence: number) {
     // Pattern tracking logic here
-    logger.info('Pattern detected', { pattern, confidence })
+    logger.info('Pattern detected', { metadata: { pattern, confidence } })
   }
 }
 

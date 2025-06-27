@@ -1,16 +1,17 @@
 import type { ZodSchema } from 'zod'
 import { eventEmitter } from '@/events'
+import type { EventMap } from '@/events/types'
 import { createLogger } from '@landale/logger'
 
 const logger = createLogger({ service: 'landale-server' })
 const log = logger.child({ module: 'display-manager' })
 
-export interface Display<T = any> {
+export interface Display<T = unknown> {
   id: string
   schema: ZodSchema<T>
   data: T
   isVisible: boolean
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
   lastUpdated: string
 }
 
@@ -20,9 +21,9 @@ export class DisplayManager {
   /**
    * Register a new display with schema validation
    */
-  register<T>(id: string, schema: ZodSchema<T>, defaultData: T, metadata?: Record<string, any>): void {
+  register<T>(id: string, schema: ZodSchema<T>, defaultData: T, metadata?: Record<string, unknown>): void {
     if (this.displays.has(id)) {
-      log.warn('Display already registered, skipping', { displayId: id })
+      log.warn('Display already registered, skipping', { metadata: { displayId: id } })
       return
     }
 
@@ -39,7 +40,7 @@ export class DisplayManager {
     }
 
     this.displays.set(id, display)
-    log.info('Registered display', { displayId: id })
+    log.info('Registered display', { metadata: { displayId: id } })
   }
 
   /**
@@ -52,7 +53,7 @@ export class DisplayManager {
     }
 
     // Merge and validate
-    const merged = { ...display.data, ...data }
+    const merged = { ...(display.data as T), ...data }
     const validated = display.schema.parse(merged)
 
     // Update display
@@ -60,9 +61,9 @@ export class DisplayManager {
     display.lastUpdated = new Date().toISOString()
 
     // Emit update event
-    eventEmitter.emit(`display:${id}:update`, display)
+    void eventEmitter.emit(`display:${id}:update`, display)
 
-    log.debug('Updated display', { displayId: id, data: validated })
+    log.debug('Updated display', { metadata: { displayId: id, data: validated } })
 
     return display as Display<T>
   }
@@ -79,7 +80,7 @@ export class DisplayManager {
     display.isVisible = isVisible
     display.lastUpdated = new Date().toISOString()
 
-    eventEmitter.emit(`display:${id}:update`, display)
+    void eventEmitter.emit(`display:${id}:update`, display)
 
     return display
   }
@@ -94,8 +95,8 @@ export class DisplayManager {
   /**
    * Get display data (throws if not found)
    */
-  getData<T>(id: string): T {
-    const display = this.get<T>(id)
+  getData(id: string): unknown {
+    const display = this.get(id)
     if (!display) {
       throw new Error(`Display ${id} not found`)
     }
@@ -130,30 +131,31 @@ export class DisplayManager {
     display.data = defaultData
     display.lastUpdated = new Date().toISOString()
 
-    eventEmitter.emit(`display:${id}:update` as any, display)
+    void eventEmitter.emit(`display:${id}:update` as keyof EventMap, display)
   }
 
   /**
    * Append to array field in display
    */
-  append<T>(id: string, field: string, item: any, maxItems?: number): Display<T> {
+  append<T>(id: string, field: string, item: unknown, maxItems?: number): Display<T> {
     const display = this.get<T>(id)
     if (!display) {
       throw new Error(`Display ${id} not found`)
     }
 
-    const data = display.data as any
+    const data = display.data as Record<string, unknown>
     if (!Array.isArray(data[field])) {
       throw new Error(`Field ${field} is not an array`)
     }
 
     // Append and trim if needed
-    data[field].push(item)
-    if (maxItems && data[field].length > maxItems) {
-      data[field] = data[field].slice(-maxItems)
+    const arrayField = data[field] as unknown[]
+    arrayField.push(item)
+    if (maxItems && arrayField.length > maxItems) {
+      data[field] = arrayField.slice(-maxItems)
     }
 
-    return this.update(id, data)
+    return this.update(id, data as Partial<T>)
   }
 }
 

@@ -14,7 +14,7 @@ export function StreamStatus() {
   const [streamStatus, setStreamStatus] = useState<StreamStatus>({ isLive: false })
 
   // Memoize callbacks to prevent infinite re-renders
-  const handleStreamOnline = useCallback((data: any) => {
+  const handleStreamOnline = useCallback((data: { type?: string; startDate?: string }) => {
     console.log('Stream went online:', data)
     setStreamStatus({
       isLive: true,
@@ -42,13 +42,17 @@ export function StreamStatus() {
   // Subscribe to stream online events
   const { isConnected: onlineConnected, error: onlineError } = useSubscription('twitch.onStreamOnline', undefined, {
     onData: handleStreamOnline,
-    onError: (error) => handleError(error, 'Stream online')
+    onError: (error) => {
+      handleError(error, 'Stream online')
+    }
   })
 
   // Subscribe to stream offline events
   const { isConnected: offlineConnected, error: offlineError } = useSubscription('twitch.onStreamOffline', undefined, {
     onData: handleStreamOffline,
-    onError: (error) => handleError(error, 'Stream offline')
+    onError: (error) => {
+      handleError(error, 'Stream offline')
+    }
   })
 
   // Calculate uptime
@@ -57,7 +61,9 @@ export function StreamStatus() {
 
     const interval = setInterval(() => {
       const now = new Date()
-      const diff = now.getTime() - streamStatus.startedAt!.getTime()
+      const startTime = streamStatus.startedAt
+      if (!startTime) return
+      const diff = now.getTime() - startTime.getTime()
       const hours = Math.floor(diff / (1000 * 60 * 60))
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
       const seconds = Math.floor((diff % (1000 * 60)) / 1000)
@@ -68,7 +74,9 @@ export function StreamStatus() {
       }))
     }, 1000)
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+    }
   }, [streamStatus.isLive, streamStatus.startedAt])
 
   const isConnected = onlineConnected && offlineConnected

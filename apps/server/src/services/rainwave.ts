@@ -3,6 +3,36 @@ import { createLogger } from '@landale/logger'
 import { displayManager } from '@/services/display-manager'
 import type { RainwaveNowPlaying } from '@landale/shared'
 
+interface RainwaveArtist {
+  name: string
+}
+
+interface RainwaveAlbum {
+  name: string
+  art?: string
+}
+
+interface RainwaveSong {
+  title: string
+  artists?: RainwaveArtist[]
+  albums?: RainwaveAlbum[]
+  length: number
+  url?: string
+}
+
+interface RainwaveApiResponse {
+  user?: {
+    id?: number | string
+  }
+  station_name?: string
+  sched_current?: {
+    songs?: RainwaveSong[]
+    start_actual?: number
+    start?: number
+    end?: number
+  }
+}
+
 const logger = createLogger({ service: 'landale-server' })
 const log = logger.child({ module: 'rainwave' })
 
@@ -43,7 +73,7 @@ class RainwaveService {
     isEnabled: false
   }
 
-  async init() {
+  init() {
     log.info('Initializing Rainwave service')
   }
 
@@ -60,10 +90,10 @@ class RainwaveService {
 
     // Poll every 10 seconds
     this.pollInterval = setInterval(() => {
-      this.fetchNowPlaying()
+      void this.fetchNowPlaying()
     }, 10000)
 
-    log.info('Started Rainwave polling', { stationId })
+    log.info('Started Rainwave polling', { metadata: { stationId } })
   }
 
   stop() {
@@ -84,7 +114,7 @@ class RainwaveService {
       // Check all stations to find where the user is listening
       const stations = [1, 2, 3, 4, 5] // All station IDs
       let activeStation: number | null = null
-      let activeData: Record<string, any> | null = null
+      let activeData: RainwaveApiResponse | null = null
 
       for (const stationId of stations) {
         const formData = new URLSearchParams()
@@ -108,10 +138,10 @@ class RainwaveService {
           continue
         }
 
-        const data = (await response.json()) as any
+        const data = (await response.json()) as RainwaveApiResponse
 
         // Check if user is listening to this station
-        if (data.user && data.user.id && data.user.id.toString() === this.currentData.userId) {
+        if (data.user?.id && String(data.user.id) === this.currentData.userId) {
           activeStation = stationId
           activeData = data
           break
@@ -129,30 +159,30 @@ class RainwaveService {
       // Update the station if it changed
       if (activeStation !== this.currentData.stationId) {
         this.currentData.stationId = activeStation
-        log.info('User switched station', { stationId: activeStation })
+        log.info('User switched station', { metadata: { stationId: activeStation } })
       }
 
       const data = activeData
 
       // Check if the user is currently listening
       // The user object should only exist if authenticated and listening
-      const isListening = !!(data.user && data.user.id && data.user.id.toString() === this.currentData.userId)
+      const isListening = !!(data.user?.id && String(data.user.id) === this.currentData.userId)
 
       if (isListening) {
         // Extract current song info from the response
         const sched = data.sched_current
-        if (sched && sched.songs && sched.songs.length > 0) {
+        if (sched?.songs && sched.songs.length > 0) {
           const song = sched.songs[0]
 
-          this.currentData.currentSong = {
+          this.currentData.currentSong = song && {
             title: song.title,
-            artist: song.artists ? song.artists.map((a: any) => a.name).join(', ') : 'Unknown',
-            album: song.albums ? song.albums[0].name : 'Unknown',
+            artist: song.artists ? song.artists.map((a) => a.name).join(', ') : 'Unknown',
+            album: song.albums?.[0]?.name ?? 'Unknown',
             length: song.length || 0,
             startTime: sched.start_actual || sched.start || Date.now() / 1000,
-            endTime: sched.end || sched.start + song.length || Date.now() / 1000 + (song.length || 0),
-            url: song.url || undefined,
-            albumArt: song.albums && song.albums[0].art ? `https://rainwave.cc${song.albums[0].art}_320.jpg` : undefined
+            endTime: sched.end || (sched.start ?? 0) + song.length || Date.now() / 1000 + (song.length || 0),
+            url: song.url,
+            albumArt: song.albums?.[0]?.art ? `https://rainwave.cc${song.albums[0].art}_320.jpg` : undefined
           }
         }
 
@@ -169,7 +199,7 @@ class RainwaveService {
       // Update display manager directly
       displayManager.update('rainwave', this.currentData)
     } catch (error) {
-      log.error('Failed to fetch Rainwave data', { error })
+      log.error('Failed to fetch Rainwave data', { error: error as Error })
     }
   }
 
@@ -184,7 +214,7 @@ class RainwaveService {
     // Handle enable/disable
     if (config.isEnabled !== undefined && config.isEnabled !== wasEnabled) {
       if (config.isEnabled) {
-        this.start(this.currentData.stationId)
+        void this.start(this.currentData.stationId)
       } else {
         this.stop()
       }
@@ -192,7 +222,7 @@ class RainwaveService {
 
     // Handle station change
     if (config.stationId && config.stationId !== this.currentData.stationId && this.currentData.isEnabled) {
-      this.start(config.stationId)
+      void this.start(config.stationId)
     }
 
     // Don't emit rainwave:update here to prevent circular updates

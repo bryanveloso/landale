@@ -33,10 +33,12 @@ export const publicProcedure = t.procedure.use(async (opts) => {
 
     if (!result.ok) {
       log.error('Procedure failed', {
-        path: opts.path,
-        type: opts.type,
-        durationMs,
-        error: result.error
+        error: result.error,
+        metadata: {
+          path: opts.path,
+          type: opts.type,
+          durationMs
+        }
       })
     }
 
@@ -44,17 +46,19 @@ export const publicProcedure = t.procedure.use(async (opts) => {
   } catch (error) {
     const durationMs = Date.now() - start
     log.error('Unexpected error in procedure', {
-      path: opts.path,
-      type: opts.type,
-      durationMs,
-      error
+      error: error as Error,
+      metadata: {
+        path: opts.path,
+        type: opts.type,
+        durationMs
+      }
     })
     throw error
   }
 })
 
 export const authedProcedure = publicProcedure.use(async (opts) => {
-  const apiKey = opts.ctx.req?.headers?.get('x-api-key')
+  const apiKey = opts.ctx.req?.headers.get('x-api-key')
   const expectedKey = env.CONTROL_API_KEY
 
   if (apiKey !== expectedKey) {

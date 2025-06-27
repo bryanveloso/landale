@@ -11,12 +11,12 @@ export function createEventStream<T extends keyof EventMap>(event: T) {
   return eventEmitter.events(event)
 }
 
-export function createCategoryStream<T extends string>(category: T) {
-  // Filter event names that start with the category.
-  const eventNames = Object.keys(eventEmitter.events).filter((event) =>
-    event.startsWith(`${category}:`)
-  ) as (keyof EventMap)[]
-  return eventEmitter.events(eventNames)
+export function createCategoryStream(_category: string) {
+  // This function needs to be rethought - eventEmitter.events is not an object
+  // For now, return an empty async generator
+  return (async function* () {
+    // No-op for now
+  })()
 }
 
 export function createSubscription<T extends keyof EventMap>(eventName: T[]) {

@@ -18,7 +18,7 @@ const DOCKER_SERVICES = ['server', 'overlays', 'db']
 const COMMANDS = {
   status: 'Check status of all services',
   start: 'Start a service',
-  stop: 'Stop a service', 
+  stop: 'Stop a service',
   restart: 'Restart a service',
   logs: 'View service logs',
   deploy: 'Deploy latest code and restart'
@@ -46,11 +46,11 @@ async function runOnHost(host: string, command: string) {
 
 async function status() {
   console.log(chalk.bold('\n🔍 Checking service health...\n'))
-  
+
   for (const [service, host] of Object.entries(SERVICE_LOCATIONS)) {
     await checkServiceStatus(service, host)
   }
-  
+
   console.log('')
 }
 
@@ -59,15 +59,15 @@ async function start(serviceName?: string) {
     console.error(chalk.red('Please specify a service to start'))
     return
   }
-  
+
   const host = SERVICE_LOCATIONS[serviceName as keyof typeof SERVICE_LOCATIONS]
   if (!host) {
     console.error(chalk.red(`Unknown service: ${serviceName}`))
     return
   }
-  
+
   console.log(chalk.blue(`Starting ${serviceName} on ${host}...`))
-  
+
   if (DOCKER_SERVICES.includes(serviceName)) {
     await runOnHost(host, `cd /opt/landale && docker compose up -d ${serviceName}`)
   } else {
@@ -80,15 +80,15 @@ async function stop(serviceName?: string) {
     console.error(chalk.red('Please specify a service to stop'))
     return
   }
-  
+
   const host = SERVICE_LOCATIONS[serviceName as keyof typeof SERVICE_LOCATIONS]
   if (!host) {
     console.error(chalk.red(`Unknown service: ${serviceName}`))
     return
   }
-  
+
   console.log(chalk.blue(`Stopping ${serviceName} on ${host}...`))
-  
+
   if (DOCKER_SERVICES.includes(serviceName)) {
     await runOnHost(host, `cd /opt/landale && docker compose stop ${serviceName}`)
   } else {
@@ -101,15 +101,15 @@ async function restart(serviceName?: string) {
     console.error(chalk.red('Please specify a service to restart'))
     return
   }
-  
+
   const host = SERVICE_LOCATIONS[serviceName as keyof typeof SERVICE_LOCATIONS]
   if (!host) {
     console.error(chalk.red(`Unknown service: ${serviceName}`))
     return
   }
-  
+
   console.log(chalk.blue(`Restarting ${serviceName} on ${host}...`))
-  
+
   if (DOCKER_SERVICES.includes(serviceName)) {
     await runOnHost(host, `cd /opt/landale && docker compose restart ${serviceName}`)
   } else {
@@ -122,74 +122,72 @@ async function logs(serviceName?: string) {
     console.error(chalk.red('Please specify a service'))
     return
   }
-  
+
   const host = SERVICE_LOCATIONS[serviceName as keyof typeof SERVICE_LOCATIONS]
   if (!host) {
     console.error(chalk.red(`Unknown service: ${serviceName}`))
     return
   }
-  
+
   console.log(chalk.blue(`Streaming logs for ${serviceName} on ${host}...`))
   console.log(chalk.gray('Press Ctrl+C to stop\n'))
-  
+
   // Stream logs in real-time
   const command = DOCKER_SERVICES.includes(serviceName)
     ? `cd /opt/landale && docker compose logs -f ${serviceName}`
     : `pm2 logs ${serviceName} --lines 50`
-    
+
   const proc = Bun.spawn(['ssh', host, command], {
     stdout: 'inherit',
     stderr: 'inherit'
   })
-  
+
   await proc.exited
 }
 
 async function deploy(serviceName?: string) {
-  const host = serviceName 
-    ? SERVICE_LOCATIONS[serviceName as keyof typeof SERVICE_LOCATIONS]
-    : null
-    
+  const host = serviceName ? SERVICE_LOCATIONS[serviceName as keyof typeof SERVICE_LOCATIONS] : null
+
   if (serviceName && !host) {
     console.error(chalk.red(`Unknown service: ${serviceName}`))
     return
   }
-  
+
   const hosts = host ? [host] : [...new Set(Object.values(SERVICE_LOCATIONS))]
-  
+
   for (const targetHost of hosts) {
     console.log(chalk.bold(`\n📦 Deploying to ${targetHost}...\n`))
-    
+
     // Pull latest code
     console.log(chalk.blue('Pulling latest code...'))
     await runOnHost(targetHost, 'cd /opt/landale && git pull')
-    
+
     // Install dependencies
     console.log(chalk.blue('Installing dependencies...'))
     await runOnHost(targetHost, 'cd /opt/landale && bun install')
-    
+
     // Build
     console.log(chalk.blue('Building services...'))
     await runOnHost(targetHost, 'cd /opt/landale && bun run build')
-    
+
     // Restart services on this host
     const servicesOnHost = Object.entries(SERVICE_LOCATIONS)
       .filter(([_, h]) => h === targetHost)
       .map(([s]) => s)
-    
+
     for (const service of servicesOnHost) {
       console.log(chalk.blue(`Restarting ${service}...`))
       await runOnHost(targetHost, `pm2 restart ${service}`)
     }
   }
-  
+
   console.log(chalk.green('\n✅ Deployment complete!\n'))
 }
 
 // Main CLI
 async function main() {
   const [command, ...args] = process.argv.slice(2)
-  
+
   if (!command || command === 'help') {
     console.log(chalk.bold('\n🚀 Landale Service Manager\n'))
     console.log('Usage: bun run manage [command] [service]\n')
@@ -204,7 +202,7 @@ async function main() {
     console.log('')
     return
   }
-  
+
   switch (command) {
     case 'status':
       await status()

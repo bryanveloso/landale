@@ -10,7 +10,7 @@ export type ControlEvent = {
   sourcePing: { id: string }
   overlayConfigUpdated: { overlayId: string; config: Record<string, unknown> }
   emoteRainBurst: { emoteId?: string; count: number }
-  emoteRainClear: void
+  emoteRainClear: undefined
   sourceReload: string
   statusBarUpdate: StatusBarState
   statusTextUpdate: StatusTextState
@@ -18,21 +18,49 @@ export type ControlEvent = {
 
 // OBS event types - these match the events emitted by the OBS service
 export type OBSEvent = {
-  connectionChanged: any
-  scenesUpdated: any
-  sceneCurrentChanged: any
-  scenePreviewChanged: any
-  sceneListChanged: any
-  streamingUpdated: any
-  streamStateChanged: any
-  recordingUpdated: any
-  recordStateChanged: any
-  studioModeUpdated: any
-  studioModeChanged: any
-  virtualCamUpdated: any
-  virtualCamChanged: any
-  replayBufferUpdated: any
-  replayBufferChanged: any
+  connectionChanged: {
+    connected: boolean
+    connectionState: 'disconnected' | 'connecting' | 'connected' | 'error'
+    lastError?: string
+    lastConnected?: Date
+    obsStudioVersion?: string
+    obsWebSocketVersion?: string
+    negotiatedRpcVersion?: number
+  }
+  scenesUpdated: {
+    current: string | null
+    preview: string | null
+    list: Array<{ sceneName?: string; sceneIndex?: number; sceneUuid?: string; [key: string]: unknown }>
+  }
+  sceneCurrentChanged: { sceneName: string; sceneUuid?: string }
+  scenePreviewChanged: { sceneName: string; sceneUuid?: string }
+  sceneListChanged: { scenes: Array<{ sceneName?: string; sceneIndex?: number; sceneUuid?: string }> }
+  streamingUpdated: {
+    active: boolean
+    reconnecting: boolean
+    timecode: string
+    duration: number
+    congestion: number
+    bytes: number
+    skippedFrames: number
+    totalFrames: number
+  }
+  streamStateChanged: { outputActive: boolean; outputState: string }
+  recordingUpdated: {
+    active: boolean
+    paused: boolean
+    timecode: string
+    duration: number
+    bytes: number
+    outputPath?: string
+  }
+  recordStateChanged: { outputActive: boolean; outputState: string; outputPaused?: boolean }
+  studioModeUpdated: { enabled: boolean }
+  studioModeChanged: { studioModeEnabled: boolean }
+  virtualCamUpdated: { active: boolean }
+  virtualCamChanged: { outputActive: boolean; outputState: string }
+  replayBufferUpdated: { active: boolean }
+  replayBufferChanged: { outputActive: boolean; outputState: string }
 }
 
 export type EventMap = {
@@ -75,7 +103,7 @@ export type EventMap = {
   'obs:replay-buffer:changed': OBSEvent['replayBufferChanged']
   'rainwave:update': RainwaveNowPlaying
   // Generic display events - any string after 'display:' is allowed
-  [key: `display:${string}:update`]: any
+  [key: `display:${string}:update`]: unknown
 }
 
 export type SubscriptionData<T extends keyof EventMap> = {

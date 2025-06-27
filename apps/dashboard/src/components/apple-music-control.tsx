@@ -6,7 +6,7 @@ export function AppleMusicControl() {
   const { data, display, isConnected, update, setVisibility } = useDisplay<AppleMusicNowPlaying>('appleMusic')
 
   const handleToggle = () => {
-    update({ isEnabled: !data?.isEnabled })
+    void update({ isEnabled: !data?.isEnabled })
   }
 
   return (

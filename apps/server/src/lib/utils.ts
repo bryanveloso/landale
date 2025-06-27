@@ -5,10 +5,10 @@ export function formatUptime(seconds: number): string {
   const secs = Math.floor(seconds % 60)
 
   const parts = []
-  if (days > 0) parts.push(`${days}d`)
-  if (hours > 0) parts.push(`${hours}h`)
-  if (minutes > 0) parts.push(`${minutes}m`)
-  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`)
+  if (days > 0) parts.push(`${days.toString()}d`)
+  if (hours > 0) parts.push(`${hours.toString()}h`)
+  if (minutes > 0) parts.push(`${minutes.toString()}m`)
+  if (secs > 0 || parts.length === 0) parts.push(`${secs.toString()}s`)
 
   return parts.join(' ')
 }
@@ -23,5 +23,5 @@ export function formatBytes(bytes: number): string {
     unitIndex++
   }
 
-  return `${size.toFixed(2)} ${units[unitIndex]}`
+  return `${size.toFixed(2)} ${units[unitIndex] ?? 'B'}`
 }

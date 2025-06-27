@@ -3,7 +3,7 @@ import { trpcClient } from '@/lib/trpc-client'
 import type { Display } from '@landale/shared'
 import type { UseDisplayOptions, UseDisplayReturn } from '@landale/shared'
 
-export function useDisplay<T = any>(displayId: string, options?: UseDisplayOptions): UseDisplayReturn<T> {
+export function useDisplay<T = unknown>(displayId: string, options?: UseDisplayOptions): UseDisplayReturn<T> {
   const { data: display, isConnected } = useSubscription<Display<T>>(
     'displays.subscribe',
     { id: displayId },

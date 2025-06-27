@@ -28,7 +28,7 @@ export class IronmonTCPServer {
    * Handles incoming socket connections
    */
   private handleOpen = (socket: Socket<unknown>) => {
-    log.info('TCP client connected', { remoteAddress: socket.remoteAddress })
+    log.info('TCP client connected', { metadata: { remoteAddress: socket.remoteAddress } })
     this.buffer.set(socket, '')
   }
 
@@ -54,7 +54,7 @@ export class IronmonTCPServer {
       const length = parseInt(lengthStr, 10)
 
       if (isNaN(length)) {
-        log.error('Invalid message length', { lengthStr })
+        log.error('Invalid message length', { metadata: { lengthStr } })
         buffer = ''
         break
       }
@@ -73,7 +73,7 @@ export class IronmonTCPServer {
       try {
         await this.processMessage(messageStr)
       } catch (error) {
-        log.error('Error processing message', { error })
+        log.error('Error processing message', { error: error as Error })
       }
 
       // Remove processed message from buffer
@@ -92,7 +92,7 @@ export class IronmonTCPServer {
     try {
       parsedMessage = JSON.parse(messageStr)
     } catch {
-      log.error('Failed to parse JSON', { message: messageStr })
+      log.error('Failed to parse JSON', { metadata: { message: messageStr } })
       return
     }
 
@@ -100,22 +100,22 @@ export class IronmonTCPServer {
     const parseResult = ironmonMessageSchema.safeParse(parsedMessage)
 
     if (!parseResult.success) {
-      log.error('Invalid IronMON message', { 
-        errors: parseResult.error.format() 
+      log.error('Invalid IronMON message', {
+        error: new Error('Validation failed'),
+        metadata: { errors: parseResult.error.format() }
       })
       return
     }
 
     const message = parseResult.data
-    log.debug('IronMON message received', { 
-      type: message.type, 
-      metadata: message.metadata 
+    log.debug('IronMON message received', {
+      metadata: { type: message.type, messageMetadata: message.metadata }
     })
 
     // Route to appropriate handler based on message type
     switch (message.type) {
       case 'init':
-        await handleInit(message)
+        handleInit(message)
         break
       case 'seed':
         await handleSeed(message)
@@ -124,7 +124,7 @@ export class IronmonTCPServer {
         await handleCheckpoint(message)
         break
       case 'location':
-        await handleLocation(message)
+        handleLocation(message)
         break
     }
   }
@@ -133,7 +133,7 @@ export class IronmonTCPServer {
    * Handles socket closure
    */
   private handleClose = (socket: Socket<unknown>) => {
-    log.info('TCP client disconnected', { remoteAddress: socket.remoteAddress })
+    log.info('TCP client disconnected', { metadata: { remoteAddress: socket.remoteAddress } })
     this.buffer.delete(socket)
   }
 
@@ -141,16 +141,16 @@ export class IronmonTCPServer {
    * Handles socket errors
    */
   private handleError = (socket: Socket<unknown>, error: Error) => {
-    log.error('TCP socket error', { 
-      remoteAddress: socket.remoteAddress, 
-      error: error.message 
+    log.error('TCP socket error', {
+      error: error,
+      metadata: { remoteAddress: socket.remoteAddress }
     })
   }
 
   /**
    * Starts the TCP server
    */
-  async start(): Promise<void> {
+  start(): void {
     if (this.server) {
       throw new Error('TCP server is already running')
     }
@@ -167,18 +167,17 @@ export class IronmonTCPServer {
     })
 
     console.log(
-      `  ${chalk.green('➜')}  ${chalk.bold('IronMON TCP Server')}: ${this.options.hostname}:${this.options.port}`
+      `  ${chalk.green('➜')}  ${chalk.bold('IronMON TCP Server')}: ${this.options.hostname}:${this.options.port.toString()}`
     )
-    log.info('IronMON TCP Server started', { 
-      hostname: this.options.hostname, 
-      port: this.options.port 
+    log.info('IronMON TCP Server started', {
+      metadata: { hostname: this.options.hostname, port: this.options.port }
     })
   }
 
   /**
    * Stops the TCP server
    */
-  async stop(): Promise<void> {
+  stop(): void {
     if (this.server) {
       this.server.stop()
       this.server = undefined

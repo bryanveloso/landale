@@ -6,6 +6,22 @@ interface ConfigUpdateData {
   newValue?: unknown
 }
 
+function valueToString(value: unknown): string {
+  if (value === null) return 'null'
+  if (value === undefined) return 'undefined'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return '[object]'
+    }
+  }
+  // For functions and symbols
+  return '[' + typeof value + ']'
+}
+
 export function ConfigUpdateActivity({ data }: { data: unknown }) {
   const configData = data as ConfigUpdateData
 
@@ -18,9 +34,9 @@ export function ConfigUpdateActivity({ data }: { data: unknown }) {
         {configData.oldValue !== undefined && configData.newValue !== undefined && (
           <>
             <span className="text-gray-500">from</span>
-            <code className="text-xs text-gray-400">{String(configData.oldValue)}</code>
+            <code className="text-xs text-gray-400">{valueToString(configData.oldValue)}</code>
             <span className="text-gray-500">to</span>
-            <code className="text-xs text-green-300">{String(configData.newValue)}</code>
+            <code className="text-xs text-green-300">{valueToString(configData.newValue)}</code>
           </>
         )}
       </div>

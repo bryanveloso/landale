@@ -6,13 +6,13 @@ This directory contains configuration for managing Landale services across diffe
 
 - **`zelan.config.cjs`** - PM2 config for Mac Studio (zelan)
   - Runs: landale-phononmaser
-  
 - **`saya.docker-compose.md`** - Docker instructions for Mac Mini (saya)
   - Runs: landale-server, landale-overlays, postgres
 
 ## Service Management
 
 ### Mac Mini (saya) - Docker Compose
+
 ```bash
 # Services managed by Docker
 cd /opt/landale
@@ -22,6 +22,7 @@ docker compose logs -f    # View logs
 ```
 
 ### Mac Studio (zelan) - PM2
+
 ```bash
 # Services managed by PM2
 pm2 start ecosystem/zelan.config.cjs

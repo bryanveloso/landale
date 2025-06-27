@@ -39,7 +39,7 @@ function MusicWidget({ service }: { service: MusicService }) {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, '0')}`
+    return `${mins.toString()}:${secs.toString().padStart(2, '0')}`
   }
 
   useEffect(() => {
@@ -154,7 +154,7 @@ function MusicWidget({ service }: { service: MusicService }) {
             className={`h-full bg-gradient-to-r ${
               service === 'rainwave' ? 'from-blue-500 to-purple-500' : 'from-pink-500 to-purple-500'
             }`}
-            style={{ width: `${musicData.progress}%` }}
+            style={{ width: `${musicData.progress.toString()}%` }}
           />
         </div>
         <div className="flex justify-between text-xs text-gray-400">

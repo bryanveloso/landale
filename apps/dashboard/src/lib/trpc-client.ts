@@ -4,7 +4,7 @@ import type { AppRouter } from '@landale/server'
 const getWebSocketUrl = () => {
   const hostname = window.location.hostname
   const port = 7175
-  return `ws://${hostname}:${port}/`
+  return `ws://${hostname}:${port.toString()}/`
 }
 
 const wsClient = createWSClient({
@@ -21,7 +21,7 @@ const wsClient = createWSClient({
   retryDelayMs: (attemptIndex): number => {
     // Shorter delays for faster reconnection
     const delays = [500, 1000, 2000, 4000, 8000]
-    return delays[Math.min(attemptIndex, delays.length - 1)]!
+    return delays[Math.min(attemptIndex, delays.length - 1)] ?? 8000
   },
   lazy: {
     enabled: false,

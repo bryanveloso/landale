@@ -65,7 +65,7 @@ export class AudioProcessor {
         this.whisperService = undefined
       }
     } catch (error) {
-      logger.error('Failed to initialize Whisper:', error)
+      logger.error('Failed to initialize Whisper', { error: error as Error })
     }
   }
 
@@ -190,7 +190,7 @@ export class AudioProcessor {
         }
       }
     } catch (error) {
-      logger.error('Error processing audio buffer:', error)
+      logger.error('Error processing audio buffer', { error: error as Error })
     } finally {
       this.transcribing = false
     }

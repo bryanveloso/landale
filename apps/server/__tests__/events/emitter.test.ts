@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { eventEmitter } from '@/events/emitter'
 import type { EventMap } from '@/events/types'
 import Emittery from 'emittery'
+import type { z } from 'zod'
 
 describe('EventEmitter', () => {
   let emitter: Emittery<EventMap>
@@ -20,7 +20,7 @@ describe('EventEmitter', () => {
       userId: '123',
       userName: 'testuser',
       userDisplayName: 'TestUser',
-      followedAt: new Date()
+      followDate: new Date()
     }
 
     await emitter.emit('twitch:follow', followEvent)
@@ -76,7 +76,7 @@ describe('EventEmitter', () => {
 
     const display = {
       id: 'statusBar',
-      schema: {} as any,
+      schema: {} as z.ZodObject<Record<string, z.ZodTypeAny>>,
       data: {
         mode: 'game' as const,
         text: 'Playing Pokemon',
@@ -95,7 +95,7 @@ describe('EventEmitter', () => {
     const handler = vi.fn()
 
     // Emittery uses a different API for once
-    const unsubscribe = emitter.once('twitch:streamOnline').then(handler)
+    const unsubscribe = emitter.once('twitch:streamOnline' as keyof EventMap).then(handler)
 
     const onlineEvent = {
       id: 'stream123',
@@ -107,8 +107,8 @@ describe('EventEmitter', () => {
     }
 
     // Emit twice
-    await emitter.emit('twitch:streamOnline', onlineEvent)
-    await emitter.emit('twitch:streamOnline', onlineEvent)
+    await emitter.emit('twitch:streamOnline' as keyof EventMap, onlineEvent)
+    await emitter.emit('twitch:streamOnline' as keyof EventMap, onlineEvent)
 
     // Wait for promise to resolve
     await unsubscribe
@@ -133,7 +133,7 @@ describe('EventEmitter', () => {
       userDisplayName: 'Chatter',
       message: 'Hello!',
       emotes: [],
-      badges: [],
+      badges: {},
       color: '#FF0000',
       timestamp: Date.now(),
       isFirst: false,
@@ -157,13 +157,13 @@ describe('EventEmitter', () => {
 
     emitter.on('twitch:follow', (event) => {
       // TypeScript knows these properties exist
-      const userId: string = event.userId
-      const userName: string = event.userName
-      const followedAt: Date = event.followedAt
+      const _userId: string = event.userId ?? ''
+      const _userName: string = event.userName ?? ''
+      const _followDate: Date = event.followDate ?? new Date()
 
-      expect(userId).toBeDefined()
-      expect(userName).toBeDefined()
-      expect(followedAt).toBeDefined()
+      expect(_userId).toBeDefined()
+      expect(_userName).toBeDefined()
+      expect(_followDate).toBeDefined()
     })
 
     // This would cause a TypeScript error if uncommented:

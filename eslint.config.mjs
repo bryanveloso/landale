@@ -8,7 +8,18 @@ export const baseConfig = tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/.turbo/**', '**/coverage/**', 'ecosystem/**', 'packages/*/dist/**', 'packages/*/build/**']
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/.turbo/**',
+      '**/coverage/**',
+      'ecosystem/**',
+      'packages/*/dist/**',
+      'packages/*/build/**',
+      '**/*.config.js',
+      '**/*.config.mjs',
+      '**/*.config.cjs'
+    ]
   },
   {
     languageOptions: {

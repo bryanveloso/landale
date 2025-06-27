@@ -4,7 +4,7 @@ import type { Display } from '@landale/shared'
 import type { UseDisplayOptions, UseDisplayReturn } from '@landale/shared'
 import { wsLogger } from '@/lib/logger'
 
-export function useDisplay<T = any>(displayId: string, options?: UseDisplayOptions): UseDisplayReturn<T> {
+export function useDisplay<T = unknown>(displayId: string, options?: UseDisplayOptions): UseDisplayReturn<T> {
   const [display, setDisplay] = useState<Display<T> | null>(null)
   const [isConnected, setIsConnected] = useState(false)
 
@@ -15,7 +15,7 @@ export function useDisplay<T = any>(displayId: string, options?: UseDisplayOptio
         onData: (data) => {
           setDisplay(data as Display<T>)
           setIsConnected(true)
-          options?.onData?.(data.data)
+          options?.onData?.((data as Display<T>).data)
         },
         onError: (error) => {
           wsLogger.error('Display subscription error', {
@@ -31,7 +31,7 @@ export function useDisplay<T = any>(displayId: string, options?: UseDisplayOptio
     return () => {
       subscription.unsubscribe()
     }
-  }, [displayId])
+  }, [displayId, options])
 
   const update = async (data: Partial<T>) => {
     await trpcClient.displays.update.mutate({ id: displayId, data })

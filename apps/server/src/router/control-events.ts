@@ -20,28 +20,36 @@ export const obsEventsRouter = router({
       transform: (eventType, data) => {
         // Transform raw events into structured updates
         switch (eventType) {
-          case 'obs:scene:current-changed':
+          case 'obs:scene:current-changed': {
+            const typedData = data as { sceneName: string; sceneUuid?: string }
             return {
               type: 'sceneChanged',
-              scene: data.sceneName,
+              scene: typedData.sceneName,
               previousScene: obsService.getState().scenes.current
             }
-          case 'obs:scene:list-changed':
+          }
+          case 'obs:scene:list-changed': {
+            const typedData = data as { scenes: Array<{ sceneName?: string; sceneIndex?: number; sceneUuid?: string }> }
             return {
               type: 'scenesListUpdated',
-              scenes: data.scenes
+              scenes: typedData.scenes
             }
-          case 'obs:stream:state-changed':
+          }
+          case 'obs:stream:state-changed': {
+            const typedData = data as { outputActive: boolean; outputState: string; outputTimecode?: string }
             return {
               type: 'streamingStateChanged',
-              active: data.outputActive,
-              timecode: data.outputTimecode
+              active: typedData.outputActive,
+              timecode: typedData.outputTimecode
             }
-          case 'obs:studio-mode:changed':
+          }
+          case 'obs:studio-mode:changed': {
+            const typedData = data as { studioModeEnabled: boolean }
             return {
               type: 'studioModeToggled',
-              enabled: data.studioModeEnabled
+              enabled: typedData.studioModeEnabled
             }
+          }
           default:
             return null
         }
@@ -50,7 +58,7 @@ export const obsEventsRouter = router({
   }),
 
   // HTTP endpoint for initial state
-  getState: publicProcedure.query(async () => {
+  getState: publicProcedure.query(() => {
     return obsService.getState()
   })
 })

@@ -3,6 +3,7 @@ import { router, publicProcedure } from '@/trpc'
 import { TRPCError } from '@trpc/server'
 import { displayManager } from '@/services/display-manager'
 import { createEventSubscription } from '@/lib/subscription'
+import type { EventMap } from '@/events/types'
 
 export const displaysRouter = router({
   /**
@@ -38,12 +39,12 @@ export const displaysRouter = router({
     .input(
       z.object({
         id: z.string(),
-        data: z.any()
+        data: z.unknown()
       })
     )
     .mutation(({ input }) => {
       try {
-        return displayManager.update(input.id, input.data)
+        return displayManager.update(input.id, input.data as Record<string, unknown>)
       } catch (error) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -106,7 +107,7 @@ export const displaysRouter = router({
 
     // Stream updates
     yield* createEventSubscription(opts, {
-      events: [`display:${input.id}:update` as any],
+      events: [`display:${input.id}:update` as keyof EventMap],
       onError: (_error) =>
         new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -124,11 +125,11 @@ export const displaysRouter = router({
 
     // Stream all display updates
     const displayIds = displayManager.list().map((d) => d.id)
-    const events = displayIds.map((id) => `display:${id}:update` as any)
+    const events = displayIds.map((id) => `display:${id}:update` as keyof EventMap)
 
     yield* createEventSubscription(opts, {
       events,
-      transform: (_event, data) => data,
+      transform: (_event, data: unknown) => data,
       onError: (_error) =>
         new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

@@ -17,7 +17,7 @@ function RouteComponent() {
         // Process message parts to find emotes
         if (data.messageParts) {
           data.messageParts.forEach((part) => {
-            if (part.type === 'emote' && part.emote) {
+            if (part.type === 'emote') {
               // Queue the emote
               emoteQueue.queueEmote(part.emote.id)
             }

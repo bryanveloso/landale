@@ -37,12 +37,15 @@ describe('useSubscription', () => {
 
   it('should establish subscription and handle data', () => {
     const mockData = { message: 'test', timestamp: Date.now() }
-    const mockSubscribe = vi.fn((_, options) => {
+    const mockSubscribe = vi.fn((_, options: { onData: (data: unknown) => void }) => {
       // Simulate async data emission
-      setTimeout(() => options.onData(mockData), 10)
+      setTimeout(() => {
+        options.onData(mockData)
+      }, 10)
       return { unsubscribe: mockUnsubscribe }
     })
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(trpcClient.health.check.subscribe as any) = mockSubscribe
 
     const { result } = renderHook(() => useSubscription('health.check', undefined))
@@ -61,12 +64,15 @@ describe('useSubscription', () => {
 
   it('should handle connection errors', () => {
     const testError = new Error('Connection failed')
-    const mockSubscribe = vi.fn((_, options) => {
+    const mockSubscribe = vi.fn((_, options: { onError: (error: Error) => void }) => {
       // Simulate error after a short delay
-      setTimeout(() => options.onError(testError), 10)
+      setTimeout(() => {
+        options.onError(testError)
+      }, 10)
       return { unsubscribe: mockUnsubscribe }
     })
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(trpcClient.health.check.subscribe as any) = mockSubscribe
 
     const { result } = renderHook(() =>
@@ -91,6 +97,7 @@ describe('useSubscription', () => {
 
   it('should cleanup subscription on unmount', () => {
     const mockSubscribe = vi.fn(() => ({ unsubscribe: mockUnsubscribe }))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(trpcClient.health.check.subscribe as any) = mockSubscribe
 
     const { unmount } = renderHook(() => useSubscription('health.check', undefined))
@@ -103,11 +110,14 @@ describe('useSubscription', () => {
   })
 
   it('should handle changing inputs', () => {
-    const mockSubscribe = vi.fn((input, options) => {
-      setTimeout(() => options.onData({ input }), 10)
+    const mockSubscribe = vi.fn((input: unknown, options: { onData: (data: unknown) => void }) => {
+      setTimeout(() => {
+        options.onData({ input })
+      }, 10)
       return { unsubscribe: mockUnsubscribe }
     })
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(trpcClient.twitch.onMessage.subscribe as any) = mockSubscribe
 
     const { result, rerender } = renderHook(({ channel }) => useSubscription('twitch.onMessage', { channel }), {
@@ -138,11 +148,14 @@ describe('useSubscription', () => {
   })
 
   it('should schedule retry on error', () => {
-    const mockSubscribe = vi.fn((_, options) => {
-      setTimeout(() => options.onError(new Error('Failed')), 10)
+    const mockSubscribe = vi.fn((_, options: { onError: (error: Error) => void }) => {
+      setTimeout(() => {
+        options.onError(new Error('Failed'))
+      }, 10)
       return { unsubscribe: mockUnsubscribe }
     })
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(trpcClient.health.check.subscribe as any) = mockSubscribe
 
     const { result } = renderHook(() =>

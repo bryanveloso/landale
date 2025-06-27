@@ -28,7 +28,7 @@ export async function handleCheckpoint(message: CheckpointMessage): Promise<Iron
   }
 
   // Emit the event
-  eventEmitter.emit('ironmon:checkpoint', eventData)
+  void eventEmitter.emit('ironmon:checkpoint', eventData)
 
   return eventData
 }
@@ -40,7 +40,7 @@ export async function handleSeed(message: SeedMessage): Promise<IronmonEvent['se
   const { metadata } = message
 
   // Record the seed using batch operation
-  await databaseService.recordSeeds([metadata.count])
+  await databaseService.batchUpsertSeeds([metadata.count])
 
   // Prepare the event data
   const eventData: IronmonEvent['seed'] = {
@@ -51,7 +51,7 @@ export async function handleSeed(message: SeedMessage): Promise<IronmonEvent['se
   }
 
   // Emit the event
-  eventEmitter.emit('ironmon:seed', eventData)
+  void eventEmitter.emit('ironmon:seed', eventData)
 
   return eventData
 }
@@ -59,7 +59,7 @@ export async function handleSeed(message: SeedMessage): Promise<IronmonEvent['se
 /**
  * Handles init messages from IronMON Connect
  */
-export async function handleInit(message: InitMessage): Promise<IronmonEvent['init']> {
+export function handleInit(message: InitMessage): IronmonEvent['init'] {
   const eventData: IronmonEvent['init'] = {
     source: 'tcp',
     type: message.type,
@@ -67,7 +67,7 @@ export async function handleInit(message: InitMessage): Promise<IronmonEvent['in
   }
 
   // Emit the event
-  eventEmitter.emit('ironmon:init', eventData)
+  void eventEmitter.emit('ironmon:init', eventData)
 
   return eventData
 }
@@ -75,7 +75,7 @@ export async function handleInit(message: InitMessage): Promise<IronmonEvent['in
 /**
  * Handles location messages from IronMON Connect
  */
-export async function handleLocation(message: LocationMessage): Promise<IronmonEvent['location']> {
+export function handleLocation(message: LocationMessage): IronmonEvent['location'] {
   const eventData: IronmonEvent['location'] = {
     source: 'tcp',
     type: message.type,
@@ -83,7 +83,7 @@ export async function handleLocation(message: LocationMessage): Promise<IronmonE
   }
 
   // Emit the event
-  eventEmitter.emit('ironmon:location', eventData)
+  void eventEmitter.emit('ironmon:location', eventData)
 
   return eventData
 }
