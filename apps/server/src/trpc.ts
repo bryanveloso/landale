@@ -1,9 +1,10 @@
 import { initTRPC, TRPCError } from '@trpc/server'
 import { ZodError } from 'zod'
-import { createLogger } from '@/lib/logger'
+import { createLogger } from '@landale/logger'
 import { env } from '@/lib/env'
 
-const log = createLogger('trpc')
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'trpc' })
 
 export interface Context {
   req?: Request

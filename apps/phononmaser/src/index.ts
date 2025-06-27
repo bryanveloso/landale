@@ -1,9 +1,10 @@
 import { WebSocketServer, WebSocket as WSWebSocket } from 'ws'
-import { logger } from '@lib/logger'
+import { logger, wsLogger } from '@lib/logger'
 import { AudioProcessor } from '@services/audio-processor'
 import { eventEmitter } from '@events'
 import { LMStudioService } from '@services/lm-studio-service'
 import { z } from 'zod'
+import { generateCorrelationId } from '@landale/logger'
 
 // Message schemas
 const _AudioDataMessageSchema = z.object({
@@ -63,14 +64,21 @@ export class Phononmaser {
         logger.info('LM Studio not configured, AI analysis disabled')
       }
     } catch (error) {
-      logger.error('Failed to initialize LM Studio:', error)
+      logger.error('Failed to initialize LM Studio', { error: error as Error })
     }
   }
 
   private setupWebSocket() {
     this.wss.on('connection', (ws) => {
-      logger.info('New audio source connected')
+      const sessionId = generateCorrelationId()
+      const clientLogger = wsLogger.child({ sessionId })
+      
+      clientLogger.info('New audio source connected')
       this.clients.add(ws)
+      
+      // Store logger on WebSocket for consistent correlation
+      ;(ws as any).logger = clientLogger
+      ;(ws as any).sessionId = sessionId
 
       ws.on('message', (data) => {
         try {
@@ -78,7 +86,7 @@ export class Phononmaser {
           if (data instanceof Buffer) {
             // Minimum size check
             if (data.length < 28) {
-              logger.error('Binary message too small for header:', data.length)
+              clientLogger.error('Binary message too small for header', { metadata: { size: data.length } })
               return
             }
 
@@ -101,9 +109,15 @@ export class Phononmaser {
 
             // Only log header once per connection
             if (!this.headerLogged) {
-              logger.debug(
-                `Header: timestamp=${timestamp.toString()}, rate=${sampleRate.toString()}, ch=${channels.toString()}, sourceIdLen=${sourceIdLen.toString()}, sourceNameLen=${sourceNameLen.toString()}`
-              )
+              clientLogger.debug('Audio header received', {
+                metadata: {
+                  timestamp: timestamp.toString(),
+                  sampleRate,
+                  channels,
+                  sourceIdLen,
+                  sourceNameLen
+                }
+              })
               this.headerLogged = true
             }
 
@@ -119,20 +133,28 @@ export class Phononmaser {
             // Log every 100th packet to reduce spam
             if (!this.packetCounter) this.packetCounter = 0
             if (this.packetCounter++ % 100 === 0) {
-              logger.debug(
-                `Audio packet: ${sampleRate.toString()}Hz, ${channels.toString()}ch, ${bitDepth.toString()}bit, ${audioData.length.toString()} bytes from ${sourceName}`
-              )
+              clientLogger.debug('Audio packet received', {
+                metadata: {
+                  sampleRate,
+                  channels,
+                  bitDepth,
+                  size: audioData.length,
+                  sourceName
+                }
+              })
             }
 
             // Validate header values
             if (sampleRate > 192000 || channels > 8 || bitDepth > 32) {
-              logger.error('Invalid header values, skipping packet')
+              clientLogger.error('Invalid header values, skipping packet', {
+                metadata: { sampleRate, channels, bitDepth }
+              })
               return
             }
 
             // Auto-start processor if not running
             if (!this.processor.isReceiving()) {
-              logger.info('Auto-starting audio processor')
+              clientLogger.info('Auto-starting audio processor')
               this.processor.start()
             }
 
@@ -168,7 +190,7 @@ export class Phononmaser {
           } else if (typeof data === 'string') {
             dataStr = data
           } else {
-            logger.error('Unsupported data type for JSON parsing')
+            clientLogger.error('Unsupported data type for JSON parsing')
             return
           }
           const message = JSON.parse(dataStr) as unknown
@@ -182,35 +204,37 @@ export class Phononmaser {
               if (result.success) {
                 this.handleAudioData(result.data)
               } else {
-                logger.error('Invalid audio data message:', result.error)
+                clientLogger.error('Invalid audio data message', { error: result.error })
               }
             } else if (msgType === 'start' || msgType === 'stop' || msgType === 'heartbeat') {
               const result = _ControlMessageSchema.safeParse(message)
               if (result.success) {
-                this.handleControlMessage(result.data)
+                this.handleControlMessage(result.data, clientLogger)
               } else {
-                logger.error('Invalid control message:', result.error)
+                clientLogger.error('Invalid control message', { error: result.error })
               }
             }
           }
           } catch (error) {
-            logger.error('Error processing message:', error)
-            logger.error('Message type:', typeof data)
             const preview = data instanceof Buffer ? data.toString('utf8', 0, Math.min(200, data.length)) : 'Non-buffer data'
-            logger.error('Message preview:', preview)
-            if (data instanceof Buffer) {
-              logger.error('Binary data size:', data.length, 'bytes')
-            }
+            clientLogger.error('Error processing message', {
+              error: error as Error,
+              metadata: {
+                messageType: typeof data,
+                preview,
+                size: data instanceof Buffer ? data.length : undefined
+              }
+            })
         }
       })
 
       ws.on('close', () => {
-        logger.info('Audio source disconnected')
+        clientLogger.info('Audio source disconnected')
         this.clients.delete(ws)
       })
 
       ws.on('error', (error) => {
-        logger.error('WebSocket error:', error)
+        clientLogger.error('WebSocket error', { error: error as Error })
       })
 
       // Send initial status
@@ -239,16 +263,17 @@ export class Phononmaser {
     })
   }
 
-  private handleControlMessage(message: ControlMessage) {
+  private handleControlMessage(message: ControlMessage, clientLogger?: typeof logger) {
+    const log = clientLogger || logger
     switch (message.type) {
       case 'start':
-        logger.info('Audio streaming started')
+        log.info('Audio streaming started')
         this.processor.start()
         eventEmitter.emit('audio:started')
         break
 
       case 'stop':
-        logger.info('Audio streaming stopped')
+        log.info('Audio streaming stopped')
         this.processor.stop()
         eventEmitter.emit('audio:stopped')
         break

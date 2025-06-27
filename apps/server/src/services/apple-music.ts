@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { logger } from '@/lib/logger'
+import { createLogger } from '@landale/logger'
 import { displayManager } from '@/services/display-manager'
 import type { AppleMusicNowPlaying } from '@landale/shared'
 
@@ -19,6 +19,9 @@ export const appleMusicNowPlayingSchema = z.object({
   playbackState: z.enum(['playing', 'paused', 'stopped']).optional()
 })
 
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'apple-music' })
+
 class AppleMusicService {
   private currentData: AppleMusicNowPlaying = {
     isEnabled: true, // Default to enabled since it's controlled by host service
@@ -26,7 +29,7 @@ class AppleMusicService {
   }
 
   async init() {
-    logger.info('🎵 Initializing Apple Music service (host-based)')
+    log.info('Initializing Apple Music service (host-based)')
     // Don't update display manager here - it's already initialized in index.ts
   }
 
@@ -43,7 +46,7 @@ class AppleMusicService {
     // Send update to display manager
     displayManager.update('appleMusic', this.currentData)
 
-    logger.debug('🎵 Apple Music update from host:', {
+    log.debug('Apple Music update from host', {
       playbackState: data.playbackState,
       song: data.currentSong?.title
     })

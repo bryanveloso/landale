@@ -7,7 +7,7 @@ import * as Twitch from '@/services/twitch/handlers'
 import * as IronMON from '@/services/ironmon'
 import * as OBS from '@/services/obs'
 import { appRouter } from '@/router'
-import { createLogger } from '@/lib/logger'
+import { createLogger } from '@landale/logger'
 import { displayManager } from '@/services/display-manager'
 import { statusBarConfigSchema, statusTextConfigSchema } from '@/types/control'
 import { rainwaveService, rainwaveNowPlayingSchema } from '@/services/rainwave'
@@ -39,10 +39,11 @@ interface ExtendedWebSocket extends ServerWebSocket<WSData> {
   pingInterval?: NodeJS.Timeout
 }
 
-const log = createLogger('main')
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'main' })
 
 console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
-log.info(`Environment: ${env.NODE_ENV}`)
+log.info('Server starting', { environment: env.NODE_ENV, version })
 
 const createContext = async (opts: CreateBunContextOptions) => {
   return {
@@ -54,7 +55,7 @@ const websocket = createBunWSHandler({
   router: appRouter,
   createContext,
   onError: (error: unknown) => {
-    log.error('tRPC error occurred', error)
+    log.error('tRPC error occurred', { error })
   },
   batching: { enabled: true },
   // Enable WebSocket ping/pong for connection health
@@ -94,7 +95,7 @@ const server: Server = Bun.serve({
     ...websocket,
     open(ws) {
       const extWs = ws as unknown as ExtendedWebSocket
-      log.info(`WebSocket connection opened from ${extWs.remoteAddress}.`)
+      log.info('WebSocket connection opened', { remoteAddress: extWs.remoteAddress })
       // Send a ping every 30 seconds to keep connection alive
       const pingInterval = setInterval(() => {
         if (extWs.readyState === 1) {
@@ -110,7 +111,7 @@ const server: Server = Bun.serve({
     },
     close(ws, code, reason) {
       const extWs = ws as unknown as ExtendedWebSocket
-      log.info(`WebSocket connection closed: ${code} - ${reason}`)
+      log.info('WebSocket connection closed', { code, reason })
       // Clear the ping interval
       if (extWs.pingInterval) {
         clearInterval(extWs.pingInterval)
@@ -186,7 +187,9 @@ displayManager.register(
   }
 )
 
-log.info('Registered display services')
+log.info('Registered display services', { 
+  displays: ['statusBar', 'statusText', 'followerCount', 'rainwave', 'appleMusic']
+})
 
 // Handle display updates for Rainwave
 eventEmitter.on('display:rainwave:update', (display) => {
@@ -201,56 +204,56 @@ eventEmitter.on('display:appleMusic:update', (display) => {
 // Initialize IronMON TCP Server
 IronMON.initialize()
   .then(() => {
-    log.info('IronMON TCP Server initialized successfully.')
+    log.info('IronMON TCP Server initialized successfully')
   })
   .catch((error) => {
-    log.error('Failed to initialize IronMON TCP Server:', error)
+    log.error('Failed to initialize IronMON TCP Server', { error })
   })
 
 // Initialize Twitch EventSub
 Twitch.initialize()
   .then(() => {
-    log.info('Twitch EventSub initialized successfully.')
+    log.info('Twitch EventSub initialized successfully')
   })
   .catch((error) => {
-    log.error('Failed to initialize Twitch EventSub integration:', error)
+    log.error('Failed to initialize Twitch EventSub integration', { error })
   })
 
 // Initialize OBS WebSocket
 OBS.initialize()
   .then(() => {
-    log.info('OBS WebSocket initialized successfully.')
+    log.info('OBS WebSocket initialized successfully')
   })
   .catch((error) => {
-    log.error('Failed to initialize OBS WebSocket integration:', error)
+    log.error('Failed to initialize OBS WebSocket integration', { error })
   })
 
 // Initialize Rainwave service
 rainwaveService
   .init()
   .then(() => {
-    log.info('Rainwave service initialized successfully.')
+    log.info('Rainwave service initialized successfully')
   })
   .catch((error) => {
-    log.error('Failed to initialize Rainwave service:', error)
+    log.error('Failed to initialize Rainwave service', { error })
   })
 
 // Initialize Apple Music service (host-based)
 appleMusicService
   .init()
   .then(() => {
-    log.info('Apple Music service initialized successfully.')
+    log.info('Apple Music service initialized successfully')
   })
   .catch((error) => {
-    log.error('Failed to initialize Apple Music service:', error)
+    log.error('Failed to initialize Apple Music service', { error })
   })
 
 // Handle graceful shutdown
 const shutdown = async (signal: string) => {
-  console.log(`\n  🛑 Received ${signal}, shutting down server...`)
+  log.info('Shutting down server', { signal })
 
   // Notify all connected clients to reconnect
-  log.info('Broadcasting reconnection notification to all clients.')
+  log.info('Broadcasting reconnection notification to all clients')
 
   // Stop accepting new connections
   server.stop()

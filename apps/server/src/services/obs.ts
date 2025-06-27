@@ -1,9 +1,10 @@
 import { OBSWebSocket, EventSubscription } from '@omnypro/obs-websocket'
-import { createLogger } from '@/lib/logger'
+import { createLogger } from '@landale/logger'
 import { eventEmitter } from '@/events'
 import type { OBSState } from '@landale/shared'
 
-const log = createLogger('obs')
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'obs' })
 
 class OBSService {
   private obs: OBSWebSocket
@@ -65,11 +66,11 @@ class OBSService {
     // Connection events
     this.obs.on('ConnectionOpened', () => {
       log.info('OBS WebSocket connection opened')
-      log.debug('Current state after open:', this.state.connection)
+      log.debug('Current state after open', { connection: this.state.connection })
     })
 
     this.obs.on('Identified', async (data) => {
-      log.info(`OBS connected. RPC version: ${data.negotiatedRpcVersion}`)
+      log.info('OBS connected', { rpcVersion: data.negotiatedRpcVersion })
       this.updateConnectionState({
         connected: true,
         connectionState: 'connected',
@@ -92,7 +93,7 @@ class OBSService {
     })
 
     this.obs.on('ConnectionError', (error) => {
-      log.error('OBS WebSocket connection error:', error)
+      log.error('OBS WebSocket connection error', { error })
       this.updateConnectionState({
         connected: false,
         connectionState: 'error',
@@ -103,33 +104,39 @@ class OBSService {
 
     // Scene events - these map directly to OBS WebSocket event names
     this.obs.on('CurrentProgramSceneChanged', (data) => {
-      log.debug('Current program scene changed:', data.sceneName)
+      log.debug('Current program scene changed', { sceneName: data.sceneName })
       this.updateSceneState({ current: data.sceneName })
       eventEmitter.emit('obs:scene:current-changed', data)
     })
 
     this.obs.on('CurrentPreviewSceneChanged', (data) => {
-      log.debug('Current preview scene changed:', data.sceneName)
+      log.debug('Current preview scene changed', { sceneName: data.sceneName })
       this.updateSceneState({ preview: data.sceneName })
       eventEmitter.emit('obs:scene:preview-changed', data)
     })
 
     this.obs.on('SceneListChanged', (data) => {
-      log.debug('Scene list changed, count:', data.scenes.length)
+      log.debug('Scene list changed', { sceneCount: data.scenes.length })
       this.updateSceneState({ list: data.scenes })
       eventEmitter.emit('obs:scene:list-changed', data)
     })
 
     // Streaming events
     this.obs.on('StreamStateChanged', (data) => {
-      log.info(`Stream state changed: ${data.outputState} (active: ${data.outputActive})`)
+      log.info('Stream state changed', { 
+        outputState: data.outputState, 
+        outputActive: data.outputActive 
+      })
       this.updateStreamingState({ active: data.outputActive })
       eventEmitter.emit('obs:stream:state-changed', data)
     })
 
     // Recording events
     this.obs.on('RecordStateChanged', (data) => {
-      log.info(`Record state changed: ${data.outputState} (active: ${data.outputActive})`)
+      log.info('Record state changed', { 
+        outputState: data.outputState, 
+        outputActive: data.outputActive 
+      })
       this.updateRecordingState({
         active: data.outputActive,
         paused: 'outputPaused' in data ? Boolean(data.outputPaused) : false
@@ -139,34 +146,34 @@ class OBSService {
 
     // Studio mode events
     this.obs.on('StudioModeStateChanged', (data) => {
-      log.info(`Studio mode changed: ${data.studioModeEnabled}`)
+      log.info('Studio mode changed', { studioModeEnabled: data.studioModeEnabled })
       this.updateStudioModeState({ enabled: data.studioModeEnabled })
       eventEmitter.emit('obs:studio-mode:changed', data)
     })
 
     // Virtual camera events
     this.obs.on('VirtualcamStateChanged', (data) => {
-      log.info(`Virtual camera state changed: ${data.outputActive}`)
+      log.info('Virtual camera state changed', { outputActive: data.outputActive })
       this.updateVirtualCamState({ active: data.outputActive })
       eventEmitter.emit('obs:virtual-cam:changed', data)
     })
 
     // Replay buffer events
     this.obs.on('ReplayBufferStateChanged', (data) => {
-      log.info(`Replay buffer state changed: ${data.outputActive}`)
+      log.info('Replay buffer state changed', { outputActive: data.outputActive })
       this.updateReplayBufferState({ active: data.outputActive })
       eventEmitter.emit('obs:replay-buffer:changed', data)
     })
 
     // Error handling for requests
     this.obs.on('ConnectionError', (error) => {
-      log.error('OBS request error:', error)
+      log.error('OBS request error', { error })
     })
   }
 
   private updateConnectionState(update: Partial<OBSState['connection']>) {
     this.state.connection = { ...this.state.connection, ...update }
-    log.debug('Updating connection state:', this.state.connection)
+    log.debug('Updating connection state', { connection: this.state.connection })
     eventEmitter.emit('obs:connection:changed', this.state.connection)
   }
 
@@ -223,7 +230,7 @@ class OBSService {
           totalFrames: streamStatus.outputTotalFrames || 0
         })
       } catch (error) {
-        log.warn('Failed to get stream status:', error)
+        log.warn('Failed to get stream status', { error })
       }
 
       // Get recording status
@@ -237,7 +244,7 @@ class OBSService {
           bytes: recordStatus.outputBytes || 0
         })
       } catch (error) {
-        log.warn('Failed to get record status:', error)
+        log.warn('Failed to get record status', { error })
       }
 
       // Get studio mode status
@@ -245,7 +252,7 @@ class OBSService {
         const studioMode = await this.obs.call('GetStudioModeEnabled')
         this.updateStudioModeState({ enabled: studioMode.studioModeEnabled })
       } catch (error) {
-        log.warn('Failed to get studio mode status:', error)
+        log.warn('Failed to get studio mode status', { error })
       }
 
       // Get virtual cam status
@@ -253,7 +260,7 @@ class OBSService {
         const virtualCamStatus = await this.obs.call('GetVirtualCamStatus')
         this.updateVirtualCamState({ active: virtualCamStatus.outputActive })
       } catch (error) {
-        log.warn('Failed to get virtual cam status:', error)
+        log.warn('Failed to get virtual cam status', { error })
       }
 
       // Get replay buffer status
@@ -261,19 +268,21 @@ class OBSService {
         const replayBufferStatus = await this.obs.call('GetReplayBufferStatus')
         this.updateReplayBufferState({ active: replayBufferStatus.outputActive })
       } catch (error) {
-        log.warn('Failed to get replay buffer status:', error)
+        log.warn('Failed to get replay buffer status', { error })
       }
 
       log.info('Initial OBS state loaded successfully')
     } catch (error) {
-      log.error('Failed to load initial OBS state:', error)
+      log.error('Failed to load initial OBS state', { error })
     }
   }
 
   private scheduleReconnect() {
     if (this.reconnectTimer || this.reconnectAttempts >= this.maxReconnectAttempts) {
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        log.error(`Max reconnection attempts (${this.maxReconnectAttempts}) reached. Giving up.`)
+        log.error('Max reconnection attempts reached. Giving up', { 
+          maxAttempts: this.maxReconnectAttempts 
+        })
       }
       return
     }
@@ -281,7 +290,11 @@ class OBSService {
     this.reconnectAttempts++
     const delay = this.reconnectDelay * Math.min(this.reconnectAttempts, 5) // Exponential backoff with cap
 
-    log.info(`Scheduling OBS reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`)
+    log.info('Scheduling OBS reconnection', { 
+      attempt: this.reconnectAttempts, 
+      maxAttempts: this.maxReconnectAttempts, 
+      delayMs: delay 
+    })
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined
@@ -299,13 +312,13 @@ class OBSService {
     this.updateConnectionState({ connectionState: 'connecting' })
 
     try {
-      log.info(`Connecting to OBS at ${this.config.url}`)
+      log.info('Connecting to OBS', { url: this.config.url })
       // Pass undefined for password when auth is disabled
       const password = this.config.password || undefined
-      log.debug(`Using password: ${password ? 'Yes' : 'No'}`)
+      log.debug('Using password authentication', { hasPassword: !!password })
       await this.obs.connect(this.config.url, password)
     } catch (error) {
-      log.error('Failed to connect to OBS:', error)
+      log.error('Failed to connect to OBS', { error })
       this.updateConnectionState({
         connected: false,
         connectionState: 'error',
@@ -426,11 +439,11 @@ export const obsService = new OBSService()
 
 // Match IronMON and Twitch signature patterns
 export const initialize = async () => {
-  log.info('Initializing OBS service...')
+  log.info('Initializing OBS service')
   await obsService.connect()
 }
 
 export const shutdown = async () => {
-  log.info('Shutting down OBS service...')
+  log.info('Shutting down OBS service')
   await obsService.disconnect()
 }

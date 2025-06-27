@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { trpcClient } from '@/lib/trpc'
 import type { Display } from '@landale/shared'
 import type { UseDisplayOptions, UseDisplayReturn } from '@landale/shared'
+import { wsLogger } from '@/lib/logger'
 
 export function useDisplay<T = any>(displayId: string, options?: UseDisplayOptions): UseDisplayReturn<T> {
   const [display, setDisplay] = useState<Display<T> | null>(null)
@@ -17,7 +18,10 @@ export function useDisplay<T = any>(displayId: string, options?: UseDisplayOptio
           options?.onData?.(data.data)
         },
         onError: (error) => {
-          console.error(`[useDisplay] Error for ${displayId}:`, error)
+          wsLogger.error('Display subscription error', {
+            error: error as Error,
+            metadata: { displayId }
+          })
           setIsConnected(false)
           options?.onError?.(error)
         }

@@ -1,5 +1,6 @@
 import type { TCPSocketListener, Socket } from 'bun'
 import chalk from 'chalk'
+import { createLogger } from '@landale/logger'
 import { ironmonMessageSchema } from './types'
 import { handleCheckpoint, handleInit, handleSeed, handleLocation } from './handlers'
 
@@ -7,6 +8,9 @@ interface TCPServerOptions {
   port?: number
   hostname?: string
 }
+
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'ironmon-tcp' })
 
 export class IronmonTCPServer {
   private server?: TCPSocketListener
@@ -24,7 +28,7 @@ export class IronmonTCPServer {
    * Handles incoming socket connections
    */
   private handleOpen = (socket: Socket<unknown>) => {
-    console.log(`  ${chalk.green('→')}  TCP client connected: ${socket.remoteAddress}`)
+    log.info('TCP client connected', { remoteAddress: socket.remoteAddress })
     this.buffer.set(socket, '')
   }
 
@@ -50,7 +54,7 @@ export class IronmonTCPServer {
       const length = parseInt(lengthStr, 10)
 
       if (isNaN(length)) {
-        console.error(`  ${chalk.red('✗')}  Invalid message length: ${lengthStr}`)
+        log.error('Invalid message length', { lengthStr })
         buffer = ''
         break
       }
@@ -69,7 +73,7 @@ export class IronmonTCPServer {
       try {
         await this.processMessage(messageStr)
       } catch (error) {
-        console.error(`  ${chalk.red('✗')}  Error processing message:`, error)
+        log.error('Error processing message', { error })
       }
 
       // Remove processed message from buffer
@@ -88,7 +92,7 @@ export class IronmonTCPServer {
     try {
       parsedMessage = JSON.parse(messageStr)
     } catch {
-      console.error(`  ${chalk.red('✗')}  Failed to parse JSON:`, messageStr)
+      log.error('Failed to parse JSON', { message: messageStr })
       return
     }
 
@@ -96,12 +100,17 @@ export class IronmonTCPServer {
     const parseResult = ironmonMessageSchema.safeParse(parsedMessage)
 
     if (!parseResult.success) {
-      console.error(`  ${chalk.red('✗')}  Invalid IronMON message:`, parseResult.error.format())
+      log.error('Invalid IronMON message', { 
+        errors: parseResult.error.format() 
+      })
       return
     }
 
     const message = parseResult.data
-    console.log(`  ${chalk.blue('◆')}  IronMON ${message.type}: ${JSON.stringify(message.metadata)}`)
+    log.debug('IronMON message received', { 
+      type: message.type, 
+      metadata: message.metadata 
+    })
 
     // Route to appropriate handler based on message type
     switch (message.type) {
@@ -124,7 +133,7 @@ export class IronmonTCPServer {
    * Handles socket closure
    */
   private handleClose = (socket: Socket<unknown>) => {
-    console.log(`  ${chalk.yellow('←')}  TCP client disconnected: ${socket.remoteAddress}`)
+    log.info('TCP client disconnected', { remoteAddress: socket.remoteAddress })
     this.buffer.delete(socket)
   }
 
@@ -132,7 +141,10 @@ export class IronmonTCPServer {
    * Handles socket errors
    */
   private handleError = (socket: Socket<unknown>, error: Error) => {
-    console.error(`  ${chalk.red('✗')}  TCP socket error from ${socket.remoteAddress}:`, error.message)
+    log.error('TCP socket error', { 
+      remoteAddress: socket.remoteAddress, 
+      error: error.message 
+    })
   }
 
   /**
@@ -157,6 +169,10 @@ export class IronmonTCPServer {
     console.log(
       `  ${chalk.green('➜')}  ${chalk.bold('IronMON TCP Server')}: ${this.options.hostname}:${this.options.port}`
     )
+    log.info('IronMON TCP Server started', { 
+      hostname: this.options.hostname, 
+      port: this.options.port 
+    })
   }
 
   /**
@@ -167,7 +183,7 @@ export class IronmonTCPServer {
       this.server.stop()
       this.server = undefined
       this.buffer.clear()
-      console.log(`  ${chalk.yellow('•')}  IronMON TCP Server stopped`)
+      log.info('IronMON TCP Server stopped')
     }
   }
 }

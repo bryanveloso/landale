@@ -1,6 +1,9 @@
 import type { ZodSchema } from 'zod'
 import { eventEmitter } from '@/events'
-import { logger } from '@/lib/logger'
+import { createLogger } from '@landale/logger'
+
+const logger = createLogger({ service: 'landale-server' })
+const log = logger.child({ module: 'display-manager' })
 
 export interface Display<T = any> {
   id: string
@@ -19,7 +22,7 @@ export class DisplayManager {
    */
   register<T>(id: string, schema: ZodSchema<T>, defaultData: T, metadata?: Record<string, any>): void {
     if (this.displays.has(id)) {
-      logger.warn(`[DisplayManager] Display ${id} already registered, skipping`)
+      log.warn('Display already registered, skipping', { displayId: id })
       return
     }
 
@@ -36,7 +39,7 @@ export class DisplayManager {
     }
 
     this.displays.set(id, display)
-    logger.info(`[DisplayManager] Registered display: ${id}`)
+    log.info('Registered display', { displayId: id })
   }
 
   /**
@@ -59,7 +62,7 @@ export class DisplayManager {
     // Emit update event
     eventEmitter.emit(`display:${id}:update`, display)
 
-    logger.debug(`[DisplayManager] Updated display: ${id}`, { data: validated })
+    log.debug('Updated display', { displayId: id, data: validated })
 
     return display as Display<T>
   }

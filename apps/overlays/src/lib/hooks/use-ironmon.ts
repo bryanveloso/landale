@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { trpcClient } from '@/lib/trpc'
 import type { IronmonEvent } from '@landale/server'
+import { gameLogger } from '@/lib/logger'
 
 type IronmonMessage = IronmonEvent[keyof IronmonEvent]
 
@@ -28,9 +29,13 @@ export function useIronmonSubscription() {
             break
         }
 
-        // Log for debugging
-        console.log(`IronMON ${message.type}:`, message.metadata)
-        console.log('Query cache updated with:', queryClient.getQueryData(['ironmon', message.type]))
+        // Log game events at debug level
+        gameLogger.debug('IronMON event received', {
+          metadata: {
+            type: message.type,
+            data: message.metadata
+          }
+        })
       }
     })
 
