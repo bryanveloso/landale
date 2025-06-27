@@ -18,8 +18,8 @@
     "lint": "eslint --ext .ts .",
     "typecheck": "tsc --noEmit",
     "postinstall": "tsc || true",
-    "test": "vitest",
-    "test:watch": "vitest --watch"
+    "test": "bun test",
+    "test:watch": "bun test --watch"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
