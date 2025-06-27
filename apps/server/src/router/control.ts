@@ -101,7 +101,7 @@ export const controlRouter = router({
         })
       }),
 
-      update: publicProcedure.input(emoteRainConfigSchema.partial()).subscription(function* ({ input }) {
+      update: publicProcedure.input(emoteRainConfigSchema.partial()).subscription(async function* ({ input }) {
         overlayConfigs.emoteRain = { ...overlayConfigs.emoteRain, ...input }
 
         void eventEmitter.emit('config:emoteRain:updated', overlayConfigs.emoteRain)
@@ -117,13 +117,13 @@ export const controlRouter = router({
             count: z.number().min(1).max(50).default(10)
           })
         )
-        .subscription(function* ({ input }) {
+        .subscription(async function* ({ input }) {
           void eventEmitter.emit('emoteRain:burst', input)
           log.info('Manual emote burst triggered', { metadata: { emoteId: input.emoteId, count: input.count } })
           yield { success: true }
         }),
 
-      clear: publicProcedure.subscription(function* () {
+      clear: publicProcedure.subscription(async function* () {
         void eventEmitter.emit('emoteRain:clear', undefined)
         log.info('Emote rain cleared')
         yield { success: true }
@@ -168,7 +168,7 @@ export const controlRouter = router({
     }),
 
     ironmon: router({
-      current: publicProcedure.subscription(function* () {
+      current: publicProcedure.subscription(async function* () {
         yield {
           active: false,
           seed: null,
@@ -591,7 +591,7 @@ export const controlRouter = router({
   }),
 
   actions: router({
-    reloadSource: publicProcedure.input(z.object({ sourceId: z.string() })).subscription(function* ({ input }) {
+    reloadSource: publicProcedure.input(z.object({ sourceId: z.string() })).subscription(async function* ({ input }) {
       void eventEmitter.emit('source:reload', input.sourceId)
       log.info('Source reload requested', { metadata: input })
       yield { success: true }

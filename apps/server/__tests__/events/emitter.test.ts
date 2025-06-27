@@ -58,12 +58,12 @@ describe('EventEmitter', () => {
     emitter.off('ironmon:init', handler)
 
     await emitter.emit('ironmon:init', {
-      gameId: 1,
-      romName: 'Pokemon Emerald',
-      seed: '12345',
-      trainerId: 67890,
-      secretId: 12345,
-      username: 'Player'
+      type: 'init',
+      metadata: {
+        version: '1.0.0',
+        game: 2
+      },
+      source: 'tcp'
     })
 
     expect(handler).not.toHaveBeenCalled()
