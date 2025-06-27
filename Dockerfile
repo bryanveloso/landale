@@ -9,23 +9,14 @@ WORKDIR /app
 # Development stage
 FROM base AS development
 
-# Copy package files for better layer caching
+# Copy dependency manifests first for better caching
 COPY package.json bun.lock turbo.json ./
 
-# Copy ONLY package.json files to preserve layer cache
-COPY apps/overlays/package.json ./apps/overlays/
-COPY apps/server/package.json ./apps/server/
-COPY apps/phononmaser/package.json ./apps/phononmaser/
-COPY packages/database/package.json packages/database/prisma ./packages/database/
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/logger/package.json ./packages/logger/
+# Install dependencies - cached layer if lockfile unchanged  
+RUN bun install --frozen-lockfile
 
-# Install dependencies - this layer is cached if package.json files don't change
-RUN bun install
-
-# NOW copy source code - changes here won't invalidate the dependency cache
-COPY apps apps
-COPY packages packages
+# Copy entire workspace
+COPY . .
 
 # Generate Prisma client
 RUN cd packages/database && bunx prisma generate
