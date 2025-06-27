@@ -2,6 +2,8 @@ import type { TwitchEvent } from '@/services/twitch/types'
 import type { IronmonEvent } from '@/services/ironmon/types'
 import type { StatusBarState, StatusTextState } from '@/types/control'
 import type { RainwaveNowPlaying } from '@landale/shared'
+import type { PerformanceMetric, StreamHealthMetric } from '@/lib/performance'
+import type { AuditEvent } from '@/lib/audit'
 
 // Control API event types
 export type ControlEvent = {
@@ -102,6 +104,22 @@ export type EventMap = {
   'obs:replay-buffer:updated': OBSEvent['replayBufferUpdated']
   'obs:replay-buffer:changed': OBSEvent['replayBufferChanged']
   'rainwave:update': RainwaveNowPlaying
+  // Performance and audit events
+  'performance:metric': PerformanceMetric
+  'performance:critical': {
+    operation: string
+    category: string
+    duration: number
+    threshold: number
+    metadata?: Record<string, unknown>
+  }
+  'streamHealth:metric': StreamHealthMetric
+  'streamHealth:alert': {
+    alerts: string[]
+    health: StreamHealthMetric
+    timestamp: Date
+  }
+  'audit:event': AuditEvent
   // Generic display events - any string after 'display:' is allowed
   [key: `display:${string}:update`]: unknown
 }

@@ -1,6 +1,8 @@
 import { OBSWebSocket, EventSubscription } from '@omnypro/obs-websocket'
 import { createLogger } from '@landale/logger'
 import { eventEmitter } from '@/events'
+import { performanceMonitor, trackApiCall, type StreamHealthMetric } from '@/lib/performance'
+import { auditLogger, AuditAction, AuditCategory } from '@/lib/audit'
 import type { OBSState } from '@landale/shared'
 
 // Type definitions for OBS WebSocket responses
@@ -55,9 +57,13 @@ class OBSService {
   // OBS connection configuration
   private config = {
     url: process.env.OBS_WEBSOCKET_URL || 'ws://192.168.1.9:4455',
-    password: process.env.OBS_WEBSOCKET_PASSWORD || '', // yfX1E3UyKP3gTQ2e
+    password: process.env.OBS_WEBSOCKET_PASSWORD || '',
     eventSubscriptions: EventSubscription.All
   }
+
+  // Performance tracking
+  private statsPollingInterval?: NodeJS.Timeout
+  private readonly STATS_POLLING_INTERVAL = 5000 // 5 seconds
 
   constructor() {
     this.obs = new OBSWebSocket()
@@ -116,8 +122,17 @@ class OBSService {
       })
       this.reconnectAttempts = 0
 
+      // Log connection established
+      await auditLogger.logConnectionEvent('OBS', AuditAction.CONNECTION_ESTABLISHED, {
+        url: this.config.url,
+        rpcVersion: data.negotiatedRpcVersion
+      })
+
       // Load initial state after successful connection
       await this.loadInitialState()
+
+      // Start performance monitoring
+      this.startStatsPolling()
     })
 
     this.obs.on('ConnectionClosed', () => {
@@ -126,6 +141,13 @@ class OBSService {
         connected: false,
         connectionState: 'disconnected'
       })
+
+      // Stop performance monitoring
+      this.stopStatsPolling()
+
+      // Log connection lost
+      void auditLogger.logConnectionEvent('OBS', AuditAction.CONNECTION_LOST)
+
       this.scheduleReconnect()
     })
 
@@ -136,13 +158,22 @@ class OBSService {
         connectionState: 'error',
         lastError: error.message
       })
+
+      // Log connection failure
+      void auditLogger.logConnectionEvent('OBS', AuditAction.CONNECTION_FAILED, undefined, error.message)
+
       this.scheduleReconnect()
     })
 
     // Scene events - these map directly to OBS WebSocket event names
     this.obs.on('CurrentProgramSceneChanged', (data: { sceneName: string; sceneUuid?: string }) => {
       log.debug('Current program scene changed', { metadata: { sceneName: data.sceneName } })
+      const previousScene = this.state.scenes.current
       this.updateSceneState({ current: data.sceneName })
+
+      // Audit log scene change
+      void auditLogger.logSceneChange(previousScene, data.sceneName)
+
       void eventEmitter.emit('obs:scene:current-changed', data)
     })
 
@@ -167,6 +198,14 @@ class OBSService {
         metadata: { outputState: data.outputState, outputActive: data.outputActive }
       })
       this.updateStreamingState({ active: data.outputActive })
+
+      // Audit log stream state changes
+      if (data.outputActive) {
+        void auditLogger.logStreamStart(undefined, { outputState: data.outputState })
+      } else {
+        void auditLogger.logStreamStop(undefined, { outputState: data.outputState })
+      }
+
       void eventEmitter.emit('obs:stream:state-changed', data)
     })
 
@@ -181,6 +220,24 @@ class OBSService {
           active: data.outputActive,
           paused: 'outputPaused' in data ? Boolean(data.outputPaused) : false
         })
+
+        // Audit log recording state changes
+        if (data.outputActive && !this.state.recording.active) {
+          void auditLogger.log({
+            action: AuditAction.RECORDING_START,
+            category: AuditCategory.RECORDING,
+            result: 'success',
+            metadata: { outputState: data.outputState }
+          })
+        } else if (!data.outputActive && this.state.recording.active) {
+          void auditLogger.log({
+            action: AuditAction.RECORDING_STOP,
+            category: AuditCategory.RECORDING,
+            result: 'success',
+            metadata: { outputState: data.outputState }
+          })
+        }
+
         void eventEmitter.emit('obs:record:state-changed', data)
       }
     )
@@ -380,47 +437,178 @@ class OBSService {
     }
   }
 
-  // Scene controls
-  async setCurrentScene(sceneName: string) {
-    await this.obs.call('SetCurrentProgramScene', { sceneName })
+  // Performance monitoring
+  startStatsPolling() {
+    this.stopStatsPolling() // Ensure no duplicate intervals
+
+    this.statsPollingInterval = setInterval(() => {
+      void (async () => {
+        if (!this.isConnected()) return
+
+        try {
+          const stats = await this.getStats()
+
+          const healthMetric: StreamHealthMetric = {
+            fps: stats.activeFps,
+            bitrate: 0, // OBS doesn't provide bitrate directly
+            droppedFrames: stats.outputSkippedFrames,
+            totalFrames: stats.outputTotalFrames,
+            cpuUsage: stats.cpuUsage,
+            memoryUsage: stats.memoryUsage,
+            congestion: this.state.streaming.congestion,
+            timestamp: new Date()
+          }
+
+          performanceMonitor.trackStreamHealth(healthMetric)
+        } catch (error) {
+          log.debug('Failed to get OBS stats', { error: error as Error })
+
+          // Emit error state metric so dashboard knows stats are unavailable
+          performanceMonitor.trackStreamHealth({
+            fps: 0,
+            bitrate: 0,
+            droppedFrames: 0,
+            totalFrames: 0,
+            cpuUsage: 0,
+            memoryUsage: 0,
+            congestion: 0,
+            timestamp: new Date()
+          })
+        }
+      })()
+    }, this.STATS_POLLING_INTERVAL)
   }
 
-  async setPreviewScene(sceneName: string) {
-    await this.obs.call('SetCurrentPreviewScene', { sceneName })
+  stopStatsPolling() {
+    if (this.statsPollingInterval) {
+      clearInterval(this.statsPollingInterval)
+      this.statsPollingInterval = undefined
+    }
   }
 
-  async createScene(sceneName: string) {
-    await this.obs.call('CreateScene', { sceneName })
+  // Scene controls with performance tracking
+  async setCurrentScene(sceneName: string, correlationId?: string) {
+    if (!this.isConnected()) {
+      throw new Error('OBS is not connected')
+    }
+    await trackApiCall(
+      'obs',
+      'setCurrentScene',
+      async () => {
+        await this.obs.call('SetCurrentProgramScene', { sceneName })
+      },
+      { sceneName, correlationId }
+    )
   }
 
-  async removeScene(sceneName: string) {
-    await this.obs.call('RemoveScene', { sceneName })
+  async setPreviewScene(sceneName: string, correlationId?: string) {
+    if (!this.isConnected()) {
+      throw new Error('OBS is not connected')
+    }
+    await trackApiCall(
+      'obs',
+      'setPreviewScene',
+      async () => {
+        await this.obs.call('SetCurrentPreviewScene', { sceneName })
+      },
+      { sceneName, correlationId }
+    )
+  }
+
+  async createScene(sceneName: string, correlationId?: string) {
+    await trackApiCall(
+      'obs',
+      'createScene',
+      async () => {
+        await this.obs.call('CreateScene', { sceneName })
+      },
+      { sceneName, correlationId }
+    )
+  }
+
+  async removeScene(sceneName: string, correlationId?: string) {
+    await trackApiCall(
+      'obs',
+      'removeScene',
+      async () => {
+        await this.obs.call('RemoveScene', { sceneName })
+      },
+      { sceneName, correlationId }
+    )
   }
 
   // Streaming controls
-  async startStream() {
-    await this.obs.call('StartStream')
+  async startStream(correlationId?: string) {
+    if (!this.isConnected()) {
+      throw new Error('OBS is not connected')
+    }
+    await trackApiCall(
+      'obs',
+      'startStream',
+      async () => {
+        await this.obs.call('StartStream')
+      },
+      { correlationId }
+    )
   }
 
-  async stopStream() {
-    await this.obs.call('StopStream')
+  async stopStream(correlationId?: string) {
+    if (!this.isConnected()) {
+      throw new Error('OBS is not connected')
+    }
+    await trackApiCall(
+      'obs',
+      'stopStream',
+      async () => {
+        await this.obs.call('StopStream')
+      },
+      { correlationId }
+    )
   }
 
   // Recording controls
-  async startRecording() {
-    await this.obs.call('StartRecord')
+  async startRecording(correlationId?: string) {
+    await trackApiCall(
+      'obs',
+      'startRecording',
+      async () => {
+        await this.obs.call('StartRecord')
+      },
+      { correlationId }
+    )
   }
 
-  async stopRecording() {
-    await this.obs.call('StopRecord')
+  async stopRecording(correlationId?: string) {
+    await trackApiCall(
+      'obs',
+      'stopRecording',
+      async () => {
+        await this.obs.call('StopRecord')
+      },
+      { correlationId }
+    )
   }
 
-  async pauseRecording() {
-    await this.obs.call('PauseRecord')
+  async pauseRecording(correlationId?: string) {
+    await trackApiCall(
+      'obs',
+      'pauseRecording',
+      async () => {
+        await this.obs.call('PauseRecord')
+      },
+      { correlationId }
+    )
   }
 
-  async resumeRecording() {
-    await this.obs.call('ResumeRecord')
+  async resumeRecording(correlationId?: string) {
+    await trackApiCall(
+      'obs',
+      'resumeRecording',
+      async () => {
+        await this.obs.call('ResumeRecord')
+      },
+      { correlationId }
+    )
   }
 
   // Studio mode controls
@@ -499,5 +687,6 @@ export const initialize = async () => {
 
 export const shutdown = () => {
   log.info('Shutting down OBS service')
+  obsService.stopStatsPolling()
   obsService.disconnect()
 }

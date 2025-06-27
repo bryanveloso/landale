@@ -37,9 +37,7 @@ export function EmoteRainControl() {
     setIsDirty(true)
   }
 
-  const { execute: updateConfig } = useSubscriptionAction<EmoteRainConfig, EmoteRainConfig>(
-    'control.config.emoteRain.update'
-  )
+  const { execute: updateConfig } = useSubscriptionAction<EmoteRainConfig>('control.config.emoteRain.update')
 
   const handleSave = async () => {
     try {
@@ -50,9 +48,7 @@ export function EmoteRainControl() {
     }
   }
 
-  const { execute: triggerBurst } = useSubscriptionAction<{ count: number }, { success: boolean }>(
-    'control.config.emoteRain.burst'
-  )
+  const { execute: triggerBurst } = useSubscriptionAction<{ success: boolean }>('control.config.emoteRain.burst')
 
   const handleBurst = async () => {
     try {
@@ -62,9 +58,7 @@ export function EmoteRainControl() {
     }
   }
 
-  const { execute: clearEmotes } = useSubscriptionAction<undefined, { success: boolean }>(
-    'control.config.emoteRain.clear'
-  )
+  const { execute: clearEmotes } = useSubscriptionAction<{ success: boolean }>('control.config.emoteRain.clear')
 
   const handleClear = async () => {
     try {

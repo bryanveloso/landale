@@ -13,15 +13,11 @@ export function emitEventWithCorrelation<T extends keyof EventMap>(
   data: EventMap[T],
   correlationId?: string
 ): Promise<void> {
-  const eventData = Object.assign(
-    {},
-    data || {},
-    {
-      correlationId: correlationId || nanoid(),
-      timestamp: new Date().toISOString()
-    }
-  ) as EventMap[T]
-  
+  const eventData = Object.assign({}, data || {}, {
+    correlationId: correlationId || nanoid(),
+    timestamp: new Date().toISOString()
+  }) as EventMap[T]
+
   return eventEmitter.emit(event, eventData)
 }
 

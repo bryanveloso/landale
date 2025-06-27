@@ -49,10 +49,10 @@ describe('Correlation ID Tracking', () => {
         }
       }
 
-      const context = createContext({ 
+      const context = createContext({
         req: mockRequest as unknown as Request,
         resHeaders: new Headers(),
-        info: { 
+        info: {
           connectionParams: {},
           type: 'request',
           calls: [],
@@ -84,10 +84,10 @@ describe('Correlation ID Tracking', () => {
         }
       }
 
-      const context = createContext({ 
+      const context = createContext({
         req: mockRequest as unknown as Request,
         resHeaders: new Headers(),
-        info: { 
+        info: {
           connectionParams: {},
           type: 'request',
           calls: [],
@@ -219,17 +219,17 @@ describe('Correlation ID Tracking', () => {
       } catch (error) {
         expect((error as Error).message).toBe('Test error')
       }
-      
+
       // Check that error was called
       expect(mockLogger.error).toHaveBeenCalled()
-      
+
       // Get the actual call arguments to debug
       const errorCalls = mockLogger.error.mock.calls
       expect(errorCalls.length).toBe(1)
-      
+
       // Check the first argument (message)
       expect(errorCalls[0]?.[0]).toBe('Procedure failed')
-      
+
       // Check the second argument (context object)
       const errorContext = errorCalls[0]?.[1] as {
         error: Error

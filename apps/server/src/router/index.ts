@@ -5,6 +5,7 @@ import { twitchRouter } from './twitch'
 import { ironmonRouter } from './ironmon'
 import { displaysRouter } from './displays'
 import { appleMusicRouter } from './apple-music'
+import { monitoringRouter } from './monitoring'
 
 export const appRouter = router({
   health: healthRouter,
@@ -12,7 +13,8 @@ export const appRouter = router({
   twitch: twitchRouter,
   ironmon: ironmonRouter,
   displays: displaysRouter,
-  appleMusic: appleMusicRouter
+  appleMusic: appleMusicRouter,
+  monitoring: monitoringRouter
 })
 
 export type AppRouter = typeof appRouter

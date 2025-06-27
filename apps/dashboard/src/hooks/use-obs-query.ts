@@ -21,7 +21,8 @@ export const obsKeys = {
  */
 function useOBSSubscription(
   key: readonly string[],
-  subscribeFn: (onData: (data: T) => void) => { unsubscribe: () => void }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  subscribeFn: (onData: (data: any) => void) => { unsubscribe: () => void }
 ) {
   const queryClient = useQueryClient()
 

@@ -5,7 +5,7 @@ import { eventEmitter } from '@/events'
 export const twitchRouter = router({
   onMessage: publicProcedure.subscription(async function* ({ signal, ctx }) {
     const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onMessage' })
-    
+
     try {
       log.debug('Starting Twitch message subscription')
       const stream = eventEmitter.events('twitch:message')
@@ -28,7 +28,7 @@ export const twitchRouter = router({
 
   onFollow: publicProcedure.subscription(async function* ({ signal, ctx }) {
     const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onFollow' })
-    
+
     try {
       log.debug('Starting Twitch follow subscription')
       const stream = eventEmitter.events('twitch:follow')
@@ -51,7 +51,7 @@ export const twitchRouter = router({
 
   onSubscription: publicProcedure.subscription(async function* ({ signal, ctx }) {
     const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onSubscription' })
-    
+
     try {
       log.debug('Starting Twitch subscription subscription')
       const stream = eventEmitter.events('twitch:subscription')
@@ -74,7 +74,7 @@ export const twitchRouter = router({
 
   onSubscriptionGift: publicProcedure.subscription(async function* ({ signal, ctx }) {
     const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onSubscriptionGift' })
-    
+
     try {
       log.debug('Starting Twitch gift subscription subscription')
       const stream = eventEmitter.events('twitch:subscription:gift')
@@ -97,7 +97,7 @@ export const twitchRouter = router({
 
   onSubscriptionMessage: publicProcedure.subscription(async function* ({ signal, ctx }) {
     const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onSubscriptionMessage' })
-    
+
     try {
       log.debug('Starting Twitch resub subscription')
       const stream = eventEmitter.events('twitch:subscription:message')
@@ -120,7 +120,7 @@ export const twitchRouter = router({
 
   onRedemption: publicProcedure.subscription(async function* ({ signal, ctx }) {
     const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onRedemption' })
-    
+
     try {
       log.debug('Starting Twitch redemption subscription')
       const stream = eventEmitter.events('twitch:redemption')
@@ -143,7 +143,7 @@ export const twitchRouter = router({
 
   onStreamOnline: publicProcedure.subscription(async function* ({ signal, ctx }) {
     const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onStreamOnline' })
-    
+
     try {
       log.debug('Starting Twitch stream online subscription')
       const stream = eventEmitter.events('twitch:stream:online')
@@ -166,7 +166,7 @@ export const twitchRouter = router({
 
   onStreamOffline: publicProcedure.subscription(async function* ({ signal, ctx }) {
     const log = ctx.logger.child({ module: 'twitch-router', subscription: 'onStreamOffline' })
-    
+
     try {
       log.debug('Starting Twitch stream offline subscription')
       const stream = eventEmitter.events('twitch:stream:offline')
