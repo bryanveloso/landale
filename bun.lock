@@ -91,20 +91,6 @@
         "@rollup/rollup-linux-arm64-gnu": "^4.44.1",
       },
     },
-    "apps/phononmaser": {
-      "name": "@landale/phononmaser",
-      "version": "0.1.0",
-      "dependencies": {
-        "@landale/logger": "workspace:*",
-        "ws": "^8.18.2",
-        "zod": "^3.25.67",
-      },
-      "devDependencies": {
-        "@types/bun": "latest",
-        "@types/ws": "^8.18.1",
-        "typescript": "^5.8.3",
-      },
-    },
     "apps/server": {
       "name": "@landale/server",
       "version": "0.7.0",
@@ -163,6 +149,7 @@
       "version": "0.1.0",
       "dependencies": {
         "pino": "^9.7.0",
+        "pino-abstract-transport": "^2.0.0",
         "pino-pretty": "^11.3.0",
       },
       "devDependencies": {
@@ -374,8 +361,6 @@
     "@landale/logger": ["@landale/logger@workspace:packages/logger"],
 
     "@landale/overlays": ["@landale/overlays@workspace:apps/overlays"],
-
-    "@landale/phononmaser": ["@landale/phononmaser@workspace:apps/phononmaser"],
 
     "@landale/server": ["@landale/server@workspace:apps/server"],
 

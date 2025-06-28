@@ -1,3 +1,15 @@
-// This file has been replaced by @landale/logger
-// Please use: import { createLogger } from '@landale/logger'
-export {}
+import { createLogger as createBaseLogger, createLoggerWithSeq as createSeqLogger } from '@landale/logger'
+import { env } from './env'
+
+// Create logger with Seq if configured
+export function createLogger(config: Parameters<typeof createBaseLogger>[0]) {
+  if (env.SEQ_HOST) {
+    const seqUrl = `http://${env.SEQ_HOST}:${env.SEQ_PORT || 5341}`
+    return createSeqLogger(config, seqUrl, env.SEQ_API_KEY)
+  }
+  
+  return createBaseLogger(config)
+}
+
+// Re-export everything else
+export * from '@landale/logger'
