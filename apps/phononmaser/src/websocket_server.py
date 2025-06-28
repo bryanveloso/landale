@@ -31,6 +31,9 @@ class PhononmaserServer:
         # Event queue for broadcasting
         self.event_queue: asyncio.Queue[dict] = asyncio.Queue()
         self.broadcast_task: Optional[asyncio.Task] = None
+        
+        # Caption clients (for OBS plugin)
+        self.caption_clients: Set[WebSocketServerProtocol] = set()
     
     async def start(self) -> None:
         """Start the WebSocket server."""
@@ -43,7 +46,8 @@ class PhononmaserServer:
             self.handle_connection,
             host,
             self.port,
-            max_size=50 * 1024 * 1024  # 50MB max message size
+            max_size=50 * 1024 * 1024,  # 50MB max message size
+            process_request=self.process_request
         )
         
         logger.info(f"Phononmaser WebSocket server started on {host}:{self.port}")
@@ -63,11 +67,33 @@ class PhononmaserServer:
         
         logger.info("Phononmaser WebSocket server stopped")
     
+    async def process_request(self, path: str, headers) -> Optional[tuple]:
+        """Process incoming WebSocket request to determine path."""
+        # Accept all paths, we'll handle routing in handle_connection
+        return None
+    
     async def handle_connection(
         self,
         websocket: WebSocketServerProtocol
     ) -> None:
         """Handle a new WebSocket connection."""
+        path = websocket.path
+        
+        if path == "/captions":
+            # Handle caption client (OBS plugin)
+            await self._handle_caption_client(websocket)
+        elif path == "/events":
+            # Handle event stream client
+            await self._handle_event_client(websocket)
+        else:
+            # Default: handle as audio source
+            await self._handle_audio_source(websocket)
+    
+    async def _handle_audio_source(
+        self,
+        websocket: WebSocketServerProtocol
+    ) -> None:
+        """Handle audio source connection (OBS WebSocket plugin)."""
         logger.info(f"New audio source connected from {websocket.remote_address}")
         self.clients.add(websocket)
         
@@ -83,6 +109,38 @@ class PhononmaserServer:
             logger.error(f"Error handling connection: {e}")
         finally:
             self.clients.discard(websocket)
+    
+    async def _handle_event_client(
+        self,
+        websocket: WebSocketServerProtocol
+    ) -> None:
+        """Handle event stream client."""
+        logger.info(f"New event client connected from {websocket.remote_address}")
+        self.clients.add(websocket)
+        
+        try:
+            # Just keep connection alive, events are broadcast automatically
+            await websocket.wait_closed()
+        except Exception as e:
+            logger.error(f"Error handling event client: {e}")
+        finally:
+            self.clients.discard(websocket)
+    
+    async def _handle_caption_client(
+        self,
+        websocket: WebSocketServerProtocol
+    ) -> None:
+        """Handle caption client (OBS caption plugin)."""
+        logger.info(f"New caption client connected from {websocket.remote_address}")
+        self.caption_clients.add(websocket)
+        
+        try:
+            # Just keep connection alive, captions are broadcast automatically
+            await websocket.wait_closed()
+        except Exception as e:
+            logger.error(f"Error handling caption client: {e}")
+        finally:
+            self.caption_clients.discard(websocket)
     
     async def _handle_message(
         self,
@@ -249,14 +307,45 @@ class PhononmaserServer:
     def emit_transcription(self, event: TranscriptionEvent) -> None:
         """Emit transcription event for broadcasting."""
         try:
+            # Emit to general event stream (with duration)
             self.event_queue.put_nowait({
                 "type": "audio:transcription",
                 "timestamp": event.timestamp,
                 "duration": event.duration,
                 "text": event.text
             })
+            
+            # Also broadcast directly to caption clients (OBS format)
+            asyncio.create_task(self._broadcast_caption({
+                "type": "audio:transcription",
+                "timestamp": event.timestamp,
+                "text": event.text,
+                "is_final": True  # Always final since we're using whisper.cpp
+            }))
+            
         except asyncio.QueueFull:
             logger.warning("Event queue full, dropping transcription event")
+    
+    async def _broadcast_caption(self, caption_data: dict) -> None:
+        """Broadcast caption data to all caption clients."""
+        if not self.caption_clients:
+            return
+        
+        message = json.dumps(caption_data)
+        disconnected = []
+        
+        for client in self.caption_clients:
+            try:
+                await client.send(message)
+            except websockets.exceptions.ConnectionClosed:
+                disconnected.append(client)
+            except Exception as e:
+                logger.error(f"Error sending caption to client: {e}")
+                disconnected.append(client)
+        
+        # Remove disconnected clients
+        for client in disconnected:
+            self.caption_clients.discard(client)
     
     async def _broadcast_loop(self) -> None:
         """Broadcast events to all connected clients."""
