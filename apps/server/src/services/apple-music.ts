@@ -68,3 +68,8 @@ class AppleMusicService {
 }
 
 export const appleMusicService = new AppleMusicService()
+
+// Export getter for health checks
+export function getAppleMusicService(): AppleMusicService {
+  return appleMusicService
+}

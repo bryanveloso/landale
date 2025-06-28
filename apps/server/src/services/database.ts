@@ -211,7 +211,19 @@ export class DatabaseService {
   async recordSeeds(seedIds: number[], challengeId: number = 1) {
     return this.batchUpsertSeeds(seedIds, challengeId)
   }
+  
+  /**
+   * Simple query method for health checks
+   */
+  async query(sql: string) {
+    return prisma.$queryRawUnsafe(sql)
+  }
 }
 
 // Export singleton instance
 export const databaseService = new DatabaseService()
+
+// Export getter for health checks
+export function getDatabaseService(): DatabaseService {
+  return databaseService
+}
