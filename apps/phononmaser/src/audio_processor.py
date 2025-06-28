@@ -75,7 +75,7 @@ class AudioProcessor:
         # Initialize Whisper
         try:
             self.whisper_model = WhisperModel(
-                model_path=whisper_model_path,
+                model=whisper_model_path,
                 n_threads=whisper_threads,
                 language=whisper_language,
                 print_progress=False,
