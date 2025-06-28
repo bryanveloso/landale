@@ -7,8 +7,8 @@
 // Get the server port from environment or default
 const SERVER_PORT = (import.meta.env.VITE_SERVER_PORT as string | undefined) || '7175'
 
-// Get the server host from environment or use current location
-const SERVER_HOST = (import.meta.env.VITE_SERVER_HOST as string | undefined) || window.location.hostname
+// Get the server host from environment or use the configured host
+const SERVER_HOST = (import.meta.env.VITE_SERVER_HOST as string | undefined) || 'saya'
 
 // Build WebSocket URL based on configuration
 export function getServerWebSocketUrl(): string {
