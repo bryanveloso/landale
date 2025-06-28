@@ -125,6 +125,38 @@ const server: Server = Bun.serve({
       )
     }
 
+    // Companion HTTP endpoints for Stream Deck
+    if (url.pathname.startsWith('/api/companion/process/')) {
+      const parts = url.pathname.split('/')
+      const machine = parts[4]
+      const processName = parts[5]
+      const action = parts[6]
+
+      if (request.method === 'GET' && action === 'status') {
+        const { getProcessStatus } = await import('@/router/companion')
+        const status = await getProcessStatus(machine, processName)
+        return Response.json(status)
+      }
+
+      if (request.method === 'POST') {
+        const { startProcess, stopProcess, restartProcess } = await import('@/router/companion')
+        
+        switch (action) {
+          case 'start':
+            return Response.json(await startProcess(machine, processName))
+          case 'stop':
+            return Response.json(await stopProcess(machine, processName))
+          case 'restart':
+            return Response.json(await restartProcess(machine, processName))
+        }
+      }
+
+      if (request.method === 'GET' && processName === 'list') {
+        const { listProcesses } = await import('@/router/companion')
+        return Response.json(await listProcesses(machine))
+      }
+    }
+
     // Raw event WebSocket endpoint
     if (url.pathname === '/events') {
       const correlationId = request.headers.get('x-correlation-id') || nanoid()
