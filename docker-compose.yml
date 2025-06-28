@@ -74,10 +74,11 @@ services:
     volumes:
       - seq_data:/data
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost/api/diagnostics/health']
+      test: ['CMD', '/bin/sh', '-c', 'wget -q -O /dev/null http://localhost/api/diagnostics/health || exit 1']
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
 
 volumes:
   postgres_data:
