@@ -20,6 +20,8 @@ import { auditLogger, AuditAction, AuditCategory } from '@/lib/audit'
 import { eventBroadcaster } from '@/services/event-broadcaster'
 import { SERVICE_CONFIG } from '@landale/service-config'
 import { getHealthMonitor } from '@/lib/health'
+import { AgentManager } from '@landale/agent'
+import { setAgentManager } from '@/router/agents'
 
 import { version } from '../package.json'
 
@@ -40,7 +42,7 @@ export type { Display } from './services/display-manager'
 interface WSData {
   req: Request
   correlationId: string
-  type: 'trpc' | 'events'
+  type: 'trpc' | 'events' | 'agent'
 }
 
 interface ExtendedWebSocket extends ServerWebSocket<WSData> {
@@ -53,6 +55,10 @@ const log = logger.child({ module: 'main' })
 
 console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
 log.info('Server starting', { metadata: { environment: env.NODE_ENV, version } })
+
+// Initialize agent manager
+const agentManager = new AgentManager()
+setAgentManager(agentManager)
 
 // Log service startup
 void auditLogger.log({
@@ -127,6 +133,14 @@ const server: Server = Bun.serve({
       }
     }
     
+    // Agent WebSocket endpoint
+    if (url.pathname === '/agent') {
+      const correlationId = request.headers.get('x-correlation-id') || nanoid()
+      if (server.upgrade(request, { data: { req: request, correlationId, type: 'agent' } })) {
+        return
+      }
+    }
+    
     // tRPC WebSocket upgrade
     const correlationId = request.headers.get('x-correlation-id') || nanoid()
     if (server.upgrade(request, { data: { req: request, correlationId, type: 'trpc' } })) {
@@ -165,6 +179,9 @@ const server: Server = Bun.serve({
       if (connectionType === 'events') {
         // Handle raw event WebSocket
         extWs.eventClient = eventBroadcaster.handleConnection(ws, correlationId)
+      } else if (connectionType === 'agent') {
+        // Handle agent WebSocket
+        agentManager.handleConnection(ws, extWs.data.req)
       } else {
         // Handle tRPC WebSocket
         void websocket.open?.(ws)
@@ -191,6 +208,8 @@ const server: Server = Bun.serve({
       // Handle event client disconnect
       if (extWs.data.type === 'events' && extWs.eventClient) {
         eventBroadcaster.handleDisconnect(extWs.eventClient.id)
+      } else if (extWs.data.type === 'agent') {
+        // Agent disconnect is handled internally by AgentManager
       } else {
         void websocket.close?.(ws, code, reason)
       }
@@ -201,6 +220,8 @@ const server: Server = Bun.serve({
       if (extWs.data.type === 'events' && extWs.eventClient) {
         // Handle event WebSocket messages
         eventBroadcaster.handleMessage(extWs.eventClient, message.toString())
+      } else if (extWs.data.type === 'agent') {
+        // Agent messages are handled internally by AgentManager
       } else {
         // Handle tRPC WebSocket messages
         websocket.message(ws, message)

@@ -1,0 +1,19 @@
+{
+  "name": "@landale/agent",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@landale/shared": "workspace:*",
+    "@landale/logger": "workspace:*",
+    "@landale/service-config": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
