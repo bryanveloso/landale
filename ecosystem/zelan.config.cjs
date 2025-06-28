@@ -3,7 +3,7 @@ module.exports = {
   apps: [
     {
       name: 'landale-phononmaser',
-      script: 'python3',
+      script: '.venv/bin/python',
       args: '-m src.main',
       cwd: './apps/phononmaser',
       instances: 1,
@@ -44,7 +44,7 @@ module.exports = {
     },
     {
       name: 'landale-analysis',
-      script: 'python3',
+      script: '.venv/bin/python',
       args: '-m src.main',
       cwd: './apps/analysis',
       instances: 1,
