@@ -32,6 +32,11 @@ jobs:
 
           # Control API Security
           CONTROL_API_KEY=${{ secrets.CONTROL_API_KEY }}
+
+          # Seq Logging
+          SEQ_HOST=${{ vars.SEQ_HOST }}
+          SEQ_PORT=${{ vars.SEQ_PORT }}
+          SEQ_API_KEY=${{ secrets.SEQ_API_KEY }}
           EOF
 
       - name: Deploy with OrbStack

@@ -34,7 +34,12 @@ const envSchema = z.object({
 
   // Rainwave (optional)
   RAINWAVE_API_KEY: z.string().optional().describe('Rainwave API key'),
-  RAINWAVE_USER_ID: z.string().optional().describe('Rainwave user ID')
+  RAINWAVE_USER_ID: z.string().optional().describe('Rainwave user ID'),
+  
+  // Seq Logging (optional)
+  SEQ_HOST: z.string().optional().describe('Seq server hostname'),
+  SEQ_PORT: z.string().optional().describe('Seq server port'),
+  SEQ_API_KEY: z.string().optional().describe('Seq API key for ingestion')
 })
 
 // Parse and validate environment variables
