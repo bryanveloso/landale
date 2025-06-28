@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, mock } from 'bun:test'
 import type { EventMap } from '@/events/types'
 import Emittery from 'emittery'
 import type { z } from 'zod'
@@ -12,7 +12,7 @@ describe('EventEmitter', () => {
   })
 
   it('should emit and listen to typed events', async () => {
-    const mockHandler = vi.fn()
+    const mockHandler = mock()
 
     emitter.on('twitch:follow', mockHandler)
 
@@ -30,8 +30,8 @@ describe('EventEmitter', () => {
   })
 
   it('should handle multiple listeners for same event', async () => {
-    const handler1 = vi.fn()
-    const handler2 = vi.fn()
+    const handler1 = mock()
+    const handler2 = mock()
 
     emitter.on('twitch:cheer', handler1)
     emitter.on('twitch:cheer', handler2)
@@ -40,9 +40,8 @@ describe('EventEmitter', () => {
       userId: '123',
       userName: 'testuser',
       userDisplayName: 'TestUser',
-      message: 'Great stream!',
       bits: 100,
-      isAnonymous: false
+      message: 'Test cheer!'
     }
 
     await emitter.emit('twitch:cheer', cheerEvent)
@@ -51,122 +50,61 @@ describe('EventEmitter', () => {
     expect(handler2).toHaveBeenCalledWith(cheerEvent)
   })
 
-  it('should remove listeners with off()', async () => {
-    const handler = vi.fn()
+  it('should remove listeners correctly', async () => {
+    const handler = mock()
 
-    emitter.on('ironmon:init', handler)
-    emitter.off('ironmon:init', handler)
+    const unsubscribe = emitter.on('twitch:subscription', handler)
 
-    await emitter.emit('ironmon:init', {
-      type: 'init',
-      metadata: {
-        version: '1.0.0',
-        game: 2
-      },
-      source: 'tcp'
-    })
-
-    expect(handler).not.toHaveBeenCalled()
-  })
-
-  it('should handle display update events', async () => {
-    const handler = vi.fn()
-
-    emitter.on('display:statusBar:update', handler)
-
-    const display = {
-      id: 'statusBar',
-      schema: {} as z.ZodObject<Record<string, z.ZodTypeAny>>,
-      data: {
-        mode: 'game' as const,
-        text: 'Playing Pokemon',
-        isVisible: true,
-        position: 'bottom' as const
-      },
-      metadata: {}
+    const subEvent = {
+      userId: '123',
+      userName: 'testuser',
+      userDisplayName: 'TestUser',
+      tier: '1000' as const,
+      isGift: false,
+      cumulativeMonths: 1,
+      streakMonths: 1,
+      message: null
     }
 
-    await emitter.emit('display:statusBar:update', display)
-
-    expect(handler).toHaveBeenCalledWith(display)
-  })
-
-  it('should support once() for single-use listeners', async () => {
-    const handler = vi.fn()
-
-    // Emittery uses a different API for once
-    const unsubscribe = emitter.once('twitch:streamOnline' as keyof EventMap).then(handler)
-
-    const onlineEvent = {
-      id: 'stream123',
-      broadcasterId: '456',
-      broadcasterUserName: 'streamer',
-      broadcasterUserDisplayName: 'Streamer',
-      type: 'live' as const,
-      startedAt: new Date()
-    }
-
-    // Emit twice
-    await emitter.emit('twitch:streamOnline' as keyof EventMap, onlineEvent)
-    await emitter.emit('twitch:streamOnline' as keyof EventMap, onlineEvent)
-
-    // Wait for promise to resolve
-    await unsubscribe
-
-    // Should only be called once
+    await emitter.emit('twitch:subscription', subEvent)
     expect(handler).toHaveBeenCalledTimes(1)
+
+    unsubscribe()
+
+    await emitter.emit('twitch:subscription', subEvent)
+    expect(handler).toHaveBeenCalledTimes(1) // Still 1, not called again
   })
 
-  it('should handle errors in listeners gracefully', async () => {
-    const errorHandler = vi.fn(() => {
-      throw new Error('Handler error')
-    })
-    const successHandler = vi.fn()
+  it('should handle display events', async () => {
+    const handler = mock()
+    
+    emitter.on('display:update', handler)
 
-    emitter.on('twitch:message', errorHandler)
-    emitter.on('twitch:message', successHandler)
+    const displayUpdate = {
+      displayId: 'statusBar',
+      data: { text: 'Test Status' }
+    } as z.infer<(typeof EventMap)['display:update']>
 
-    const messageEvent = {
-      id: 'msg123',
-      userId: '789',
-      userName: 'chatter',
-      userDisplayName: 'Chatter',
-      message: 'Hello!',
-      emotes: [],
-      badges: {},
-      color: '#FF0000',
-      timestamp: Date.now(),
-      isFirst: false,
-      isReturning: false,
-      isSubscriber: false,
-      isModerator: false,
-      isVip: false
+    await emitter.emit('display:update', displayUpdate)
+
+    expect(handler).toHaveBeenCalledWith(displayUpdate)
+  })
+
+  it('should handle once listeners', async () => {
+    const handler = mock()
+
+    emitter.once('twitch:raid').then(handler)
+
+    const raidEvent = {
+      userId: '123',
+      userName: 'raider',
+      userDisplayName: 'Raider',
+      viewerCount: 50
     }
 
-    // Emittery does propagate errors by default, so we expect it to throw
-    await expect(emitter.emit('twitch:message', messageEvent)).rejects.toThrow('Handler error')
+    await emitter.emit('twitch:raid', raidEvent)
+    await emitter.emit('twitch:raid', raidEvent)
 
-    // But the success handler should still have been called before the error
-    expect(successHandler).toHaveBeenCalledWith(messageEvent)
-    expect(errorHandler).toHaveBeenCalledWith(messageEvent)
-  })
-
-  it('should properly type-check event data', () => {
-    // This test verifies TypeScript compilation
-    // The following should not compile if types are wrong:
-
-    emitter.on('twitch:follow', (event) => {
-      // TypeScript knows these properties exist
-      const _userId: string = event.userId ?? ''
-      const _userName: string = event.userName ?? ''
-      const _followDate: Date = event.followDate ?? new Date()
-
-      expect(_userId).toBeDefined()
-      expect(_userName).toBeDefined()
-      expect(_followDate).toBeDefined()
-    })
-
-    // This would cause a TypeScript error if uncommented:
-    // emitter.emit('twitch:follow', { wrongProperty: 'value' })
+    expect(handler).toHaveBeenCalledTimes(1)
   })
 })

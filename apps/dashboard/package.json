@@ -9,8 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "test:watch": "vitest --watch"
+    "test": "bun test",
+    "test:watch": "bun test --watch"
   },
   "dependencies": {
     "@landale/server": "workspace:*",
