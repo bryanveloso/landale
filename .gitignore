@@ -186,5 +186,8 @@ apps/overlays/public/emotes/
 # Turborepo
 .turbo
 
+# TanStack Router temporary files
+.tanstack/
+
 # Claude
 .claude
