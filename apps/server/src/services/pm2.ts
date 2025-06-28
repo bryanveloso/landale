@@ -2,7 +2,7 @@ import pm2 from 'pm2'
 import { createLogger } from '@landale/logger'
 import { SERVICE_CONFIG } from '@landale/service-config'
 
-const log = createLogger({ service: 'pm2-manager' })
+const log = createLogger({ service: 'pm2' })
 
 export interface ProcessInfo {
   name: string
@@ -37,7 +37,7 @@ class PM2Manager {
 
       // For local machine
       if (machine === 'localhost' || machine === SERVICE_CONFIG.server.host) {
-        pm2.connect((err) => {
+        pm2.connect((err: Error | null) => {
           if (err) {
             log.error('Failed to connect to local PM2', { error: { message: err.message } })
             reject(err)
@@ -63,7 +63,7 @@ class PM2Manager {
     await this.connect(machine)
 
     return new Promise((resolve, reject) => {
-      pm2.list((err, processDescriptionList) => {
+      pm2.list((err: Error | null, processDescriptionList) => {
         if (err) {
           log.error('Failed to list PM2 processes', { error: { message: err.message } })
           reject(err)
@@ -73,7 +73,7 @@ class PM2Manager {
         const processes: ProcessInfo[] = processDescriptionList.map((proc) => ({
           name: proc.name || 'unknown',
           pm_id: proc.pm_id || 0,
-          status: proc.pm2_env?.status || 'stopped',
+          status: (proc.pm2_env?.status || 'stopped') as ProcessInfo['status'],
           cpu: proc.monit?.cpu || 0,
           memory: proc.monit?.memory || 0,
           uptime: proc.pm2_env?.pm_uptime || 0,
@@ -93,7 +93,7 @@ class PM2Manager {
     await this.connect(machine)
 
     return new Promise((resolve, reject) => {
-      pm2.start(processName, (err) => {
+      pm2.start(processName, (err: Error | null) => {
         if (err) {
           log.error('Failed to start process', { 
             error: { message: err.message },
@@ -115,7 +115,7 @@ class PM2Manager {
     await this.connect(machine)
 
     return new Promise((resolve, reject) => {
-      pm2.stop(processName, (err) => {
+      pm2.stop(processName, (err: Error | null) => {
         if (err) {
           log.error('Failed to stop process', { 
             error: { message: err.message },
@@ -137,7 +137,7 @@ class PM2Manager {
     await this.connect(machine)
 
     return new Promise((resolve, reject) => {
-      pm2.restart(processName, (err) => {
+      pm2.restart(processName, (err: Error | null) => {
         if (err) {
           log.error('Failed to restart process', { 
             error: { message: err.message },
@@ -155,11 +155,11 @@ class PM2Manager {
   /**
    * Get detailed information about a process
    */
-  async describe(machine: string, processName: string): Promise<any> {
+  async describe(machine: string, processName: string): Promise<pm2.ProcessDescription[]> {
     await this.connect(machine)
 
     return new Promise((resolve, reject) => {
-      pm2.describe(processName, (err, processDescription) => {
+      pm2.describe(processName, (err: Error | null, processDescription) => {
         if (err) {
           log.error('Failed to describe process', { 
             error: { message: err.message },
@@ -180,7 +180,7 @@ class PM2Manager {
     await this.connect(machine)
 
     return new Promise((resolve, reject) => {
-      pm2.flush(processName, (err) => {
+      const callback = (err: Error | null) => {
         if (err) {
           log.error('Failed to flush logs', { 
             error: { message: err.message },
@@ -191,7 +191,41 @@ class PM2Manager {
         }
         log.info('Logs flushed', { metadata: { machine, processName } })
         resolve()
-      })
+      }
+      
+      if (processName) {
+        pm2.flush(processName, callback)
+      } else {
+        // Flush all processes
+        pm2.list((err: Error | null, processes) => {
+          if (err) {
+            callback(err)
+            return
+          }
+          
+          // Flush logs for all processes
+          let flushCount = 0
+          const totalProcesses = processes.length
+          
+          if (totalProcesses === 0) {
+            callback(null)
+            return
+          }
+          
+          processes.forEach((proc) => {
+            pm2.flush(proc.pm_id || 0, (flushErr: Error | null) => {
+              flushCount++
+              if (flushErr) {
+                callback(flushErr)
+                return
+              }
+              if (flushCount === totalProcesses) {
+                callback(null)
+              }
+            })
+          })
+        })
+      }
     })
   }
 

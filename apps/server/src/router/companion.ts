@@ -4,12 +4,12 @@
  */
 
 import type { Server } from 'bun'
-import { pm2Manager } from '@/services/pm2-manager'
+import { pm2Manager } from '@/services/pm2'
 import { createLogger } from '@landale/logger'
 
 const log = createLogger({ service: 'companion-api' })
 
-export function registerCompanionEndpoints(server: Server) {
+export function registerCompanionEndpoints(_server: Server) {
   // This would be called from your main server setup
   // For now, we'll document the endpoints that need to be created
 }

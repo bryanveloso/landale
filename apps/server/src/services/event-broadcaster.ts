@@ -9,9 +9,15 @@ import { nanoid } from 'nanoid'
 const logger = createLogger({ service: 'landale-server' })
 const log = logger.child({ module: 'event-broadcaster' })
 
+interface WSData {
+  req: Request
+  correlationId: string
+  type: 'trpc' | 'events'
+}
+
 interface EventClient {
   id: string
-  ws: ServerWebSocket<any>
+  ws: ServerWebSocket<WSData>
   subscriptions: Set<string>
   correlationId: string
 }
@@ -26,7 +32,7 @@ interface EventBroadcast {
   type: 'event' | 'subscribed' | 'unsubscribed' | 'error' | 'pong' | 'connected'
   channel?: string
   channels?: string[]
-  event?: any
+  event?: unknown
   timestamp?: number
   error?: string
   id?: string
@@ -34,7 +40,7 @@ interface EventBroadcast {
 
 class EventBroadcaster {
   private clients = new Map<string, EventClient>()
-  private eventListeners = new Map<string, (data: any) => void>()
+  private eventListeners = new Map<string, (data: unknown) => void>()
 
   constructor() {
     // Set up listeners for Twitch events we want to broadcast
@@ -49,8 +55,8 @@ class EventBroadcaster {
         username: data.chatterDisplayName || data.chatterName,
         message: data.messageText,
         emotes: this.extractEmotes(data.messageParts),
-        is_subscriber: Array.isArray(data.badges) ? data.badges.some((b: any) => b.setId === 'subscriber') : false,
-        is_moderator: Array.isArray(data.badges) ? data.badges.some((b: any) => b.setId === 'moderator') : false
+        is_subscriber: Array.isArray(data.badges) ? data.badges.some((b: { setId: string }) => b.setId === 'subscriber') : false,
+        is_moderator: Array.isArray(data.badges) ? data.badges.some((b: { setId: string }) => b.setId === 'moderator') : false
       })
     })
 
@@ -81,7 +87,7 @@ class EventBroadcaster {
     })
   }
 
-  private extractEmotes(messageParts: any[] | undefined): string[] {
+  private extractEmotes(messageParts: Array<{ type: string; text: string }> | undefined): string[] {
     if (!messageParts) return []
     
     return messageParts
@@ -89,7 +95,7 @@ class EventBroadcaster {
       .map(part => part.text)
   }
 
-  handleConnection(ws: ServerWebSocket<any>, correlationId: string) {
+  handleConnection(ws: ServerWebSocket<WSData>, correlationId: string) {
     const client: EventClient = {
       id: nanoid(),
       ws,
@@ -190,7 +196,7 @@ class EventBroadcaster {
     }
   }
 
-  private broadcast(channel: string, event: any) {
+  broadcast(channel: string, event: unknown) {
     const message: EventBroadcast = {
       type: 'event',
       channel,

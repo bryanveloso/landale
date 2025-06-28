@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test'
 import type { EventMap } from '@/events/types'
 import Emittery from 'emittery'
-import type { z } from 'zod'
 
 describe('EventEmitter', () => {
   let emitter: Emittery<EventMap>
@@ -78,14 +77,14 @@ describe('EventEmitter', () => {
   it('should handle display events', async () => {
     const handler = mock()
     
-    emitter.on('display:update', handler)
+    emitter.on('display:statusBar:update' as keyof EventMap, handler)
 
     const displayUpdate = {
       displayId: 'statusBar',
       data: { text: 'Test Status' }
-    } as z.infer<(typeof EventMap)['display:update']>
+    }
 
-    await emitter.emit('display:update', displayUpdate)
+    await emitter.emit('display:statusBar:update' as keyof EventMap, displayUpdate)
 
     expect(handler).toHaveBeenCalledWith(displayUpdate)
   })
@@ -93,17 +92,18 @@ describe('EventEmitter', () => {
   it('should handle once listeners', async () => {
     const handler = mock()
 
-    emitter.once('twitch:raid').then(handler)
+    void emitter.once('twitch:cheer').then(handler)
 
-    const raidEvent = {
+    const cheerEvent = {
       userId: '123',
-      userName: 'raider',
-      userDisplayName: 'Raider',
-      viewerCount: 50
+      userName: 'cheerer',
+      userDisplayName: 'Cheerer',
+      bits: 100,
+      message: 'Test cheer'
     }
 
-    await emitter.emit('twitch:raid', raidEvent)
-    await emitter.emit('twitch:raid', raidEvent)
+    await emitter.emit('twitch:cheer', cheerEvent)
+    await emitter.emit('twitch:cheer', cheerEvent)
 
     expect(handler).toHaveBeenCalledTimes(1)
   })

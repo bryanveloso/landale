@@ -5,6 +5,7 @@ import { getDatabaseService } from '@/services/database'
 import { getOBSService } from '@/services/obs'
 import { getRainwaveService } from '@/services/rainwave'
 import { getAppleMusicService } from '@/services/apple-music'
+import type { eventBroadcaster } from '@/services/event-broadcaster'
 
 // Health check types
 export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy' | 'unknown'
@@ -41,7 +42,7 @@ export class HealthMonitor extends EventEmitter {
   private readonly log = createLogger({ service: 'landale-server' }).child({ module: 'health-monitor' })
   private services = new Map<string, ServiceHealth>()
   private checkTimer?: NodeJS.Timeout
-  private eventBroadcaster?: any
+  private eventBroadcaster?: typeof eventBroadcaster
   
   constructor(
     private readonly options: HealthMonitorOptions = {}
@@ -55,7 +56,7 @@ export class HealthMonitor extends EventEmitter {
     }
   }
   
-  setEventBroadcaster(broadcaster: any) {
+  setEventBroadcaster(broadcaster: typeof eventBroadcaster) {
     this.eventBroadcaster = broadcaster
   }
   
@@ -84,7 +85,7 @@ export class HealthMonitor extends EventEmitter {
     // Schedule periodic checks
     this.checkTimer = setInterval(() => {
       void this.checkAllServices()
-    }, this.options.checkInterval!)
+    }, this.options.checkInterval || 30000)
   }
   
   // Stop monitoring
@@ -106,10 +107,9 @@ export class HealthMonitor extends EventEmitter {
     
     // Broadcast overall health status
     const healthData = this.getHealthStatus()
-    this.eventBroadcaster?.broadcast({
-      type: 'health:status',
-      data: healthData
-    })
+    if (this.eventBroadcaster) {
+      this.eventBroadcaster.broadcast('health:status', healthData)
+    }
   }
   
   // Check individual service
@@ -120,7 +120,11 @@ export class HealthMonitor extends EventEmitter {
       const result = await this.performHealthCheck(serviceName)
       const duration = Date.now() - startTime
       
-      const health = this.services.get(serviceName)!
+      const health = this.services.get(serviceName)
+      if (!health) {
+        this.log.error('Service not found', { metadata: { service: serviceName } })
+        return
+      }
       const previousStatus = health.status
       
       health.status = result.status
@@ -152,15 +156,14 @@ export class HealthMonitor extends EventEmitter {
         
         // Broadcast alert for unhealthy services
         if (result.status === 'unhealthy') {
-          this.eventBroadcaster?.broadcast({
-            type: 'health:alert',
-            data: {
+          if (this.eventBroadcaster) {
+            this.eventBroadcaster.broadcast('health:alert', {
               service: serviceName,
               status: result.status,
               error: result.error,
               timestamp: new Date().toISOString()
-            }
-          })
+            })
+          }
         }
       }
       
@@ -173,7 +176,11 @@ export class HealthMonitor extends EventEmitter {
       })
       
     } catch (error) {
-      const health = this.services.get(serviceName)!
+      const health = this.services.get(serviceName)
+      if (!health) {
+        this.log.error('Service not found', { metadata: { service: serviceName } })
+        return
+      }
       health.status = 'unhealthy'
       health.lastCheck = new Date()
       health.error = error instanceof Error ? error.message : 'Unknown error'
@@ -335,7 +342,7 @@ export class HealthMonitor extends EventEmitter {
       service: 'ironmon',
       status: 'healthy',
       metadata: {
-        port: SERVICE_CONFIG.server?.ports.tcp || 8080
+        port: SERVICE_CONFIG.server.ports.tcp || 8080
       }
     }
   }

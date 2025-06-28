@@ -43,9 +43,16 @@ interface WSData {
   type: 'trpc' | 'events'
 }
 
+interface EventClient {
+  id: string
+  ws: ServerWebSocket<WSData>
+  subscriptions: Set<string>
+  correlationId: string
+}
+
 interface ExtendedWebSocket extends ServerWebSocket<WSData> {
   pingInterval?: NodeJS.Timeout
-  eventClient?: any
+  eventClient?: EventClient
 }
 
 const logger = createLogger({ service: 'landale-server' })
@@ -102,7 +109,7 @@ const serverPort = serverConfig.ports.http || 7175
 const server: Server = Bun.serve({
   port: serverPort,
   hostname: '0.0.0.0',
-  fetch: (request, server) => {
+  fetch: async (request, server) => {
     const url = new URL(request.url)
 
     // Health check endpoint
@@ -127,13 +134,13 @@ const server: Server = Bun.serve({
       const processName = parts[5]
       const action = parts[6]
 
-      if (request.method === 'GET' && action === 'status') {
+      if (request.method === 'GET' && action === 'status' && machine && processName) {
         const { getProcessStatus } = await import('@/router/companion')
         const status = await getProcessStatus(machine, processName)
         return Response.json(status)
       }
 
-      if (request.method === 'POST') {
+      if (request.method === 'POST' && machine && processName) {
         const { startProcess, stopProcess, restartProcess } = await import('@/router/companion')
         
         switch (action) {
@@ -146,7 +153,7 @@ const server: Server = Bun.serve({
         }
       }
 
-      if (request.method === 'GET' && processName === 'list') {
+      if (request.method === 'GET' && processName === 'list' && machine) {
         const { listProcesses } = await import('@/router/companion')
         return Response.json(await listProcesses(machine))
       }
@@ -197,7 +204,7 @@ const server: Server = Bun.serve({
       // Route to appropriate handler
       if (connectionType === 'events') {
         // Handle raw event WebSocket
-        extWs.eventClient = eventBroadcaster.handleConnection(ws, correlationId)
+        extWs.eventClient = eventBroadcaster.handleConnection(ws as unknown as ServerWebSocket<WSData>, correlationId)
       } else {
         // Handle tRPC WebSocket
         void websocket.open?.(ws)
@@ -236,7 +243,7 @@ const server: Server = Bun.serve({
         eventBroadcaster.handleMessage(extWs.eventClient, message.toString())
       } else {
         // Handle tRPC WebSocket messages
-        websocket.message(ws, message)
+        void websocket.message(ws, message)
       }
     }
   }
