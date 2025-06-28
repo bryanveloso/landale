@@ -93,6 +93,7 @@ class Phononmaser:
     
     async def _handle_transcription(self, event):
         """Handle transcription events from audio processor."""
+        logger.info(f"Transcription received: {event.text[:50] if event.text else 'empty'}...")
         if self.websocket_server:
             self.websocket_server.emit_transcription(event)
 

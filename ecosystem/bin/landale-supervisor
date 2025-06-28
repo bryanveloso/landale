@@ -1,0 +1,36 @@
+#!/bin/bash
+# Landale supervisor management script
+
+ECOSYSTEM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SUPERVISOR_CONF="$ECOSYSTEM_ROOT/zelan.supervisord.conf"
+SUPERVISOR_SOCK="unix:///tmp/landale-supervisor.sock"
+
+case "$1" in
+    start)
+        echo "Starting Landale supervisor..."
+        supervisord -c "$SUPERVISOR_CONF"
+        ;;
+    stop)
+        echo "Stopping Landale supervisor..."
+        supervisorctl -s "$SUPERVISOR_SOCK" shutdown
+        ;;
+    restart)
+        echo "Restarting Landale services..."
+        supervisorctl -s "$SUPERVISOR_SOCK" restart all
+        ;;
+    status)
+        supervisorctl -s "$SUPERVISOR_SOCK" status
+        ;;
+    logs)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 logs <service>"
+            echo "Services: phononmaser, analysis"
+            exit 1
+        fi
+        supervisorctl -s "$SUPERVISOR_SOCK" tail -f "landale-python:$2"
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status|logs <service>}"
+        exit 1
+        ;;
+esac

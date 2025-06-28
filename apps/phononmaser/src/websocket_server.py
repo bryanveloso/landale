@@ -127,7 +127,8 @@ class PhononmaserServer:
         try:
             # Parse header
             offset = 0
-            timestamp = struct.unpack_from("<Q", data, offset)[0]
+            timestamp_ns = struct.unpack_from("<Q", data, offset)[0]
+            timestamp = timestamp_ns // 1000  # Convert nanoseconds to microseconds
             offset += 8
             sample_rate = struct.unpack_from("<I", data, offset)[0]
             offset += 4
@@ -156,6 +157,13 @@ class PhononmaserServer:
             
             # Extract audio data
             audio_data = data[offset:]
+            
+            # Log audio chunk info periodically
+            if len(audio_data) > 0 and timestamp % 10000000 < 20000:  # Log every ~10 seconds
+                logger.info(
+                    f"Audio chunk: {len(audio_data)} bytes, "
+                    f"{sample_rate}Hz, {channels}ch, {bit_depth}bit"
+                )
             
             # Auto-start processor if needed
             if not self.audio_processor.is_running:
@@ -240,12 +248,15 @@ class PhononmaserServer:
     
     def emit_transcription(self, event: TranscriptionEvent) -> None:
         """Emit transcription event for broadcasting."""
-        asyncio.create_task(self.event_queue.put({
-            "type": "audio:transcription",
-            "timestamp": event.timestamp,
-            "duration": event.duration,
-            "text": event.text
-        }))
+        try:
+            self.event_queue.put_nowait({
+                "type": "audio:transcription",
+                "timestamp": event.timestamp,
+                "duration": event.duration,
+                "text": event.text
+            })
+        except asyncio.QueueFull:
+            logger.warning("Event queue full, dropping transcription event")
     
     async def _broadcast_loop(self) -> None:
         """Broadcast events to all connected clients."""
