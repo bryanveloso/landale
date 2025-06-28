@@ -69,14 +69,14 @@ module.exports = {
       env: {
         LOG_LEVEL: 'info',
         PHONONMASER_URL: 'ws://localhost:8889',
-        SERVER_URL: 'ws://localhost:7175/events',
+        SERVER_URL: 'ws://saya:7175/events',
         LMS_API_URL: 'http://localhost:1234/v1',
         LMS_MODEL: 'dolphin-2.9.3-llama-3-8b'
       },
       env_development: {
         LOG_LEVEL: 'debug',
         PHONONMASER_URL: 'ws://localhost:8889',
-        SERVER_URL: 'ws://localhost:7175/events',
+        SERVER_URL: 'ws://saya:7175/events',
         LMS_API_URL: 'http://localhost:1234/v1',
         LMS_MODEL: 'dolphin-2.9.3-llama-3-8b'
       }

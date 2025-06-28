@@ -11,6 +11,7 @@ from .websocket_client import PhononmaserClient, ServerClient
 from .lms_client import LMSClient
 from .correlator import StreamCorrelator
 from .events import TranscriptionEvent, ChatMessage, EmoteEvent, AnalysisResult
+from .health import create_health_app
 
 # Load environment variables
 load_dotenv()
@@ -42,6 +43,7 @@ class AnalysisService:
         # State
         self.running = False
         self.tasks = []
+        self.health_runner = None
         
     async def start(self):
         """Start the analysis service."""
@@ -62,12 +64,22 @@ class AnalysisService:
         # Connect to services
         try:
             await self.phononmaser_client.connect()
-            await self.server_client.connect()
+            logger.info("Connected to phononmaser")
         except Exception as e:
-            logger.error(f"Failed to connect to services: {e}")
+            logger.error(f"Failed to connect to phononmaser: {e}")
             raise
             
+        # Try to connect to server, but don't fail if it's not available
+        try:
+            await self.server_client.connect()
+            logger.info("Connected to server")
+        except Exception as e:
+            logger.warning(f"Could not connect to server (will work without chat events): {e}")
+            
         self.running = True
+        
+        # Start health check endpoint
+        self.health_runner = await create_health_app(port=8891)
         
         # Start listening tasks
         self.tasks = [
@@ -95,6 +107,10 @@ class AnalysisService:
         await self.phononmaser_client.disconnect()
         await self.server_client.disconnect()
         await self.lms_client.__aexit__(None, None, None)
+        
+        # Cleanup health endpoint
+        if self.health_runner:
+            await self.health_runner.cleanup()
         
         logger.info("Analysis service stopped")
         
