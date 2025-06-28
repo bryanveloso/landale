@@ -19,6 +19,10 @@ COPY apps/server/package.json ./apps/server/
 COPY packages/database/package.json packages/database/prisma ./packages/database/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/logger/package.json ./packages/logger/
+COPY packages/service-config/package.json ./packages/service-config/
+
+# Copy services.json for service-config package
+COPY packages/service-config/services.json ./packages/service-config/
 
 # Install dependencies - this layer is cached if package.json files don't change
 RUN bun install
