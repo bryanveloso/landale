@@ -29,7 +29,7 @@ module.exports = {
         LOG_LEVEL: 'info',
         PHONONMASER_PORT: 8889,
         PHONONMASER_HEALTH_PORT: 8890,
-        WHISPER_MODEL_PATH: '/usr/local/share/whisper/models/large-v3-turbo.bin',
+        WHISPER_MODEL_PATH: 'large-v3-turbo',
         WHISPER_THREADS: 8,
         WHISPER_LANGUAGE: 'en'
       },
@@ -37,7 +37,7 @@ module.exports = {
         LOG_LEVEL: 'debug',
         PHONONMASER_PORT: 8889,
         PHONONMASER_HEALTH_PORT: 8890,
-        WHISPER_MODEL_PATH: '/usr/local/share/whisper/models/large-v3-turbo.bin',
+        WHISPER_MODEL_PATH: 'large-v3-turbo',
         WHISPER_THREADS: 8,
         WHISPER_LANGUAGE: 'en'
       }
