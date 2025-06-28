@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events'
 import { createLogger } from './logger'
+import { SERVICE_CONFIG } from '@landale/service-config'
 import { getDatabaseService } from '@/services/database'
 import { getOBSService } from '@/services/obs'
 import { getRainwaveService } from '@/services/rainwave'
@@ -334,7 +335,7 @@ export class HealthMonitor extends EventEmitter {
       service: 'ironmon',
       status: 'healthy',
       metadata: {
-        port: 8080
+        port: SERVICE_CONFIG.server?.ports.tcp || 8080
       }
     }
   }

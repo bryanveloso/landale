@@ -1,129 +1,112 @@
-import { z } from 'zod'
+/**
+ * Service configuration management
+ * Reads from services.json with environment variable overrides
+ */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
-// Service configuration schema
-const ServiceSchema = z.object({
-  host: z.string(),
-  ports: z.record(z.number())
-})
-
-type Service = z.infer<typeof ServiceSchema>
-
-// All services in the Landale system
-// Using Tailscale hostnames for consistency
-export const SERVICE_CONFIG: Record<string, Service> = {
-  // Mac Mini (saya) services
-  server: {
-    host: process.env.SERVER_HOST || 'saya',
-    ports: {
-      http: 7175,
-      ws: 7175,
-      tcp: 8080
-    }
-  },
-  database: {
-    host: process.env.DATABASE_HOST || 'saya',
-    ports: {
-      postgres: 5432
-    }
-  },
-
-  // Mac Studio (zelan) services
-  phononmaser: {
-    host: process.env.PHONONMASER_HOST || 'zelan',
-    ports: {
-      ws: 8889,
-      health: 8890
-    }
-  },
-  lmStudio: {
-    host: process.env.LM_STUDIO_HOST || 'zelan',
-    ports: {
-      api: 1234
-    }
-  },
-
-  // Unraid services
-  storage: {
-    host: process.env.STORAGE_HOST || 'unraid',
-    ports: {
-      smb: 445,
-      http: 80
-    }
-  }
+// Service configuration type
+export type Service = {
+  host: string
+  ports: Record<string, number>
 }
 
+// Known service names
+export type ServiceName = 
+  | 'server'
+  | 'database'
+  | 'seq'
+  | 'phononmaser'
+  | 'analysis'
+  | 'lms'
+  | 'obs'
+  | 'dashboard'
+  | 'overlays'
+  | 'storage'
+
+type ServicesConfig = {
+  services: Record<ServiceName, Service>
+}
+
+// Load the configuration file
+function loadConfig(): Record<ServiceName, Service> {
+  const configPath = join(__dirname, '..', 'services.json')
+  const configData = readFileSync(configPath, 'utf-8')
+  const config = JSON.parse(configData) as ServicesConfig
+
+  // Apply environment variable overrides
+  const services = { ...config.services }
+
+  // Override hosts if environment variables are set
+  if (process.env.SERVER_HOST) services.server.host = process.env.SERVER_HOST
+  if (process.env.DATABASE_HOST) services.database.host = process.env.DATABASE_HOST
+  if (process.env.SEQ_HOST) services.seq.host = process.env.SEQ_HOST
+  if (process.env.PHONONMASER_HOST) services.phononmaser.host = process.env.PHONONMASER_HOST
+  if (process.env.ANALYSIS_HOST) services.analysis.host = process.env.ANALYSIS_HOST
+  if (process.env.LMS_HOST) services.lms.host = process.env.LMS_HOST
+  if (process.env.OBS_HOST) services.obs.host = process.env.OBS_HOST
+  if (process.env.DASHBOARD_HOST) services.dashboard.host = process.env.DASHBOARD_HOST
+  if (process.env.OVERLAYS_HOST) services.overlays.host = process.env.OVERLAYS_HOST
+  if (process.env.STORAGE_HOST) services.storage.host = process.env.STORAGE_HOST
+
+  // Override specific ports if needed
+  if (process.env.SEQ_PORT) services.seq.ports.http = parseInt(process.env.SEQ_PORT, 10)
+
+  return services
+}
+
+// Export the configuration
+export const SERVICE_CONFIG = loadConfig()
+
+/**
+ * Service registry for URL generation
+ */
 export class ServiceRegistry {
-  constructor(private config = SERVICE_CONFIG) {}
-
-  getUrl(service: string, port?: string): string {
-    const serviceConfig = this.config[service]
-    if (!serviceConfig) {
-      throw new Error(`Unknown service: ${service}`)
-    }
-
-    const portName = port || 'http' || Object.keys(serviceConfig.ports)[0]
+  getUrl(service: ServiceName, port?: string): string {
+    const serviceConfig = SERVICE_CONFIG[service]
+    const portName = port || 'http'
     const portNumber = serviceConfig.ports[portName]
 
     if (!portNumber) {
       throw new Error(`Unknown port ${portName} for service ${service}`)
     }
 
-    return `http://${serviceConfig.host}:${portNumber}`
+    return `http://${serviceConfig.host}:${portNumber.toString()}`
   }
 
-  getWebSocketUrl(service: string, port = 'ws'): string {
+  getWebSocketUrl(service: ServiceName, port = 'ws'): string {
     const url = this.getUrl(service, port)
     return url.replace('http://', 'ws://')
   }
 
-  getTcpEndpoint(service: string, port = 'tcp'): { host: string; port: number } {
-    const serviceConfig = this.config[service]
-    if (!serviceConfig) {
-      throw new Error(`Unknown service: ${service}`)
+  getTcpEndpoint(service: ServiceName, port = 'tcp'): { host: string; port: number } {
+    const serviceConfig = SERVICE_CONFIG[service]
+    const portNumber = serviceConfig.ports[port] ?? serviceConfig.ports.tcp
+
+    if (!portNumber) {
+      throw new Error(`No TCP port found for service ${service}`)
     }
 
     return {
       host: serviceConfig.host,
-      port: serviceConfig.ports[port] || serviceConfig.ports.tcp
+      port: portNumber
     }
-  }
-
-  async healthCheck(service: string): Promise<boolean> {
-    try {
-      const healthPort = this.config[service]?.ports.health || this.config[service]?.ports.http
-      if (!healthPort) return false
-
-      const url = `http://${this.config[service].host}:${healthPort}/health`
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(5000)
-      })
-
-      return response.ok
-    } catch {
-      return false
-    }
-  }
-
-  async checkAll(): Promise<Record<string, boolean>> {
-    const results: Record<string, boolean> = {}
-
-    for (const service of Object.keys(this.config)) {
-      results[service] = await this.healthCheck(service)
-    }
-
-    return results
   }
 }
 
 // Export singleton instance
 export const services = new ServiceRegistry()
 
-// Export for special cases
+// Convenience functions
 export function getDatabaseUrl(
   database = 'landale',
   user = process.env.DB_USER || 'landale',
   password = process.env.DB_PASSWORD || 'landale'
 ): string {
   const { host, port } = services.getTcpEndpoint('database', 'postgres')
-  return `postgresql://${user}:${password}@${host}:${port}/${database}`
+  return `postgresql://${user}:${password}@${host}:${port.toString()}/${database}`
+}
+
+export function getSeqUrl(): string {
+  return services.getUrl('seq', 'http')
 }

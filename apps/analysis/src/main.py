@@ -12,6 +12,7 @@ from .lms_client import LMSClient
 from .correlator import StreamCorrelator
 from .events import TranscriptionEvent, ChatMessage, EmoteEvent, AnalysisResult
 from .health import create_health_app
+from .service_config import get_phononmaser_url, get_server_events_url, get_lms_api_url
 
 # Load environment variables
 load_dotenv()
@@ -28,10 +29,10 @@ class AnalysisService:
     """Main analysis service that coordinates all components."""
     
     def __init__(self):
-        # Configuration from environment
-        self.phononmaser_url = os.getenv("PHONONMASER_URL", "ws://localhost:8889")
-        self.server_url = os.getenv("SERVER_URL", "ws://localhost:7175/events")
-        self.lms_url = os.getenv("LMS_API_URL", "http://zelan:1234/v1")
+        # Configuration from environment with service-config defaults
+        self.phononmaser_url = os.getenv("PHONONMASER_URL", get_phononmaser_url())
+        self.server_url = os.getenv("SERVER_URL", get_server_events_url())
+        self.lms_url = os.getenv("LMS_API_URL", get_lms_api_url())
         self.lms_model = os.getenv("LMS_MODEL", "dolphin-2.9.3-llama-3-8b")
         
         # Components
@@ -79,7 +80,9 @@ class AnalysisService:
         self.running = True
         
         # Start health check endpoint
-        self.health_runner = await create_health_app(port=8891)
+        from .service_config import ServiceConfig
+        health_port = ServiceConfig.SERVICES['analysis']['ports']['health']
+        self.health_runner = await create_health_app(port=health_port)
         
         # Start listening tasks
         self.tasks = [

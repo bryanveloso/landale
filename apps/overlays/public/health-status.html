@@ -80,7 +80,7 @@
 
       async function checkHealth() {
         try {
-          const response = await fetch('http://localhost:7175/health')
+          const response = await fetch('http://saya:7175/health')
           const data = await response.json()
 
           if (data.status === 'ok') {

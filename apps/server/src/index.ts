@@ -18,6 +18,7 @@ import { z } from 'zod'
 import { performanceMonitor } from '@/lib/performance'
 import { auditLogger, AuditAction, AuditCategory } from '@/lib/audit'
 import { eventBroadcaster } from '@/services/event-broadcaster'
+import { SERVICE_CONFIG } from '@landale/service-config'
 import { getHealthMonitor } from '@/lib/health'
 
 import { version } from '../package.json'
@@ -92,9 +93,13 @@ const websocket = createBunWSHandler({
   enableSubscriptions: true
 })
 
+// Get server configuration
+const serverConfig = SERVICE_CONFIG.server
+const serverPort = serverConfig.ports.http || 7175
+
 // Initialize the tRPC server
 const server: Server = Bun.serve({
-  port: 7175,
+  port: serverPort,
   hostname: '0.0.0.0',
   fetch: (request, server) => {
     const url = new URL(request.url)
@@ -204,11 +209,12 @@ const server: Server = Bun.serve({
   }
 })
 
+const displayHost = serverConfig.host || 'localhost'
 console.log(
-  `  ${chalk.green('➜')}  ${chalk.bold('tRPC Server')}: ${server.hostname ?? 'localhost'}:${server.port?.toString() ?? '7175'}`
+  `  ${chalk.green('➜')}  ${chalk.bold('tRPC Server')}: ${displayHost}:${server.port?.toString() ?? '7175'}`
 )
 console.log(
-  `  ${chalk.green('➜')}  ${chalk.bold('Event Stream')}: ${server.hostname ?? 'localhost'}:${server.port?.toString() ?? '7175'}/events`
+  `  ${chalk.green('➜')}  ${chalk.bold('Event Stream')}: ${displayHost}:${server.port?.toString() ?? '7175'}/events`
 )
 
 // Register displays

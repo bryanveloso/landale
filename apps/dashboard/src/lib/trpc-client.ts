@@ -1,16 +1,11 @@
 import { createTRPCClient, createWSClient, wsLink, type TRPCClient } from '@trpc/client'
 import type { AppRouter } from '@landale/server'
-
-const getWebSocketUrl = () => {
-  const hostname = window.location.hostname
-  const port = 7175
-  return `ws://${hostname}:${port.toString()}/`
-}
+import { serviceUrls } from './config'
 
 const wsClient = createWSClient({
-  url: getWebSocketUrl(),
+  url: serviceUrls.server.ws,
   onOpen: () => {
-    console.log(`[tRPC] Connected to server at ${getWebSocketUrl()}`)
+    console.log(`[tRPC] Connected to server at ${serviceUrls.server.ws}`)
   },
   onClose: (cause) => {
     console.log('[tRPC] Disconnected:', cause)

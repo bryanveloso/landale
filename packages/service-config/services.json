@@ -1,0 +1,68 @@
+{
+  "services": {
+    "server": {
+      "host": "saya",
+      "ports": {
+        "http": 7175,
+        "ws": 7175,
+        "tcp": 8080
+      }
+    },
+    "database": {
+      "host": "saya",
+      "ports": {
+        "postgres": 5432
+      }
+    },
+    "seq": {
+      "host": "saya",
+      "ports": {
+        "http": 5341
+      }
+    },
+    "phononmaser": {
+      "host": "zelan",
+      "ports": {
+        "ws": 8889,
+        "health": 8890
+      }
+    },
+    "analysis": {
+      "host": "zelan",
+      "ports": {
+        "health": 8891
+      }
+    },
+    "lms": {
+      "host": "zelan",
+      "ports": {
+        "api": 1234
+      }
+    },
+    "obs": {
+      "host": "demi",
+      "ports": {
+        "ws": 4455
+      }
+    },
+    "dashboard": {
+      "host": "saya",
+      "ports": {
+        "http": 5174
+      }
+    },
+    "overlays": {
+      "host": "saya",
+      "ports": {
+        "http": 8008
+      }
+    },
+    "storage": {
+      "host": "unraid",
+      "ports": {
+        "smb": 445,
+        "http": 80
+      }
+    }
+  }
+}
