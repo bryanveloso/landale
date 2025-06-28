@@ -1,0 +1,39 @@
+[project]
+name = "landale-phononmaser"
+version = "0.1.0"
+description = "Audio processing and transcription service for Landale"
+requires-python = ">=3.11"
+dependencies = [
+    "websockets>=13.0",
+    "numpy>=1.26",
+    "aiohttp>=3.9",
+    "python-dotenv>=1.0",
+    "pywhispercpp>=2.0",
+    "pyaudio>=0.2.14",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "ARG"]
+ignore = ["E501"]  # Line length handled by formatter
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

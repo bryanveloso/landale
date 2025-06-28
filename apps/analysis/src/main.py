@@ -29,7 +29,7 @@ class AnalysisService:
     def __init__(self):
         # Configuration from environment
         self.phononmaser_url = os.getenv("PHONONMASER_URL", "ws://localhost:8889")
-        self.server_url = os.getenv("SERVER_URL", "ws://localhost:8080/ws")
+        self.server_url = os.getenv("SERVER_URL", "ws://localhost:7175/events")
         self.lms_url = os.getenv("LMS_API_URL", "http://zelan:1234/v1")
         self.lms_model = os.getenv("LMS_MODEL", "dolphin-2.9.3-llama-3-8b")
         
