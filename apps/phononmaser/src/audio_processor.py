@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Optional, Callable, Awaitable
 
 import numpy as np
-import pywhispercpp
+from pywhispercpp.model import Model as WhisperModel
 
 from .events import TranscriptionEvent
 
@@ -74,10 +74,10 @@ class AudioProcessor:
         
         # Initialize Whisper
         try:
-            self.whisper_model = pywhispercpp.Model(
+            self.whisper_model = WhisperModel(
                 model_path=whisper_model_path,
                 n_threads=whisper_threads,
-                language=whisper_language.encode(),
+                language=whisper_language,
                 print_progress=False,
                 print_timestamps=False
             )
