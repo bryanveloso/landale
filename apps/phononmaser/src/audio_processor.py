@@ -8,7 +8,10 @@ from dataclasses import dataclass
 from typing import Optional, Callable, Awaitable
 
 import numpy as np
-from pywhispercpp.model import Model as WhisperModel
+import subprocess
+import tempfile
+import wave
+import json
 
 from .events import TranscriptionEvent
 
@@ -72,36 +75,26 @@ class AudioProcessor:
         # Transcription callback
         self.transcription_callback: Optional[Callable[[TranscriptionEvent], Awaitable[None]]] = None
         
-        # Initialize Whisper
-        try:
-            # If it's a path, use it directly; otherwise treat as model name
-            if whisper_model_path.endswith('.bin'):
-                # It's a file path
-                import os
-                if os.path.exists(whisper_model_path):
-                    self.whisper_model = WhisperModel(
-                        model=whisper_model_path,
-                        n_threads=whisper_threads,
-                        language=whisper_language,
-                        print_progress=False,
-                        print_timestamps=False
-                    )
-                else:
-                    logger.error(f"Whisper model file not found: {whisper_model_path}")
-                    raise FileNotFoundError(f"Model file not found: {whisper_model_path}")
-            else:
-                # It's a model name - pywhispercpp will download if needed
-                self.whisper_model = WhisperModel(
-                    model=whisper_model_path,
-                    n_threads=whisper_threads,
-                    language=whisper_language,
-                    print_progress=False,
-                    print_timestamps=False
-                )
-            logger.info(f"Whisper model loaded: {whisper_model_path}")
-        except Exception as e:
-            logger.error(f"Failed to load Whisper model: {e}")
-            raise
+        # Store Whisper configuration
+        self.whisper_exe = '/usr/local/bin/whisper'
+        self.whisper_model_path = whisper_model_path
+        self.whisper_language = whisper_language
+        self.whisper_threads = whisper_threads
+        self.vad_model_path = '/Users/Avalonstar/Code/utilities/whisper.cpp/models/ggml-silero-v5.1.2.bin'
+        
+        # Verify whisper executable exists
+        import os
+        if not os.path.exists(self.whisper_exe):
+            logger.error(f"Whisper executable not found: {self.whisper_exe}")
+            raise FileNotFoundError(f"Whisper executable not found: {self.whisper_exe}")
+        
+        # Verify model file exists
+        if not os.path.exists(self.whisper_model_path):
+            logger.error(f"Whisper model file not found: {self.whisper_model_path}")
+            raise FileNotFoundError(f"Model file not found: {self.whisper_model_path}")
+        
+        logger.info(f"Using whisper-cli at: {self.whisper_exe}")
+        logger.info(f"Using model: {self.whisper_model_path}")
     
     async def start(self) -> None:
         """Start the audio processor."""
@@ -149,7 +142,7 @@ class AudioProcessor:
         last_second = int(self.last_logged_duration)
         
         if current_second > last_second:
-            logger.debug(
+            logger.info(
                 f"Buffer: {duration:.1f}s of audio "
                 f"({self.buffer.total_size / 1024 / 1024:.1f}MB)"
             )
@@ -165,6 +158,7 @@ class AudioProcessor:
         """Main processing loop."""
         while self.is_running:
             if self._should_process_buffer():
+                logger.info(f"Processing buffer with {self.get_buffer_duration():.1f}s of audio")
                 event = await self._process_buffer()
                 if event and self.transcription_callback:
                     await self.transcription_callback(event)
@@ -215,27 +209,86 @@ class AudioProcessor:
             # Convert to float32 for Whisper
             audio_float = self._pcm_to_float32(pcm_data, format)
             
-            # Transcribe
-            start_time = time.time()
-            segments = self.whisper_model.transcribe(audio_float)
-            transcription_time = time.time() - start_time
+            # Write audio to temporary WAV file
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                temp_wav = tmp.name
             
-            # Combine segments
-            if segments:
-                text = " ".join(segment.text.strip() for segment in segments)
-                if text:
-                    logger.info(f"Transcription ({transcription_time:.2f}s): \"{text}\"")
+            try:
+                # Convert float32 to int16 for WAV
+                audio_int16 = (audio_float * 32767).astype(np.int16)
+                
+                # Write WAV file
+                with wave.open(temp_wav, 'wb') as wav:
+                    wav.setnchannels(1)
+                    wav.setsampwidth(2)
+                    wav.setframerate(16000)
+                    wav.writeframes(audio_int16.tobytes())
+                
+                # Transcribe using whisper-cli
+                start_time = time.time()
+                logger.info(f"Starting transcription of {len(audio_float)/16000:.1f}s audio")
+                
+                cmd = [
+                    self.whisper_exe,
+                    '-m', self.whisper_model_path,
+                    '-f', temp_wav,
+                    '-l', self.whisper_language,
+                    '-t', str(self.whisper_threads),
+                    '-np',  # No prints except results
+                    '--vad',  # Enable VAD
+                    '--vad-model', self.vad_model_path
+                ]
+                
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                transcription_time = time.time() - start_time
+                
+                if result.returncode != 0:
+                    logger.error(f"Whisper failed with code {result.returncode}: {result.stderr}")
+                    return None
+                
+                # Parse text output
+                if result.stdout:
+                    # Extract text from timestamp format: [00:00:00.000 --> 00:00:00.000] text
+                    lines = result.stdout.strip().split('\n')
+                    text_parts = []
                     
-                    # Return transcription event
-                    return TranscriptionEvent(
-                        timestamp=processing_buffer.start_timestamp,
-                        duration=duration_seconds,
-                        text=text
-                    )
-                else:
-                    logger.debug("No speech detected in buffer")
-            
-            return None
+                    for line in lines:
+                        if line.strip():
+                            # Remove timestamp brackets if present
+                            if line.startswith('[') and '] ' in line:
+                                text = line.split('] ', 1)[1].strip()
+                            else:
+                                text = line.strip()
+                            
+                            if text and text not in ['[BLANK_AUDIO]', 'Thank you.']:
+                                text_parts.append(text)
+                    
+                    if text_parts:
+                        full_text = ' '.join(text_parts)
+                        logger.info(f"Transcription ({transcription_time:.2f}s): \"{full_text}\"")
+                        
+                        # Return transcription event
+                        return TranscriptionEvent(
+                            timestamp=processing_buffer.start_timestamp,
+                            duration=duration_seconds,
+                            text=full_text
+                        )
+                    else:
+                        logger.debug("No speech detected in buffer")
+                
+                return None
+                
+            finally:
+                # Clean up temp file
+                import os
+                if os.path.exists(temp_wav):
+                    os.unlink(temp_wav)
             
         except Exception as e:
             logger.error(f"Error processing audio buffer: {e}")
