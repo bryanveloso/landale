@@ -7,7 +7,9 @@
  * Usage: bun run scripts/check-health.ts
  */
 
-const HEALTH_URL = 'http://localhost:7175/health'
+import { services } from '@landale/service-config'
+
+const HEALTH_URL = `${services.getUrl('server', 'http')}/health`
 const TIMEOUT = 3000 // 3 seconds
 
 async function checkHealth() {

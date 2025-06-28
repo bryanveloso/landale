@@ -8,7 +8,7 @@ const SERVICE_LOCATIONS = {
   server: 'saya',
   overlays: 'saya',
   phononmaser: 'zelan',
-  lmStudio: 'zelan'
+  lms: 'zelan'
 } as const
 
 // Services managed by Docker instead of PM2

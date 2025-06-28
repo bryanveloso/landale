@@ -1,5 +1,6 @@
 import { OBSWebSocket, EventSubscription } from '@omnypro/obs-websocket'
 import { createLogger } from '@landale/logger'
+import { services } from '@landale/service-config'
 import { eventEmitter } from '@/events'
 import { performanceMonitor, trackApiCall, type StreamHealthMetric } from '@/lib/performance'
 import { auditLogger, AuditAction, AuditCategory } from '@/lib/audit'
@@ -56,7 +57,7 @@ class OBSService {
 
   // OBS connection configuration
   private config = {
-    url: process.env.OBS_WEBSOCKET_URL || 'ws://192.168.1.9:4455',
+    url: process.env.OBS_WEBSOCKET_URL || services.getWebSocketUrl('obs'),
     password: process.env.OBS_WEBSOCKET_PASSWORD || '',
     eventSubscriptions: EventSubscription.All
   }

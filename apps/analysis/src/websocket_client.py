@@ -73,7 +73,7 @@ class PhononmaserClient:
 class ServerClient:
     """WebSocket client for server chat/emote events."""
     
-    def __init__(self, url: str = "ws://localhost:7175/events"):
+    def __init__(self, url: str = "ws://saya:7175/events"):
         self.url = url
         self.ws: Optional[WebSocketClientProtocol] = None
         self._handlers = {

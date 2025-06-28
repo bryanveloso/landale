@@ -39,7 +39,11 @@ const envSchema = z.object({
   // Seq Logging (optional)
   SEQ_HOST: z.string().optional().describe('Seq server hostname'),
   SEQ_PORT: z.string().optional().describe('Seq server port'),
-  SEQ_API_KEY: z.string().optional().describe('Seq API key for ingestion')
+  SEQ_API_KEY: z.string().optional().describe('Seq API key for ingestion'),
+  
+  // Tailscale OAuth (optional)
+  TAILSCALE_CLIENT_ID: z.string().optional().describe('Tailscale OAuth client ID'),
+  TAILSCALE_CLIENT_SECRET: z.string().optional().describe('Tailscale OAuth client secret')
 })
 
 // Parse and validate environment variables

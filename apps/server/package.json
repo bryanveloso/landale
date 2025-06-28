@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@landale/logger": "workspace:*",
+    "@landale/service-config": "workspace:*",
     "@landale/shared": "workspace:*",
     "@omnypro/obs-websocket": "^5.6.3",
     "@trpc/server": "^11.4.2",

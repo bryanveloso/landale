@@ -12,11 +12,12 @@ import { promisify } from 'util'
 import { writeFileSync, unlinkSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { services } from '@landale/service-config'
 
 const execAsync = promisify(exec)
 
 // Configuration
-const SERVER_URL = process.env.LANDALE_SERVER_URL || 'ws://localhost:7175'
+const SERVER_URL = process.env.LANDALE_SERVER_URL || services.getWebSocketUrl('server')
 const POLL_INTERVAL = parseInt(process.env.POLL_INTERVAL || '1000', 10)
 
 // AppleScript to get current track info

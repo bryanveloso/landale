@@ -96,6 +96,7 @@
       "version": "0.7.0",
       "dependencies": {
         "@landale/logger": "workspace:*",
+        "@landale/service-config": "workspace:*",
         "@landale/shared": "workspace:*",
         "@omnypro/obs-websocket": "^5.6.3",
         "@trpc/server": "^11.4.2",
@@ -158,6 +159,17 @@
       },
       "peerDependencies": {
         "zod": "^3.22.4",
+      },
+    },
+    "packages/service-config": {
+      "name": "@landale/service-config",
+      "version": "1.0.0",
+      "dependencies": {
+        "zod": "^3.25.67",
+      },
+      "devDependencies": {
+        "@types/node": "^22.15.21",
+        "typescript": "^5.8.3",
       },
     },
     "packages/shared": {
@@ -363,6 +375,8 @@
     "@landale/overlays": ["@landale/overlays@workspace:apps/overlays"],
 
     "@landale/server": ["@landale/server@workspace:apps/server"],
+
+    "@landale/service-config": ["@landale/service-config@workspace:packages/service-config"],
 
     "@landale/shared": ["@landale/shared@workspace:packages/shared"],
 

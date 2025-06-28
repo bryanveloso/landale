@@ -1,9 +1,10 @@
 import { createTRPCClient, createWSClient, loggerLink, wsLink, type TRPCClient } from '@trpc/client'
 import type { AppRouter } from '@landale/server'
 import { wsLogger } from '@/lib/logger'
+import { serviceUrls } from '@/lib/config'
 
-// Use the same hostname as the current page to support different environments
-const wsUrl = `ws://${window.location.hostname}:7175`
+// Use service configuration for WebSocket URL
+const wsUrl = serviceUrls.server.ws
 
 const wsClient = createWSClient({
   url: wsUrl,

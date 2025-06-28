@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from .audio_processor import AudioProcessor
 from .websocket_server import PhononmaserServer
 from .health import create_health_app
+from .service_config import get_server_url, get_phononmaser_port, get_phononmaser_health_port
 
 # Load environment variables
 load_dotenv()
@@ -27,8 +28,8 @@ class Phononmaser:
     
     def __init__(self):
         # Configuration
-        self.port = int(os.getenv("PHONONMASER_PORT", "8889"))
-        self.health_port = int(os.getenv("PHONONMASER_HEALTH_PORT", "8890"))
+        self.port = get_phononmaser_port()
+        self.health_port = get_phononmaser_health_port()
         self.whisper_model_path = os.getenv("WHISPER_MODEL_PATH", "")
         self.whisper_threads = int(os.getenv("WHISPER_THREADS", "8"))
         self.whisper_language = os.getenv("WHISPER_LANGUAGE", "en")

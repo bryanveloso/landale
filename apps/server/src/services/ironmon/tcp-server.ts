@@ -1,6 +1,7 @@
 import type { TCPSocketListener, Socket } from 'bun'
 import chalk from 'chalk'
 import { createLogger } from '@landale/logger'
+import { SERVICE_CONFIG } from '@landale/service-config'
 import { ironmonMessageSchema } from './types'
 import { handleCheckpoint, handleInit, handleSeed, handleLocation } from './handlers'
 
@@ -18,8 +19,9 @@ export class IronmonTCPServer {
   private options: Required<TCPServerOptions>
 
   constructor(options: TCPServerOptions = {}) {
+    const tcpPort = SERVICE_CONFIG.server.ports.tcp || 8080
     this.options = {
-      port: options.port ?? 8080,
+      port: options.port ?? tcpPort,
       hostname: options.hostname ?? '0.0.0.0'
     }
   }
