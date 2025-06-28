@@ -1,4 +1,4 @@
-"""Simple HTTP health check endpoint."""
+"""Health check endpoint for phononmaser."""
 from aiohttp import web
 import logging
 import os
@@ -11,20 +11,20 @@ async def health_check(request):
     """Health check endpoint."""
     return web.json_response({
         "status": "healthy",
-        "service": "landale-analysis",
+        "service": "phononmaser",
         "timestamp": int(request.app["start_time"])
     })
 
 
-async def create_health_app(port: int = 8891):
+async def create_health_app(port: int = 8890):
     """Create health check web app."""
     app = web.Application()
-    app["start_time"] = int(time.time())
+    app["start_time"] = int(time.time() * 1000)
     app.router.add_get("/health", health_check)
     
     runner = web.AppRunner(app)
     await runner.setup()
-    host = os.getenv("ANALYSIS_HOST", "0.0.0.0")
+    host = os.getenv("PHONONMASER_HOST", "0.0.0.0")
     site = web.TCPSite(runner, host, port)
     await site.start()
     
