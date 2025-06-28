@@ -199,9 +199,13 @@ export function createLoggerWithSeq(
 ): Logger {
   const fullConfig = getLoggerConfig(config)
   
+  // Create Pino options without formatters (not allowed with transport targets)
+  const pinoOptions = createPinoOptions(fullConfig)
+  const { formatters, ...optionsWithoutFormatters } = pinoOptions
+  
   // Create Pino logger with Seq transport
   const pinoLogger = pino({
-    ...createPinoOptions(fullConfig),
+    ...optionsWithoutFormatters,
     transport: {
       targets: [
         {
