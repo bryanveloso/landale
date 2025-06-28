@@ -18,6 +18,7 @@ import { z } from 'zod'
 import { performanceMonitor } from '@/lib/performance'
 import { auditLogger, AuditAction, AuditCategory } from '@/lib/audit'
 import { eventBroadcaster } from '@/services/event-broadcaster'
+import { getHealthMonitor } from '@/lib/health'
 
 import { version } from '../package.json'
 
@@ -327,6 +328,22 @@ try {
   log.error('Failed to initialize Apple Music service', { error: error as Error })
 }
 
+// Initialize health monitoring
+const healthMonitor = getHealthMonitor()
+healthMonitor.setEventBroadcaster(eventBroadcaster)
+
+// Register services for health monitoring
+healthMonitor.registerService('database')
+healthMonitor.registerService('obs')
+healthMonitor.registerService('rainwave')
+healthMonitor.registerService('apple-music')
+healthMonitor.registerService('twitch')
+healthMonitor.registerService('ironmon')
+
+// Start health monitoring
+healthMonitor.start()
+log.info('Health monitoring started')
+
 // Handle graceful shutdown
 const shutdown = async (signal: string) => {
   log.info('Shutting down server', { metadata: { signal } })
@@ -351,6 +368,7 @@ const shutdown = async (signal: string) => {
   OBS.shutdown()
 
   // Shutdown monitoring services
+  healthMonitor.stop()
   performanceMonitor.shutdown()
   await auditLogger.shutdown()
 

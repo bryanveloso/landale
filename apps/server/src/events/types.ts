@@ -120,6 +120,25 @@ export type EventMap = {
     timestamp: Date
   }
   'audit:event': AuditEvent
+  // Health monitoring events
+  'health:status': {
+    status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown'
+    services: Array<{
+      name: string
+      status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown'
+      lastCheck: Date
+      lastSuccessfulCheck?: Date
+      error?: string
+      metadata?: Record<string, unknown>
+    }>
+    timestamp: string
+  }
+  'health:alert': {
+    service: string
+    status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown'
+    error?: string
+    timestamp: string
+  }
   // Generic display events - any string after 'display:' is allowed
   [key: `display:${string}:update`]: unknown
 }

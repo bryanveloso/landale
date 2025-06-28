@@ -679,6 +679,11 @@ class OBSService {
 // Create singleton instance
 export const obsService = new OBSService()
 
+// Export getter for health checks
+export function getOBSService(): OBSService {
+  return obsService
+}
+
 // Match IronMON and Twitch signature patterns
 export const initialize = async () => {
   log.info('Initializing OBS service')

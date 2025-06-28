@@ -235,3 +235,8 @@ class RainwaveService {
 }
 
 export const rainwaveService = new RainwaveService()
+
+// Export getter for health checks
+export function getRainwaveService(): RainwaveService {
+  return rainwaveService
+}
