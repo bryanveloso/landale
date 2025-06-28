@@ -65,8 +65,7 @@ class PhononmaserServer:
     
     async def handle_connection(
         self,
-        websocket: WebSocketServerProtocol,
-        path: str
+        websocket: WebSocketServerProtocol
     ) -> None:
         """Handle a new WebSocket connection."""
         logger.info(f"New audio source connected from {websocket.remote_address}")
