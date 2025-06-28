@@ -6,7 +6,6 @@ import { ironmonRouter } from './ironmon'
 import { displaysRouter } from './displays'
 import { appleMusicRouter } from './apple-music'
 import { monitoringRouter } from './monitoring'
-import { agentsRouter } from './agents'
 import { processesRouter } from './processes'
 
 export const appRouter = router({
@@ -17,7 +16,6 @@ export const appRouter = router({
   displays: displaysRouter,
   appleMusic: appleMusicRouter,
   monitoring: monitoringRouter,
-  agents: agentsRouter,
   processes: processesRouter
 })
 
