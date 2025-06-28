@@ -4,7 +4,7 @@ import { env } from './env'
 // Create logger with Seq if configured
 export function createLogger(config: Parameters<typeof createBaseLogger>[0]) {
   if (env.SEQ_HOST) {
-    const seqUrl = `http://${env.SEQ_HOST}:${env.SEQ_PORT || 5341}`
+    const seqUrl = `http://${env.SEQ_HOST}:${env.SEQ_PORT || '5341'}`
     return createSeqLogger(config, seqUrl, env.SEQ_API_KEY)
   }
   
