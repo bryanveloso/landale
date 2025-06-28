@@ -1,7 +1,14 @@
-name: Deploy
+name: Deploy to OrbStack
 on:
   push:
     branches: [main]
+    paths:
+      - 'apps/server/**'
+      - 'apps/overlays/**'
+      - 'packages/**'
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy:
