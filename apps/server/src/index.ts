@@ -20,6 +20,7 @@ import { auditLogger, AuditAction, AuditCategory } from '@/lib/audit'
 import { eventBroadcaster } from '@/services/event-broadcaster'
 import { SERVICE_CONFIG } from '@landale/service-config'
 import { getHealthMonitor } from '@/lib/health'
+import { pm2Manager } from '@/services/pm2'
 
 import { version } from '../package.json'
 
@@ -36,6 +37,7 @@ export type {
   StatusTextConfig
 } from './types/control'
 export type { Display } from './services/display-manager'
+export type { ProcessInfo } from './services/pm2'
 
 interface WSData {
   req: Request
@@ -373,6 +375,15 @@ try {
 } catch (error) {
   log.error('Failed to initialize Apple Music service', { error: error as Error })
 }
+
+// Initialize PM2 Manager
+void pm2Manager.connect('localhost')
+  .then(() => {
+    log.info('PM2 Manager initialized successfully')
+  })
+  .catch((error: unknown) => {
+    log.error('Failed to initialize PM2 Manager', { error: error as Error })
+  })
 
 // Initialize health monitoring
 const healthMonitor = getHealthMonitor()

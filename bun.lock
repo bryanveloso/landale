@@ -92,7 +92,6 @@
       "name": "@landale/server",
       "version": "0.7.0",
       "dependencies": {
-        "@landale/agent": "workspace:*",
         "@landale/logger": "workspace:*",
         "@landale/service-config": "workspace:*",
         "@landale/shared": "workspace:*",
@@ -126,18 +125,6 @@
       },
       "peerDependencies": {
         "typescript": "^5.0.0",
-      },
-    },
-    "packages/agent": {
-      "name": "@landale/agent",
-      "version": "0.1.0",
-      "dependencies": {
-        "@landale/logger": "workspace:*",
-        "@landale/service-config": "workspace:*",
-        "@landale/shared": "workspace:*",
-      },
-      "devDependencies": {
-        "typescript": "^5.8.3",
       },
     },
     "packages/database": {
@@ -367,8 +354,6 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.0", "", {}, "sha512-gv3ZRaISU3fjPAgNsriBRqGWQL6quFx04YMPW/zD8XMLsU32mhCCbfbO6KZFLjvYpCZ8zyDEgqsgf+PwPaM7GQ=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.25", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ=="],
-
-    "@landale/agent": ["@landale/agent@workspace:packages/agent"],
 
     "@landale/dashboard": ["@landale/dashboard@workspace:apps/dashboard"],
 

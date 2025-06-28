@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { t, publicProcedure } from '@/trpc'
 import { TRPCError } from '@trpc/server'
 import { pm2Manager, type ProcessInfo } from '@/services/pm2'
+import { observable } from '@trpc/server/observable'
 import { EventEmitter } from 'events'
 
 // Process status emitter for subscriptions
@@ -134,38 +135,53 @@ export const processesRouter = t.router({
       }
     }),
 
-  // Subscribe to process status updates - using async generator
+  // Subscribe to process status updates
   onStatusUpdate: publicProcedure
     .input(z.object({
       machine: z.string().default('localhost')
     }))
-    .query(async function* ({ input }) {
-      // Send initial state
-      try {
-        const processes = await pm2Manager.list(input.machine)
-        yield { type: 'update' as const, data: processes }
-      } catch {
-        yield { type: 'update' as const, data: [] }
-      }
+    .subscription(({ input }) => {
+      return observable<ProcessInfo[]>((emit) => {
+        // Send initial state
+        void (async () => {
+          try {
+            const processes = await pm2Manager.list(input.machine)
+            emit.next(processes)
+          } catch (error) {
+            console.error('Failed to get initial process list:', error)
+            emit.next([])
+          }
+        })()
 
-      // Set up event listener
-      const eventPromise = new Promise<never>((_, reject) => {
+        // Set up event listener for updates
         const handleUpdate = (processes: ProcessInfo[]) => {
-          // In a real async generator, we'd yield here
-          // For now, this is a placeholder
-          console.log('Process update:', processes)
+          // Emit updates for all machines, the client will filter
+          emit.next(processes)
         }
         
         processEvents.on('status', handleUpdate)
         
-        // Cleanup on abort
-        process.on('SIGINT', () => {
+        // For non-localhost machines, we need to poll since we don't have remote events
+        let pollInterval: NodeJS.Timeout | null = null
+        if (input.machine !== 'localhost') {
+          pollInterval = setInterval(async () => {
+            try {
+              const processes = await pm2Manager.list(input.machine)
+              emit.next(processes)
+            } catch (error) {
+              console.error(`Failed to poll ${input.machine}:`, error)
+            }
+          }, 5000) // Poll every 5 seconds
+        }
+        
+        // Cleanup function
+        return () => {
           processEvents.off('status', handleUpdate)
-          reject(new Error('Aborted'))
-        })
+          if (pollInterval) {
+            clearInterval(pollInterval)
+          }
+        }
       })
-      
-      await eventPromise
     })
 })
 
