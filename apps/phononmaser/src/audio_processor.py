@@ -74,13 +74,30 @@ class AudioProcessor:
         
         # Initialize Whisper
         try:
-            self.whisper_model = WhisperModel(
-                model=whisper_model_path,
-                n_threads=whisper_threads,
-                language=whisper_language,
-                print_progress=False,
-                print_timestamps=False
-            )
+            # If it's a path, use it directly; otherwise treat as model name
+            if whisper_model_path.endswith('.bin'):
+                # It's a file path
+                import os
+                if os.path.exists(whisper_model_path):
+                    self.whisper_model = WhisperModel(
+                        model=whisper_model_path,
+                        n_threads=whisper_threads,
+                        language=whisper_language,
+                        print_progress=False,
+                        print_timestamps=False
+                    )
+                else:
+                    logger.error(f"Whisper model file not found: {whisper_model_path}")
+                    raise FileNotFoundError(f"Model file not found: {whisper_model_path}")
+            else:
+                # It's a model name - pywhispercpp will download if needed
+                self.whisper_model = WhisperModel(
+                    model=whisper_model_path,
+                    n_threads=whisper_threads,
+                    language=whisper_language,
+                    print_progress=False,
+                    print_timestamps=False
+                )
             logger.info(f"Whisper model loaded: {whisper_model_path}")
         except Exception as e:
             logger.error(f"Failed to load Whisper model: {e}")
