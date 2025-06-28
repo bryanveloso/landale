@@ -10,7 +10,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest"
+    "test": "bun test"
   },
   "dependencies": {
     "pino": "^9.7.0",
