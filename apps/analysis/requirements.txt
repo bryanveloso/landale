@@ -1,0 +1,4 @@
+aiohttp>=3.9
+pydantic>=2.5
+python-dotenv>=1.0
+websockets>=13.0
