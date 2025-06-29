@@ -22,8 +22,9 @@ module.exports = {
     },
     {
       name: 'pm2-agent',
-      script: 'C:\\Users\\Avalonstar\\Code\\Landale\\ecosystem\\bin\\pm2-agent.js',
-      interpreter: 'bun',
+      script: 'bun',
+      args: 'C:\\Users\\Avalonstar\\Code\\Landale\\ecosystem\\bin\\pm2-agent.js',
+      interpreter: 'none',
       cwd: 'C:\\Users\\Avalonstar\\Code\\Landale',
       env: {
         PM2_AGENT_PORT: 9615,
