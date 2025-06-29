@@ -3,9 +3,7 @@
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
-    "lib": ["ESNext", "DOM"], // Support both environments
-    "types": ["node"] // But primarily Node-focused
   },
   "include": ["src/**/*"],
-  "exclude": ["dist", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

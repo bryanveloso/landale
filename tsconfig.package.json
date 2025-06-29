@@ -1,12 +1,15 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ESNext", "DOM"],
+    "lib": ["ESNext"],
+    "types": ["node", "bun"],
+    "composite": true,
     "declaration": true,
     "declarationMap": true,
     "noEmit": false,
     "emitDeclarationOnly": true,
     "noUnusedLocals": true,
     "exactOptionalPropertyTypes": true
-  }
+  },
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
