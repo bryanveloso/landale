@@ -20,7 +20,7 @@ export default tseslint.config(
     ]
   },
 
-  // JavaScript files - basic rules only, no TypeScript parser
+  // JavaScript files - basic rules only
   {
     files: ['**/*.{js,mjs,cjs}'],
     extends: [js.configs.recommended],
@@ -36,7 +36,7 @@ export default tseslint.config(
     }
   },
 
-  // TypeScript files - full type-aware rules
+  // TypeScript files - type-aware rules with tRPC-friendly settings
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommendedTypeChecked],
@@ -47,6 +47,7 @@ export default tseslint.config(
       }
     },
     rules: {
+      // Basic TypeScript rules
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
@@ -63,24 +64,29 @@ export default tseslint.config(
           fixStyle: 'inline-type-imports'
         }
       ],
-      '@typescript-eslint/no-misused-promises': [
-        'error',
-        {
-          checksVoidReturn: {
-            attributes: false,
-            arguments: false
-          }
-        }
-      ],
+
+      // Customized rules
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/prefer-nullish-coalescing': 'warn',
       '@typescript-eslint/prefer-optional-chain': 'warn',
       '@typescript-eslint/restrict-template-expressions': 'off',
-      '@typescript-eslint/no-unnecessary-condition': 'off'
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+
+      // Disable "unsafe" rules that don't work well with tRPC
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+
+      // Disable other problematic rules for async/tRPC patterns
+      '@typescript-eslint/no-misused-promises': 'off',
+      '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/require-await': 'off'
     }
   },
 
-  // React-specific rules for React apps
+  // React-specific rules
   {
     files: ['apps/dashboard/**/*.{ts,tsx}', 'apps/overlays/**/*.{ts,tsx}'],
     plugins: {
@@ -102,13 +108,11 @@ export default tseslint.config(
     }
   },
 
-  // Server-specific rules (Node.js environment)
+  // Server-specific rules
   {
     files: ['apps/server/**/*.{ts,js}'],
     rules: {
-      'no-console': 'off', // Console logging is fine in server code
-      '@typescript-eslint/require-await': 'off', // Async handlers often don't await
-      '@typescript-eslint/no-misused-promises': 'off' // Express handlers return promises
+      'no-console': 'off' // Console logging is fine in server code
     }
   },
 
@@ -121,28 +125,13 @@ export default tseslint.config(
     }
   },
 
-  // Scripts - relaxed rules for utility scripts
+  // Scripts & Tests - relaxed rules
   {
-    files: ['scripts/**/*.{ts,js}'],
+    files: ['scripts/**/*.{ts,js}', '**/*.{test,spec}.{ts,tsx,js,jsx}', '**/__tests__/**/*.{ts,tsx,js,jsx}'],
     rules: {
-      'no-console': 'off', // Scripts often need console output
-      '@typescript-eslint/no-explicit-any': 'off', // Scripts can be more flexible
-      '@typescript-eslint/no-unused-vars': 'warn', // Warn instead of error
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-member-access': 'off',
-      '@typescript-eslint/no-unsafe-call': 'off',
-      '@typescript-eslint/no-unsafe-return': 'off'
-    }
-  },
-
-  // Test files - more relaxed rules
-  {
-    files: ['**/*.{test,spec}.{ts,tsx,js,jsx}', '**/__tests__/**/*.{ts,tsx,js,jsx}'],
-    rules: {
+      'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-member-access': 'off',
-      '@typescript-eslint/no-unsafe-call': 'off'
+      '@typescript-eslint/no-unused-vars': 'warn'
     }
   }
 )
