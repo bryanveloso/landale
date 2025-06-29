@@ -51,7 +51,17 @@ export function PM2Status({ machine }: PM2StatusProps) {
     connectionState,
     isConnected,
     isError
-  } = useSubscription<ProcessInfo[]>('processes.onStatusUpdate', { machine: selectedMachine })
+  } = useSubscription<ProcessInfo[]>('processes.onStatusUpdate', { machine: selectedMachine }, {
+    onData: (data) => {
+      console.log(`[Dashboard] Received ${data.length} processes for ${selectedMachine}:`, data)
+    },
+    onError: (error) => {
+      console.error(`[Dashboard] Subscription error for ${selectedMachine}:`, error)
+    },
+    onConnectionStateChange: (state) => {
+      console.log(`[Dashboard] Connection state changed for ${selectedMachine}:`, state)
+    }
+  })
 
   const startMutation = useMutation({
     mutationFn: ({ machine, process }: { machine: string; process: string }) => 
@@ -198,19 +208,13 @@ export function PM2Status({ machine }: PM2StatusProps) {
 
       {isError && (
         <div className="text-sm text-red-400">
-          {selectedMachine !== 'localhost' 
-            ? `Remote PM2 connections not yet implemented. Use Companion HTTP endpoints for ${selectedMachine}.`
-            : (connectionState.error || 'Unable to connect to PM2')
-          }
+          {connectionState.error || `Unable to connect to PM2 on ${selectedMachine}`}
         </div>
       )}
 
       {isConnected && (!processes || processes.length === 0) && (
         <div className="text-center text-gray-400 py-8">
-          {selectedMachine === 'localhost' 
-            ? 'No processes managed by PM2'
-            : `Remote PM2 management for ${selectedMachine} is not yet implemented`
-          }
+          No processes managed by PM2 on {selectedMachine}
         </div>
       )}
 
