@@ -13,22 +13,22 @@ interface MachineConfig {
 
 const MACHINE_REGISTRY: Record<string, MachineConfig> = {
   saya: {
-    host: 'saya.local',
+    host: 'saya',
     port: 9615,
     token: process.env.PM2_AGENT_TOKEN || 'change-me-in-production'
   },
   zelan: {
-    host: 'zelan.local',
+    host: 'zelan',
     port: 9615,
     token: process.env.PM2_AGENT_TOKEN || 'change-me-in-production'
   },
   demi: {
-    host: 'demi.local',
+    host: 'demi',
     port: 9615,
     token: process.env.PM2_AGENT_TOKEN || 'change-me-in-production'
   },
   alys: {
-    host: 'alys.local',
+    host: 'alys',
     port: 9615,
     token: process.env.PM2_AGENT_TOKEN || 'change-me-in-production'
   }
@@ -143,17 +143,25 @@ class PM2Manager {
     if (!config) {
       throw new Error(`Unknown machine: ${machine}`)
     }
-    const response = await fetch(`http://${config.host}:${config.port}/processes`, {
+    
+    const url = `http://${config.host}:${config.port}/processes`
+    console.log(`[PM2] Fetching processes from ${machine} at ${url}`)
+    
+    const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${config.token}`
       }
     })
     
     if (!response.ok) {
+      const text = await response.text()
+      console.error(`[PM2] Failed response from ${machine}:`, response.status, text)
       throw new Error(`Failed to list processes on ${machine}: ${response.status}`)
     }
     
-    return response.json() as Promise<ProcessInfo[]>
+    const processes = await response.json() as ProcessInfo[]
+    console.log(`[PM2] Received ${processes.length} processes from ${machine}:`, processes.map(p => p.name))
+    return processes
   }
 
   /**
