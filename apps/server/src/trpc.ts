@@ -26,6 +26,7 @@ const t = initTRPC.context<Context>().create({
 })
 
 export const router = t.router
+export { t }
 
 const correlationMiddleware = t.middleware(async (opts) => {
   const correlationId = opts.ctx.req?.headers.get('x-correlation-id') || nanoid()

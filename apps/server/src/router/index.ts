@@ -6,6 +6,7 @@ import { ironmonRouter } from './ironmon'
 import { displaysRouter } from './displays'
 import { appleMusicRouter } from './apple-music'
 import { monitoringRouter } from './monitoring'
+import { processesRouter } from './processes'
 
 export const appRouter = router({
   health: healthRouter,
@@ -14,7 +15,8 @@ export const appRouter = router({
   ironmon: ironmonRouter,
   displays: displaysRouter,
   appleMusic: appleMusicRouter,
-  monitoring: monitoringRouter
+  monitoring: monitoringRouter,
+  processes: processesRouter
 })
 
 export type AppRouter = typeof appRouter
