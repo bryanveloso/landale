@@ -2,15 +2,11 @@
   "extends": "../../tsconfig.node.json",
   "compilerOptions": {
     "composite": true,
-    "noEmit": false,
-    "emitDeclarationOnly": true,
-    "declaration": true,
-    "outDir": "./dist",
-    "baseUrl": ".",
+    "noEmit": true,
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*", "__tests__/**/*"],
+  "include": ["src/**/*", "__tests__/**/*", "package.json"],
   "exclude": ["dist", "node_modules"]
 }
