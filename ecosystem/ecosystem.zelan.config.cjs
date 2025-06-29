@@ -6,34 +6,40 @@ module.exports = {
     {
       name: 'phononmaser',
       script: 'python',
-      args: 'src/main.py',
-      cwd: '/opt/landale/apps/phononmaser',
+      args: 'run.py',
+      cwd: '/Users/Avalonstar/Code/landale/apps/phononmaser',
       interpreter: 'none',
       env: {
         PYTHONUNBUFFERED: '1',
         PHONONMASER_PORT: '8889'
       },
-      error_file: '/opt/landale/logs/phononmaser-error.log',
-      out_file: '/opt/landale/logs/phononmaser-out.log',
+      error_file: '/Users/Avalonstar/Library/Logs/Landale/phononmaser-error.log',
+      out_file: '/Users/Avalonstar/Library/Logs/Landale/phononmaser-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      time: true,
+      autorestart: true,
       max_restarts: 10,
-      min_uptime: '10s'
+      min_uptime: '10s',
+      watch: false
     },
     {
-      name: 'analysis-service',
+      name: 'analysis',
       script: 'python',
-      args: 'src/main.py',
-      cwd: '/opt/landale/apps/analysis',
+      args: '-m src.main',
+      cwd: '/Users/Avalonstar/Code/landale/apps/analysis',
       interpreter: 'none',
       env: {
         PYTHONUNBUFFERED: '1',
         ANALYSIS_PORT: '8890'
       },
-      error_file: '/opt/landale/logs/analysis-error.log',
-      out_file: '/opt/landale/logs/analysis-out.log',
+      error_file: '/Users/Avalonstar/Library/Logs/Landale/analysis-error.log',
+      out_file: '/Users/Avalonstar/Library/Logs/Landale/analysis-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      time: true
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '10s',
+      watch: false
     },
     {
       name: 'lm-studio',
@@ -41,14 +47,34 @@ module.exports = {
       interpreter: 'none',
       args: '--headless --port 1234',
       env: {
-        // LM Studio environment variables if needed
       },
-      error_file: '/opt/landale/logs/lm-studio-error.log',
-      out_file: '/opt/landale/logs/lm-studio-out.log',
+      error_file: '/Users/Avalonstar/Library/Logs/Landale/lm-studio-error.log',
+      out_file: '/Users/Avalonstar/Library/Logs/Landale/lm-studio-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      time: true,
-      // LM Studio might need manual start initially
-      // After first manual config, PM2 can manage it
+      autorestart: false,
+      max_restarts: 5,
+      min_uptime: '30s',
+      watch: false
+    },
+    {
+      name: 'pm2-agent',
+      script: 'bun',
+      args: '/Users/Avalonstar/Code/landale/ecosystem/bin/pm2-agent.ts',
+      interpreter: 'none',
+      env: {
+        PM2_AGENT_PORT: 9615,
+        PM2_AGENT_HOST: '0.0.0.0',
+        PM2_AGENT_TOKEN: process.env.PM2_AGENT_TOKEN || 'change-me-in-production'
+      },
+      error_file: '/Users/Avalonstar/Library/Logs/Landale/pm2-agent-error.log',
+      out_file: '/Users/Avalonstar/Library/Logs/Landale/pm2-agent-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '10s',
+      watch: false
     }
   ]
 }

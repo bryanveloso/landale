@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { t, publicProcedure } from '@/trpc'
+import { t, publicProcedure, type Router } from '@/trpc'
 import { TRPCError } from '@trpc/server'
 import { pm2Manager, type ProcessInfo } from '@/services/pm2'
 import { observable } from '@trpc/server/observable'

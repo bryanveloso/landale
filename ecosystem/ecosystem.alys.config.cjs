@@ -1,21 +1,42 @@
-// PM2 ecosystem configuration for alys (Windows - Gaming PC)
-// This manages streaming and gaming applications
+// PM2 ecosystem configuration for alys (Windows Gaming Machine)
+// Handles gaming applications
 
 module.exports = {
   apps: [
-    // Game launchers - optional, add as needed
     {
-      name: 'steam',
-      script: 'C:\\Program Files (x86)\\Steam\\steam.exe',
+      name: 'streamer-bot',
+      script: 'D:\\Utilities\\Streamer.Bot\\Streamer.Bot.exe',
       interpreter: 'none',
-      args: '-silent',
-      cwd: 'C:\\Program Files (x86)\\Steam',
-      // Use AppData for logs - better practice than polluting C:\
-      error_file: process.env.APPDATA + '\\landale\\logs\\steam-error.log',
-      out_file: process.env.APPDATA + '\\landale\\logs\\steam-out.log',
+      cwd: 'D:\\Utilities\\Streamer.Bot',
+      env: {},
+      error_file: 'C:\\Users\\Avalonstar\\AppData\\Local\\Landale\\logs\\streamer-bot-error.log',
+      out_file: 'C:\\Users\\Avalonstar\\AppData\\Local\\Landale\\logs\\streamer-bot-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      time: true,
-      autorestart: false
+      autorestart: false,
+      min_uptime: '30s',
+      watch: false,
+      windowsHide: false
+    },
+    {
+      name: 'pm2-agent',
+      script: 'node',
+      args: 'C:\\Users\\Avalonstar\\Code\\landale\\ecosystem\\bin\\pm2-agent.js',
+      interpreter: 'none',
+      cwd: 'C:\\Users\\Avalonstar\\Code\\landale\\ecosystem\\bin',
+      env: {
+        PM2_AGENT_PORT: 9615,
+        PM2_AGENT_HOST: '0.0.0.0',
+        PM2_AGENT_TOKEN: process.env.PM2_AGENT_TOKEN || 'change-me-in-production'
+      },
+      error_file: 'C:\\Users\\Avalonstar\\AppData\\Local\\Landale\\logs\\pm2-agent-error.log',
+      out_file: 'C:\\Users\\Avalonstar\\AppData\\Local\\Landale\\logs\\pm2-agent-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '10s',
+      watch: false
     }
   ]
 }

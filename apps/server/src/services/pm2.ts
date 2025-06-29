@@ -4,6 +4,36 @@ import { SERVICE_CONFIG } from '@landale/service-config'
 
 const log = createLogger({ service: 'pm2' })
 
+// Machine registry with connection details
+interface MachineConfig {
+  host: string
+  port: number
+  token: string
+}
+
+const MACHINE_REGISTRY: Record<string, MachineConfig> = {
+  saya: {
+    host: 'saya.local',
+    port: 9615,
+    token: process.env.PM2_AGENT_TOKEN || 'change-me-in-production'
+  },
+  zelan: {
+    host: 'zelan.local',
+    port: 9615,
+    token: process.env.PM2_AGENT_TOKEN || 'change-me-in-production'
+  },
+  demi: {
+    host: 'demi.local',
+    port: 9615,
+    token: process.env.PM2_AGENT_TOKEN || 'change-me-in-production'
+  },
+  alys: {
+    host: 'alys.local',
+    port: 9615,
+    token: process.env.PM2_AGENT_TOKEN || 'change-me-in-production'
+  }
+}
+
 export interface ProcessInfo {
   name: string
   pm_id: number
@@ -26,17 +56,16 @@ class PM2Manager {
 
   /**
    * Connect to PM2 on a specific machine
-   * For remote machines, this requires PM2 to be configured with RPC
+   * For remote machines, this uses the PM2 HTTP Agent
    */
   async connect(machine: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.connections.get(machine)) {
-        resolve()
-        return
-      }
+    if (this.connections.get(machine)) {
+      return
+    }
 
-      // For local machine
-      if (machine === 'localhost' || machine === SERVICE_CONFIG.server.host) {
+    // For local machine
+    if (machine === 'localhost' || machine === SERVICE_CONFIG.server.host) {
+      return new Promise((resolve, reject) => {
         pm2.connect((err: Error | null) => {
           if (err) {
             log.error('Failed to connect to local PM2', { error: { message: err.message } })
@@ -47,13 +76,34 @@ class PM2Manager {
           log.info('Connected to local PM2')
           resolve()
         })
-      } else {
-        // For remote machines, we'll use HTTP API
-        // This requires pm2-web or custom PM2 HTTP API on each machine
-        log.warn('Remote PM2 connections not yet implemented', { metadata: { machine } })
-        reject(new Error('Remote PM2 connections not yet implemented'))
+      })
+    } else {
+      // For remote machines, test the HTTP connection
+      const config = MACHINE_REGISTRY[machine]
+      if (!config) {
+        throw new Error(`Unknown machine: ${machine}`)
       }
-    })
+      
+      try {
+        const response = await fetch(`http://${config.host}:${config.port}/health`, {
+          headers: {
+            'Authorization': `Bearer ${config.token}`
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Failed to connect to ${machine}: ${response.status}`)
+        }
+        
+        this.connections.set(machine, true)
+        log.info(`Connected to remote PM2 on ${machine}`)
+      } catch (error) {
+        log.error(`Failed to connect to remote PM2 on ${machine}`, { 
+          error: error instanceof Error ? { message: error.message } : { message: String(error) }
+        })
+        throw error
+      }
+    }
   }
 
   /**
@@ -62,28 +112,48 @@ class PM2Manager {
   async list(machine: string): Promise<ProcessInfo[]> {
     await this.connect(machine)
 
-    return new Promise((resolve, reject) => {
-      pm2.list((err: Error | null, processDescriptionList) => {
-        if (err) {
-          log.error('Failed to list PM2 processes', { error: { message: err.message } })
-          reject(err)
-          return
-        }
+    // Local PM2
+    if (machine === 'localhost' || machine === SERVICE_CONFIG.server.host) {
+      return new Promise((resolve, reject) => {
+        pm2.list((err: Error | null, processDescriptionList) => {
+          if (err) {
+            log.error('Failed to list PM2 processes', { error: { message: err.message } })
+            reject(err)
+            return
+          }
 
-        const processes: ProcessInfo[] = processDescriptionList.map((proc) => ({
-          name: proc.name || 'unknown',
-          pm_id: proc.pm_id || 0,
-          status: (proc.pm2_env?.status || 'stopped') as ProcessInfo['status'],
-          cpu: proc.monit?.cpu || 0,
-          memory: proc.monit?.memory || 0,
-          uptime: proc.pm2_env?.pm_uptime || 0,
-          restart_time: proc.pm2_env?.restart_time || 0,
-          unstable_restarts: proc.pm2_env?.unstable_restarts || 0
-        }))
+          const processes: ProcessInfo[] = processDescriptionList.map((proc) => ({
+            name: proc.name || 'unknown',
+            pm_id: proc.pm_id || 0,
+            status: (proc.pm2_env?.status || 'stopped') as ProcessInfo['status'],
+            cpu: proc.monit?.cpu || 0,
+            memory: proc.monit?.memory || 0,
+            uptime: proc.pm2_env?.pm_uptime || 0,
+            restart_time: proc.pm2_env?.restart_time || 0,
+            unstable_restarts: proc.pm2_env?.unstable_restarts || 0
+          }))
 
-        resolve(processes)
+          resolve(processes)
+        })
       })
+    }
+    
+    // Remote PM2 via HTTP
+    const config = MACHINE_REGISTRY[machine]
+    if (!config) {
+      throw new Error(`Unknown machine: ${machine}`)
+    }
+    const response = await fetch(`http://${config.host}:${config.port}/processes`, {
+      headers: {
+        'Authorization': `Bearer ${config.token}`
+      }
     })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to list processes on ${machine}: ${response.status}`)
+    }
+    
+    return response.json() as Promise<ProcessInfo[]>
   }
 
   /**
@@ -92,20 +162,42 @@ class PM2Manager {
   async start(machine: string, processName: string): Promise<void> {
     await this.connect(machine)
 
-    return new Promise((resolve, reject) => {
-      pm2.start(processName, (err: Error | null) => {
-        if (err) {
-          log.error('Failed to start process', { 
-            error: { message: err.message },
-            metadata: { machine, processName }
-          })
-          reject(err)
-          return
-        }
-        log.info('Process started', { metadata: { machine, processName } })
-        resolve()
+    // Local PM2
+    if (machine === 'localhost' || machine === SERVICE_CONFIG.server.host) {
+      return new Promise((resolve, reject) => {
+        pm2.start(processName, (err: Error | null) => {
+          if (err) {
+            log.error('Failed to start process', { 
+              error: { message: err.message },
+              metadata: { machine, processName }
+            })
+            reject(err)
+            return
+          }
+          log.info('Process started', { metadata: { machine, processName } })
+          resolve()
+        })
       })
+    }
+    
+    // Remote PM2 via HTTP
+    const config = MACHINE_REGISTRY[machine]
+    if (!config) {
+      throw new Error(`Unknown machine: ${machine}`)
+    }
+    const response = await fetch(`http://${config.host}:${config.port}/process/${encodeURIComponent(processName)}/start`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.token}`
+      }
     })
+    
+    if (!response.ok) {
+      const error = await response.json() as { error?: string }
+      throw new Error(error.error || `Failed to start process on ${machine}`)
+    }
+    
+    log.info('Process started', { metadata: { machine, processName } })
   }
 
   /**
@@ -114,20 +206,42 @@ class PM2Manager {
   async stop(machine: string, processName: string): Promise<void> {
     await this.connect(machine)
 
-    return new Promise((resolve, reject) => {
-      pm2.stop(processName, (err: Error | null) => {
-        if (err) {
-          log.error('Failed to stop process', { 
-            error: { message: err.message },
-            metadata: { machine, processName }
-          })
-          reject(err)
-          return
-        }
-        log.info('Process stopped', { metadata: { machine, processName } })
-        resolve()
+    // Local PM2
+    if (machine === 'localhost' || machine === SERVICE_CONFIG.server.host) {
+      return new Promise((resolve, reject) => {
+        pm2.stop(processName, (err: Error | null) => {
+          if (err) {
+            log.error('Failed to stop process', { 
+              error: { message: err.message },
+              metadata: { machine, processName }
+            })
+            reject(err)
+            return
+          }
+          log.info('Process stopped', { metadata: { machine, processName } })
+          resolve()
+        })
       })
+    }
+    
+    // Remote PM2 via HTTP
+    const config = MACHINE_REGISTRY[machine]
+    if (!config) {
+      throw new Error(`Unknown machine: ${machine}`)
+    }
+    const response = await fetch(`http://${config.host}:${config.port}/process/${encodeURIComponent(processName)}/stop`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.token}`
+      }
     })
+    
+    if (!response.ok) {
+      const error = await response.json() as { error?: string }
+      throw new Error(error.error || `Failed to stop process on ${machine}`)
+    }
+    
+    log.info('Process stopped', { metadata: { machine, processName } })
   }
 
   /**
@@ -136,20 +250,42 @@ class PM2Manager {
   async restart(machine: string, processName: string): Promise<void> {
     await this.connect(machine)
 
-    return new Promise((resolve, reject) => {
-      pm2.restart(processName, (err: Error | null) => {
-        if (err) {
-          log.error('Failed to restart process', { 
-            error: { message: err.message },
-            metadata: { machine, processName }
-          })
-          reject(err)
-          return
-        }
-        log.info('Process restarted', { metadata: { machine, processName } })
-        resolve()
+    // Local PM2
+    if (machine === 'localhost' || machine === SERVICE_CONFIG.server.host) {
+      return new Promise((resolve, reject) => {
+        pm2.restart(processName, (err: Error | null) => {
+          if (err) {
+            log.error('Failed to restart process', { 
+              error: { message: err.message },
+              metadata: { machine, processName }
+            })
+            reject(err)
+            return
+          }
+          log.info('Process restarted', { metadata: { machine, processName } })
+          resolve()
+        })
       })
+    }
+    
+    // Remote PM2 via HTTP
+    const config = MACHINE_REGISTRY[machine]
+    if (!config) {
+      throw new Error(`Unknown machine: ${machine}`)
+    }
+    const response = await fetch(`http://${config.host}:${config.port}/process/${encodeURIComponent(processName)}/restart`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.token}`
+      }
     })
+    
+    if (!response.ok) {
+      const error = await response.json() as { error?: string }
+      throw new Error(error.error || `Failed to restart process on ${machine}`)
+    }
+    
+    log.info('Process restarted', { metadata: { machine, processName } })
   }
 
   /**
@@ -158,19 +294,41 @@ class PM2Manager {
   async describe(machine: string, processName: string): Promise<pm2.ProcessDescription[]> {
     await this.connect(machine)
 
-    return new Promise((resolve, reject) => {
-      pm2.describe(processName, (err: Error | null, processDescription) => {
-        if (err) {
-          log.error('Failed to describe process', { 
-            error: { message: err.message },
-            metadata: { machine, processName }
-          })
-          reject(err)
-          return
-        }
-        resolve(processDescription)
+    // Local PM2
+    if (machine === 'localhost' || machine === SERVICE_CONFIG.server.host) {
+      return new Promise((resolve, reject) => {
+        pm2.describe(processName, (err: Error | null, processDescription) => {
+          if (err) {
+            log.error('Failed to describe process', { 
+              error: { message: err.message },
+              metadata: { machine, processName }
+            })
+            reject(err)
+            return
+          }
+          resolve(processDescription)
+        })
       })
+    }
+    
+    // Remote PM2 via HTTP
+    const config = MACHINE_REGISTRY[machine]
+    if (!config) {
+      throw new Error(`Unknown machine: ${machine}`)
+    }
+    const response = await fetch(`http://${config.host}:${config.port}/process/${encodeURIComponent(processName)}/describe`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.token}`
+      }
     })
+    
+    if (!response.ok) {
+      const error = await response.json() as { error?: string }
+      throw new Error(error.error || `Failed to describe process on ${machine}`)
+    }
+    
+    return response.json() as Promise<pm2.ProcessDescription[]>
   }
 
   /**
@@ -179,54 +337,80 @@ class PM2Manager {
   async flush(machine: string, processName?: string): Promise<void> {
     await this.connect(machine)
 
-    return new Promise((resolve, reject) => {
-      const callback = (err: Error | null) => {
-        if (err) {
-          log.error('Failed to flush logs', { 
-            error: { message: err.message },
-            metadata: { machine, processName }
-          })
-          reject(err)
-          return
-        }
-        log.info('Logs flushed', { metadata: { machine, processName } })
-        resolve()
-      }
-      
-      if (processName) {
-        pm2.flush(processName, callback)
-      } else {
-        // Flush all processes
-        pm2.list((err: Error | null, processes) => {
+    // Local PM2
+    if (machine === 'localhost' || machine === SERVICE_CONFIG.server.host) {
+      return new Promise((resolve, reject) => {
+        const callback = (err: Error | null) => {
           if (err) {
-            callback(err)
+            log.error('Failed to flush logs', { 
+              error: { message: err.message },
+              metadata: { machine, processName }
+            })
+            reject(err)
             return
           }
-          
-          // Flush logs for all processes
-          let flushCount = 0
-          const totalProcesses = processes.length
-          
-          if (totalProcesses === 0) {
-            callback(null)
-            return
-          }
-          
-          processes.forEach((proc) => {
-            pm2.flush(proc.pm_id || 0, (flushErr: Error | null) => {
-              flushCount++
-              if (flushErr) {
-                callback(flushErr)
-                return
-              }
-              if (flushCount === totalProcesses) {
-                callback(null)
-              }
+          log.info('Logs flushed', { metadata: { machine, processName } })
+          resolve()
+        }
+        
+        if (processName) {
+          pm2.flush(processName, callback)
+        } else {
+          // Flush all processes
+          pm2.list((err: Error | null, processes) => {
+            if (err) {
+              callback(err)
+              return
+            }
+            
+            // Flush logs for all processes
+            let flushCount = 0
+            const totalProcesses = processes.length
+            
+            if (totalProcesses === 0) {
+              callback(null)
+              return
+            }
+            
+            processes.forEach((proc) => {
+              pm2.flush(proc.pm_id || 0, (flushErr: Error | null) => {
+                flushCount++
+                if (flushErr) {
+                  callback(flushErr)
+                  return
+                }
+                if (flushCount === totalProcesses) {
+                  callback(null)
+                }
+              })
             })
           })
-        })
+        }
+      })
+    }
+    
+    // Remote PM2 via HTTP
+    const config = MACHINE_REGISTRY[machine]
+    if (!config) {
+      throw new Error(`Unknown machine: ${machine}`)
+    }
+    const url = processName 
+      ? `http://${config.host}:${config.port}/flush?process=${encodeURIComponent(processName)}`
+      : `http://${config.host}:${config.port}/flush`
+      
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.token}`
       }
     })
+    
+    if (!response.ok) {
+      const error = await response.json() as { error?: string }
+      throw new Error(error.error || `Failed to flush logs on ${machine}`)
+    }
+    
+    log.info('Logs flushed', { metadata: { machine, processName } })
   }
 
   /**
