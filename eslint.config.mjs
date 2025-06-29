@@ -13,7 +13,10 @@ export default tseslint.config(
       '**/coverage/**',
       'ecosystem/**',
       'packages/*/dist/**',
-      'packages/*/build/**'
+      'packages/*/build/**',
+      'apps/analysis/**',
+      'apps/phononmaser/**',
+      'scripts/**/*.sh'
     ]
   },
 
@@ -115,6 +118,20 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'error', // Packages should be well-typed
       'no-console': 'warn' // Packages shouldn't log directly
+    }
+  },
+
+  // Scripts - relaxed rules for utility scripts
+  {
+    files: ['scripts/**/*.{ts,js}'],
+    rules: {
+      'no-console': 'off', // Scripts often need console output
+      '@typescript-eslint/no-explicit-any': 'off', // Scripts can be more flexible
+      '@typescript-eslint/no-unused-vars': 'warn', // Warn instead of error
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off'
     }
   },
 
