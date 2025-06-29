@@ -8,25 +8,6 @@ import { EventEmitter } from 'events'
 // Process status emitter for subscriptions
 const processEvents = new EventEmitter()
 
-// Poll PM2 for status changes
-let pollInterval: NodeJS.Timeout | null = null
-const startPolling = () => {
-  if (pollInterval) return
-  
-  pollInterval = setInterval(() => {
-    void (async () => {
-      try {
-        const processes = await pm2Manager.list('localhost')
-        processEvents.emit('status', processes)
-      } catch {
-        // Silent fail - will retry next interval
-      }
-    })()
-  }, 5000) // Poll every 5 seconds
-}
-
-// Start polling when server starts
-startPolling()
 
 export const processesRouter = t.router({
   // List all processes on a machine
@@ -145,9 +126,12 @@ export const processesRouter = t.router({
         // Send initial state
         void (async () => {
           try {
+            console.log(`[PM2] Getting initial process list for ${input.machine}...`)
             const processes = await pm2Manager.list(input.machine)
+            console.log(`[PM2] Initial fetch got ${processes.length} processes from ${input.machine}:`, processes.map(p => p.name))
             emit.next(processes)
           } catch (error) {
+            console.error(`[PM2] Failed to get initial process list for ${input.machine}:`, error)
             // Use same pattern as the log variable at top of file
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
@@ -156,10 +140,12 @@ export const processesRouter = t.router({
           }
         })()
 
-        // Set up event listener for updates
+        // Set up event listener for updates - only for localhost
         const handleUpdate = (processes: ProcessInfo[]) => {
-          // Emit updates for all machines, the client will filter
-          emit.next(processes)
+          // Only emit localhost updates to localhost subscribers
+          if (input.machine === 'localhost') {
+            emit.next(processes)
+          }
         }
         
         processEvents.on('status', handleUpdate)
@@ -167,12 +153,15 @@ export const processesRouter = t.router({
         // For non-localhost machines, we need to poll since we don't have remote events
         let pollInterval: NodeJS.Timeout | null = null
         if (input.machine !== 'localhost') {
+          console.log(`[PM2] Starting polling for machine: ${input.machine}`)
           pollInterval = setInterval(async () => {
             try {
+              console.log(`[PM2] Polling ${input.machine} for processes...`)
               const processes = await pm2Manager.list(input.machine)
+              console.log(`[PM2] Got ${processes.length} processes from ${input.machine}:`, processes.map(p => p.name))
               emit.next(processes)
             } catch (error) {
-              // Silent fail - will retry next interval
+              console.error(`[PM2] Failed to poll ${input.machine}:`, error)
             }
           }, 5000) // Poll every 5 seconds
         }
@@ -188,15 +177,3 @@ export const processesRouter = t.router({
     })
 })
 
-// Cleanup on exit
-process.on('SIGINT', () => {
-  if (pollInterval) {
-    clearInterval(pollInterval)
-  }
-})
-
-process.on('SIGTERM', () => {
-  if (pollInterval) {
-    clearInterval(pollInterval)
-  }
-})
