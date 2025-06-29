@@ -65,17 +65,8 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
     onConnectionStateChangeRef.current?.(newState)
   }, [])
 
-  // Create stable input key using a more efficient method
-  const inputKey = useRef<unknown>(undefined)
-  const hasInputChanged =
-    inputKey.current !== input &&
-    (input === undefined ||
-      inputKey.current === undefined ||
-      JSON.stringify(input) !== JSON.stringify(inputKey.current))
-
-  if (hasInputChanged) {
-    inputKey.current = input
-  }
+  // Track input changes
+  const inputKey = JSON.stringify(input)
 
   const clearRetryTimeout = useCallback(() => {
     if (retryTimeoutRef.current) {
@@ -129,11 +120,13 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
       return
     }
 
-    // Don't create a new subscription if we already have one
+    // Clean up existing subscription before creating a new one
     if (subscriptionRef.current) {
-      return
+      subscriptionRef.current.unsubscribe()
+      subscriptionRef.current = null
     }
 
+    
     updateConnectionState({ state: 'connecting' })
 
     // Get the procedure from the tRPC client using the path
@@ -163,7 +156,7 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
         ) => { unsubscribe: () => void }
       }
 
-      const subscription = subscribe.subscribe(inputKey.current, {
+      const subscription = subscribe.subscribe(input, {
         onData: (receivedData: T) => {
           setData(receivedData)
           setError(null)
@@ -206,7 +199,7 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
       }
       updateConnectionState({ state: 'idle' })
     }
-  }, [path, hasInputChanged, enabled, updateConnectionState, resetRetryState, scheduleRetry, clearRetryTimeout])
+  }, [path, inputKey, enabled, updateConnectionState, resetRetryState, scheduleRetry, clearRetryTimeout])
 
   const reset = useCallback(() => {
     setData(null)
