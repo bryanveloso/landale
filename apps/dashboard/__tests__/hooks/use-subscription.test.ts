@@ -1,13 +1,13 @@
+import '../setup'
 import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test'
 import { renderHook, act } from '@testing-library/react'
-import { useSubscription } from '@/hooks/use-subscription'
 
 // Create mock functions
 const mockSubscribe = mock()
 const mockUnsubscribe = mock()
 
-// Mock the trpc client module
-import.meta.mock('@/lib/trpc-client', () => ({
+// Mock module before importing
+mock.module('@/lib/trpc-client', () => ({
   trpcClient: {
     twitch: {
       onMessage: {
@@ -18,9 +18,17 @@ import.meta.mock('@/lib/trpc-client', () => ({
       check: {
         subscribe: mockSubscribe
       }
+    },
+    processes: {
+      onStatusUpdate: {
+        subscribe: mockSubscribe
+      }
     }
   }
 }))
+
+// Import after mocking
+const { useSubscription } = await import('@/hooks/use-subscription')
 
 describe('useSubscription', () => {
   beforeEach(() => {
@@ -38,12 +46,11 @@ describe('useSubscription', () => {
 
     const onData = mock()
     const { result } = renderHook(() => 
-      useSubscription(['twitch', 'onMessage'], onData)
+      useSubscription('twitch.onMessage', undefined, { onData })
     )
 
     // Verify subscription was created
     expect(mockSubscribe).toHaveBeenCalled()
-    expect(result.current.isConnected).toBe(true)
 
     // Verify data handler works
     act(() => {
@@ -64,7 +71,7 @@ describe('useSubscription', () => {
 
     const onError = mock()
     const { result } = renderHook(() => 
-      useSubscription(['health', 'check'], undefined, { onError })
+      useSubscription('health.check', undefined, { onError })
     )
 
     // Simulate error
@@ -76,14 +83,13 @@ describe('useSubscription', () => {
 
     expect(onError).toHaveBeenCalledWith(mockError)
     expect(result.current.error).toBe(mockError)
-    expect(result.current.isConnected).toBe(false)
   })
 
   it('should cleanup subscription on unmount', () => {
     mockSubscribe.mockReturnValue({ unsubscribe: mockUnsubscribe })
 
     const { unmount } = renderHook(() => 
-      useSubscription(['twitch', 'onMessage'])
+      useSubscription('twitch.onMessage')
     )
 
     expect(mockSubscribe).toHaveBeenCalled()
@@ -97,19 +103,40 @@ describe('useSubscription', () => {
     mockSubscribe.mockReturnValue({ unsubscribe: mockUnsubscribe })
 
     const { result, rerender } = renderHook(() => 
-      useSubscription(['twitch', 'onMessage'])
+      useSubscription('twitch.onMessage')
     )
 
     // Initial connection
-    expect(result.current.isConnected).toBe(true)
+    expect(mockSubscribe).toHaveBeenCalledTimes(1)
 
     // Simulate disconnection
     act(() => {
-      result.current.reconnect()
+      result.current.reset()
     })
 
     // Should unsubscribe and resubscribe
     expect(mockUnsubscribe).toHaveBeenCalled()
     expect(mockSubscribe).toHaveBeenCalledTimes(2)
+  })
+
+  it('should re-subscribe when input parameters change', () => {
+    mockSubscribe.mockReturnValue({ unsubscribe: mockUnsubscribe })
+
+    const { result, rerender } = renderHook(
+      ({ machine }) => useSubscription('processes.onStatusUpdate', { machine }),
+      { initialProps: { machine: 'zelan' } }
+    )
+
+    // Initial subscription
+    expect(mockSubscribe).toHaveBeenCalledTimes(1)
+    expect(mockSubscribe).toHaveBeenCalledWith({ machine: 'zelan' }, expect.any(Object))
+
+    // Change the machine parameter
+    rerender({ machine: 'demi' })
+
+    // Should unsubscribe from old and subscribe to new
+    expect(mockUnsubscribe).toHaveBeenCalledTimes(1)
+    expect(mockSubscribe).toHaveBeenCalledTimes(2)
+    expect(mockSubscribe).toHaveBeenLastCalledWith({ machine: 'demi' }, expect.any(Object))
   })
 })
