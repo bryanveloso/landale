@@ -60,7 +60,7 @@ module.exports = {
     {
       name: 'pm2-agent',
       script: 'bun',
-      args: '/Users/Avalonstar/Code/landale/ecosystem/bin/pm2-agent.ts',
+      args: './ecosystem/bin/pm2-agent.ts',
       interpreter: 'none',
       env: {
         PM2_AGENT_PORT: 9615,

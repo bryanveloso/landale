@@ -22,9 +22,9 @@ module.exports = {
     {
       name: 'pm2-agent',
       script: 'node',
-      args: 'C:\\Users\\Avalonstar\\Code\\landale\\ecosystem\\bin\\pm2-agent.js',
+      args: '.\\ecosystem\\bin\\pm2-agent.js',
       interpreter: 'none',
-      cwd: 'C:\\Users\\Avalonstar\\Code\\landale\\ecosystem\\bin',
+      cwd: '.\\ecosystem\\bin',
       env: {
         PM2_AGENT_PORT: 9615,
         PM2_AGENT_HOST: '0.0.0.0',
