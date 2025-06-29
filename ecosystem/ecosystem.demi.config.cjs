@@ -17,6 +17,7 @@ module.exports = {
       autorestart: false,
       min_uptime: '30s',
       watch: false,
+      max_restarts: 0,
       windowsHide: false
     },
     {
