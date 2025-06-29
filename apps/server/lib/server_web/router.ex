@@ -5,7 +5,21 @@ defmodule ServerWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Health check endpoint
+  get "/health", ServerWeb.HealthController, :check
+
   scope "/api", ServerWeb do
     pipe_through :api
+    
+    # Health and system status
+    get "/health", HealthController, :detailed
+    
+    # OBS controls
+    get "/obs/status", OBSController, :status
+    post "/obs/streaming/start", OBSController, :start_streaming
+    post "/obs/streaming/stop", OBSController, :stop_streaming
+    post "/obs/recording/start", OBSController, :start_recording
+    post "/obs/recording/stop", OBSController, :stop_recording
+    post "/obs/scene/:scene_name", OBSController, :set_scene
   end
 end

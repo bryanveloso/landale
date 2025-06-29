@@ -12,8 +12,8 @@ defmodule Server.Application do
       Server.Repo,
       {DNSCluster, query: Application.get_env(:server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Server.PubSub},
-      # Start a worker by calling: Server.Worker.start_link(arg)
-      # {Server.Worker, arg},
+      # OBS WebSocket Service
+      Server.Services.OBS,
       # Start to serve requests, typically the last entry
       ServerWeb.Endpoint
     ]
