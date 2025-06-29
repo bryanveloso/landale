@@ -5,13 +5,22 @@ module.exports = {
   apps: [
     {
       name: 'phononmaser',
-      script: 'python',
-      args: 'run.py',
-      cwd: '/Users/Avalonstar/Code/landale/apps/phononmaser',
+      script: '/Users/Avalonstar/Code/bryanveloso/landale/apps/phononmaser/.venv/bin/python',
+      args: '-m src.main',
+      cwd: '/Users/Avalonstar/Code/bryanveloso/landale/apps/phononmaser',
       interpreter: 'none',
       env: {
         PYTHONUNBUFFERED: '1',
-        PHONONMASER_PORT: '8889'
+        LOG_LEVEL: 'info',
+        PHONONMASER_PORT: '8889',
+        PHONONMASER_HEALTH_PORT: '8890',
+        WHISPER_MODEL_PATH: '/Users/Avalonstar/Code/utilities/whisper.cpp/models/ggml-large-v3-turbo-q8_0.bin',
+        WHISPER_THREADS: '8',
+        WHISPER_LANGUAGE: 'en',
+        WHISPER_VAD_MODEL_PATH: '/Users/Avalonstar/Code/utilities/whisper.cpp/models/ggml-silero-v5.1.2.bin',
+        SERVER_HOST: 'saya',
+        PHONONMASER_HOST: 'zelan',
+        SERVER_URL: 'ws://saya:7175/events'
       },
       error_file: '/Users/Avalonstar/Library/Logs/Landale/phononmaser-error.log',
       out_file: '/Users/Avalonstar/Library/Logs/Landale/phononmaser-out.log',
@@ -24,13 +33,21 @@ module.exports = {
     },
     {
       name: 'analysis',
-      script: 'python',
+      script: '/Users/Avalonstar/Code/bryanveloso/landale/apps/analysis/.venv/bin/python',
       args: '-m src.main',
-      cwd: '/Users/Avalonstar/Code/landale/apps/analysis',
+      cwd: '/Users/Avalonstar/Code/bryanveloso/landale/apps/analysis',
       interpreter: 'none',
       env: {
         PYTHONUNBUFFERED: '1',
-        ANALYSIS_PORT: '8890'
+        LOG_LEVEL: 'info',
+        SERVER_HOST: 'saya',
+        PHONONMASER_HOST: 'zelan',
+        LMS_HOST: 'zelan',
+        ANALYSIS_HOST: 'zelan',
+        PHONONMASER_URL: 'ws://zelan:8889',
+        SERVER_URL: 'ws://saya:7175/events',
+        LMS_API_URL: 'http://zelan:1234/v1',
+        LMS_MODEL: 'dolphin-2.9.3-llama-3-8b'
       },
       error_file: '/Users/Avalonstar/Library/Logs/Landale/analysis-error.log',
       out_file: '/Users/Avalonstar/Library/Logs/Landale/analysis-out.log',
@@ -42,14 +59,13 @@ module.exports = {
       watch: false
     },
     {
-      name: 'lm-studio',
-      script: '/Applications/LM Studio.app/Contents/MacOS/LM Studio',
+      name: 'lms',
+      script: 'lms',
+      args: ['server', 'start', '--port', '1234'],
       interpreter: 'none',
-      args: '--headless --port 1234',
-      env: {
-      },
-      error_file: '/Users/Avalonstar/Library/Logs/Landale/lm-studio-error.log',
-      out_file: '/Users/Avalonstar/Library/Logs/Landale/lm-studio-out.log',
+      env: {},
+      error_file: '/Users/Avalonstar/Library/Logs/Landale/lms-error.log',
+      out_file: '/Users/Avalonstar/Library/Logs/Landale/lms-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       autorestart: false,
