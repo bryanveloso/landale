@@ -36,11 +36,26 @@ module.exports = {
       windowsHide: false
     },
     {
+      name: 'tits',
+      script: 'D:\\Applications\\TITS\\TITS Launcher.exe',
+      interpreter: 'none',
+      cwd: 'D:\\Applications\\TITS',
+      env: {},
+      error_file: 'C:\\Users\\Avalonstar\\AppData\\Local\\Landale\\logs\\tits-error.log',
+      out_file: 'C:\\Users\\Avalonstar\\AppData\\Local\\Landale\\logs\\tits-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      autorestart: false,
+      min_uptime: '30s',
+      watch: false,
+      windowsHide: false
+    },
+    {
       name: 'pm2-agent',
       script: 'node',
-      args: 'C:\\Users\\Avalonstar\\Code\\landale\\ecosystem\\bin\\pm2-agent.js',
+      args: '.\\ecosystem\\bin\\pm2-agent.js',
       interpreter: 'none',
-      cwd: 'C:\\Users\\Avalonstar\\Code\\landale\\ecosystem\\bin',
+      cwd: '.\\ecosystem\\bin',
       env: {
         PM2_AGENT_PORT: 9615,
         PM2_AGENT_HOST: '0.0.0.0',
