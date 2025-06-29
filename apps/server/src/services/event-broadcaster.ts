@@ -213,3 +213,4 @@ class EventBroadcaster {
 }
 
 export const eventBroadcaster = new EventBroadcaster()
+export { EventBroadcaster }

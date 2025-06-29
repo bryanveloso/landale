@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { t, publicProcedure, type Router } from '@/trpc'
+import { t, publicProcedure } from '@/trpc'
 import { TRPCError } from '@trpc/server'
 import { pm2Manager, type ProcessInfo } from '@/services/pm2'
 import { observable } from '@trpc/server/observable'
@@ -148,8 +148,11 @@ export const processesRouter = t.router({
             const processes = await pm2Manager.list(input.machine)
             emit.next(processes)
           } catch (error) {
-            console.error('Failed to get initial process list:', error)
-            emit.next([])
+            // Use same pattern as the log variable at top of file
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to get initial process list'
+            })
           }
         })()
 
@@ -169,7 +172,7 @@ export const processesRouter = t.router({
               const processes = await pm2Manager.list(input.machine)
               emit.next(processes)
             } catch (error) {
-              console.error(`Failed to poll ${input.machine}:`, error)
+              // Silent fail - will retry next interval
             }
           }, 5000) // Poll every 5 seconds
         }

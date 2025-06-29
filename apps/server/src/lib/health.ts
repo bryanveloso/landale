@@ -5,7 +5,7 @@ import { getDatabaseService } from '@/services/database'
 import { getOBSService } from '@/services/obs'
 import { getRainwaveService } from '@/services/rainwave'
 import { getAppleMusicService } from '@/services/apple-music'
-import type { eventBroadcaster } from '@/services/event-broadcaster'
+import type { EventBroadcaster } from '@/services/event-broadcaster'
 
 // Health check types
 export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy' | 'unknown'
@@ -42,7 +42,7 @@ export class HealthMonitor extends EventEmitter {
   private readonly log = createLogger({ service: 'landale-server' }).child({ module: 'health-monitor' })
   private services = new Map<string, ServiceHealth>()
   private checkTimer?: NodeJS.Timeout
-  private eventBroadcaster?: typeof eventBroadcaster
+  private eventBroadcaster?: EventBroadcaster
   
   constructor(
     private readonly options: HealthMonitorOptions = {}
@@ -56,7 +56,7 @@ export class HealthMonitor extends EventEmitter {
     }
   }
   
-  setEventBroadcaster(broadcaster: typeof eventBroadcaster) {
+  setEventBroadcaster(broadcaster: EventBroadcaster) {
     this.eventBroadcaster = broadcaster
   }
   
