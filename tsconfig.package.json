@@ -2,7 +2,6 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext", "DOM"],
-    "composite": true,
     "declaration": true,
     "declarationMap": true,
     "noEmit": false,

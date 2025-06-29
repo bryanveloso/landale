@@ -1,12 +1,3 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./apps/dashboard" },
-    { "path": "./apps/overlays" },
-    { "path": "./apps/server" },
-    { "path": "./packages/database" },
-    { "path": "./packages/logger" },
-    { "path": "./packages/shared" },
-    { "path": "./packages/service-config" }
-  ]
+  "files": []
 }
