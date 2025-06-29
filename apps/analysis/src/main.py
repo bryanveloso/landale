@@ -80,8 +80,8 @@ class AnalysisService:
         self.running = True
         
         # Start health check endpoint
-        from .service_config import ServiceConfig
-        health_port = ServiceConfig.SERVICES['analysis']['ports']['health']
+        from .service_config import ServiceConfig, SERVICES
+        health_port = SERVICES['analysis']['ports']['health']
         self.health_runner = await create_health_app(port=health_port)
         
         # Start listening tasks
