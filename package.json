@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "lint": "turbo run lint",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --fix",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "cache-emotes": "bun run scripts/cache-emotes.ts",
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",

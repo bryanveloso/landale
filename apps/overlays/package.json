@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "bunx --bun vite",
     "build": "tsc && bunx --bun vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "preview": "bunx --bun vite preview",
     "test": "bun test",

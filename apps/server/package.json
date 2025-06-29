@@ -15,7 +15,6 @@
     "build": "tsc",
     "dev": "bun --hot run src/index.ts",
     "start": "bun run dist/index.js",
-    "lint": "eslint --ext .ts .",
     "typecheck": "tsc --noEmit",
     "postinstall": "tsc || true",
     "test": "bun test",
