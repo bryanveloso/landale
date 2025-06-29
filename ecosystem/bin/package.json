@@ -9,6 +9,6 @@
     "start:bun": "bun run pm2-agent.ts"
   },
   "dependencies": {
-    "pm2": "^5.3.1"
+    "pm2": "^6.0.8"
   }
 }

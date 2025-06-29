@@ -26,12 +26,12 @@
     },
     "lint": {
       "outputs": [],
-      "cache": false
+      "cache": true
     },
     "typecheck": {
       "dependsOn": ["generate"],
       "outputs": [],
-      "cache": false
+      "cache": true
     },
     "db:push": {
       "cache": false
@@ -42,7 +42,7 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"],
-      "cache": false
+      "cache": true
     },
     "test:watch": {
       "cache": false,
