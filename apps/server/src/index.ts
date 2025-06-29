@@ -20,6 +20,7 @@ import { auditLogger, AuditAction, AuditCategory } from '@/lib/audit'
 import { eventBroadcaster } from '@/services/event-broadcaster'
 import { SERVICE_CONFIG } from '@landale/service-config'
 import { getHealthMonitor } from '@/lib/health'
+import { pm2Manager } from '@/services/pm2'
 
 import { version } from '../package.json'
 
@@ -36,6 +37,7 @@ export type {
   StatusTextConfig
 } from './types/control'
 export type { Display } from './services/display-manager'
+export type { ProcessInfo } from './services/pm2'
 
 interface WSData {
   req: Request
@@ -43,9 +45,47 @@ interface WSData {
   type: 'trpc' | 'events'
 }
 
-interface ExtendedWebSocket extends ServerWebSocket<WSData> {
+interface EventClient {
+  id: string
+  ws: ServerWebSocket<WSData>
+  subscriptions: Set<string>
+  correlationId: string
+}
+
+// Type guard to check if websocket has our extended properties
+function isExtendedWebSocket(ws: any): ws is ServerWebSocket<WSData> & {
   pingInterval?: NodeJS.Timeout
-  eventClient?: any
+  eventClient?: EventClient
+} {
+  return 'data' in ws && ws.data !== undefined && 'correlationId' in ws.data && 'type' in ws.data
+}
+
+// Helper to safely get extended websocket properties
+function getExtendedProps(ws: any) {
+  const props = {
+    pingInterval: undefined as NodeJS.Timeout | undefined,
+    eventClient: undefined as EventClient | undefined
+  }
+  
+  // Use object property access to avoid type issues
+  if ('pingInterval' in ws) {
+    props.pingInterval = ws.pingInterval
+  }
+  if ('eventClient' in ws) {
+    props.eventClient = ws.eventClient
+  }
+  
+  return props
+}
+
+// Helper to safely set extended websocket properties
+function setExtendedProps(ws: any, props: { pingInterval?: NodeJS.Timeout; eventClient?: EventClient }) {
+  if (props.pingInterval !== undefined) {
+    ws.pingInterval = props.pingInterval
+  }
+  if (props.eventClient !== undefined) {
+    ws.eventClient = props.eventClient
+  }
 }
 
 const logger = createLogger({ service: 'landale-server' })
@@ -53,6 +93,7 @@ const log = logger.child({ module: 'main' })
 
 console.log(chalk.bold.green(`\n  LANDALE OVERLAY SYSTEM SERVER v${version}\n`))
 log.info('Server starting', { metadata: { environment: env.NODE_ENV, version } })
+
 
 // Log service startup
 void auditLogger.log({
@@ -101,7 +142,7 @@ const serverPort = serverConfig.ports.http || 7175
 const server: Server = Bun.serve({
   port: serverPort,
   hostname: '0.0.0.0',
-  fetch: (request, server) => {
+  fetch: async (request, server) => {
     const url = new URL(request.url)
 
     // Health check endpoint
@@ -117,6 +158,38 @@ const server: Server = Bun.serve({
           headers: { 'Content-Type': 'application/json' }
         }
       )
+    }
+
+    // Companion HTTP endpoints for Stream Deck
+    if (url.pathname.startsWith('/api/companion/process/')) {
+      const parts = url.pathname.split('/')
+      const machine = parts[4]
+      const processName = parts[5]
+      const action = parts[6]
+
+      if (request.method === 'GET' && action === 'status' && machine && processName) {
+        const { getProcessStatus } = await import('@/router/companion')
+        const status = await getProcessStatus(machine, processName)
+        return Response.json(status)
+      }
+
+      if (request.method === 'POST' && machine && processName) {
+        const { startProcess, stopProcess, restartProcess } = await import('@/router/companion')
+        
+        switch (action) {
+          case 'start':
+            return Response.json(await startProcess(machine, processName))
+          case 'stop':
+            return Response.json(await stopProcess(machine, processName))
+          case 'restart':
+            return Response.json(await restartProcess(machine, processName))
+        }
+      }
+
+      if (request.method === 'GET' && processName === 'list' && machine) {
+        const { listProcesses } = await import('@/router/companion')
+        return Response.json(await listProcesses(machine))
+      }
     }
 
     // Raw event WebSocket endpoint
@@ -138,13 +211,17 @@ const server: Server = Bun.serve({
   websocket: {
     ...websocket,
     open(ws) {
-      const extWs = ws as unknown as ExtendedWebSocket
-      const correlationId = extWs.data.correlationId
-      const connectionType = extWs.data.type
+      if (!isExtendedWebSocket(ws)) {
+        log.error('Invalid WebSocket connection - missing data')
+        return
+      }
+      
+      const correlationId = ws.data.correlationId
+      const connectionType = ws.data.type
 
       log.info('WebSocket connection opened', {
         metadata: {
-          remoteAddress: extWs.remoteAddress,
+          remoteAddress: ws.remoteAddress,
           correlationId,
           type: connectionType
         }
@@ -152,27 +229,33 @@ const server: Server = Bun.serve({
 
       // Send a ping every 30 seconds to keep connection alive
       const pingInterval = setInterval(() => {
-        if (extWs.readyState === 1) {
+        if (ws.readyState === 1) {
           // OPEN state
-          extWs.ping()
+          ws.ping()
         }
       }, 30000)
 
       // Store interval ID on the websocket instance
-      extWs.pingInterval = pingInterval
+      setExtendedProps(ws, { pingInterval })
 
       // Route to appropriate handler
       if (connectionType === 'events') {
         // Handle raw event WebSocket
-        extWs.eventClient = eventBroadcaster.handleConnection(ws, correlationId)
+        const eventClient = eventBroadcaster.handleConnection(ws, correlationId)
+        setExtendedProps(ws, { eventClient })
       } else {
         // Handle tRPC WebSocket
         void websocket.open?.(ws)
       }
     },
     close(ws, code, reason) {
-      const extWs = ws as unknown as ExtendedWebSocket
-      const correlationId = extWs.data.correlationId
+      if (!isExtendedWebSocket(ws)) {
+        log.error('Invalid WebSocket connection - missing data')
+        return
+      }
+      
+      const correlationId = ws.data.correlationId
+      const props = getExtendedProps(ws)
 
       log.info('WebSocket connection closed', {
         metadata: {
@@ -183,27 +266,32 @@ const server: Server = Bun.serve({
       })
 
       // Clear the ping interval
-      if (extWs.pingInterval) {
-        clearInterval(extWs.pingInterval)
-        extWs.pingInterval = undefined
+      if (props.pingInterval) {
+        clearInterval(props.pingInterval)
+        setExtendedProps(ws, { pingInterval: undefined })
       }
 
       // Handle event client disconnect
-      if (extWs.data.type === 'events' && extWs.eventClient) {
-        eventBroadcaster.handleDisconnect(extWs.eventClient.id)
+      if (ws.data.type === 'events' && props.eventClient) {
+        eventBroadcaster.handleDisconnect(props.eventClient.id)
       } else {
         void websocket.close?.(ws, code, reason)
       }
     },
     message(ws, message) {
-      const extWs = ws as unknown as ExtendedWebSocket
+      if (!isExtendedWebSocket(ws)) {
+        log.error('Invalid WebSocket connection - missing data')
+        return
+      }
       
-      if (extWs.data.type === 'events' && extWs.eventClient) {
+      const props = getExtendedProps(ws)
+      
+      if (ws.data.type === 'events' && props.eventClient) {
         // Handle event WebSocket messages
-        eventBroadcaster.handleMessage(extWs.eventClient, message.toString())
+        eventBroadcaster.handleMessage(props.eventClient, message.toString())
       } else {
         // Handle tRPC WebSocket messages
-        websocket.message(ws, message)
+        void websocket.message(ws, message)
       }
     }
   }
@@ -333,6 +421,15 @@ try {
 } catch (error) {
   log.error('Failed to initialize Apple Music service', { error: error as Error })
 }
+
+// Initialize PM2 Manager
+void pm2Manager.connect('localhost')
+  .then(() => {
+    log.info('PM2 Manager initialized successfully')
+  })
+  .catch((error: unknown) => {
+    log.error('Failed to initialize PM2 Manager', { error: error as Error })
+  })
 
 // Initialize health monitoring
 const healthMonitor = getHealthMonitor()
