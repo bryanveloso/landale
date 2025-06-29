@@ -1,6 +1,6 @@
 import Emittery from 'emittery'
 import { nanoid } from 'nanoid'
-import { type EventMap } from './types'
+import type { EventMap } from './types'
 
 export const eventEmitter = new Emittery<EventMap>()
 

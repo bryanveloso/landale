@@ -1,5 +1,5 @@
-import { type FC, type PropsWithChildren } from 'react'
-import { type QueryClient } from '@tanstack/react-query'
+import type { FC, PropsWithChildren } from 'react'
+import type { QueryClient } from '@tanstack/react-query'
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router'
 import { useOBS } from '@/lib/obs-detection'
 

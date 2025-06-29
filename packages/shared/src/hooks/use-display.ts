@@ -1,7 +1,7 @@
 import type { Display } from '../types/display'
 
-export interface UseDisplayOptions {
-  onData?: (data: any) => void
+export interface UseDisplayOptions<T = unknown> {
+  onData?: (data: T) => void
   onError?: (error: Error) => void
 }
 
@@ -16,6 +16,5 @@ export interface UseDisplayReturn<T> {
 }
 
 // This is the interface that each package (dashboard/overlays) will implement
-export interface UseDisplay {
-  <T = any>(displayId: string, options?: UseDisplayOptions): UseDisplayReturn<T>
-}
+export type UseDisplay = 
+  <T = unknown>(displayId: string, options?: UseDisplayOptions<T>) => UseDisplayReturn<T>

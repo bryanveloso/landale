@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { type FC, memo, useEffect, useState } from 'react'
-import { type IronmonEvent } from '@landale/server'
+import type { IronmonEvent } from '@landale/server'
 
 export const Statistics: FC = memo(() => {
   const queryClient = useQueryClient()

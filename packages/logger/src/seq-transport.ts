@@ -63,7 +63,7 @@ export default function (options: SeqTransportOptions) {
     }
   }
   
-  return build(async function (source: AsyncIterable<PinoLogObject>) {
+  return build(async (source: AsyncIterable<PinoLogObject>) => {
     for await (const obj of source) {
       const seqEvent: SeqEvent = {
         '@t': new Date(obj.time).toISOString(),

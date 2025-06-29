@@ -1,7 +1,7 @@
 import { useEffect, useState, type FC, memo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
-import { type IronmonEvent } from '@landale/server'
+import type { IronmonEvent } from '@landale/server'
 import { animate, motion, useMotionValue, useTransform } from 'framer-motion'
 
 export const Seed: FC = memo(() => {
