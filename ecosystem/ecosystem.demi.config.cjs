@@ -6,8 +6,9 @@ module.exports = {
     {
       name: 'obs-studio',
       script: 'C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe',
-      args: '--minimize-to-tray --multi',
-      interpreter: 'none',
+      args: '--enable-media-stream',
+      exec_mode: 'fork',
+      instances: 1,
       cwd: 'C:\\Program Files\\obs-studio\\bin\\64bit',
       env: {},
       error_file: 'C:\\Users\\Avalonstar\\AppData\\Local\\Landale\\logs\\obs-error.log',
@@ -23,7 +24,8 @@ module.exports = {
     {
       name: 'vtube-studio',
       script: 'D:\\Steam\\steamapps\\common\\VTube Studio\\VTube Studio.exe',
-      interpreter: 'none',
+      exec_mode: 'fork',
+      instances: 1,
       cwd: 'D:\\Steam\\steamapps\\common\\VTube Studio',
       env: {},
       error_file: 'C:\\Users\\Avalonstar\\AppData\\Local\\Landale\\logs\\vts-error.log',
@@ -38,7 +40,8 @@ module.exports = {
     {
       name: 'tits',
       script: 'D:\\Applications\\TITS\\TITS Launcher.exe',
-      interpreter: 'none',
+      exec_mode: 'fork',
+      instances: 1,
       cwd: 'D:\\Applications\\TITS',
       env: {},
       error_file: 'C:\\Users\\Avalonstar\\AppData\\Local\\Landale\\logs\\tits-error.log',
@@ -52,7 +55,7 @@ module.exports = {
     },
     {
       name: 'pm2-agent',
-      script: 'node',
+      script: 'bun',
       args: '.\\ecosystem\\bin\\pm2-agent.js',
       interpreter: 'none',
       cwd: '.\\ecosystem\\bin',
