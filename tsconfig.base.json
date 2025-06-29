@@ -26,5 +26,6 @@
     "exactOptionalPropertyTypes": false, // Can be very strict with APIs
     "noImplicitReturns": true, // Good practice
     "noUncheckedSideEffectImports": false // Can break with CSS imports, etc.
-  }
+  },
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
