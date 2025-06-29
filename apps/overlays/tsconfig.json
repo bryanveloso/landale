@@ -3,12 +3,6 @@
   "compilerOptions": {
     "composite": true,
     "noEmit": true,
-    "jsx": "react-jsx",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
       "+/*": ["./assets/*"],

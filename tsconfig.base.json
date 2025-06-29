@@ -14,16 +14,17 @@
     "verbatimModuleSyntax": true,
     "noEmit": true,
 
-    // Best practices
+    // Core settings
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
-
-    // Some stricter flags (disabled by default)
+    "noUncheckedIndexedAccess": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    "noPropertyAccessFromIndexSignature": false,
+    "exactOptionalPropertyTypes": false, // Can be very strict with APIs
+    "noImplicitReturns": true, // Good practice
+    "noUncheckedSideEffectImports": false // Can break with CSS imports, etc.
   }
 }

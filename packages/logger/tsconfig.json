@@ -1,15 +1,11 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.package.json",
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
-    "lib": ["ESNext", "DOM"],
-    "types": ["bun", "node"],
-    "noEmit": false
+    "lib": ["ESNext", "DOM"], // Support both environments
+    "types": ["node"] // But primarily Node-focused
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": ["dist", "**/*.test.ts"]
 }
