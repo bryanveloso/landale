@@ -45,6 +45,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    extra_hosts:
+      - "zelan:100.112.39.113"
+      - "alys:100.106.79.5"
+      - "demi:100.106.173.14"
+      - "saya:100.122.53.119"
 
   overlays:
     build:
