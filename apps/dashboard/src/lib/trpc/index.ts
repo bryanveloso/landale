@@ -1,6 +1,6 @@
-import { createTRPCClient, createWSClient, wsLink, type TRPCClient } from '@trpc/client'
 import type { AppRouter } from '@landale/server'
-import { serviceUrls } from './config'
+import { createTRPCClient, createWSClient, type TRPCClient, wsLink } from '@trpc/client'
+import { serviceUrls } from '@/lib/config'
 
 const wsClient = createWSClient({
   url: serviceUrls.server.ws,
@@ -25,9 +25,5 @@ const wsClient = createWSClient({
 })
 
 export const trpcClient: TRPCClient<AppRouter> = createTRPCClient<AppRouter>({
-  links: [
-    wsLink({
-      client: wsClient
-    })
-  ]
+  links: [wsLink({ client: wsClient })]
 })
