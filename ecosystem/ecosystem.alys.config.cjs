@@ -6,7 +6,8 @@ module.exports = {
     {
       name: 'streamer-bot',
       script: 'D:\\Utilities\\Streamer.Bot\\Streamer.Bot.exe',
-      interpreter: 'none',
+      exec_mode: 'fork',
+      instances: 1,
       cwd: 'D:\\Utilities\\Streamer.Bot',
       env: {},
       error_file: 'C:\\Users\\Avalonstar\\AppData\\Local\\Landale\\logs\\streamer-bot-error.log',
@@ -21,7 +22,7 @@ module.exports = {
     },
     {
       name: 'pm2-agent',
-      script: 'node',
+      script: 'bun',
       args: '.\\ecosystem\\bin\\pm2-agent.js',
       interpreter: 'none',
       cwd: '.\\ecosystem\\bin',
