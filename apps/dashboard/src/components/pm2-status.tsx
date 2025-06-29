@@ -28,15 +28,13 @@ interface ConfirmDialog {
 
 // Known machines in the network
 const MACHINES = [
-  { id: 'localhost', name: 'Local', icon: '🏠' },
-  { id: 'saya', name: 'Saya (Mac Mini)', icon: '🖥️' },
   { id: 'zelan', name: 'Zelan (Mac Studio)', icon: '💻' },
   { id: 'demi', name: 'Demi (Windows OBS)', icon: '🎬' },
   { id: 'alys', name: 'Alys (Windows Gaming)', icon: '🎮' }
 ]
 
 export function PM2Status({ machine }: PM2StatusProps) {
-  const [selectedMachine, setSelectedMachine] = useState(machine || 'localhost')
+  const [selectedMachine, setSelectedMachine] = useState(machine || 'zelan')
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>({
