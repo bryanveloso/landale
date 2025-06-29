@@ -52,9 +52,40 @@ interface EventClient {
   correlationId: string
 }
 
-interface ExtendedWebSocket extends ServerWebSocket<WSData> {
+// Type guard to check if websocket has our extended properties
+function isExtendedWebSocket(ws: any): ws is ServerWebSocket<WSData> & {
   pingInterval?: NodeJS.Timeout
   eventClient?: EventClient
+} {
+  return 'data' in ws && ws.data !== undefined && 'correlationId' in ws.data && 'type' in ws.data
+}
+
+// Helper to safely get extended websocket properties
+function getExtendedProps(ws: any) {
+  const props = {
+    pingInterval: undefined as NodeJS.Timeout | undefined,
+    eventClient: undefined as EventClient | undefined
+  }
+  
+  // Use object property access to avoid type issues
+  if ('pingInterval' in ws) {
+    props.pingInterval = ws.pingInterval
+  }
+  if ('eventClient' in ws) {
+    props.eventClient = ws.eventClient
+  }
+  
+  return props
+}
+
+// Helper to safely set extended websocket properties
+function setExtendedProps(ws: any, props: { pingInterval?: NodeJS.Timeout; eventClient?: EventClient }) {
+  if (props.pingInterval !== undefined) {
+    ws.pingInterval = props.pingInterval
+  }
+  if (props.eventClient !== undefined) {
+    ws.eventClient = props.eventClient
+  }
 }
 
 const logger = createLogger({ service: 'landale-server' })
@@ -180,13 +211,17 @@ const server: Server = Bun.serve({
   websocket: {
     ...websocket,
     open(ws) {
-      const extWs = ws as unknown as ExtendedWebSocket
-      const correlationId = extWs.data.correlationId
-      const connectionType = extWs.data.type
+      if (!isExtendedWebSocket(ws)) {
+        log.error('Invalid WebSocket connection - missing data')
+        return
+      }
+      
+      const correlationId = ws.data.correlationId
+      const connectionType = ws.data.type
 
       log.info('WebSocket connection opened', {
         metadata: {
-          remoteAddress: extWs.remoteAddress,
+          remoteAddress: ws.remoteAddress,
           correlationId,
           type: connectionType
         }
@@ -194,27 +229,33 @@ const server: Server = Bun.serve({
 
       // Send a ping every 30 seconds to keep connection alive
       const pingInterval = setInterval(() => {
-        if (extWs.readyState === 1) {
+        if (ws.readyState === 1) {
           // OPEN state
-          extWs.ping()
+          ws.ping()
         }
       }, 30000)
 
       // Store interval ID on the websocket instance
-      extWs.pingInterval = pingInterval
+      setExtendedProps(ws, { pingInterval })
 
       // Route to appropriate handler
       if (connectionType === 'events') {
         // Handle raw event WebSocket
-        extWs.eventClient = eventBroadcaster.handleConnection(ws as unknown as ServerWebSocket<WSData>, correlationId)
+        const eventClient = eventBroadcaster.handleConnection(ws, correlationId)
+        setExtendedProps(ws, { eventClient })
       } else {
         // Handle tRPC WebSocket
         void websocket.open?.(ws)
       }
     },
     close(ws, code, reason) {
-      const extWs = ws as unknown as ExtendedWebSocket
-      const correlationId = extWs.data.correlationId
+      if (!isExtendedWebSocket(ws)) {
+        log.error('Invalid WebSocket connection - missing data')
+        return
+      }
+      
+      const correlationId = ws.data.correlationId
+      const props = getExtendedProps(ws)
 
       log.info('WebSocket connection closed', {
         metadata: {
@@ -225,24 +266,29 @@ const server: Server = Bun.serve({
       })
 
       // Clear the ping interval
-      if (extWs.pingInterval) {
-        clearInterval(extWs.pingInterval)
-        extWs.pingInterval = undefined
+      if (props.pingInterval) {
+        clearInterval(props.pingInterval)
+        setExtendedProps(ws, { pingInterval: undefined })
       }
 
       // Handle event client disconnect
-      if (extWs.data.type === 'events' && extWs.eventClient) {
-        eventBroadcaster.handleDisconnect(extWs.eventClient.id)
+      if (ws.data.type === 'events' && props.eventClient) {
+        eventBroadcaster.handleDisconnect(props.eventClient.id)
       } else {
         void websocket.close?.(ws, code, reason)
       }
     },
     message(ws, message) {
-      const extWs = ws as unknown as ExtendedWebSocket
+      if (!isExtendedWebSocket(ws)) {
+        log.error('Invalid WebSocket connection - missing data')
+        return
+      }
       
-      if (extWs.data.type === 'events' && extWs.eventClient) {
+      const props = getExtendedProps(ws)
+      
+      if (ws.data.type === 'events' && props.eventClient) {
         // Handle event WebSocket messages
-        eventBroadcaster.handleMessage(extWs.eventClient, message.toString())
+        eventBroadcaster.handleMessage(props.eventClient, message.toString())
       } else {
         // Handle tRPC WebSocket messages
         void websocket.message(ws, message)
