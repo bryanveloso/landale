@@ -1,5 +1,5 @@
 # Use specific version for reproducibility
-FROM oven/bun:latest AS base
+FROM oven/bun:latest-alpine AS base
 
 # Install OpenSSL for Prisma for Prisma generate
 RUN apk add --no-cache openssl
