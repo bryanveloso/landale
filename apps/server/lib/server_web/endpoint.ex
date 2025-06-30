@@ -1,4 +1,6 @@
 defmodule ServerWeb.Endpoint do
+  @moduledoc "Phoenix endpoint configuration for the server application."
+
   use Phoenix.Endpoint, otp_app: :server
 
   # The session will be stored in the cookie and signed,

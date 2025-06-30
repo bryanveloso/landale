@@ -1,4 +1,6 @@
 defmodule ServerWeb.UserSocket do
+  @moduledoc "Phoenix socket configuration for WebSocket connections."
+
   use Phoenix.Socket
   require Logger
 

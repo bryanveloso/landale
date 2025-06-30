@@ -1,4 +1,6 @@
 defmodule ServerWeb.OBSController do
+  @moduledoc "Controller for OBS WebSocket operations and status monitoring."
+
   use ServerWeb, :controller
 
   def status(conn, _params) do
