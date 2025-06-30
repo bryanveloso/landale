@@ -32,5 +32,10 @@ defmodule ServerWeb.Router do
     get "/ironmon/checkpoints/:id/stats", IronmonController, :checkpoint_stats
     get "/ironmon/results/recent", IronmonController, :recent_results
     get "/ironmon/seeds/:id/challenge", IronmonController, :active_challenge
+
+    # Control system
+    get "/control/status", ControlController, :status
+    get "/control/services", ControlController, :services
+    post "/control/ping", ControlController, :ping
   end
 end
