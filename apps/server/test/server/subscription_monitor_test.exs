@@ -4,16 +4,15 @@ defmodule Server.SubscriptionMonitorTest do
   alias Server.SubscriptionMonitor
 
   setup do
-    # Start a fresh monitor for each test
-    {:ok, pid} = SubscriptionMonitor.start_link([])
-
-    on_exit(fn ->
-      if Process.alive?(pid) do
-        GenServer.stop(pid)
-      end
-    end)
-
-    %{monitor: pid}
+    # Ensure clean state by stopping any existing monitor
+    if Process.whereis(SubscriptionMonitor) do
+      GenServer.stop(SubscriptionMonitor)
+    end
+    
+    # Start fresh monitor for each test
+    {:ok, monitor} = start_supervised(SubscriptionMonitor)
+    
+    %{monitor: monitor}
   end
 
   describe "subscription tracking" do
@@ -256,7 +255,7 @@ defmodule Server.SubscriptionMonitorTest do
   describe "telemetry integration" do
     test "emits telemetry events for subscription operations" do
       # Set up telemetry handler
-      events = []
+      _events = []
       test_pid = self()
 
       :telemetry.attach_many(

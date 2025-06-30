@@ -206,11 +206,11 @@ defmodule Server.OAuthTokenManager do
   @spec set_token(manager_state(), map()) :: manager_state()
   def set_token(manager, token_info) do
     processed_token = %{
-      access_token: token_info.access_token || token_info["access_token"],
-      refresh_token: token_info.refresh_token || token_info["refresh_token"],
+      access_token: Map.get(token_info, :access_token) || Map.get(token_info, "access_token"),
+      refresh_token: Map.get(token_info, :refresh_token) || Map.get(token_info, "refresh_token"),
       expires_at: parse_expires_at(token_info),
       scopes: parse_scopes(token_info),
-      user_id: token_info.user_id || token_info["user_id"]
+      user_id: Map.get(token_info, :user_id) || Map.get(token_info, "user_id")
     }
 
     updated_manager = %{manager | token_info: processed_token}
