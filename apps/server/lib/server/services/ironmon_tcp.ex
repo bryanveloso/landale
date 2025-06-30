@@ -27,7 +27,7 @@ defmodule Server.Services.IronmonTCP do
   use GenServer
   require Logger
 
-  alias Server.{Events, ServiceError, CorrelationId}
+  alias Server.{CorrelationId, Events, ServiceError}
 
   # Default TCP server configuration
   @default_port 8080

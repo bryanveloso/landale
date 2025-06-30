@@ -25,5 +25,12 @@ defmodule ServerWeb.Router do
     post "/obs/recording/start", OBSController, :start_recording
     post "/obs/recording/stop", OBSController, :stop_recording
     post "/obs/scene/:scene_name", OBSController, :set_scene
+
+    # IronMON data and statistics
+    get "/ironmon/challenges", IronmonController, :list_challenges
+    get "/ironmon/challenges/:id/checkpoints", IronmonController, :list_checkpoints
+    get "/ironmon/checkpoints/:id/stats", IronmonController, :checkpoint_stats
+    get "/ironmon/results/recent", IronmonController, :recent_results
+    get "/ironmon/seeds/:id/challenge", IronmonController, :active_challenge
   end
 end

@@ -82,11 +82,14 @@ defmodule Server.Application do
 
   defp setup_signal_handlers do
     # Handle SIGTERM gracefully (Docker sends this for shutdown)
+    # Note: Signal names vary by OTP version, using try/catch for compatibility
     :os.set_signal(:sigterm, :handle)
     :os.set_signal(:sigint, :handle)
-
     # Spawn a process to handle signals
     spawn_link(fn -> signal_handler_loop() end)
+  rescue
+    ArgumentError ->
+      Logger.warning("Signal handling not available on this platform")
   end
 
   defp signal_handler_loop do
