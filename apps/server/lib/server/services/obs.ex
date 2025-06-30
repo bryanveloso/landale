@@ -1,6 +1,6 @@
 defmodule Server.Services.OBS do
   @moduledoc """
-  OBS WebSocket integration service using Fresh WebSocket client.
+  OBS WebSocket integration service using Gun WebSocket client.
   
   Provides comprehensive OBS WebSocket v5 functionality:
   - Connection management with auto-reconnect
@@ -10,16 +10,21 @@ defmodule Server.Services.OBS do
   - Full OBS WebSocket v5 protocol support
   """
 
-  use Fresh
+  use GenServer
   require Logger
 
   # OBS WebSocket protocol constants
   @event_subscription_all 0x1FF  # Subscribe to all events
   @stats_polling_interval 5_000  # 5 seconds
+  @reconnect_interval 2_000      # 2 seconds
 
   defstruct [
+    :conn_pid,
+    :stream_ref,
     :stats_timer,
+    :reconnect_timer,
     :pending_requests,
+    uri: nil,
     state: %{
       connection: %{
         connected: false,
@@ -63,15 +68,7 @@ defmodule Server.Services.OBS do
 
   # Client API
   def start_link(opts \\ []) do
-    url = Keyword.get(opts, :url, get_websocket_url())
-    
-    state = %__MODULE__{
-      pending_requests: %{}
-    }
-
-    Logger.info("Starting OBS WebSocket service", url: url)
-    
-    Fresh.start_link(url, state, [], name: __MODULE__)
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
   def get_state do
@@ -142,97 +139,42 @@ defmodule Server.Services.OBS do
     GenServer.call(__MODULE__, {:obs_call, "SaveReplayBuffer", %{}})
   end
 
-  # Fresh callbacks
-  @impl Fresh
-  def handle_connect(_status, _headers, state) do
-    Logger.info("OBS WebSocket connected")
+  # GenServer callbacks
+  @impl GenServer
+  def init(opts) do
+    url = Keyword.get(opts, :url, get_websocket_url())
+    uri = URI.parse(url)
     
-    # Update connection state
-    state = update_connection_state(state, %{
-      connected: true,
-      connection_state: "connected",
-      last_connected: DateTime.utc_now()
-    })
+    state = %__MODULE__{
+      uri: uri,
+      pending_requests: %{}
+    }
 
-    # Publish connection event
-    Server.Events.publish_obs_event("connection_established", %{})
-
-    {:ok, state}
-  end
-
-  @impl Fresh
-  def handle_disconnect(_code, _reason, state) do
-    Logger.warning("OBS WebSocket disconnected")
+    Logger.info("Starting OBS WebSocket service", url: url)
     
-    # Update connection state
-    state = update_connection_state(state, %{
-      connected: false,
-      connection_state: "disconnected"
-    })
-    |> stop_stats_polling()
-
-    # Publish disconnection event
-    Server.Events.publish_obs_event("connection_lost", %{})
-
-    {:ok, state}
-  end
-
-  @impl Fresh
-  def handle_in({:text, message}, state) do
-    state = handle_obs_message(state, message)
-    {:ok, state}
-  end
-
-  @impl Fresh
-  def handle_in(frame, state) do
-    Logger.debug("Unhandled WebSocket frame", frame: frame)
-    {:ok, state}
-  end
-
-  @impl Fresh
-  def handle_error(error, state) do
-    Logger.error("OBS WebSocket error", error: error)
+    # Try to connect immediately
+    send(self(), :connect)
     
-    state = update_connection_state(state, %{
-      connected: false,
-      connection_state: "error",
-      last_error: to_string(error)
-    })
-
     {:ok, state}
   end
 
-  @impl Fresh
-  def handle_info(:poll_stats, state) do
-    if state.state.connection.connected do
-      request_obs_stats()
-    end
-    
-    # Schedule next poll
-    timer = Process.send_after(self(), :poll_stats, @stats_polling_interval)
-    state = %{state | stats_timer: timer}
-    {:ok, state}
+  @impl GenServer
+  def handle_call(:get_state, _from, state) do
+    {:reply, state.state, state}
   end
 
-  @impl Fresh
-  def handle_info({:get_state, from}, state) do
-    GenServer.reply(from, state.state)
-    {:ok, state}
-  end
-
-  @impl Fresh
-  def handle_info({:get_status, from}, state) do
+  @impl GenServer
+  def handle_call(:get_status, _from, state) do
     status = %{
       connected: state.state.connection.connected,
       connection_state: state.state.connection.connection_state
     }
-    GenServer.reply(from, {:ok, status})
-    {:ok, state}
+    {:reply, {:ok, status}, state}
   end
 
-  @impl Fresh
-  def handle_info({{:obs_call, request_type, request_data}, from}, state) do
-    if state.state.connection.connected do
+  @impl GenServer
+  def handle_call({:obs_call, request_type, request_data}, from, state) do
+    if state.state.connection.connected and state.conn_pid and state.stream_ref do
       request_id = UUID.uuid4()
       
       message = %{
@@ -244,27 +186,261 @@ defmodule Server.Services.OBS do
         }
       }
 
-      case send_message(message) do
+      case send_websocket_message(state, message) do
         :ok ->
           # Store the pending request
           pending_requests = Map.put(state.pending_requests, request_id, from)
-          state = %{state | pending_requests: pending_requests}
-          {:ok, state}
+          new_state = %{state | pending_requests: pending_requests}
+          {:noreply, new_state}
 
         {:error, reason} ->
-          GenServer.reply(from, {:error, reason})
-          {:ok, state}
+          {:reply, {:error, reason}, state}
       end
     else
-      GenServer.reply(from, {:error, "OBS not connected"})
-      {:ok, state}
+      {:reply, {:error, "OBS not connected"}, state}
     end
   end
 
-  @impl Fresh
+  @impl GenServer
+  def handle_info(:connect, state) do
+    case connect_websocket(state) do
+      {:ok, new_state} ->
+        {:noreply, new_state}
+      
+      {:error, new_state} ->
+        # Schedule reconnect
+        timer = Process.send_after(self(), :connect, @reconnect_interval)
+        new_state = %{new_state | reconnect_timer: timer}
+        {:noreply, new_state}
+    end
+  end
+
+  @impl GenServer
+  def handle_info(:poll_stats, state) do
+    if state.state.connection.connected do
+      request_obs_stats(state)
+    end
+    
+    # Schedule next poll
+    timer = Process.send_after(self(), :poll_stats, @stats_polling_interval)
+    state = %{state | stats_timer: timer}
+    {:noreply, state}
+  end
+
+  # Gun WebSocket messages
+  @impl GenServer
+  def handle_info({:gun_response, conn_pid, stream_ref, is_fin, status, headers}, state) do
+    if conn_pid == state.conn_pid and stream_ref == state.stream_ref do
+      Logger.info("OBS HTTP response", 
+        status: status, 
+        is_fin: is_fin, 
+        headers: inspect(headers)
+      )
+    end
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:gun_upgrade, _conn_pid, stream_ref, ["websocket"], _headers}, state) do
+    if stream_ref == state.stream_ref do
+      Logger.info("OBS WebSocket connection established")
+      
+      # Update connection state
+      state = update_connection_state(state, %{
+        connected: true,
+        connection_state: "connected",
+        last_connected: DateTime.utc_now()
+      })
+
+      # Publish connection event
+      Server.Events.publish_obs_event("connection_established", %{})
+      
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_info({:gun_ws, _conn_pid, stream_ref, {:text, message}}, state) do
+    if stream_ref == state.stream_ref do
+      state = handle_obs_message(state, message)
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_info({:gun_ws, _conn_pid, stream_ref, frame}, state) do
+    if stream_ref == state.stream_ref do
+      Logger.debug("Unhandled WebSocket frame", frame: frame)
+    end
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:gun_down, conn_pid, _protocol, reason, _killed_streams}, state) do
+    if conn_pid == state.conn_pid do
+      Logger.warning("OBS WebSocket connection down", reason: reason)
+      
+      # Update connection state
+      state = update_connection_state(state, %{
+        connected: false,
+        connection_state: "disconnected"
+      })
+      |> stop_stats_polling()
+      |> cleanup_connection()
+
+      # Publish disconnection event
+      Server.Events.publish_obs_event("connection_lost", %{})
+      
+      # Schedule reconnect
+      timer = Process.send_after(self(), :connect, @reconnect_interval)
+      state = %{state | reconnect_timer: timer}
+      
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_info({:gun_error, conn_pid, stream_ref, reason}, state) do
+    if conn_pid == state.conn_pid and stream_ref == state.stream_ref do
+      Logger.error("OBS WebSocket stream error", 
+        conn_pid: inspect(conn_pid), 
+        stream_ref: inspect(stream_ref), 
+        reason: inspect(reason, pretty: true)
+      )
+      
+      state = update_connection_state(state, %{
+        connected: false,
+        connection_state: "error",
+        last_error: inspect(reason)
+      })
+      |> cleanup_connection()
+
+      # Schedule reconnect
+      timer = Process.send_after(self(), :connect, @reconnect_interval)
+      state = %{state | reconnect_timer: timer}
+      
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_info({:gun_error, conn_pid, reason}, state) do
+    if conn_pid == state.conn_pid do
+      Logger.error("OBS WebSocket connection error", 
+        conn_pid: inspect(conn_pid), 
+        reason: inspect(reason, pretty: true)
+      )
+      
+      state = update_connection_state(state, %{
+        connected: false,
+        connection_state: "error",
+        last_error: inspect(reason)
+      })
+      |> cleanup_connection()
+
+      # Schedule reconnect
+      timer = Process.send_after(self(), :connect, @reconnect_interval)
+      state = %{state | reconnect_timer: timer}
+      
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_info({:DOWN, _ref, :process, pid, reason}, state) do
+    if pid == state.conn_pid do
+      Logger.info("OBS connection process down", reason: reason)
+      
+      # Update connection state and schedule reconnect
+      state = update_connection_state(state, %{
+        connected: false,
+        connection_state: "disconnected"
+      })
+      |> stop_stats_polling()
+      |> cleanup_connection()
+
+      # Publish disconnection event
+      Server.Events.publish_obs_event("connection_lost", %{})
+      
+      # Schedule reconnect
+      timer = Process.send_after(self(), :connect, @reconnect_interval)
+      state = %{state | reconnect_timer: timer}
+      
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
+  end
+
+  @impl GenServer
   def handle_info(info, state) do
-    Logger.debug("Unhandled info message", info: info)
-    {:ok, state}
+    Logger.warning("Unhandled Gun message", message: inspect(info, pretty: true))
+    {:noreply, state}
+  end
+
+  # WebSocket connection handling using Gun
+  defp connect_websocket(state) do
+    host = to_charlist(state.uri.host)
+    port = state.uri.port || 4455
+    path = state.uri.path || "/"
+    
+    case :gun.open(host, port) do
+      {:ok, conn_pid} ->
+        # Monitor the connection
+        Process.monitor(conn_pid)
+        
+        case :gun.await_up(conn_pid, 5_000) do
+          {:ok, _protocol} ->
+            # Upgrade to WebSocket - try without protocol first
+            stream_ref = :gun.ws_upgrade(conn_pid, path)
+            
+            Logger.debug("WebSocket upgrade requested", 
+              conn_pid: inspect(conn_pid), 
+              stream_ref: inspect(stream_ref), 
+              path: path
+            )
+            
+            Logger.info("Initiating WebSocket upgrade to OBS")
+            
+            new_state = %{state | conn_pid: conn_pid, stream_ref: stream_ref}
+            |> update_connection_state(%{
+              connected: false,
+              connection_state: "connecting"
+            })
+            
+            {:ok, new_state}
+            
+          {:error, reason} ->
+            Logger.error("Failed to establish connection to OBS", error: reason)
+            :gun.close(conn_pid)
+            
+            state = update_connection_state(state, %{
+              connected: false,
+              connection_state: "error",
+              last_error: inspect(reason)
+            })
+            {:error, state}
+        end
+        
+      {:error, reason} ->
+        Logger.error("Failed to open connection to OBS", error: reason)
+        state = update_connection_state(state, %{
+          connected: false,
+          connection_state: "error",
+          last_error: inspect(reason)
+        })
+        {:error, state}
+    end
   end
 
   # OBS WebSocket protocol handlers
@@ -292,8 +468,10 @@ defmodule Server.Services.OBS do
       }
     }
     
-    send_message(identify_message)
-    state
+    case send_websocket_message(state, identify_message) do
+      :ok -> state
+      {:error, _reason} -> state
+    end
   end
 
   defp handle_obs_protocol_message(state, 2, %{"d" => data}) do
@@ -345,7 +523,7 @@ defmodule Server.Services.OBS do
     state
   end
 
-  # OBS event handlers
+  # OBS event handlers (simplified versions)
   defp handle_obs_event(state, "CurrentProgramSceneChanged", %{"sceneName" => scene_name}) do
     Logger.debug("Current program scene changed", scene_name: scene_name)
     
@@ -357,26 +535,6 @@ defmodule Server.Services.OBS do
       scene_name: scene_name,
       previous_scene: previous_scene
     })
-    
-    state
-  end
-
-  defp handle_obs_event(state, "CurrentPreviewSceneChanged", %{"sceneName" => scene_name}) do
-    Logger.debug("Current preview scene changed", scene_name: scene_name)
-    
-    state = update_scene_state(state, %{preview: scene_name})
-    
-    Server.Events.publish_obs_event("scene_preview_changed", %{scene_name: scene_name})
-    
-    state
-  end
-
-  defp handle_obs_event(state, "SceneListChanged", %{"scenes" => scenes}) do
-    Logger.debug("Scene list changed", scene_count: length(scenes))
-    
-    state = update_scene_state(state, %{list: scenes})
-    
-    Server.Events.publish_obs_event("scene_list_changed", %{scenes: scenes})
     
     state
   end
@@ -395,59 +553,20 @@ defmodule Server.Services.OBS do
     state
   end
 
-  defp handle_obs_event(state, "RecordStateChanged", data) do
-    %{"outputActive" => active, "outputState" => output_state} = data
-    paused = Map.get(data, "outputPaused", false)
-    
-    Logger.info("Record state changed", output_active: active, output_state: output_state, paused: paused)
-    
-    state = update_recording_state(state, %{active: active, paused: paused})
-    
-    event_type = cond do
-      active and not state.state.recording.active -> "recording_started"
-      not active and state.state.recording.active -> "recording_stopped"
-      paused -> "recording_paused"
-      true -> "recording_state_changed"
-    end
-    
-    Server.Events.publish_obs_event(event_type, data)
-    
-    state
-  end
-
-  defp handle_obs_event(state, "StudioModeStateChanged", %{"studioModeEnabled" => enabled}) do
-    Logger.info("Studio mode changed", enabled: enabled)
-    
-    state = update_studio_mode_state(state, %{enabled: enabled})
-    
-    Server.Events.publish_obs_event("studio_mode_changed", %{enabled: enabled})
-    
-    state
-  end
-
-  defp handle_obs_event(state, "VirtualcamStateChanged", %{"outputActive" => active}) do
-    Logger.info("Virtual camera state changed", active: active)
-    
-    state = update_virtual_cam_state(state, %{active: active})
-    
-    Server.Events.publish_obs_event("virtual_cam_changed", %{active: active})
-    
-    state
-  end
-
-  defp handle_obs_event(state, "ReplayBufferStateChanged", %{"outputActive" => active}) do
-    Logger.info("Replay buffer state changed", active: active)
-    
-    state = update_replay_buffer_state(state, %{active: active})
-    
-    Server.Events.publish_obs_event("replay_buffer_changed", %{active: active})
-    
-    state
-  end
-
   defp handle_obs_event(state, event_type, event_data) do
     Logger.debug("Unhandled OBS event", event_type: event_type, event_data: event_data)
     state
+  end
+
+  # Helper functions
+  defp send_websocket_message(state, message) do
+    if state.conn_pid && state.stream_ref do
+      json_message = Jason.encode!(message)
+      :gun.ws_send(state.conn_pid, state.stream_ref, {:text, json_message})
+      :ok
+    else
+      {:error, "WebSocket not connected"}
+    end
   end
 
   # State update helpers
@@ -479,42 +598,6 @@ defmodule Server.Services.OBS do
     new_state
   end
 
-  defp update_recording_state(state, updates) do
-    recording = Map.merge(state.state.recording, updates)
-    new_state = put_in(state.state.recording, recording)
-    
-    Server.Events.publish_obs_event("recording_updated", recording)
-    
-    new_state
-  end
-
-  defp update_studio_mode_state(state, updates) do
-    studio_mode = Map.merge(state.state.studio_mode, updates)
-    new_state = put_in(state.state.studio_mode, studio_mode)
-    
-    Server.Events.publish_obs_event("studio_mode_updated", studio_mode)
-    
-    new_state
-  end
-
-  defp update_virtual_cam_state(state, updates) do
-    virtual_cam = Map.merge(state.state.virtual_cam, updates)
-    new_state = put_in(state.state.virtual_cam, virtual_cam)
-    
-    Server.Events.publish_obs_event("virtual_cam_updated", virtual_cam)
-    
-    new_state
-  end
-
-  defp update_replay_buffer_state(state, updates) do
-    replay_buffer = Map.merge(state.state.replay_buffer, updates)
-    new_state = put_in(state.state.replay_buffer, replay_buffer)
-    
-    Server.Events.publish_obs_event("replay_buffer_updated", replay_buffer)
-    
-    new_state
-  end
-
   # Stats polling
   defp start_stats_polling(state) do
     timer = Process.send_after(self(), :poll_stats, @stats_polling_interval)
@@ -528,7 +611,7 @@ defmodule Server.Services.OBS do
     %{state | stats_timer: nil}
   end
 
-  defp request_obs_stats do
+  defp request_obs_stats(state) do
     # Request GetStats from OBS for performance monitoring
     request_id = UUID.uuid4()
     
@@ -541,13 +624,15 @@ defmodule Server.Services.OBS do
       }
     }
     
-    send_message(message)
+    send_websocket_message(state, message)
   end
 
-  # Helper functions
-  defp send_message(message) do
-    json_message = Jason.encode!(message)
-    Fresh.send(__MODULE__, {:text, json_message})
+  defp cleanup_connection(state) do
+    if state.conn_pid do
+      :gun.close(state.conn_pid)
+    end
+    
+    %{state | conn_pid: nil, stream_ref: nil}
   end
 
   # Configuration helpers
