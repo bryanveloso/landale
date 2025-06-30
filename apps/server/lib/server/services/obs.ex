@@ -589,21 +589,21 @@ defmodule Server.Services.OBS do
   @impl GenServer
   def terminate(_reason, state) do
     Logger.info("OBS service terminating")
-    
+
     # Cancel timers
     if state.stats_timer do
       Process.cancel_timer(state.stats_timer)
     end
-    
+
     if state.reconnect_timer do
       Process.cancel_timer(state.reconnect_timer)
     end
-    
+
     # Close WebSocket connection
     if state.conn_pid do
       :gun.close(state.conn_pid)
     end
-    
+
     :ok
   end
 
@@ -612,6 +612,10 @@ defmodule Server.Services.OBS do
     host = to_charlist(state.uri.host)
     port = state.uri.port || 4455
     path = state.uri.path || "/"
+
+    # Emit telemetry for connection attempt
+    Server.Telemetry.obs_connection_attempt()
+    start_time = System.monotonic_time(:millisecond)
 
     case :gun.open(host, port) do
       {:ok, conn_pid} ->
@@ -642,6 +646,10 @@ defmodule Server.Services.OBS do
             Logger.error("OBS connection failed during await_up", error: reason)
             :gun.close(conn_pid)
 
+            # Emit telemetry for connection failure
+            duration = System.monotonic_time(:millisecond) - start_time
+            Server.Telemetry.obs_connection_failure(duration, inspect(reason))
+
             state =
               update_connection_state(state, %{
                 connected: false,
@@ -654,6 +662,10 @@ defmodule Server.Services.OBS do
 
       {:error, reason} ->
         Logger.error("OBS connection failed during open", error: reason)
+
+        # Emit telemetry for connection failure
+        duration = System.monotonic_time(:millisecond) - start_time
+        Server.Telemetry.obs_connection_failure(duration, inspect(reason))
 
         state =
           update_connection_state(state, %{
@@ -701,6 +713,13 @@ defmodule Server.Services.OBS do
   defp handle_obs_protocol_message(state, 2, %{"d" => data}) do
     # Identified - connection successful
     Logger.info("OBS authentication successful", rpc_version: data["negotiatedRpcVersion"])
+
+    # Emit telemetry for successful connection
+    # Calculate duration from when we started connecting
+    if state.state.connection.last_connected do
+      duration = DateTime.diff(DateTime.utc_now(), state.state.connection.last_connected, :millisecond)
+      Server.Telemetry.obs_connection_success(duration)
+    end
 
     state =
       update_connection_state(state, %{

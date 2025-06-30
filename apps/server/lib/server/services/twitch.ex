@@ -202,9 +202,7 @@ defmodule Server.Services.Twitch do
     if state.state.connection.connected && state.session_id do
       # Check subscription limits before creating
       if state.state.subscription_count >= state.state.subscription_max_count do
-        {:reply,
-         {:error, "Subscription count limit exceeded (#{state.state.subscription_max_count})"},
-         state}
+        {:reply, {:error, "Subscription count limit exceeded (#{state.state.subscription_max_count})"}, state}
       else
         # Check for duplicate subscription
         existing_key = generate_subscription_key(event_type, condition)
@@ -615,19 +613,15 @@ defmodule Server.Services.Twitch do
       default_subscriptions = [
         {"stream.online", %{"broadcaster_user_id" => state.user_id}, []},
         {"stream.offline", %{"broadcaster_user_id" => state.user_id}, []},
-        {"channel.follow",
-         %{"broadcaster_user_id" => state.user_id, "moderator_user_id" => state.user_id},
+        {"channel.follow", %{"broadcaster_user_id" => state.user_id, "moderator_user_id" => state.user_id},
          ["moderator:read:followers"]},
-        {"channel.subscribe", %{"broadcaster_user_id" => state.user_id},
-         ["channel:read:subscriptions"]},
-        {"channel.subscription.gift", %{"broadcaster_user_id" => state.user_id},
-         ["channel:read:subscriptions"]},
+        {"channel.subscribe", %{"broadcaster_user_id" => state.user_id}, ["channel:read:subscriptions"]},
+        {"channel.subscription.gift", %{"broadcaster_user_id" => state.user_id}, ["channel:read:subscriptions"]},
         {"channel.cheer", %{"broadcaster_user_id" => state.user_id}, ["bits:read"]}
       ]
 
       {successful_count, failed_count} =
-        Enum.reduce(default_subscriptions, {0, 0}, fn {event_type, condition, required_scopes},
-                                                      {success, failed} ->
+        Enum.reduce(default_subscriptions, {0, 0}, fn {event_type, condition, required_scopes}, {success, failed} ->
           if validate_scopes_for_subscription(state.scopes, required_scopes) do
             case create_eventsub_subscription(state, event_type, condition) do
               {:ok, subscription} ->
@@ -652,12 +646,9 @@ defmodule Server.Services.Twitch do
                     cond do
                       String.contains?(to_string(reason), "Forbidden") ->
                         Logger.info("Channel follow subscription failed",
-                          reason:
-                            "Forbidden - broadcaster may need explicit moderator verification",
-                          note:
-                            "This is common when using broadcaster token for moderator-required subscriptions",
-                          workaround:
-                            "Consider obtaining separate moderator authorization or treating as optional"
+                          reason: "Forbidden - broadcaster may need explicit moderator verification",
+                          note: "This is common when using broadcaster token for moderator-required subscriptions",
+                          workaround: "Consider obtaining separate moderator authorization or treating as optional"
                         )
 
                       String.contains?(to_string(reason), "unauthorized") ->
@@ -675,8 +666,7 @@ defmodule Server.Services.Twitch do
                           reason: reason,
                           condition: inspect(condition),
                           user_id: state.user_id,
-                          note:
-                            "Follow subscriptions require special broadcaster/moderator relationship"
+                          note: "Follow subscriptions require special broadcaster/moderator relationship"
                         )
                     end
 
@@ -762,16 +752,16 @@ defmodule Server.Services.Twitch do
   @impl GenServer
   def terminate(_reason, state) do
     Logger.info("Twitch service terminating")
-    
+
     # Cancel timers
     if state.reconnect_timer do
       Process.cancel_timer(state.reconnect_timer)
     end
-    
+
     if state.token_refresh_timer do
       Process.cancel_timer(state.token_refresh_timer)
     end
-    
+
     # Close DETS table on shutdown
     if state.token_table do
       :dets.close(state.token_table)
@@ -1303,8 +1293,8 @@ defmodule Server.Services.Twitch do
 
     case :httpc.request(
            :post,
-           {url, Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end),
-            ~c"application/json", to_charlist(json_body)},
+           {url, Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end), ~c"application/json",
+            to_charlist(json_body)},
            [],
            []
          ) do
