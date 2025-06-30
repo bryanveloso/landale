@@ -44,7 +44,6 @@ defmodule Server.MixProject do
       {:bandit, "~> 1.5"},
       {:uuid, "~> 1.1"},
       {:gun, "~> 2.0"},
-      {:dotenvy, "~> 1.0.0"},
       {:oauth2, "~> 2.1"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
