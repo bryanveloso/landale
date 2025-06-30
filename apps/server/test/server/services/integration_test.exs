@@ -12,7 +12,7 @@ defmodule Server.Services.IntegrationTest do
       # Clean up
       System.delete_env("TWITCH_CLIENT_ID")
       System.delete_env("TWITCH_CLIENT_SECRET")
-      
+
       # Clean up any test files
       if File.exists?("./data/twitch_tokens.dets") do
         File.rm!("./data/twitch_tokens.dets")
@@ -23,13 +23,14 @@ defmodule Server.Services.IntegrationTest do
   describe "refactored services integration" do
     test "OAuth token manager can be created and used" do
       # Test that OAuthTokenManager can be initialized
-      {:ok, manager} = Server.OAuthTokenManager.new(
-        storage_key: :test_tokens,
-        client_id: "test_client_id", 
-        client_secret: "test_client_secret",
-        token_url: "https://id.twitch.tv/oauth2/token",
-        validate_url: "https://id.twitch.tv/oauth2/validate"
-      )
+      {:ok, manager} =
+        Server.OAuthTokenManager.new(
+          storage_key: :test_tokens,
+          client_id: "test_client_id",
+          client_secret: "test_client_secret",
+          token_url: "https://id.twitch.tv/oauth2/token",
+          validate_url: "https://id.twitch.tv/oauth2/validate"
+        )
 
       assert manager.storage_key == :test_tokens
       assert manager.oauth_client.client_id == "test_client_id"
@@ -37,17 +38,18 @@ defmodule Server.Services.IntegrationTest do
       # Test loading tokens (should succeed even with no existing tokens)
       updated_manager = Server.OAuthTokenManager.load_tokens(manager)
       assert updated_manager.dets_table != nil
-      
+
       # Clean up
       Server.OAuthTokenManager.close(updated_manager)
     end
 
     test "WebSocket client can be created" do
       # Test that WebSocketClient can be initialized
-      client = Server.WebSocketClient.new(
-        "wss://eventsub.wss.twitch.tv/ws",
-        self()
-      )
+      client =
+        Server.WebSocketClient.new(
+          "wss://eventsub.wss.twitch.tv/ws",
+          self()
+        )
 
       assert client.url == "wss://eventsub.wss.twitch.tv/ws"
       assert client.owner_pid == self()
@@ -59,18 +61,20 @@ defmodule Server.Services.IntegrationTest do
       # Test core EventSubManager functionality
       user_scopes = MapSet.new(["channel:read:subscriptions", "bits:read"])
       required_scopes = ["channel:read:subscriptions"]
-      
-      result = Server.Services.Twitch.EventSubManager.validate_scopes_for_subscription(
-        user_scopes, 
-        required_scopes
-      )
-      
+
+      result =
+        Server.Services.Twitch.EventSubManager.validate_scopes_for_subscription(
+          user_scopes,
+          required_scopes
+        )
+
       assert result == true
     end
 
     test "Event handler normalization works" do
       # Test core EventHandler functionality
       event_type = "stream.online"
+
       event_data = %{
         "id" => "stream_123",
         "broadcaster_user_id" => "user_123",
@@ -101,7 +105,7 @@ defmodule Server.Services.IntegrationTest do
 
       for module <- modules do
         assert Code.ensure_loaded?(module), "Module #{module} failed to load"
-        
+
         # Check that module has proper module doc
         {:docs_v1, _, _, _, module_doc, _, _} = Code.fetch_docs(module)
         assert module_doc != :none, "Module #{module} missing @moduledoc"

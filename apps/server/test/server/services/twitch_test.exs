@@ -26,7 +26,7 @@ defmodule Server.Services.TwitchTest do
     test "starts without crashing" do
       assert {:ok, pid} = Twitch.start_link()
       assert Process.alive?(pid)
-      
+
       # Give it a moment to initialize
       Process.sleep(100)
 
@@ -36,7 +36,7 @@ defmodule Server.Services.TwitchTest do
       assert Map.has_key?(status, :connection_state)
       assert Map.has_key?(status, :subscription_count)
       assert Map.has_key?(status, :subscription_cost)
-      
+
       # Stop the service
       GenServer.stop(pid)
     end
@@ -45,11 +45,11 @@ defmodule Server.Services.TwitchTest do
       # Remove credentials
       System.delete_env("TWITCH_CLIENT_ID")
       System.delete_env("TWITCH_CLIENT_SECRET")
-      
+
       # Service should still start but log errors
       assert {:ok, pid} = Twitch.start_link()
       assert Process.alive?(pid)
-      
+
       GenServer.stop(pid)
     end
   end
@@ -58,11 +58,11 @@ defmodule Server.Services.TwitchTest do
     setup do
       {:ok, pid} = Twitch.start_link()
       Process.sleep(100)
-      
+
       on_exit(fn ->
         GenServer.stop(pid)
       end)
-      
+
       %{pid: pid}
     end
 
@@ -71,7 +71,7 @@ defmodule Server.Services.TwitchTest do
       assert Map.has_key?(state, :connection)
       assert Map.has_key?(state, :subscription_total_cost)
       assert Map.has_key?(state, :subscription_count)
-      
+
       # Check connection structure
       assert Map.has_key?(state.connection, :connected)
       assert Map.has_key?(state.connection, :connection_state)
@@ -81,14 +81,14 @@ defmodule Server.Services.TwitchTest do
 
     test "get_status returns expected format", %{pid: _pid} do
       assert {:ok, status} = Twitch.get_status()
-      
+
       # Required status fields
       assert Map.has_key?(status, :connected)
-      assert Map.has_key?(status, :connection_state) 
+      assert Map.has_key?(status, :connection_state)
       assert Map.has_key?(status, :session_id)
       assert Map.has_key?(status, :subscription_count)
       assert Map.has_key?(status, :subscription_cost)
-      
+
       # Initial values
       assert status.connected == false
       assert status.connection_state == "disconnected"
@@ -102,11 +102,11 @@ defmodule Server.Services.TwitchTest do
     setup do
       {:ok, pid} = Twitch.start_link()
       Process.sleep(100)
-      
+
       on_exit(fn ->
         GenServer.stop(pid)
       end)
-      
+
       %{pid: pid}
     end
 
@@ -131,13 +131,13 @@ defmodule Server.Services.TwitchTest do
     test "service terminates gracefully" do
       {:ok, pid} = Twitch.start_link()
       Process.sleep(100)
-      
+
       # Monitor the process
       ref = Process.monitor(pid)
-      
+
       # Stop the service
       GenServer.stop(pid, :normal)
-      
+
       # Wait for termination
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1000
     end
