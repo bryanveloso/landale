@@ -13,7 +13,7 @@ env:
 
 jobs:
   test:
-    name: Test
+    name: Test and Lint Elixir Server
     runs-on: ubuntu-latest
     
     services:
