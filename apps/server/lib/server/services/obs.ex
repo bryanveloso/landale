@@ -8,6 +8,35 @@ defmodule Server.Services.OBS do
   - Event publishing via PubSub
   - Performance monitoring with stats polling
   - Full OBS WebSocket v5 protocol support
+
+  ## Configuration
+
+  The service can be configured with the following environment variables:
+  - `OBS_WEBSOCKET_URL` - WebSocket URL (default: "ws://localhost:4455")
+
+  ## Usage
+
+      # Get current service status
+      {:ok, status} = Server.Services.OBS.get_status()
+
+      # Control streaming
+      :ok = Server.Services.OBS.start_streaming()
+      :ok = Server.Services.OBS.stop_streaming()
+
+      # Control recording  
+      :ok = Server.Services.OBS.start_recording()
+      :ok = Server.Services.OBS.stop_recording()
+
+      # Scene management
+      :ok = Server.Services.OBS.set_current_scene("Scene Name")
+
+  ## Events
+
+  The service publishes events via Phoenix.PubSub on the "obs:events" topic:
+  - `connection_established` - WebSocket connected
+  - `connection_lost` - WebSocket disconnected
+  - `scene_current_changed` - Current scene changed
+  - `stream_started` / `stream_stopped` - Streaming state changes
   """
 
   use GenServer
@@ -70,76 +99,233 @@ defmodule Server.Services.OBS do
   ]
 
   # Client API
+
+  @doc """
+  Starts the OBS service GenServer.
+
+  ## Parameters
+  - `opts` - Keyword list of options (optional)
+    - `:url` - WebSocket URL to connect to
+
+  ## Returns
+  - `{:ok, pid}` on success
+  - `{:error, reason}` on failure
+  """
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
+  @doc """
+  Gets the current internal state of the OBS service.
+
+  ## Returns
+  - Map containing connection, scenes, streaming, and recording state
+  """
+  @spec get_state() :: map()
   def get_state do
     GenServer.call(__MODULE__, :get_state)
   end
 
+  @doc """
+  Gets the current status of the OBS service.
+
+  ## Returns
+  - `{:ok, status}` where status contains connection information
+  - `{:error, reason}` if service is unavailable
+  """
+  @spec get_status() :: {:ok, map()} | {:error, binary()}
   def get_status do
     GenServer.call(__MODULE__, :get_status)
   end
 
+  @doc """
+  Starts streaming in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec start_streaming() :: :ok | {:error, binary()}
   def start_streaming do
     GenServer.call(__MODULE__, {:obs_call, "StartStream", %{}})
   end
 
+  @doc """
+  Stops streaming in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec stop_streaming() :: :ok | {:error, binary()}
   def stop_streaming do
     GenServer.call(__MODULE__, {:obs_call, "StopStream", %{}})
   end
 
+  @doc """
+  Starts recording in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec start_recording() :: :ok | {:error, binary()}
   def start_recording do
     GenServer.call(__MODULE__, {:obs_call, "StartRecord", %{}})
   end
 
+  @doc """
+  Stops recording in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec stop_recording() :: :ok | {:error, binary()}
   def stop_recording do
     GenServer.call(__MODULE__, {:obs_call, "StopRecord", %{}})
   end
 
+  @doc """
+  Pauses the current recording in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec pause_recording() :: :ok | {:error, binary()}
   def pause_recording do
     GenServer.call(__MODULE__, {:obs_call, "PauseRecord", %{}})
   end
 
+  @doc """
+  Resumes a paused recording in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec resume_recording() :: :ok | {:error, binary()}
   def resume_recording do
     GenServer.call(__MODULE__, {:obs_call, "ResumeRecord", %{}})
   end
 
+  @doc """
+  Sets the current program scene in OBS.
+
+  ## Parameters
+  - `scene_name` - Name of the scene to switch to
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec set_current_scene(binary()) :: :ok | {:error, binary()}
   def set_current_scene(scene_name) do
     GenServer.call(__MODULE__, {:obs_call, "SetCurrentProgramScene", %{sceneName: scene_name}})
   end
 
+  @doc """
+  Sets the current preview scene in OBS (requires Studio Mode).
+
+  ## Parameters
+  - `scene_name` - Name of the scene to set as preview
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec set_preview_scene(binary()) :: :ok | {:error, binary()}
   def set_preview_scene(scene_name) do
     GenServer.call(__MODULE__, {:obs_call, "SetCurrentPreviewScene", %{sceneName: scene_name}})
   end
 
+  @doc """
+  Enables or disables Studio Mode in OBS.
+
+  ## Parameters
+  - `enabled` - Boolean to enable or disable Studio Mode
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec set_studio_mode_enabled(boolean()) :: :ok | {:error, binary()}
   def set_studio_mode_enabled(enabled) do
     GenServer.call(__MODULE__, {:obs_call, "SetStudioModeEnabled", %{studioModeEnabled: enabled}})
   end
 
+  @doc """
+  Triggers a transition from the current preview scene to the program scene in Studio Mode.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec trigger_studio_mode_transition() :: :ok | {:error, binary()}
   def trigger_studio_mode_transition do
     GenServer.call(__MODULE__, {:obs_call, "TriggerStudioModeTransition", %{}})
   end
 
+  @doc """
+  Starts the virtual camera output in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec start_virtual_cam() :: :ok | {:error, binary()}
   def start_virtual_cam do
     GenServer.call(__MODULE__, {:obs_call, "StartVirtualCam", %{}})
   end
 
+  @doc """
+  Stops the virtual camera output in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec stop_virtual_cam() :: :ok | {:error, binary()}
   def stop_virtual_cam do
     GenServer.call(__MODULE__, {:obs_call, "StopVirtualCam", %{}})
   end
 
+  @doc """
+  Starts the replay buffer feature in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec start_replay_buffer() :: :ok | {:error, binary()}
   def start_replay_buffer do
     GenServer.call(__MODULE__, {:obs_call, "StartReplayBuffer", %{}})
   end
 
+  @doc """
+  Stops the replay buffer feature in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec stop_replay_buffer() :: :ok | {:error, binary()}
   def stop_replay_buffer do
     GenServer.call(__MODULE__, {:obs_call, "StopReplayBuffer", %{}})
   end
 
+  @doc """
+  Saves the current replay buffer to disk in OBS.
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec save_replay_buffer() :: :ok | {:error, binary()}
   def save_replay_buffer do
-    GenServer.call(__MODULE__, {:obs_call, "SaveReplayBuffer", %{}})
+    GenServer.call(__MODULE__, {:obs_call, "SaveReployBuffer", %{}})
   end
 
   # GenServer callbacks

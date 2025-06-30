@@ -5,13 +5,13 @@ defmodule ServerWeb.EventsChannel do
 
   @impl true
   def join("events:" <> topic, _payload, socket) do
-    Logger.info("Events channel joined", 
-      topic: topic, 
+    Logger.info("Events channel joined",
+      topic: topic,
       correlation_id: socket.assigns.correlation_id
     )
-    
+
     socket = assign(socket, :topic, topic)
-    
+
     # Subscribe to the specific topic or all events
     case topic do
       "all" ->
@@ -19,11 +19,11 @@ defmodule ServerWeb.EventsChannel do
         Phoenix.PubSub.subscribe(Server.PubSub, "twitch:events")
         Phoenix.PubSub.subscribe(Server.PubSub, "ironmon:events")
         Phoenix.PubSub.subscribe(Server.PubSub, "system:events")
-      
+
       specific_topic ->
         Phoenix.PubSub.subscribe(Server.PubSub, "#{specific_topic}:events")
     end
-    
+
     {:ok, socket}
   end
 
@@ -34,18 +34,18 @@ defmodule ServerWeb.EventsChannel do
       data: event,
       timestamp: System.system_time(:second)
     })
-    
+
     {:noreply, socket}
   end
 
   @impl true
   def handle_info({:twitch_event, event}, socket) do
     push(socket, "event", %{
-      type: "twitch", 
+      type: "twitch",
       data: event,
       timestamp: System.system_time(:second)
     })
-    
+
     {:noreply, socket}
   end
 
@@ -56,7 +56,7 @@ defmodule ServerWeb.EventsChannel do
       data: event,
       timestamp: System.system_time(:second)
     })
-    
+
     {:noreply, socket}
   end
 
@@ -67,7 +67,7 @@ defmodule ServerWeb.EventsChannel do
       data: event,
       timestamp: System.system_time(:second)
     })
-    
+
     {:noreply, socket}
   end
 
@@ -80,12 +80,12 @@ defmodule ServerWeb.EventsChannel do
   # Catch-all for unhandled messages
   @impl true
   def handle_in(event, payload, socket) do
-    Logger.warning("Unhandled events channel message", 
-      event: event, 
+    Logger.warning("Unhandled events channel message",
+      event: event,
       payload: payload,
       correlation_id: socket.assigns.correlation_id
     )
-    
+
     {:noreply, socket}
   end
 end

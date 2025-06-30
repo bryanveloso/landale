@@ -1,11 +1,37 @@
 defmodule ServerWeb.HealthController do
+  @moduledoc """
+  Health check endpoints for monitoring system status.
+
+  Provides HTTP endpoints for Docker health checks, Kubernetes probes,
+  and general system monitoring. Includes both simple and detailed
+  health reporting.
+
+  ## Endpoints
+  - `GET /health` - Basic health check (always returns 200)
+  - `GET /ready` - Readiness probe (503 if database unavailable)
+  - `GET /api/health` - Detailed health with all service statuses
+  """
+
   use ServerWeb, :controller
 
+  @doc """
+  Basic health check endpoint.
+
+  Always returns 200 OK with minimal response for simple uptime monitoring.
+  """
+  @spec check(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def check(conn, _params) do
     # Basic health check
     json(conn, %{status: "ok", timestamp: System.system_time(:second)})
   end
 
+  @doc """
+  Detailed health check with service status information.
+
+  Returns comprehensive health data including all services and system metrics.
+  Returns HTTP 503 if any critical services are unhealthy.
+  """
+  @spec detailed(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def detailed(conn, _params) do
     # Detailed system health including all services
     obs_status =
@@ -52,6 +78,13 @@ defmodule ServerWeb.HealthController do
     |> json(health_data)
   end
 
+  @doc """
+  Kubernetes-style readiness probe.
+
+  Returns 200 if service is ready to accept traffic, 503 otherwise.
+  Currently only checks database connectivity.
+  """
+  @spec ready(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def ready(conn, _params) do
     # Kubernetes-style readiness probe
     # Service is ready if critical services are available
