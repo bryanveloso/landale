@@ -16,20 +16,6 @@ jobs:
     name: Test and Lint Elixir Server
     runs-on: ubuntu-latest
     
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: server_test
-          POSTGRES_USER: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
 
     steps:
       - name: Checkout code
@@ -69,17 +55,6 @@ jobs:
         working-directory: apps/server
         run: mix compile --warnings-as-errors
 
-      - name: Create test database
+      - name: Run tests
         working-directory: apps/server
-        run: mix ecto.create
-
-      - name: Run database migrations
-        working-directory: apps/server
-        run: mix ecto.migrate
-
-      - name: Run tests with coverage
-        working-directory: apps/server
-        run: mix coveralls.github
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/server_test
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mix test
