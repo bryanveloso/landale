@@ -24,7 +24,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
       assert result.broadcaster_user_login == "testuser"
       assert result.broadcaster_user_name == "TestUser"
       assert result.stream_type == "live"
-      assert result.started_at == "2023-01-01T12:00:00Z"
+      assert result.started_at == ~U[2023-01-01 12:00:00Z]
     end
 
     test "normalizes stream.offline event" do
@@ -64,7 +64,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
       assert result.user_login == "newfollower"
       assert result.user_name == "NewFollower"
       assert result.broadcaster_user_id == "user_123"
-      assert result.followed_at == "2023-01-01T12:00:00Z"
+      assert result.followed_at == ~U[2023-01-01 12:00:00Z]
     end
 
     test "normalizes channel.subscribe event" do
