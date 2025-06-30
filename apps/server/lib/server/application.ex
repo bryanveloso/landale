@@ -34,7 +34,8 @@ defmodule Server.Application do
             Server.SubscriptionMonitor,
             # Services
             Server.Services.OBS,
-            Server.Services.Twitch
+            Server.Services.Twitch,
+            Server.Services.IronmonTCP
           ]
       end
 
@@ -119,7 +120,7 @@ defmodule Server.Application do
 
   defp graceful_service_shutdown do
     # Allow services to clean up their resources
-    services = [Server.Services.OBS, Server.Services.Twitch]
+    services = [Server.Services.OBS, Server.Services.Twitch, Server.Services.IronmonTCP]
 
     Enum.each(services, fn service ->
       try do
