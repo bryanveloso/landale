@@ -150,7 +150,7 @@ defmodule Server.Services.OBS do
       pending_requests: %{}
     }
 
-    Logger.info("Starting OBS WebSocket service", url: url)
+    Logger.info("OBS service starting", url: url)
     
     # Try to connect immediately
     send(self(), :connect)
@@ -231,7 +231,7 @@ defmodule Server.Services.OBS do
   @impl GenServer
   def handle_info({:gun_response, conn_pid, stream_ref, is_fin, status, headers}, state) do
     if conn_pid == state.conn_pid and stream_ref == state.stream_ref do
-      Logger.info("OBS HTTP response", 
+      Logger.debug("OBS HTTP response received", 
         status: status, 
         is_fin: is_fin, 
         headers: inspect(headers)
@@ -274,7 +274,7 @@ defmodule Server.Services.OBS do
   @impl GenServer
   def handle_info({:gun_ws, _conn_pid, stream_ref, frame}, state) do
     if stream_ref == state.stream_ref do
-      Logger.debug("Unhandled WebSocket frame", frame: frame)
+      Logger.debug("OBS WebSocket frame unhandled", frame: frame)
     end
     {:noreply, state}
   end
@@ -282,7 +282,7 @@ defmodule Server.Services.OBS do
   @impl GenServer
   def handle_info({:gun_down, conn_pid, _protocol, reason, _killed_streams}, state) do
     if conn_pid == state.conn_pid do
-      Logger.warning("OBS WebSocket connection down", reason: reason)
+      Logger.warning("OBS connection lost", reason: reason)
       
       # Update connection state
       state = update_connection_state(state, %{
@@ -334,7 +334,7 @@ defmodule Server.Services.OBS do
   @impl GenServer
   def handle_info({:gun_error, conn_pid, reason}, state) do
     if conn_pid == state.conn_pid do
-      Logger.error("OBS WebSocket connection error", 
+      Logger.error("OBS connection error", 
         conn_pid: inspect(conn_pid), 
         reason: inspect(reason, pretty: true)
       )
@@ -359,7 +359,7 @@ defmodule Server.Services.OBS do
   @impl GenServer
   def handle_info({:DOWN, _ref, :process, pid, reason}, state) do
     if pid == state.conn_pid do
-      Logger.info("OBS connection process down", reason: reason)
+      Logger.info("OBS connection process terminated", reason: reason)
       
       # Update connection state and schedule reconnect
       state = update_connection_state(state, %{
@@ -384,7 +384,7 @@ defmodule Server.Services.OBS do
 
   @impl GenServer
   def handle_info(info, state) do
-    Logger.warning("Unhandled Gun message", message: inspect(info, pretty: true))
+    Logger.warning("Gun message unhandled", message: inspect(info, pretty: true))
     {:noreply, state}
   end
 
@@ -404,13 +404,11 @@ defmodule Server.Services.OBS do
             # Upgrade to WebSocket - try without protocol first
             stream_ref = :gun.ws_upgrade(conn_pid, path)
             
-            Logger.debug("WebSocket upgrade requested", 
+            Logger.debug("OBS WebSocket upgrade initiated", 
               conn_pid: inspect(conn_pid), 
               stream_ref: inspect(stream_ref), 
               path: path
             )
-            
-            Logger.info("Initiating WebSocket upgrade to OBS")
             
             new_state = %{state | conn_pid: conn_pid, stream_ref: stream_ref}
             |> update_connection_state(%{
@@ -421,7 +419,7 @@ defmodule Server.Services.OBS do
             {:ok, new_state}
             
           {:error, reason} ->
-            Logger.error("Failed to establish connection to OBS", error: reason)
+            Logger.error("OBS connection failed during await_up", error: reason)
             :gun.close(conn_pid)
             
             state = update_connection_state(state, %{
@@ -433,7 +431,7 @@ defmodule Server.Services.OBS do
         end
         
       {:error, reason} ->
-        Logger.error("Failed to open connection to OBS", error: reason)
+        Logger.error("OBS connection failed during open", error: reason)
         state = update_connection_state(state, %{
           connected: false,
           connection_state: "error",
@@ -450,14 +448,14 @@ defmodule Server.Services.OBS do
         handle_obs_protocol_message(state, op, message)
       
       {:error, reason} ->
-        Logger.error("Failed to decode OBS WebSocket message", error: reason, message: message_json)
+        Logger.error("OBS message decode failed", error: reason, message: message_json)
         state
     end
   end
 
   defp handle_obs_protocol_message(state, 0, %{"d" => %{"rpcVersion" => rpc_version}}) do
     # Hello message - send Identify
-    Logger.info("Received OBS Hello", rpc_version: rpc_version)
+    Logger.info("OBS Hello received", rpc_version: rpc_version)
     
     identify_message = %{
       op: 1,  # Identify opcode
@@ -476,7 +474,7 @@ defmodule Server.Services.OBS do
 
   defp handle_obs_protocol_message(state, 2, %{"d" => data}) do
     # Identified - connection successful
-    Logger.info("OBS connection identified", rpc_version: data["negotiatedRpcVersion"])
+    Logger.info("OBS authentication successful", rpc_version: data["negotiatedRpcVersion"])
     
     state = update_connection_state(state, %{
       connected: true,
@@ -503,7 +501,7 @@ defmodule Server.Services.OBS do
     # Request response
     case Map.pop(state.pending_requests, request_id) do
       {nil, _} ->
-        Logger.warning("Received response for unknown request", request_id: request_id)
+        Logger.warning("OBS response for unknown request", request_id: request_id)
         state
 
       {from, remaining_requests} ->
@@ -519,13 +517,13 @@ defmodule Server.Services.OBS do
   end
 
   defp handle_obs_protocol_message(state, op, message) do
-    Logger.debug("Unhandled OBS WebSocket message", op: op, message: message)
+    Logger.debug("OBS message unhandled", op: op, message: message)
     state
   end
 
   # OBS event handlers (simplified versions)
   defp handle_obs_event(state, "CurrentProgramSceneChanged", %{"sceneName" => scene_name}) do
-    Logger.debug("Current program scene changed", scene_name: scene_name)
+    Logger.debug("OBS current scene changed", scene_name: scene_name)
     
     previous_scene = state.state.scenes.current
     state = update_scene_state(state, %{current: scene_name})
@@ -540,7 +538,7 @@ defmodule Server.Services.OBS do
   end
 
   defp handle_obs_event(state, "StreamStateChanged", %{"outputActive" => active, "outputState" => output_state}) do
-    Logger.info("Stream state changed", output_active: active, output_state: output_state)
+    Logger.info("OBS stream state changed", output_active: active, output_state: output_state)
     
     state = update_streaming_state(state, %{active: active})
     
@@ -554,7 +552,7 @@ defmodule Server.Services.OBS do
   end
 
   defp handle_obs_event(state, event_type, event_data) do
-    Logger.debug("Unhandled OBS event", event_type: event_type, event_data: event_data)
+    Logger.debug("OBS event unhandled", event_type: event_type, event_data: event_data)
     state
   end
 
