@@ -110,7 +110,7 @@ defmodule Server.Application do
       try do
         if Process.whereis(service) do
           Logger.info("Gracefully stopping service", service: service)
-          GenServer.stop(service, :normal, 5000)
+          GenServer.stop(service, :normal, Server.NetworkConfig.connection_timeout())
         end
       rescue
         error ->

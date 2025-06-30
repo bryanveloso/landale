@@ -334,31 +334,24 @@ defmodule Server.OAuthTokenManager do
           {"Content-Type", "application/json"}
         ]
 
-        case :httpc.request(:get, {String.to_charlist(validate_url), headers}, [], []) do
-          {:ok, {{_version, 200, _reason}, _headers, body}} ->
-            case Jason.decode(List.to_string(body)) do
-              {:ok, data} ->
-                # Update token info with validation data
-                updated_token_info =
-                  Map.merge(manager.token_info, %{
-                    user_id: data["user_id"],
-                    scopes: MapSet.new(data["scopes"] || [])
-                  })
+        case Server.RetryStrategy.retry(fn ->
+               make_validation_request(validate_url, headers)
+             end) do
+          {:ok, {data, _body}} ->
+            # Update token info with validation data
+            updated_token_info =
+              Map.merge(manager.token_info, %{
+                user_id: data["user_id"],
+                scopes: MapSet.new(data["scopes"] || [])
+              })
 
-                updated_manager = %{manager | token_info: updated_token_info}
-                save_tokens(updated_manager)
+            updated_manager = %{manager | token_info: updated_token_info}
+            save_tokens(updated_manager)
 
-                {:ok, data, updated_manager}
-
-              {:error, reason} ->
-                {:error, "Failed to parse validation response: #{inspect(reason)}"}
-            end
-
-          {:ok, {{_version, status, _reason}, _headers, body}} ->
-            {:error, "Token validation failed with status #{status}: #{List.to_string(body)}"}
+            {:ok, data, updated_manager}
 
           {:error, reason} ->
-            {:error, "Token validation request failed: #{inspect(reason)}"}
+            {:error, reason}
         end
     end
   end
@@ -477,5 +470,33 @@ defmodule Server.OAuthTokenManager do
   defp emit_telemetry(manager, event_suffix, metadata \\ %{}) do
     event = manager.telemetry_prefix ++ event_suffix
     :telemetry.execute(event, %{}, Map.put(metadata, :storage_key, manager.storage_key))
+  end
+
+  # Private helper function for making validation requests with proper error handling
+  defp make_validation_request(validate_url, headers) do
+    http_config = Server.NetworkConfig.http_config()
+
+    case :httpc.request(:get, {String.to_charlist(validate_url), headers}, [{:timeout, http_config.timeout}], []) do
+      {:ok, {{_version, 200, _reason}, _headers, body}} ->
+        case Jason.decode(List.to_string(body)) do
+          {:ok, data} ->
+            {:ok, {data, body}}
+
+          {:error, reason} ->
+            {:error, "Failed to parse validation response: #{inspect(reason)}"}
+        end
+
+      {:ok, {{_version, 429, _reason}, _headers, body}} ->
+        {:error, {:http_error, 429, List.to_string(body)}}
+
+      {:ok, {{_version, status, _reason}, _headers, body}} when status >= 500 ->
+        {:error, {:http_error, status, List.to_string(body)}}
+
+      {:ok, {{_version, status, _reason}, _headers, body}} ->
+        {:error, "Token validation failed with status #{status}: #{List.to_string(body)}"}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 end

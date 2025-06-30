@@ -81,14 +81,11 @@ defmodule Server.Services.Twitch.EventSubManager do
       version: version
     )
 
-    case :httpc.request(
-           :post,
-           {url, Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end), ~c"application/json",
-            to_charlist(json_body)},
-           [],
-           []
-         ) do
-      {:ok, {{_version, 202, _reason_phrase}, _headers, response_body}} ->
+    # Use retry strategy for rate limit handling
+    case Server.RetryStrategy.retry_with_rate_limit_detection(fn ->
+           make_subscription_request(url, headers, json_body)
+         end) do
+      {:ok, response_body} ->
         case Jason.decode(List.to_string(response_body)) do
           {:ok, %{"data" => [subscription]}} ->
             Logger.info("EventSub subscription created successfully",
@@ -119,16 +116,39 @@ defmodule Server.Services.Twitch.EventSubManager do
             {:error, "Failed to parse response: #{inspect(reason)}"}
         end
 
-      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} ->
-        response_string = List.to_string(response_body)
-
-        Logger.error("EventSub subscription creation failed",
+      {:error, reason} ->
+        Logger.error("EventSub subscription creation failed after retries",
           event_type: event_type,
-          http_status: status,
-          response: response_string
+          reason: inspect(reason)
         )
 
-        Server.Telemetry.twitch_subscription_failed(event_type, "HTTP #{status}")
+        Server.Telemetry.twitch_subscription_failed(event_type, inspect(reason))
+        {:error, reason}
+    end
+  end
+
+  # Private helper function for making subscription requests with proper error handling
+  defp make_subscription_request(url, headers, json_body) do
+    http_config = Server.NetworkConfig.http_config()
+
+    case :httpc.request(
+           :post,
+           {url, Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end), ~c"application/json",
+            to_charlist(json_body)},
+           [{:timeout, http_config.timeout}],
+           []
+         ) do
+      {:ok, {{_version, 202, _reason_phrase}, _headers, response_body}} ->
+        {:ok, response_body}
+
+      {:ok, {{_version, 429, _reason_phrase}, _headers, response_body}} ->
+        {:error, {:http_error, 429, List.to_string(response_body)}}
+
+      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} when status >= 500 ->
+        {:error, {:http_error, status, List.to_string(response_body)}}
+
+      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} ->
+        response_string = List.to_string(response_body)
 
         case Jason.decode(response_string) do
           {:ok, %{"message" => message}} -> {:error, message}
@@ -137,13 +157,7 @@ defmodule Server.Services.Twitch.EventSubManager do
         end
 
       {:error, reason} ->
-        Logger.error("EventSub subscription HTTP request failed",
-          event_type: event_type,
-          reason: inspect(reason)
-        )
-
-        Server.Telemetry.twitch_subscription_failed(event_type, inspect(reason))
-        {:error, "Request failed: #{inspect(reason)}"}
+        {:error, reason}
     end
   end
 
@@ -169,29 +183,48 @@ defmodule Server.Services.Twitch.EventSubManager do
 
     Logger.debug("Deleting EventSub subscription", subscription_id: subscription_id)
 
-    case :httpc.request(:delete, {url, Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)}, [], []) do
-      {:ok, {{_version, 204, _reason_phrase}, _headers, _body}} ->
+    case Server.RetryStrategy.retry(fn ->
+           make_delete_request(url, headers)
+         end) do
+      {:ok, :success} ->
         Logger.info("EventSub subscription deleted successfully", subscription_id: subscription_id)
         :ok
 
-      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} ->
-        response_string = List.to_string(response_body)
-
-        Logger.error("EventSub subscription deletion failed",
-          subscription_id: subscription_id,
-          http_status: status,
-          response: response_string
-        )
-
-        {:error, "HTTP #{status}: #{response_string}"}
-
       {:error, reason} ->
-        Logger.error("EventSub subscription deletion HTTP request failed",
+        Logger.error("EventSub subscription deletion failed after retries",
           subscription_id: subscription_id,
           reason: inspect(reason)
         )
 
-        {:error, "Request failed: #{inspect(reason)}"}
+        {:error, reason}
+    end
+  end
+
+  # Private helper function for making delete requests with proper error handling
+  defp make_delete_request(url, headers) do
+    http_config = Server.NetworkConfig.http_config()
+
+    case :httpc.request(
+           :delete,
+           {url, Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)},
+           [{:timeout, http_config.timeout}],
+           []
+         ) do
+      {:ok, {{_version, 204, _reason_phrase}, _headers, _body}} ->
+        {:ok, :success}
+
+      {:ok, {{_version, 429, _reason_phrase}, _headers, response_body}} ->
+        {:error, {:http_error, 429, List.to_string(response_body)}}
+
+      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} when status >= 500 ->
+        {:error, {:http_error, status, List.to_string(response_body)}}
+
+      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} ->
+        response_string = List.to_string(response_body)
+        {:error, "HTTP #{status}: #{response_string}"}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
