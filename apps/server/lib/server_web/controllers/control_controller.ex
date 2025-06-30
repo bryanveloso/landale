@@ -116,7 +116,17 @@ defmodule ServerWeb.ControlController do
 
     additional_info =
       if base_status.connected do
-        %{service_type: "obs_websocket"}
+        case Server.Services.OBS.get_scene_list() do
+          {:ok, scenes_data} ->
+            %{
+              service_type: "obs_websocket",
+              scene_count: length(Map.get(scenes_data, "scenes", [])),
+              current_scene: Map.get(scenes_data, "currentProgramSceneName")
+            }
+
+          {:error, _} ->
+            %{service_type: "obs_websocket"}
+        end
       else
         %{}
       end

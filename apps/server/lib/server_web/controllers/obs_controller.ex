@@ -74,4 +74,102 @@ defmodule ServerWeb.OBSController do
         |> json(%{success: false, error: reason})
     end
   end
+
+  # Enhanced endpoints for dashboard metrics
+
+  def scenes(conn, _params) do
+    case Server.Services.OBS.get_scene_list() do
+      {:ok, scenes_data} ->
+        json(conn, %{success: true, data: scenes_data})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: reason})
+    end
+  end
+
+  def stream_status(conn, _params) do
+    case Server.Services.OBS.get_stream_status() do
+      {:ok, stream_data} ->
+        json(conn, %{success: true, data: stream_data})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: reason})
+    end
+  end
+
+  def record_status(conn, _params) do
+    case Server.Services.OBS.get_record_status() do
+      {:ok, record_data} ->
+        json(conn, %{success: true, data: record_data})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: reason})
+    end
+  end
+
+  def stats(conn, _params) do
+    # This endpoint can combine GetStats with current state for comprehensive metrics
+    with {:ok, obs_stats} <- Server.Services.OBS.get_status(),
+         state when is_map(state) <- Server.Services.OBS.get_state() do
+      combined_stats = %{
+        service_state: state,
+        obs_internal: obs_stats,
+        timestamp: System.system_time(:second)
+      }
+
+      json(conn, %{success: true, data: combined_stats})
+    else
+      {:error, reason} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: reason})
+
+      _ ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: "OBS service unavailable"})
+    end
+  end
+
+  def version(conn, _params) do
+    case Server.Services.OBS.get_version() do
+      {:ok, version_data} ->
+        json(conn, %{success: true, data: version_data})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: reason})
+    end
+  end
+
+  def virtual_cam(conn, _params) do
+    case Server.Services.OBS.get_virtual_cam_status() do
+      {:ok, virtual_cam_data} ->
+        json(conn, %{success: true, data: virtual_cam_data})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: reason})
+    end
+  end
+
+  def outputs(conn, _params) do
+    case Server.Services.OBS.get_output_list() do
+      {:ok, outputs_data} ->
+        json(conn, %{success: true, data: outputs_data})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: reason})
+    end
+  end
 end

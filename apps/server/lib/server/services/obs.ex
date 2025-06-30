@@ -327,7 +327,106 @@ defmodule Server.Services.OBS do
   """
   @spec save_replay_buffer() :: :ok | {:error, binary()}
   def save_replay_buffer do
-    GenServer.call(__MODULE__, {:obs_call, "SaveReployBuffer", %{}})
+    GenServer.call(__MODULE__, {:obs_call, "SaveReplayBuffer", %{}})
+  end
+
+  @doc """
+  Gets the list of all scenes in OBS.
+
+  ## Returns
+  - `{:ok, scenes}` with list of scenes and current scene info
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec get_scene_list() :: {:ok, map()} | {:error, binary()}
+  def get_scene_list do
+    GenServer.call(__MODULE__, {:obs_call, "GetSceneList", %{}})
+  end
+
+  @doc """
+  Gets the current program scene in OBS.
+
+  ## Returns
+  - `{:ok, scene_info}` with current scene details
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec get_current_program_scene() :: {:ok, map()} | {:error, binary()}
+  def get_current_program_scene do
+    GenServer.call(__MODULE__, {:obs_call, "GetCurrentProgramScene", %{}})
+  end
+
+  @doc """
+  Gets detailed stream status information from OBS.
+
+  ## Returns
+  - `{:ok, stream_status}` with stream metrics (uptime, bitrate, frames, etc.)
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec get_stream_status() :: {:ok, map()} | {:error, binary()}
+  def get_stream_status do
+    GenServer.call(__MODULE__, {:obs_call, "GetStreamStatus", %{}})
+  end
+
+  @doc """
+  Gets detailed recording status information from OBS.
+
+  ## Returns
+  - `{:ok, record_status}` with recording metrics (duration, status, etc.)
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec get_record_status() :: {:ok, map()} | {:error, binary()}
+  def get_record_status do
+    GenServer.call(__MODULE__, {:obs_call, "GetRecordStatus", %{}})
+  end
+
+  @doc """
+  Gets OBS version information.
+
+  ## Returns
+  - `{:ok, version_info}` with OBS and WebSocket plugin versions
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec get_version() :: {:ok, map()} | {:error, binary()}
+  def get_version do
+    GenServer.call(__MODULE__, {:obs_call, "GetVersion", %{}})
+  end
+
+  @doc """
+  Gets virtual camera status.
+
+  ## Returns
+  - `{:ok, virtual_cam_status}` with virtual camera state
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec get_virtual_cam_status() :: {:ok, map()} | {:error, binary()}
+  def get_virtual_cam_status do
+    GenServer.call(__MODULE__, {:obs_call, "GetVirtualCamStatus", %{}})
+  end
+
+  @doc """
+  Gets list of outputs configured in OBS.
+
+  ## Returns
+  - `{:ok, outputs}` with list of all outputs
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec get_output_list() :: {:ok, map()} | {:error, binary()}
+  def get_output_list do
+    GenServer.call(__MODULE__, {:obs_call, "GetOutputList", %{}})
+  end
+
+  @doc """
+  Gets status of a specific output.
+
+  ## Parameters
+  - `output_name` - Name of the output to check
+
+  ## Returns
+  - `{:ok, output_status}` with output details
+  - `{:error, reason}` if not connected or command fails
+  """
+  @spec get_output_status(binary()) :: {:ok, map()} | {:error, binary()}
+  def get_output_status(output_name) do
+    GenServer.call(__MODULE__, {:obs_call, "GetOutputStatus", %{outputName: output_name}})
   end
 
   # GenServer callbacks
