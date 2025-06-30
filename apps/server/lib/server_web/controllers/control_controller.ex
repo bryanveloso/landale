@@ -184,9 +184,9 @@ defmodule ServerWeb.ControlController do
 
   defp format_uptime(seconds) when is_float(seconds) do
     seconds = round(seconds)
-    days = div(seconds, 86400)
-    hours = div(rem(seconds, 86400), 3600)
-    minutes = div(rem(seconds, 3600), 60)
+    days = div(seconds, 86_400)
+    hours = div(rem(seconds, 86_400), 3_600)
+    minutes = div(rem(seconds, 3_600), 60)
     secs = rem(seconds, 60)
 
     cond do
