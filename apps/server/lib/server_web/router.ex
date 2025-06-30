@@ -35,6 +35,13 @@ defmodule ServerWeb.Router do
     get "/obs/virtual-cam", OBSController, :virtual_cam
     get "/obs/outputs", OBSController, :outputs
 
+    # Twitch EventSub management
+    get "/twitch/status", TwitchController, :status
+    get "/twitch/subscriptions", TwitchController, :subscriptions
+    post "/twitch/subscriptions", TwitchController, :create_subscription
+    delete "/twitch/subscriptions/:id", TwitchController, :delete_subscription
+    get "/twitch/subscription-types", TwitchController, :subscription_types
+
     # IronMON data and statistics
     get "/ironmon/challenges", IronmonController, :list_challenges
     get "/ironmon/challenges/:id/checkpoints", IronmonController, :list_checkpoints

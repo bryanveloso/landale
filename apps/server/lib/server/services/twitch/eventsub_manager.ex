@@ -16,22 +16,169 @@ defmodule Server.Services.Twitch.EventSubManager do
 
   ## Event Types Supported
 
+  ### Stream Events
   - `stream.online` / `stream.offline` - Stream state changes
+
+  ### Channel Events
+  - `channel.update` - Channel information updates
   - `channel.follow` - New followers (requires moderator scope)
+  - `channel.ad_break.begin` - Ad break start
+  - `channel.chat.clear` - Chat cleared
+  - `channel.chat.clear_user_messages` - User messages cleared
+  - `channel.chat.message` - Chat messages
+  - `channel.chat.message_delete` - Message deletions
+  - `channel.chat.notification` - Chat notifications
+  - `channel.chat_settings.update` - Chat settings updates
   - `channel.subscribe` - New subscribers
+  - `channel.subscription.end` - Subscription end
   - `channel.subscription.gift` - Gift subscriptions
+  - `channel.subscription.message` - Subscription messages
   - `channel.cheer` - Bits cheered
+  - `channel.raid` - Incoming raids
+  - `channel.ban` / `channel.unban` - User bans/unbans
+  - `channel.moderator.add` / `channel.moderator.remove` - Moderator changes
+  - `channel.guest_star_session.begin` / `channel.guest_star_session.end` - Guest star sessions
+  - `channel.guest_star_guest.update` - Guest star updates
+  - `channel.channel_points_custom_reward.add` - Custom reward creation
+  - `channel.channel_points_custom_reward.update` - Custom reward updates
+  - `channel.channel_points_custom_reward.remove` - Custom reward removal
+  - `channel.channel_points_custom_reward_redemption.add` - Reward redemptions
+  - `channel.channel_points_custom_reward_redemption.update` - Redemption updates
+  - `channel.poll.begin` / `channel.poll.progress` / `channel.poll.end` - Polls
+  - `channel.prediction.begin` / `channel.prediction.progress` / `channel.prediction.lock` / `channel.prediction.end` - Predictions
+  - `channel.charity_campaign.donate` / `channel.charity_campaign.progress` - Charity campaigns
+  - `channel.hype_train.begin` / `channel.hype_train.progress` / `channel.hype_train.end` - Hype trains
+  - `channel.shield_mode.begin` / `channel.shield_mode.end` - Shield mode
+  - `channel.shoutout.create` / `channel.shoutout.receive` - Shoutouts
+  - `channel.suspicious_user.message` / `channel.suspicious_user.update` - Suspicious users
+  - `channel.vip.add` / `channel.vip.remove` - VIP changes
+  - `channel.warning.acknowledge` / `channel.warning.send` - Warnings
+  - `channel.goal.begin` / `channel.goal.progress` / `channel.goal.end` - Goals
+
+  ### User Events
+  - `user.authorization.grant` / `user.authorization.revoke` - Authorization changes
+  - `user.update` - User information updates
+  - `user.whisper.message` - Whisper messages
+
+  ### Drop Events
+  - `drop.entitlement.grant` - Drop entitlements
+
+  ### Extension Events
+  - `extension.bits_transaction.create` - Extension bits transactions
   """
 
   require Logger
 
   @default_subscriptions [
+    # Stream events (no scopes required)
     {"stream.online", [], []},
     {"stream.offline", [], []},
+
+    # Channel information updates
+    {"channel.update", [], []},
+
+    # Follow events (requires moderator scope)
     {"channel.follow", ["moderator:read:followers"], []},
+
+    # Subscription events
     {"channel.subscribe", ["channel:read:subscriptions"], []},
+    {"channel.subscription.end", ["channel:read:subscriptions"], []},
     {"channel.subscription.gift", ["channel:read:subscriptions"], []},
-    {"channel.cheer", ["bits:read"], []}
+    {"channel.subscription.message", ["channel:read:subscriptions"], []},
+
+    # Bits/Cheer events
+    {"channel.cheer", ["bits:read"], []},
+
+    # Raid events
+    {"channel.raid", [], []},
+
+    # Moderation events
+    {"channel.ban", ["channel:moderate"], []},
+    {"channel.unban", ["channel:moderate"], []},
+    {"channel.moderator.add", ["moderation:read"], []},
+    {"channel.moderator.remove", ["moderation:read"], []},
+
+    # Chat events
+    {"channel.chat.clear", ["moderator:read:chat_settings"], []},
+    {"channel.chat.clear_user_messages", ["moderator:read:chat_settings"], []},
+    {"channel.chat.message", ["user:read:chat"], []},
+    {"channel.chat.message_delete", ["moderator:read:chat_settings"], []},
+    {"channel.chat.notification", ["user:read:chat"], []},
+    {"channel.chat_settings.update", ["moderator:read:chat_settings"], []},
+
+    # Channel Points events
+    {"channel.channel_points_custom_reward.add", ["channel:read:redemptions"], []},
+    {"channel.channel_points_custom_reward.update", ["channel:read:redemptions"], []},
+    {"channel.channel_points_custom_reward.remove", ["channel:read:redemptions"], []},
+    {"channel.channel_points_custom_reward_redemption.add", ["channel:read:redemptions"], []},
+    {"channel.channel_points_custom_reward_redemption.update", ["channel:read:redemptions"], []},
+
+    # Poll events
+    {"channel.poll.begin", ["channel:read:polls"], []},
+    {"channel.poll.progress", ["channel:read:polls"], []},
+    {"channel.poll.end", ["channel:read:polls"], []},
+
+    # Prediction events
+    {"channel.prediction.begin", ["channel:read:predictions"], []},
+    {"channel.prediction.progress", ["channel:read:predictions"], []},
+    {"channel.prediction.lock", ["channel:read:predictions"], []},
+    {"channel.prediction.end", ["channel:read:predictions"], []},
+
+    # Charity events
+    {"channel.charity_campaign.donate", ["channel:read:charity"], []},
+    {"channel.charity_campaign.progress", ["channel:read:charity"], []},
+
+    # Hype Train events
+    {"channel.hype_train.begin", ["channel:read:hype_train"], []},
+    {"channel.hype_train.progress", ["channel:read:hype_train"], []},
+    {"channel.hype_train.end", ["channel:read:hype_train"], []},
+
+    # Goal events
+    {"channel.goal.begin", ["channel:read:goals"], []},
+    {"channel.goal.progress", ["channel:read:goals"], []},
+    {"channel.goal.end", ["channel:read:goals"], []},
+
+    # Shield mode events
+    {"channel.shield_mode.begin", ["moderator:read:shield_mode"], []},
+    {"channel.shield_mode.end", ["moderator:read:shield_mode"], []},
+
+    # Shoutout events
+    {"channel.shoutout.create", ["moderator:read:shoutouts"], []},
+    {"channel.shoutout.receive", ["moderator:read:shoutouts"], []},
+
+    # VIP events
+    {"channel.vip.add", ["channel:read:vips"], []},
+    {"channel.vip.remove", ["channel:read:vips"], []},
+
+    # Warning events
+    {"channel.warning.acknowledge", ["moderator:read:warnings"], []},
+    {"channel.warning.send", ["moderator:read:warnings"], []},
+
+    # Suspicious user events
+    {"channel.suspicious_user.message", ["moderator:read:suspicious_users"], []},
+    {"channel.suspicious_user.update", ["moderator:read:suspicious_users"], []},
+
+    # Guest star events
+    {"channel.guest_star_session.begin", ["channel:read:guest_star"], []},
+    {"channel.guest_star_session.end", ["channel:read:guest_star"], []},
+    {"channel.guest_star_guest.update", ["channel:read:guest_star"], []},
+
+    # Ad break events
+    {"channel.ad_break.begin", ["channel:read:ads"], []},
+
+    # User events
+    {"user.authorization.grant", ["user:read:subscriptions"], []},
+    {"user.authorization.revoke", ["user:read:subscriptions"], []},
+    {"user.update", [], []},
+
+    # Whisper events
+    {"user.whisper.message", ["user:read:whispers"], []},
+
+    # Drop events
+    {"drop.entitlement.grant", ["user:read:subscriptions"], []},
+
+    # Extension events
+    {"extension.bits_transaction.create", ["user:read:subscriptions"], []}
   ]
 
   @doc """
@@ -62,8 +209,8 @@ defmodule Server.Services.Twitch.EventSubManager do
       "session_id" => state.session_id
     }
 
-    # Use version 2 for channel.follow, version 1 for others
-    version = if event_type == "channel.follow", do: "2", else: "1"
+    # Determine API version based on event type
+    version = get_api_version_for_event_type(event_type)
 
     body = %{
       "type" => event_type,
@@ -240,88 +387,102 @@ defmodule Server.Services.Twitch.EventSubManager do
   @spec create_default_subscriptions(map()) :: {integer(), integer()}
   def create_default_subscriptions(state) do
     if state.user_id do
-      subscriptions_with_conditions =
-        Enum.map(@default_subscriptions, fn
-          {event_type, required_scopes, opts} ->
-            condition =
-              case event_type do
-                "channel.follow" ->
-                  %{"broadcaster_user_id" => state.user_id, "moderator_user_id" => state.user_id}
-
-                _ ->
-                  %{"broadcaster_user_id" => state.user_id}
-              end
-
-            {event_type, condition, required_scopes, opts}
-        end)
-
-      Enum.reduce(subscriptions_with_conditions, {0, 0}, fn {event_type, condition, required_scopes, opts},
-                                                            {success, failed} ->
-        if validate_scopes_for_subscription(state.scopes, required_scopes) do
-          case create_subscription(state, event_type, condition, opts) do
-            {:ok, subscription} ->
-              Logger.info("Created default EventSub subscription",
-                event_type: event_type,
-                subscription_id: subscription["id"],
-                status: subscription["status"],
-                cost: subscription["cost"] || 1
-              )
-
-              {success + 1, failed}
-
-            {:error, reason} ->
-              Logger.warning("Failed to create default EventSub subscription",
-                event_type: event_type,
-                reason: reason
-              )
-
-              # Provide specific guidance for known issues
-              case event_type do
-                "channel.follow" ->
-                  cond do
-                    String.contains?(to_string(reason), "Forbidden") ->
-                      Logger.info("Channel follow subscription failed",
-                        reason: "Forbidden - broadcaster may need explicit moderator verification",
-                        note: "This is common when using broadcaster token for moderator-required subscriptions",
-                        workaround: "Consider obtaining separate moderator authorization or treating as optional"
-                      )
-
-                    String.contains?(to_string(reason), "unauthorized") ->
-                      Logger.info("Channel follow subscription failed",
-                        reason: "Unauthorized - token may need additional verification",
-                        scope_present: MapSet.member?(state.scopes || MapSet.new(), "moderator:read:followers"),
-                        note: "Follow subscriptions require special broadcaster/moderator relationship"
-                      )
-
-                    true ->
-                      Logger.info("Channel follow subscription failed",
-                        reason: reason,
-                        condition: inspect(condition),
-                        user_id: state.user_id,
-                        note: "Follow subscriptions require special broadcaster/moderator relationship"
-                      )
-                  end
-
-                _ ->
-                  Logger.debug("Subscription failed for #{event_type}", reason: reason)
-              end
-
-              {success, failed + 1}
-          end
-        else
-          Logger.info("Skipping EventSub subscription due to missing scopes",
-            event_type: event_type,
-            required_scopes: required_scopes,
-            user_scopes: MapSet.to_list(state.scopes || MapSet.new())
-          )
-
-          {success, failed + 1}
-        end
-      end)
+      subscriptions_with_conditions = prepare_default_subscriptions(state.user_id)
+      process_subscription_list(state, subscriptions_with_conditions)
     else
       Logger.error("Cannot create subscriptions: user_id not available")
       {0, 1}
     end
+  end
+
+  # Prepares the default subscriptions with conditions
+  defp prepare_default_subscriptions(user_id) do
+    Enum.map(@default_subscriptions, fn {event_type, required_scopes, opts} ->
+      condition = build_condition_for_event_type(event_type, user_id)
+      {event_type, condition, required_scopes, opts}
+    end)
+  end
+
+  # Processes the subscription list and creates subscriptions
+  defp process_subscription_list(state, subscriptions) do
+    Enum.reduce(subscriptions, {0, 0}, fn subscription, acc ->
+      create_single_subscription(state, subscription, acc)
+    end)
+  end
+
+  # Creates a single subscription and handles the result
+  defp create_single_subscription(state, {event_type, condition, required_scopes, opts}, {success, failed}) do
+    if validate_scopes_for_subscription(state.scopes, required_scopes) do
+      case create_subscription(state, event_type, condition, opts) do
+        {:ok, subscription} ->
+          log_successful_subscription(event_type, subscription)
+          {success + 1, failed}
+
+        {:error, reason} ->
+          log_failed_subscription(state, event_type, condition, reason)
+          {success, failed + 1}
+      end
+    else
+      log_skipped_subscription(event_type, required_scopes, state.scopes)
+      {success, failed + 1}
+    end
+  end
+
+  # Logs successful subscription creation
+  defp log_successful_subscription(event_type, subscription) do
+    Logger.info("Created default EventSub subscription",
+      event_type: event_type,
+      subscription_id: subscription["id"],
+      status: subscription["status"],
+      cost: subscription["cost"] || 1
+    )
+  end
+
+  # Logs failed subscription creation with specific guidance
+  defp log_failed_subscription(state, event_type, condition, reason) do
+    Logger.warning("Failed to create default EventSub subscription",
+      event_type: event_type,
+      reason: reason
+    )
+
+    log_subscription_failure_guidance(state, event_type, condition, reason)
+  end
+
+  # Provides specific guidance for known subscription failures
+  defp log_subscription_failure_guidance(state, "channel.follow", condition, reason) do
+    cond do
+      String.contains?(to_string(reason), "Forbidden") ->
+        Logger.info("Channel follow subscription failed",
+          reason: "Forbidden - broadcaster may need explicit moderator verification",
+          note: "This is common when using broadcaster token for moderator-required subscriptions"
+        )
+
+      String.contains?(to_string(reason), "unauthorized") ->
+        Logger.info("Channel follow subscription failed",
+          reason: "Unauthorized - token may need additional verification",
+          scope_present: MapSet.member?(state.scopes || MapSet.new(), "moderator:read:followers")
+        )
+
+      true ->
+        Logger.info("Channel follow subscription failed",
+          reason: reason,
+          condition: inspect(condition),
+          user_id: state.user_id
+        )
+    end
+  end
+
+  defp log_subscription_failure_guidance(_state, event_type, _condition, reason) do
+    Logger.debug("Subscription failed for #{event_type}", reason: reason)
+  end
+
+  # Logs skipped subscription due to missing scopes
+  defp log_skipped_subscription(event_type, required_scopes, user_scopes) do
+    Logger.info("Skipping EventSub subscription due to missing scopes",
+      event_type: event_type,
+      required_scopes: required_scopes,
+      user_scopes: MapSet.to_list(user_scopes || MapSet.new())
+    )
   end
 
   @doc """
@@ -364,4 +525,65 @@ defmodule Server.Services.Twitch.EventSubManager do
 
     "#{event_type}:#{Jason.encode!(sorted_condition)}"
   end
+
+  # Builds the appropriate condition map for different EventSub event types.
+  # Parameters: event_type (binary), user_id (binary)
+  # Returns: Map containing the appropriate condition for the event type
+  @spec build_condition_for_event_type(binary(), binary()) :: map()
+  defp build_condition_for_event_type(event_type, user_id) do
+    case event_type do
+      # Events that require both broadcaster_user_id and moderator_user_id
+      "channel.follow" ->
+        %{"broadcaster_user_id" => user_id, "moderator_user_id" => user_id}
+
+      # Chat events that require user_id instead of broadcaster_user_id
+      "user.authorization.grant" ->
+        %{"client_id" => get_client_id()}
+
+      "user.authorization.revoke" ->
+        %{"client_id" => get_client_id()}
+
+      "user.update" ->
+        %{"user_id" => user_id}
+
+      "user.whisper.message" ->
+        %{"user_id" => user_id}
+
+      # Drop events that require organization_id and category_id (would need to be configured)
+      "drop.entitlement.grant" ->
+        %{
+          "organization_id" => get_organization_id(),
+          "category_id" => get_category_id()
+        }
+
+      # Extension events that require extension_client_id
+      "extension.bits_transaction.create" ->
+        %{"extension_client_id" => get_extension_client_id()}
+
+      # All other events use broadcaster_user_id
+      _ ->
+        %{"broadcaster_user_id" => user_id}
+    end
+  end
+
+  # Helper functions for configuration values (these would need to be configured in environment)
+  defp get_client_id do
+    System.get_env("TWITCH_CLIENT_ID") || ""
+  end
+
+  defp get_organization_id do
+    System.get_env("TWITCH_ORGANIZATION_ID") || ""
+  end
+
+  defp get_category_id do
+    System.get_env("TWITCH_CATEGORY_ID") || ""
+  end
+
+  defp get_extension_client_id do
+    System.get_env("TWITCH_EXTENSION_CLIENT_ID") || ""
+  end
+
+  # Helper function to determine the correct API version for each event type
+  defp get_api_version_for_event_type("channel.follow"), do: "2"
+  defp get_api_version_for_event_type(_event_type), do: "1"
 end
