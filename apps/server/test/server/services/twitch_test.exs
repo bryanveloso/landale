@@ -25,7 +25,7 @@ defmodule Server.Services.TwitchTest do
   # - Add contract tests for API response parsing
   # - Test retry strategies with simulated failures
   # - Test subscription management with mocked WebSocket events
-  # 
+  #
   # Current integration tests removed as they test environmental connectivity
   # rather than actual functionality. See: https://github.com/bryanveloso/landale/issues/xxx
 end

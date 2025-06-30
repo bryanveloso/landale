@@ -6,7 +6,7 @@ defmodule Server.Services.OBSTest do
   # - Test connection retry logic with simulated failures
   # - Test command handling with mocked OBS responses
   # - Test scene management with mocked WebSocket events
-  # 
+  #
   # Current integration tests removed as they test environmental connectivity
   # rather than actual functionality. See: https://github.com/bryanveloso/landale/issues/xxx
 end

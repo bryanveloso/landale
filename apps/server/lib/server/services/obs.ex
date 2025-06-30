@@ -42,6 +42,8 @@ defmodule Server.Services.OBS do
   use GenServer
   require Logger
 
+  alias Server.ServiceError
+
   # OBS WebSocket protocol constants
   # Subscribe to all events
   @event_subscription_all 0x1FF
@@ -134,7 +136,7 @@ defmodule Server.Services.OBS do
   - `{:ok, status}` where status contains connection information
   - `{:error, reason}` if service is unavailable
   """
-  @spec get_status() :: {:ok, map()} | {:error, binary()}
+  @spec get_status() :: {:ok, map()} | {:error, ServiceError.service_error()}
   def get_status do
     GenServer.call(__MODULE__, :get_status)
   end
@@ -385,11 +387,16 @@ defmodule Server.Services.OBS do
           new_state = %{state | pending_requests: pending_requests}
           {:noreply, new_state}
 
+        {:error, %ServiceError{} = error} ->
+          {:reply, {:error, error}, state}
+
         {:error, reason} ->
-          {:reply, {:error, reason}, state}
+          error = ServiceError.from_error_tuple(:obs, "websocket_message", {:error, reason})
+          {:reply, {:error, error}, state}
       end
     else
-      {:reply, {:error, "OBS not connected"}, state}
+      error = ServiceError.new(:obs, "websocket_call", :service_unavailable, "OBS not connected")
+      {:reply, {:error, error}, state}
     end
   end
 
@@ -817,7 +824,14 @@ defmodule Server.Services.OBS do
           if response["requestStatus"]["result"] do
             {:ok, response["responseData"] || %{}}
           else
-            {:error, response["requestStatus"]["comment"] || "Request failed"}
+            comment = response["requestStatus"]["comment"] || "Request failed"
+
+            error =
+              ServiceError.new(:obs, "request", :invalid_request, comment,
+                details: %{request_id: request_id, response: response}
+              )
+
+            {:error, error}
           end
 
         GenServer.reply(from, result)
@@ -876,7 +890,7 @@ defmodule Server.Services.OBS do
       :gun.ws_send(state.conn_pid, state.stream_ref, {:text, json_message})
       :ok
     else
-      {:error, "WebSocket not connected"}
+      {:error, ServiceError.new(:obs, "send_message", :service_unavailable, "WebSocket not connected")}
     end
   end
 

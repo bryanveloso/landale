@@ -30,14 +30,20 @@ defmodule ServerWeb.DashboardChannel do
 
   require Logger
 
+  alias Server.CorrelationId
+
   @impl true
   def join("dashboard:" <> room_id, _payload, socket) do
-    Logger.info("Dashboard channel joined",
-      room_id: room_id,
-      correlation_id: Map.get(socket.assigns, :correlation_id, "test")
-    )
+    # Generate correlation ID for this session
+    correlation_id = CorrelationId.from_context(assigns: socket.assigns)
+    CorrelationId.put_logger_metadata(correlation_id)
 
-    socket = assign(socket, :room_id, room_id)
+    Logger.info("Dashboard channel joined", room_id: room_id)
+
+    socket =
+      socket
+      |> assign(:room_id, room_id)
+      |> assign(:correlation_id, correlation_id)
 
     # Subscribe to relevant PubSub topics for real-time updates
     Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
@@ -82,14 +88,30 @@ defmodule ServerWeb.DashboardChannel do
   # Handle incoming messages from client
   @impl true
   def handle_in("obs:get_status", _payload, socket) do
-    # Forward request to OBS service
-    case Server.Services.OBS.get_status() do
-      {:ok, status} ->
-        {:reply, {:ok, status}, socket}
+    correlation_id = socket.assigns.correlation_id
 
-      {:error, reason} ->
-        {:reply, {:error, %{message: reason}}, socket}
-    end
+    CorrelationId.with_context(correlation_id, fn ->
+      Logger.debug("Handling OBS status request")
+
+      # Forward request to OBS service
+      case Server.Services.OBS.get_status() do
+        {:ok, status} ->
+          Logger.debug("OBS status request successful")
+          {:reply, {:ok, status}, socket}
+
+        {:error, %Server.ServiceError{} = error} ->
+          Logger.warning("OBS status request failed",
+            reason: error.reason,
+            message: error.message
+          )
+
+          {:reply, {:error, %{message: error.message}}, socket}
+
+        {:error, reason} ->
+          Logger.warning("OBS status request failed", reason: inspect(reason))
+          {:reply, {:error, %{message: inspect(reason)}}, socket}
+      end
+    end)
   end
 
   @impl true
