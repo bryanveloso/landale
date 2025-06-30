@@ -5,15 +5,16 @@ defmodule ServerWeb.Router do
     plug :accepts, ["json"]
   end
 
-  # Health check endpoint
+  # Health check endpoints for Docker/Kubernetes
   get "/health", ServerWeb.HealthController, :check
+  get "/ready", ServerWeb.HealthController, :ready
 
   scope "/api", ServerWeb do
     pipe_through :api
-    
+
     # Health and system status
     get "/health", HealthController, :detailed
-    
+
     # OBS controls
     get "/obs/status", OBSController, :status
     post "/obs/streaming/start", OBSController, :start_streaming

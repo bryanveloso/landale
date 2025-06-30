@@ -1,13 +1,14 @@
 import Config
-import Dotenvy
 
-# Load environment variables from .env files and system environment
-# Manual .env parsing since dotenvy seems to have issues
+# Load environment variables from .env files (development) or system environment (Docker)
+# This gracefully handles both scenarios:
+# - Development: Loads from .env file if it exists
+# - Docker: .env file won't exist, falls back to system environment variables
 
 if File.exists?(".env") do
   File.read!(".env")
   |> String.split("\n")
-  |> Enum.filter(fn line -> 
+  |> Enum.filter(fn line ->
     line = String.trim(line)
     line != "" and not String.starts_with?(line, "#")
   end)
@@ -17,10 +18,15 @@ if File.exists?(".env") do
         key = String.trim(key)
         value = String.trim(value)
         System.put_env(key, value)
+
       _ ->
         :ok
     end
   end)
+else
+  # No .env file found (likely Docker environment)
+  # Application will use system environment variables directly via System.get_env()
+  :ok
 end
 
 # config/runtime.exs is executed for all environments, including
