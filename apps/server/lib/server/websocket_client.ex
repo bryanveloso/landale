@@ -54,8 +54,7 @@ defmodule Server.WebSocketClient do
           telemetry_prefix: [atom()]
         }
 
-  @default_reconnect_interval 5_000
-  @default_connection_timeout 10_000
+  # Network configuration is now handled by Server.NetworkConfig
 
   @doc """
   Creates a new WebSocket client state.
@@ -84,8 +83,8 @@ defmodule Server.WebSocketClient do
       monitor_ref: nil,
       connection_start_time: nil,
       reconnect_timer: nil,
-      reconnect_interval: Keyword.get(opts, :reconnect_interval, @default_reconnect_interval),
-      connection_timeout: Keyword.get(opts, :connection_timeout, @default_connection_timeout),
+      reconnect_interval: Keyword.get(opts, :reconnect_interval, Server.NetworkConfig.reconnect_interval()),
+      connection_timeout: Keyword.get(opts, :connection_timeout, Server.NetworkConfig.connection_timeout()),
       telemetry_prefix: Keyword.get(opts, :telemetry_prefix, [:server, :websocket])
     }
   end
@@ -126,7 +125,9 @@ defmodule Server.WebSocketClient do
           # Monitor the connection process
           monitor_ref = Process.monitor(conn_pid)
 
-          case :gun.await_up(conn_pid, client.connection_timeout) do
+          websocket_config = Server.NetworkConfig.websocket_config()
+
+          case :gun.await_up(conn_pid, websocket_config.timeout) do
             {:ok, _protocol} ->
               headers = Keyword.get(opts, :headers, [])
               protocols = Keyword.get(opts, :protocols, [])

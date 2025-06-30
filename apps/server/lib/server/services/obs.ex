@@ -45,10 +45,9 @@ defmodule Server.Services.OBS do
   # OBS WebSocket protocol constants
   # Subscribe to all events
   @event_subscription_all 0x1FF
+  # Network configuration is now handled by Server.NetworkConfig
   # 5 seconds
   @stats_polling_interval 5_000
-  # 2 seconds
-  @reconnect_interval 2_000
 
   defstruct [
     :conn_pid,
@@ -400,7 +399,7 @@ defmodule Server.Services.OBS do
 
       {:error, new_state} ->
         # Schedule reconnect
-        timer = Process.send_after(self(), :connect, @reconnect_interval)
+        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
         new_state = %{new_state | reconnect_timer: timer}
         {:noreply, new_state}
     end
@@ -491,7 +490,7 @@ defmodule Server.Services.OBS do
       Server.Events.publish_obs_event("connection_lost", %{})
 
       # Schedule reconnect
-      timer = Process.send_after(self(), :connect, @reconnect_interval)
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
       state = %{state | reconnect_timer: timer}
 
       {:noreply, state}
@@ -518,7 +517,7 @@ defmodule Server.Services.OBS do
         |> cleanup_connection()
 
       # Schedule reconnect
-      timer = Process.send_after(self(), :connect, @reconnect_interval)
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
       state = %{state | reconnect_timer: timer}
 
       {:noreply, state}
@@ -544,7 +543,7 @@ defmodule Server.Services.OBS do
         |> cleanup_connection()
 
       # Schedule reconnect
-      timer = Process.send_after(self(), :connect, @reconnect_interval)
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
       state = %{state | reconnect_timer: timer}
 
       {:noreply, state}
@@ -571,7 +570,7 @@ defmodule Server.Services.OBS do
       Server.Events.publish_obs_event("connection_lost", %{})
 
       # Schedule reconnect
-      timer = Process.send_after(self(), :connect, @reconnect_interval)
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
       state = %{state | reconnect_timer: timer}
 
       {:noreply, state}
@@ -622,7 +621,9 @@ defmodule Server.Services.OBS do
         # Monitor the connection
         Process.monitor(conn_pid)
 
-        case :gun.await_up(conn_pid, 5_000) do
+        websocket_config = Server.NetworkConfig.websocket_config()
+
+        case :gun.await_up(conn_pid, websocket_config.timeout) do
           {:ok, _protocol} ->
             # Upgrade to WebSocket - try without protocol first
             stream_ref = :gun.ws_upgrade(conn_pid, path)

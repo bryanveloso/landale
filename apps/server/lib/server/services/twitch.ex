@@ -17,7 +17,7 @@ defmodule Server.Services.Twitch do
 
   # Twitch EventSub constants
   @eventsub_websocket_url "wss://eventsub.wss.twitch.tv/ws"
-  @reconnect_interval 5_000
+  # Network configuration is now handled by Server.NetworkConfig
   @token_refresh_buffer 300_000
 
   defstruct [
@@ -183,7 +183,7 @@ defmodule Server.Services.Twitch do
 
       {:error, _reason} ->
         Logger.info("No valid tokens available, will retry connection later")
-        timer = Process.send_after(self(), :retry_connection, @reconnect_interval)
+        timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval())
         {:ok, %{state | reconnect_timer: timer}}
     end
   end
@@ -315,7 +315,7 @@ defmodule Server.Services.Twitch do
 
       {:error, reason} ->
         Logger.info("Still no valid tokens available", reason: reason)
-        timer = Process.send_after(self(), :retry_connection, @reconnect_interval)
+        timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval())
         {:noreply, %{state | reconnect_timer: timer}}
     end
   end
@@ -347,7 +347,7 @@ defmodule Server.Services.Twitch do
           })
 
         # Schedule reconnect
-        timer = Process.send_after(self(), :connect, @reconnect_interval)
+        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
         state = %{state | reconnect_timer: timer}
         {:noreply, state}
     end
@@ -387,7 +387,7 @@ defmodule Server.Services.Twitch do
 
           {:error, refresh_reason} ->
             Logger.error("Token refresh also failed", error: refresh_reason)
-            timer = Process.send_after(self(), :retry_connection, @reconnect_interval)
+            timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval())
             {:noreply, %{state | reconnect_timer: timer}}
         end
     end
@@ -407,7 +407,7 @@ defmodule Server.Services.Twitch do
       {:error, reason} ->
         Logger.error("Twitch OAuth token refresh failed", error: reason)
         # Try again in a shorter interval
-        timer = Process.send_after(self(), :refresh_token, @reconnect_interval)
+        timer = Process.send_after(self(), :refresh_token, Server.NetworkConfig.reconnect_interval())
         state = %{state | token_refresh_timer: timer}
         {:noreply, state}
     end
@@ -453,7 +453,7 @@ defmodule Server.Services.Twitch do
     Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_disconnected, %{reason: reason}})
 
     # Schedule reconnect
-    timer = Process.send_after(self(), :connect, @reconnect_interval)
+    timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
     state = %{state | reconnect_timer: timer}
 
     {:noreply, state}
