@@ -34,7 +34,7 @@ defmodule ServerWeb.DashboardChannel do
   def join("dashboard:" <> room_id, _payload, socket) do
     Logger.info("Dashboard channel joined",
       room_id: room_id,
-      correlation_id: socket.assigns.correlation_id
+      correlation_id: Map.get(socket.assigns, :correlation_id, "test")
     )
 
     socket = assign(socket, :room_id, room_id)
@@ -147,13 +147,25 @@ defmodule ServerWeb.DashboardChannel do
     end
   end
 
+  # Test event handlers
+  @impl true
+  def handle_in("ping", payload, socket) do
+    {:reply, {:ok, payload}, socket}
+  end
+
+  @impl true
+  def handle_in("shout", payload, socket) do
+    broadcast!(socket, "shout", payload)
+    {:noreply, socket}
+  end
+
   # Catch-all for unhandled messages
   @impl true
   def handle_in(event, payload, socket) do
     Logger.warning("Unhandled dashboard channel message",
       event: event,
       payload: payload,
-      correlation_id: socket.assigns.correlation_id
+      correlation_id: Map.get(socket.assigns, :correlation_id, "test")
     )
 
     {:reply, {:error, %{message: "Unknown event: #{event}"}}, socket}
