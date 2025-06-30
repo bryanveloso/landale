@@ -418,7 +418,7 @@ defmodule Server.OAuthTokenManager do
     %{
       access_token: token_data.access_token,
       refresh_token: token_data.refresh_token,
-      expires_at: token_data.expires_at && DateTime.from_iso8601!(token_data.expires_at),
+      expires_at: token_data.expires_at && parse_stored_datetime(token_data.expires_at),
       scopes: token_data.scopes && MapSet.new(token_data.scopes),
       user_id: token_data.user_id
     }
@@ -453,6 +453,14 @@ defmodule Server.OAuthTokenManager do
   end
 
   defp calculate_expires_at(_), do: nil
+
+  defp parse_stored_datetime(datetime_string) when is_binary(datetime_string) do
+    case DateTime.from_iso8601(datetime_string) do
+      {:ok, datetime, _offset} -> datetime
+      {:error, _reason} -> nil
+    end
+  end
+  defp parse_stored_datetime(_), do: nil
 
   defp token_needs_refresh?(token_info, buffer_ms) do
     case token_info.expires_at do

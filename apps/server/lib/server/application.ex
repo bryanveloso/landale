@@ -28,7 +28,7 @@ defmodule Server.Application do
     opts = [strategy: :one_for_one, name: Server.Supervisor]
 
     case Supervisor.start_link(children, opts) do
-      {:ok, pid} = result ->
+      {:ok, _pid} = result ->
         Logger.info("Server application started successfully")
         result
 
@@ -93,7 +93,7 @@ defmodule Server.Application do
     Logger.info("Starting graceful shutdown sequence")
 
     # Stop accepting new connections
-    ServerWeb.Endpoint.stop()
+    # ServerWeb.Endpoint.stop()
 
     # Wait a moment for in-flight requests to complete
     Process.sleep(1000)
