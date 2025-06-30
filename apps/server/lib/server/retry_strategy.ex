@@ -121,7 +121,7 @@ defmodule Server.RetryStrategy do
       base_delay: 5_000,
       max_delay: 300_000,
       backoff_factor: 2.0,
-      retry_predicate: &is_retryable_error?/1,
+      retry_predicate: &retryable_error?/1,
       telemetry_prefix: [:server, :retry, :rate_limit]
     ]
 
@@ -289,7 +289,7 @@ defmodule Server.RetryStrategy do
     end
   end
 
-  defp is_retryable_error?(reason) do
+  defp retryable_error?(reason) do
     case reason do
       # Twitch-specific rate limit errors
       {:http_error, 429} ->

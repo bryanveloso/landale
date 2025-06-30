@@ -28,7 +28,7 @@ defmodule Server.Telemetry do
         streaming_value = if state.streaming.active, do: 1, else: 0
         :telemetry.execute([:server, :obs, :streaming, :status], %{value: streaming_value}, %{})
 
-        # Emit recording status  
+        # Emit recording status
         recording_value = if state.recording.active, do: 1, else: 0
         :telemetry.execute([:server, :obs, :recording, :status], %{value: recording_value}, %{})
 

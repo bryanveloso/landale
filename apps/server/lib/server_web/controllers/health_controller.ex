@@ -201,39 +201,35 @@ defmodule ServerWeb.HealthController do
   end
 
   defp get_database_status do
-    try do
-      case Server.Repo.query("SELECT 1", []) do
-        {:ok, _} -> %{connected: true, status: "healthy"}
-        {:error, reason} -> %{connected: false, error: to_string(reason)}
-      end
-    rescue
-      _ -> %{connected: false, error: "Database unavailable"}
+    case Server.Repo.query("SELECT 1", []) do
+      {:ok, _} -> %{connected: true, status: "healthy"}
+      {:error, reason} -> %{connected: false, error: to_string(reason)}
     end
+  rescue
+    _ -> %{connected: false, error: "Database unavailable"}
   end
 
   defp get_subscription_status do
-    try do
-      report = Server.SubscriptionMonitor.get_health_report()
+    report = Server.SubscriptionMonitor.get_health_report()
 
-      status =
-        cond do
-          report.total_subscriptions == 0 -> "no_subscriptions"
-          report.failed_subscriptions > report.enabled_subscriptions -> "degraded"
-          report.failed_subscriptions > 0 -> "warning"
-          true -> "healthy"
-        end
+    status =
+      cond do
+        report.total_subscriptions == 0 -> "no_subscriptions"
+        report.failed_subscriptions > report.enabled_subscriptions -> "degraded"
+        report.failed_subscriptions > 0 -> "warning"
+        true -> "healthy"
+      end
 
-      %{
-        status: status,
-        total: report.total_subscriptions,
-        enabled: report.enabled_subscriptions,
-        failed: report.failed_subscriptions,
-        orphaned: report.orphaned_subscriptions
-      }
-    rescue
-      _ ->
-        %{status: "error", error: "Subscription monitor unavailable"}
-    end
+    %{
+      status: status,
+      total: report.total_subscriptions,
+      enabled: report.enabled_subscriptions,
+      failed: report.failed_subscriptions,
+      orphaned: report.orphaned_subscriptions
+    }
+  rescue
+    _ ->
+      %{status: "error", error: "Subscription monitor unavailable"}
   end
 
   defp determine_overall_status(service_statuses) do

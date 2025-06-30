@@ -1,4 +1,6 @@
 defmodule ServerWeb.Router do
+  @moduledoc "Phoenix router configuration for API endpoints."
+
   use ServerWeb, :router
 
   pipeline :api do

@@ -1,4 +1,6 @@
 defmodule ServerWeb.EventsChannel do
+  @moduledoc "Phoenix channel for real-time event streaming."
+
   use ServerWeb, :channel
 
   require Logger

@@ -12,7 +12,7 @@ defmodule Server.Services.Twitch do
   use GenServer
   require Logger
 
-  alias Server.Services.Twitch.{EventSubManager, EventHandler}
+  alias Server.Services.Twitch.{EventHandler, EventSubManager}
   alias Server.{OAuthTokenManager, WebSocketClient}
 
   # Twitch EventSub constants
@@ -494,6 +494,19 @@ defmodule Server.Services.Twitch do
     {:noreply, state}
   end
 
+  def handle_info({:reconnect_to_url, url}, state) do
+    Logger.info("Reconnecting to new Twitch EventSub URL", url: url)
+
+    # Create new WebSocket client with the new URL
+    new_client = WebSocketClient.new(url, self())
+
+    # Initiate connection
+    WebSocketClient.connect(new_client)
+
+    state = %{state | ws_client: new_client, session_id: nil}
+    {:noreply, state}
+  end
+
   @impl GenServer
   def terminate(reason, state) do
     Logger.info("Twitch service terminating", reason: reason)
@@ -623,8 +636,21 @@ defmodule Server.Services.Twitch do
     reconnect_url = get_in(message, ["payload", "session", "reconnect_url"])
     Logger.info("Twitch session reconnect requested", reconnect_url: reconnect_url)
 
-    # TODO: Handle reconnection to new URL
-    state
+    # Initiate reconnection to new URL
+    case reconnect_url do
+      nil ->
+        Logger.error("No reconnect URL provided in session_reconnect message")
+        state
+
+      url when is_binary(url) ->
+        Logger.info("Initiating reconnection to new URL", url: url)
+        # Close current connection and reconnect to new URL
+        :ok = WebSocketClient.close(state.ws_client)
+        new_state = %{state | session_id: nil}
+        # Start reconnection process
+        send(self(), {:reconnect_to_url, url})
+        new_state
+    end
   end
 
   defp handle_eventsub_protocol_message(state, message) do

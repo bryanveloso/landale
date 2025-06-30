@@ -80,7 +80,7 @@ defmodule Server.SubscriptionMonitor do
   # Consider subscription orphaned if no events for 2 hours
   @orphan_threshold_ms 2 * 60 * 60 * 1000
 
-  # Health check interval: every 5 minutes  
+  # Health check interval: every 5 minutes
   @health_check_interval_ms 5 * 60 * 1000
 
   ## Public API
@@ -572,7 +572,7 @@ defmodule Server.SubscriptionMonitor do
         true
 
       # Cleanup orphaned subscriptions
-      is_orphaned_subscription?(subscription, now) ->
+      orphaned_subscription?(subscription, now) ->
         true
 
       true ->
@@ -580,7 +580,7 @@ defmodule Server.SubscriptionMonitor do
     end
   end
 
-  defp is_orphaned_subscription?(subscription, now) do
+  defp orphaned_subscription?(subscription, now) do
     case subscription.last_event_at do
       nil ->
         # No events ever received, consider orphaned if created more than threshold ago
@@ -608,7 +608,7 @@ defmodule Server.SubscriptionMonitor do
       subscription.failure_count >= 10 ->
         "too_many_failures: #{subscription.failure_count}"
 
-      is_orphaned_subscription?(subscription, now) ->
+      orphaned_subscription?(subscription, now) ->
         "orphaned"
 
       true ->
