@@ -12,6 +12,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
   describe "normalize_event/2" do
     test "normalizes stream.online event" do
       event_type = "stream.online"
+
       event_data = %{
         "id" => "stream_123",
         "broadcaster_user_id" => "user_123",
@@ -36,6 +37,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
     test "normalizes stream.offline event" do
       event_type = "stream.offline"
+
       event_data = %{
         "id" => "event_123",
         "broadcaster_user_id" => "user_123",
@@ -53,6 +55,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
     test "normalizes channel.follow event" do
       event_type = "channel.follow"
+
       event_data = %{
         "id" => "follow_123",
         "broadcaster_user_id" => "user_123",
@@ -75,6 +78,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
     test "normalizes channel.subscribe event" do
       event_type = "channel.subscribe"
+
       event_data = %{
         "id" => "sub_123",
         "broadcaster_user_id" => "user_123",
@@ -97,6 +101,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
     test "normalizes channel.subscription.gift event" do
       event_type = "channel.subscription.gift"
+
       event_data = %{
         "id" => "gift_123",
         "broadcaster_user_id" => "user_123",
@@ -123,6 +128,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
     test "normalizes channel.cheer event" do
       event_type = "channel.cheer"
+
       event_data = %{
         "id" => "cheer_123",
         "broadcaster_user_id" => "user_123",
@@ -147,6 +153,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
     test "normalizes channel.update event" do
       event_type = "channel.update"
+
       event_data = %{
         "id" => "update_123",
         "broadcaster_user_id" => "user_123",
@@ -169,6 +176,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
     test "normalizes unknown event type with raw data" do
       event_type = "unknown.event"
+
       event_data = %{
         "id" => "unknown_123",
         "broadcaster_user_id" => "user_123",
@@ -188,6 +196,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
   describe "process_event/3" do
     test "successfully processes a valid event" do
       event_type = "stream.online"
+
       event_data = %{
         "id" => "stream_123",
         "broadcaster_user_id" => "user_123",
@@ -221,6 +230,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
       # This would test error handling in process_event
       # For now, we test with invalid data that might cause JSON encoding issues
       event_type = "test.event"
+
       event_data = %{
         "id" => "test_123",
         "broadcaster_user_id" => "user_123",
@@ -238,6 +248,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
   describe "publish_event/2" do
     test "publishes to general dashboard topic" do
       event_type = "channel.follow"
+
       normalized_event = %{
         type: "channel.follow",
         id: "follow_123",
@@ -253,6 +264,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
     test "publishes to event-specific topic" do
       event_type = "channel.subscribe"
+
       normalized_event = %{
         type: "channel.subscribe",
         id: "sub_123",
@@ -268,6 +280,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
     test "publishes to legacy topic structure for backward compatibility" do
       event_type = "channel.follow"
+
       normalized_event = %{
         type: "channel.follow",
         id: "follow_123",
@@ -285,6 +298,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
   describe "emit_telemetry/2" do
     test "emits telemetry events" do
       event_type = "stream.online"
+
       normalized_event = %{
         type: "stream.online",
         broadcaster_user_id: "user_123",
@@ -295,9 +309,14 @@ defmodule Server.Services.Twitch.EventHandlerTest do
       test_pid = self()
       handler_id = :test_handler
 
-      :telemetry.attach(handler_id, [:server, :twitch, :stream, :online], fn name, measurements, metadata, _config ->
-        send(test_pid, {:telemetry_event, name, measurements, metadata})
-      end, nil)
+      :telemetry.attach(
+        handler_id,
+        [:server, :twitch, :stream, :online],
+        fn name, measurements, metadata, _config ->
+          send(test_pid, {:telemetry_event, name, measurements, metadata})
+        end,
+        nil
+      )
 
       EventHandler.emit_telemetry(event_type, normalized_event)
 
@@ -311,6 +330,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
     test "emits generic telemetry for unknown event types" do
       event_type = "unknown.event"
+
       normalized_event = %{
         type: "unknown.event",
         broadcaster_user_id: "user_123"
@@ -320,9 +340,14 @@ defmodule Server.Services.Twitch.EventHandlerTest do
       test_pid = self()
       handler_id = :test_handler_generic
 
-      :telemetry.attach(handler_id, [:server, :twitch, :event, :other], fn name, measurements, metadata, _config ->
-        send(test_pid, {:telemetry_event, name, measurements, metadata})
-      end, nil)
+      :telemetry.attach(
+        handler_id,
+        [:server, :twitch, :event, :other],
+        fn name, measurements, metadata, _config ->
+          send(test_pid, {:telemetry_event, name, measurements, metadata})
+        end,
+        nil
+      )
 
       EventHandler.emit_telemetry(event_type, normalized_event)
 

@@ -34,7 +34,8 @@ defmodule Server.OAuthTokenManagerTest do
       assert manager.storage_path == @test_storage_path
       assert manager.oauth_client.client_id == "test_client_id"
       assert manager.oauth_client.client_secret == "test_client_secret"
-      assert manager.refresh_buffer_ms == 300_000  # default
+      # default
+      assert manager.refresh_buffer_ms == 300_000
     end
 
     test "accepts custom refresh buffer" do
@@ -79,13 +80,14 @@ defmodule Server.OAuthTokenManagerTest do
 
   describe "load_tokens/1" do
     test "loads tokens when DETS file doesn't exist" do
-      {:ok, manager} = OAuthTokenManager.new([
-        storage_key: :test_tokens,
-        client_id: "test_client_id",
-        client_secret: "test_client_secret",
-        token_url: "https://example.com/oauth/token",
-        storage_path: @test_storage_path
-      ])
+      {:ok, manager} =
+        OAuthTokenManager.new(
+          storage_key: :test_tokens,
+          client_id: "test_client_id",
+          client_secret: "test_client_secret",
+          token_url: "https://example.com/oauth/token",
+          storage_path: @test_storage_path
+        )
 
       updated_manager = OAuthTokenManager.load_tokens(manager)
 
@@ -98,13 +100,14 @@ defmodule Server.OAuthTokenManagerTest do
     test "creates storage directory if it doesn't exist" do
       storage_path = "./test_data/nested/dir/test_tokens.dets"
 
-      {:ok, manager} = OAuthTokenManager.new([
-        storage_key: :test_tokens,
-        client_id: "test_client_id",
-        client_secret: "test_client_secret",
-        token_url: "https://example.com/oauth/token",
-        storage_path: storage_path
-      ])
+      {:ok, manager} =
+        OAuthTokenManager.new(
+          storage_key: :test_tokens,
+          client_id: "test_client_id",
+          client_secret: "test_client_secret",
+          token_url: "https://example.com/oauth/token",
+          storage_path: storage_path
+        )
 
       updated_manager = OAuthTokenManager.load_tokens(manager)
 
@@ -119,13 +122,14 @@ defmodule Server.OAuthTokenManagerTest do
 
   describe "set_token/2" do
     setup do
-      {:ok, manager} = OAuthTokenManager.new([
-        storage_key: :test_tokens,
-        client_id: "test_client_id",
-        client_secret: "test_client_secret",
-        token_url: "https://example.com/oauth/token",
-        storage_path: @test_storage_path
-      ])
+      {:ok, manager} =
+        OAuthTokenManager.new(
+          storage_key: :test_tokens,
+          client_id: "test_client_id",
+          client_secret: "test_client_secret",
+          token_url: "https://example.com/oauth/token",
+          storage_path: @test_storage_path
+        )
 
       manager = OAuthTokenManager.load_tokens(manager)
       %{manager: manager}
@@ -154,7 +158,8 @@ defmodule Server.OAuthTokenManagerTest do
         access_token: "test_access_token",
         refresh_token: "test_refresh_token",
         expires_in: 3600,
-        scope: "read write",  # space-separated string
+        # space-separated string
+        scope: "read write",
         user_id: "user123"
       }
 
@@ -167,13 +172,14 @@ defmodule Server.OAuthTokenManagerTest do
 
   describe "get_valid_token/1" do
     setup do
-      {:ok, manager} = OAuthTokenManager.new([
-        storage_key: :test_tokens,
-        client_id: "test_client_id",
-        client_secret: "test_client_secret",
-        token_url: "https://example.com/oauth/token",
-        storage_path: @test_storage_path
-      ])
+      {:ok, manager} =
+        OAuthTokenManager.new(
+          storage_key: :test_tokens,
+          client_id: "test_client_id",
+          client_secret: "test_client_secret",
+          token_url: "https://example.com/oauth/token",
+          storage_path: @test_storage_path
+        )
 
       manager = OAuthTokenManager.load_tokens(manager)
       %{manager: manager}
@@ -186,7 +192,7 @@ defmodule Server.OAuthTokenManagerTest do
     test "returns token when it's valid and not expired", %{manager: manager} do
       # Set a token that expires in the future
       expires_at = DateTime.add(DateTime.utc_now(), 3600, :second)
-      
+
       token_info = %{
         access_token: "valid_token",
         refresh_token: "refresh_token",
@@ -219,27 +225,29 @@ defmodule Server.OAuthTokenManagerTest do
 
   describe "close/1" do
     test "closes DETS table gracefully" do
-      {:ok, manager} = OAuthTokenManager.new([
-        storage_key: :test_tokens,
-        client_id: "test_client_id",
-        client_secret: "test_client_secret",
-        token_url: "https://example.com/oauth/token",
-        storage_path: @test_storage_path
-      ])
+      {:ok, manager} =
+        OAuthTokenManager.new(
+          storage_key: :test_tokens,
+          client_id: "test_client_id",
+          client_secret: "test_client_secret",
+          token_url: "https://example.com/oauth/token",
+          storage_path: @test_storage_path
+        )
 
       manager = OAuthTokenManager.load_tokens(manager)
-      
+
       assert :ok = OAuthTokenManager.close(manager)
     end
 
     test "handles close when no DETS table is open" do
-      {:ok, manager} = OAuthTokenManager.new([
-        storage_key: :test_tokens,
-        client_id: "test_client_id",
-        client_secret: "test_client_secret",
-        token_url: "https://example.com/oauth/token",
-        storage_path: @test_storage_path
-      ])
+      {:ok, manager} =
+        OAuthTokenManager.new(
+          storage_key: :test_tokens,
+          client_id: "test_client_id",
+          client_secret: "test_client_secret",
+          token_url: "https://example.com/oauth/token",
+          storage_path: @test_storage_path
+        )
 
       assert :ok = OAuthTokenManager.close(manager)
     end
@@ -247,13 +255,14 @@ defmodule Server.OAuthTokenManagerTest do
 
   describe "refresh_token/1" do
     setup do
-      {:ok, manager} = OAuthTokenManager.new([
-        storage_key: :test_tokens,
-        client_id: "test_client_id",
-        client_secret: "test_client_secret",
-        token_url: "https://example.com/oauth/token",
-        storage_path: @test_storage_path
-      ])
+      {:ok, manager} =
+        OAuthTokenManager.new(
+          storage_key: :test_tokens,
+          client_id: "test_client_id",
+          client_secret: "test_client_secret",
+          token_url: "https://example.com/oauth/token",
+          storage_path: @test_storage_path
+        )
 
       manager = OAuthTokenManager.load_tokens(manager)
       %{manager: manager}
@@ -283,13 +292,14 @@ defmodule Server.OAuthTokenManagerTest do
 
   describe "validate_token/2" do
     setup do
-      {:ok, manager} = OAuthTokenManager.new([
-        storage_key: :test_tokens,
-        client_id: "test_client_id",
-        client_secret: "test_client_secret",
-        token_url: "https://example.com/oauth/token",
-        storage_path: @test_storage_path
-      ])
+      {:ok, manager} =
+        OAuthTokenManager.new(
+          storage_key: :test_tokens,
+          client_id: "test_client_id",
+          client_secret: "test_client_secret",
+          token_url: "https://example.com/oauth/token",
+          storage_path: @test_storage_path
+        )
 
       manager = OAuthTokenManager.load_tokens(manager)
       %{manager: manager}
@@ -297,7 +307,7 @@ defmodule Server.OAuthTokenManagerTest do
 
     test "returns error when no token is available", %{manager: manager} do
       validate_url = "https://example.com/oauth/validate"
-      
+
       assert {:error, "No token available for validation"} = OAuthTokenManager.validate_token(manager, validate_url)
     end
 

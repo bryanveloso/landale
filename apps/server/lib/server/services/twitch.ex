@@ -145,24 +145,26 @@ defmodule Server.Services.Twitch do
     end
 
     # Initialize OAuth token manager
-    {:ok, token_manager} = OAuthTokenManager.new(
-      storage_key: :twitch_tokens,
-      client_id: client_id,
-      client_secret: client_secret,
-      token_url: "https://id.twitch.tv/oauth2/token",
-      validate_url: "https://id.twitch.tv/oauth2/validate",
-      telemetry_prefix: [:server, :twitch, :oauth]
-    )
+    {:ok, token_manager} =
+      OAuthTokenManager.new(
+        storage_key: :twitch_tokens,
+        client_id: client_id,
+        client_secret: client_secret,
+        token_url: "https://id.twitch.tv/oauth2/token",
+        validate_url: "https://id.twitch.tv/oauth2/validate",
+        telemetry_prefix: [:server, :twitch, :oauth]
+      )
 
     # Load existing tokens
     token_manager = OAuthTokenManager.load_tokens(token_manager)
 
     # Initialize WebSocket client
-    ws_client = WebSocketClient.new(
-      @eventsub_websocket_url,
-      self(),
-      telemetry_prefix: [:server, :twitch, :websocket]
-    )
+    ws_client =
+      WebSocketClient.new(
+        @eventsub_websocket_url,
+        self(),
+        telemetry_prefix: [:server, :twitch, :websocket]
+      )
 
     state = %__MODULE__{
       token_manager: token_manager,
@@ -178,7 +180,7 @@ defmodule Server.Services.Twitch do
         state = %{state | token_manager: updated_manager}
         send(self(), :validate_token)
         {:ok, state}
-        
+
       {:error, _reason} ->
         Logger.info("No valid tokens available, will retry connection later")
         timer = Process.send_after(self(), :retry_connection, @reconnect_interval)
@@ -237,7 +239,7 @@ defmodule Server.Services.Twitch do
             scopes: state.scopes,
             user_id: state.user_id
           }
-          
+
           case EventSubManager.create_subscription(manager_state, event_type, condition, opts) do
             {:ok, subscription} ->
               # Store the subscription and update counters
@@ -272,7 +274,7 @@ defmodule Server.Services.Twitch do
     manager_state = %{
       oauth_client: state.token_manager.oauth_client
     }
-    
+
     case EventSubManager.delete_subscription(manager_state, subscription_id) do
       :ok ->
         # Remove from local state and update counters
@@ -310,7 +312,7 @@ defmodule Server.Services.Twitch do
         state = %{state | token_manager: updated_manager}
         send(self(), :validate_token)
         {:noreply, state}
-        
+
       {:error, reason} ->
         Logger.info("Still no valid tokens available", reason: reason)
         timer = Process.send_after(self(), :retry_connection, @reconnect_interval)
@@ -321,24 +323,29 @@ defmodule Server.Services.Twitch do
   @impl GenServer
   def handle_info(:connect, state) do
     Logger.info("Initiating Twitch WebSocket connection")
-    
+
     case WebSocketClient.connect(state.ws_client) do
       {:ok, updated_client} ->
         state = %{state | ws_client: updated_client}
-        state = update_connection_state(state, %{
-          connection_state: "connecting"
-        })
+
+        state =
+          update_connection_state(state, %{
+            connection_state: "connecting"
+          })
+
         {:noreply, state}
 
       {:error, updated_client, reason} ->
         Logger.error("Twitch WebSocket connection failed", reason: reason)
         state = %{state | ws_client: updated_client}
-        state = update_connection_state(state, %{
-          connected: false,
-          connection_state: "error",
-          last_error: inspect(reason)
-        })
-        
+
+        state =
+          update_connection_state(state, %{
+            connected: false,
+            connection_state: "error",
+            last_error: inspect(reason)
+          })
+
         # Schedule reconnect
         timer = Process.send_after(self(), :connect, @reconnect_interval)
         state = %{state | reconnect_timer: timer}
@@ -369,7 +376,7 @@ defmodule Server.Services.Twitch do
 
       {:error, reason} ->
         Logger.error("Twitch token validation failed", error: reason)
-        
+
         # Try to refresh the token first
         case OAuthTokenManager.refresh_token(state.token_manager) do
           {:ok, updated_manager} ->
@@ -377,7 +384,7 @@ defmodule Server.Services.Twitch do
             state = %{state | token_manager: updated_manager}
             send(self(), :validate_token)
             {:noreply, state}
-            
+
           {:error, refresh_reason} ->
             Logger.error("Token refresh also failed", error: refresh_reason)
             timer = Process.send_after(self(), :retry_connection, @reconnect_interval)
@@ -410,51 +417,55 @@ defmodule Server.Services.Twitch do
   @impl GenServer
   def handle_info({:websocket_connected, client}, state) do
     Logger.info("Twitch WebSocket connection established")
-    
+
     state = %{state | ws_client: client}
-    state = update_connection_state(state, %{
-      connected: true,
-      connection_state: "connected",
-      last_connected: DateTime.utc_now()
-    })
-    
+
+    state =
+      update_connection_state(state, %{
+        connected: true,
+        connection_state: "connected",
+        last_connected: DateTime.utc_now()
+      })
+
     # Publish connection event
     Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_connected, %{}})
-    
+
     {:noreply, state}
   end
-  
+
   @impl GenServer
   def handle_info({:websocket_disconnected, client, reason}, state) do
     Logger.warning("Twitch WebSocket disconnected", reason: reason)
-    
+
     state = %{state | ws_client: client}
-    state = update_connection_state(state, %{
-      connected: false,
-      connection_state: "disconnected",
-      last_error: inspect(reason)
-    })
-    
+
+    state =
+      update_connection_state(state, %{
+        connected: false,
+        connection_state: "disconnected",
+        last_error: inspect(reason)
+      })
+
     # Clear session and subscriptions on disconnect
     state = %{state | session_id: nil, subscriptions: %{}}
-    
+
     # Publish disconnection event
     Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_disconnected, %{reason: reason}})
-    
+
     # Schedule reconnect
     timer = Process.send_after(self(), :connect, @reconnect_interval)
     state = %{state | reconnect_timer: timer}
-    
+
     {:noreply, state}
   end
-  
+
   @impl GenServer
   def handle_info({:websocket_message, client, message}, state) do
     state = %{state | ws_client: client}
     state = handle_eventsub_message(state, message)
     {:noreply, state}
   end
-  
+
   @impl GenServer
   def handle_info({:websocket_reconnect, client}, state) do
     Logger.info("Attempting Twitch WebSocket reconnection")
@@ -466,26 +477,26 @@ defmodule Server.Services.Twitch do
   @impl GenServer
   def terminate(reason, state) do
     Logger.info("Twitch service terminating", reason: reason)
-    
+
     # Close WebSocket connection
     if state.ws_client do
       WebSocketClient.close(state.ws_client)
     end
-    
+
     # Close OAuth token manager
     if state.token_manager do
       OAuthTokenManager.close(state.token_manager)
     end
-    
+
     # Cancel timers
     if state.reconnect_timer do
       Process.cancel_timer(state.reconnect_timer)
     end
-    
+
     if state.token_refresh_timer do
       Process.cancel_timer(state.token_refresh_timer)
     end
-    
+
     :ok
   end
 
@@ -527,11 +538,11 @@ defmodule Server.Services.Twitch do
       scopes: state.scopes,
       user_id: state.user_id
     }
-    
+
     {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
-    
-    Logger.info("Twitch default subscriptions created", 
-      success: success_count, 
+
+    Logger.info("Twitch default subscriptions created",
+      success: success_count,
       failed: failed_count
     )
 
@@ -603,7 +614,7 @@ defmodule Server.Services.Twitch do
         # Token is still valid, check again in 5 minutes
         timer = Process.send_after(self(), :refresh_token, @token_refresh_buffer)
         %{state | token_manager: updated_manager, token_refresh_timer: timer}
-        
+
       {:error, _reason} ->
         # Token needs refresh now
         timer = Process.send_after(self(), :refresh_token, 1000)

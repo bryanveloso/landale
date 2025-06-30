@@ -25,6 +25,7 @@ defmodule Server.WebSocketClientTest do
     test "creates client with custom options" do
       url = "wss://example.com:443/ws"
       owner_pid = self()
+
       opts = [
         reconnect_interval: 10_000,
         connection_timeout: 30_000,
@@ -57,8 +58,8 @@ defmodule Server.WebSocketClientTest do
   describe "connect/2" do
     test "returns ok status when already connected" do
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        conn_pid: :fake_pid
+        WebSocketClient.new("ws://localhost:4455", self())
+        | conn_pid: :fake_pid
       }
 
       assert {:ok, ^client} = WebSocketClient.connect(client)
@@ -66,7 +67,7 @@ defmodule Server.WebSocketClientTest do
 
     # Note: Testing actual connection would require mocking :gun
     # In a full test suite, you would mock :gun.open/3 and related functions
-    
+
     test "attempts connection with correct parameters" do
       client = WebSocketClient.new("ws://localhost:4455", self())
 
@@ -75,9 +76,10 @@ defmodule Server.WebSocketClientTest do
       result = WebSocketClient.connect(client)
 
       case result do
-        {:ok, _updated_client} -> 
+        {:ok, _updated_client} ->
           # Connection succeeded (unlikely in test)
           assert true
+
         {:error, updated_client, _reason} ->
           # Connection failed as expected in test environment
           assert updated_client.url == client.url
@@ -94,9 +96,9 @@ defmodule Server.WebSocketClientTest do
 
     test "handles binary messages" do
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        conn_pid: :fake_pid,
-        stream_ref: :fake_ref
+        WebSocketClient.new("ws://localhost:4455", self())
+        | conn_pid: :fake_pid,
+          stream_ref: :fake_ref
       }
 
       # This would normally call :gun.ws_send, which we can't test without mocking
@@ -108,13 +110,13 @@ defmodule Server.WebSocketClientTest do
 
     test "handles map messages by JSON encoding" do
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        conn_pid: :fake_pid,
-        stream_ref: :fake_ref
+        WebSocketClient.new("ws://localhost:4455", self())
+        | conn_pid: :fake_pid,
+          stream_ref: :fake_ref
       }
 
       message = %{"type" => "test", "data" => "value"}
-      
+
       # This would normally call :gun.ws_send with JSON-encoded data
       result = WebSocketClient.send_message(client, message)
       assert result != nil
@@ -124,10 +126,10 @@ defmodule Server.WebSocketClientTest do
   describe "close/1" do
     test "cleans up connection state" do
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        conn_pid: :fake_pid,
-        stream_ref: :fake_ref,
-        monitor_ref: :fake_monitor
+        WebSocketClient.new("ws://localhost:4455", self())
+        | conn_pid: :fake_pid,
+          stream_ref: :fake_ref,
+          monitor_ref: :fake_monitor
       }
 
       updated_client = WebSocketClient.close(client)
@@ -164,7 +166,7 @@ defmodule Server.WebSocketClientTest do
 
     test "cancels existing timer before scheduling new one" do
       client = WebSocketClient.new("ws://localhost:4455", self())
-      
+
       # Schedule first reconnect
       client_with_timer = WebSocketClient.schedule_reconnect(client)
       first_timer = client_with_timer.reconnect_timer
@@ -184,10 +186,11 @@ defmodule Server.WebSocketClientTest do
   describe "handle_upgrade/2" do
     test "handles successful upgrade with matching stream ref" do
       stream_ref = make_ref()
+
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        stream_ref: stream_ref,
-        connection_start_time: System.monotonic_time(:millisecond)
+        WebSocketClient.new("ws://localhost:4455", self())
+        | stream_ref: stream_ref,
+          connection_start_time: System.monotonic_time(:millisecond)
       }
 
       updated_client = WebSocketClient.handle_upgrade(client, stream_ref)
@@ -201,10 +204,10 @@ defmodule Server.WebSocketClientTest do
     test "ignores upgrade for non-matching stream ref" do
       client_stream_ref = make_ref()
       other_stream_ref = make_ref()
-      
+
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        stream_ref: client_stream_ref
+        WebSocketClient.new("ws://localhost:4455", self())
+        | stream_ref: client_stream_ref
       }
 
       updated_client = WebSocketClient.handle_upgrade(client, other_stream_ref)
@@ -219,9 +222,10 @@ defmodule Server.WebSocketClientTest do
   describe "handle_message/3" do
     test "handles text messages with matching stream ref" do
       stream_ref = make_ref()
+
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        stream_ref: stream_ref
+        WebSocketClient.new("ws://localhost:4455", self())
+        | stream_ref: stream_ref
       }
 
       frame = {:text, "test message"}
@@ -233,9 +237,10 @@ defmodule Server.WebSocketClientTest do
 
     test "handles binary messages with matching stream ref" do
       stream_ref = make_ref()
+
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        stream_ref: stream_ref
+        WebSocketClient.new("ws://localhost:4455", self())
+        | stream_ref: stream_ref
       }
 
       frame = {:binary, <<1, 2, 3>>}
@@ -247,9 +252,10 @@ defmodule Server.WebSocketClientTest do
 
     test "handles close messages with matching stream ref" do
       stream_ref = make_ref()
+
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        stream_ref: stream_ref
+        WebSocketClient.new("ws://localhost:4455", self())
+        | stream_ref: stream_ref
       }
 
       frame = {:close, 1000, "Normal closure"}
@@ -262,10 +268,10 @@ defmodule Server.WebSocketClientTest do
     test "ignores messages for non-matching stream ref" do
       client_stream_ref = make_ref()
       other_stream_ref = make_ref()
-      
+
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        stream_ref: client_stream_ref
+        WebSocketClient.new("ws://localhost:4455", self())
+        | stream_ref: client_stream_ref
       }
 
       frame = {:text, "test message"}
@@ -281,11 +287,11 @@ defmodule Server.WebSocketClientTest do
   describe "handle_connection_failure/2" do
     test "handles connection failure and notifies owner" do
       client = %{
-        WebSocketClient.new("ws://localhost:4455", self()) | 
-        conn_pid: :fake_pid,
-        stream_ref: make_ref(),
-        monitor_ref: make_ref(),
-        connection_start_time: System.monotonic_time(:millisecond)
+        WebSocketClient.new("ws://localhost:4455", self())
+        | conn_pid: :fake_pid,
+          stream_ref: make_ref(),
+          monitor_ref: make_ref(),
+          connection_start_time: System.monotonic_time(:millisecond)
       }
 
       reason = :connection_lost
@@ -293,13 +299,13 @@ defmodule Server.WebSocketClientTest do
 
       # Should notify owner of disconnection
       assert_receive {:websocket_disconnected, disconnected_client, ^reason}
-      
+
       # State should be cleaned up
       assert disconnected_client.conn_pid == nil
       assert disconnected_client.stream_ref == nil
       assert disconnected_client.monitor_ref == nil
       assert disconnected_client.connection_start_time == nil
-      
+
       assert updated_client == disconnected_client
     end
   end

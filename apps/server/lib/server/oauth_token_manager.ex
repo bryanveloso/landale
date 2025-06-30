@@ -460,6 +460,7 @@ defmodule Server.OAuthTokenManager do
       {:error, _reason} -> nil
     end
   end
+
   defp parse_stored_datetime(_), do: nil
 
   defp token_needs_refresh?(token_info, buffer_ms) do
