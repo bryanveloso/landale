@@ -43,7 +43,7 @@ defmodule Server.MixProject do
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
       {:uuid, "~> 1.1"},
-      {:fresh, "~> 0.4.4"}
+      {:gun, "~> 2.0"}
     ]
   end
 
