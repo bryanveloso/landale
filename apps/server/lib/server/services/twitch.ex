@@ -24,6 +24,8 @@ defmodule Server.Services.Twitch do
     :session_id,
     :reconnect_timer,
     :token_refresh_timer,
+    :token_validation_task,
+    :token_refresh_task,
     :token_manager,
     :ws_client,
     :user_id,
@@ -169,7 +171,9 @@ defmodule Server.Services.Twitch do
     state = %__MODULE__{
       token_manager: token_manager,
       ws_client: ws_client,
-      subscriptions: %{}
+      subscriptions: %{},
+      token_validation_task: nil,
+      token_refresh_task: nil
     }
 
     Logger.info("Twitch service starting", client_id: client_id)
@@ -370,7 +374,41 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_info(:validate_token, state) do
-    case OAuthTokenManager.validate_token(state.token_manager, "https://id.twitch.tv/oauth2/validate") do
+    # Cancel any existing validation task
+    if state.token_validation_task do
+      Task.shutdown(state.token_validation_task, :brutal_kill)
+    end
+
+    # Start async token validation
+    task =
+      Task.async(fn ->
+        OAuthTokenManager.validate_token(state.token_manager, "https://id.twitch.tv/oauth2/validate")
+      end)
+
+    {:noreply, %{state | token_validation_task: task}}
+  end
+
+  @impl GenServer
+  def handle_info(:refresh_token, state) do
+    # Cancel any existing refresh task
+    if state.token_refresh_task do
+      Task.shutdown(state.token_refresh_task, :brutal_kill)
+    end
+
+    # Start async token refresh
+    task =
+      Task.async(fn ->
+        OAuthTokenManager.refresh_token(state.token_manager)
+      end)
+
+    {:noreply, %{state | token_refresh_task: task}}
+  end
+
+  # Async task result handlers
+  @impl GenServer
+  def handle_info({ref, result}, %{token_validation_task: %Task{ref: ref}} = state) do
+    # Token validation task completed
+    case result do
       {:ok, token_info, updated_manager} ->
         Logger.info("Twitch token validation successful",
           user_id: token_info["user_id"],
@@ -383,7 +421,8 @@ defmodule Server.Services.Twitch do
           state
           | token_manager: updated_manager,
             user_id: token_info["user_id"],
-            scopes: MapSet.new(token_info["scopes"] || [])
+            scopes: MapSet.new(token_info["scopes"] || []),
+            token_validation_task: nil
         }
 
         send(self(), :connect)
@@ -393,27 +432,19 @@ defmodule Server.Services.Twitch do
         Logger.error("Twitch token validation failed", error: reason)
 
         # Try to refresh the token first
-        case OAuthTokenManager.refresh_token(state.token_manager) do
-          {:ok, updated_manager} ->
-            Logger.info("Token refreshed, retrying validation")
-            state = %{state | token_manager: updated_manager}
-            send(self(), :validate_token)
-            {:noreply, state}
-
-          {:error, refresh_reason} ->
-            Logger.error("Token refresh also failed", error: refresh_reason)
-            timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval())
-            {:noreply, %{state | reconnect_timer: timer}}
-        end
+        state = %{state | token_validation_task: nil}
+        send(self(), :refresh_token)
+        {:noreply, state}
     end
   end
 
   @impl GenServer
-  def handle_info(:refresh_token, state) do
-    case OAuthTokenManager.refresh_token(state.token_manager) do
+  def handle_info({ref, result}, %{token_refresh_task: %Task{ref: ref}} = state) do
+    # Token refresh task completed
+    case result do
       {:ok, updated_manager} ->
         Logger.info("Twitch OAuth tokens refreshed")
-        state = %{state | token_manager: updated_manager}
+        state = %{state | token_manager: updated_manager, token_refresh_task: nil}
         state = schedule_token_refresh(state)
         # Validate new token after successful refresh
         send(self(), :validate_token)
@@ -423,9 +454,26 @@ defmodule Server.Services.Twitch do
         Logger.error("Twitch OAuth token refresh failed", error: reason)
         # Try again in a shorter interval
         timer = Process.send_after(self(), :refresh_token, Server.NetworkConfig.reconnect_interval())
-        state = %{state | token_refresh_timer: timer}
+        state = %{state | token_refresh_timer: timer, token_refresh_task: nil}
         {:noreply, state}
     end
+  end
+
+  # Handle task DOWN messages (task crashed)
+  @impl GenServer
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %{token_validation_task: %Task{ref: ref}} = state) do
+    Logger.error("Token validation task crashed", reason: inspect(reason))
+    # Retry validation after a delay
+    timer = Process.send_after(self(), :validate_token, Server.NetworkConfig.reconnect_interval())
+    {:noreply, %{state | token_validation_task: nil, reconnect_timer: timer}}
+  end
+
+  @impl GenServer
+  def handle_info({:DOWN, ref, :process, _pid, reason}, %{token_refresh_task: %Task{ref: ref}} = state) do
+    Logger.error("Token refresh task crashed", reason: inspect(reason))
+    # Retry refresh after a delay
+    timer = Process.send_after(self(), :refresh_token, Server.NetworkConfig.reconnect_interval())
+    {:noreply, %{state | token_refresh_task: nil, token_refresh_timer: timer}}
   end
 
   # WebSocketClient event handlers
@@ -529,6 +577,15 @@ defmodule Server.Services.Twitch do
         error ->
           Logger.warning("Error closing OAuth token manager", error: inspect(error))
       end
+    end
+
+    # Cancel async tasks
+    if state.token_validation_task do
+      Task.shutdown(state.token_validation_task, :brutal_kill)
+    end
+
+    if state.token_refresh_task do
+      Task.shutdown(state.token_refresh_task, :brutal_kill)
     end
 
     # Cancel timers with validation
