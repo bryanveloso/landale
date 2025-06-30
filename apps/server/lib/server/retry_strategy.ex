@@ -211,7 +211,7 @@ defmodule Server.RetryStrategy do
     end
   rescue
     exception ->
-      reason = {exception.__struct__, exception.message}
+      reason = {exception.__struct__, Exception.message(exception)}
 
       if attempt < config.max_attempts and should_retry?(reason, config) do
         delay = calculate_delay(attempt, config)
