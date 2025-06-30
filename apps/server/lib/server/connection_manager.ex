@@ -355,8 +355,28 @@ defmodule Server.ConnectionManager do
       connections: map_size(state.connections)
     )
 
-    # Cancel all timers
-    Enum.each(state.timers, fn {label, timer_ref} ->
+    # Create immutable snapshots to prevent race conditions during iteration
+    timers_snapshot = Map.to_list(state.timers)
+    connections_snapshot = Map.to_list(state.connections)
+    monitors_snapshot = Map.to_list(state.monitors)
+
+    # Cancel all timers atomically
+    cleanup_timers(timers_snapshot)
+
+    # Close all connections with timeout protection
+    cleanup_connections(connections_snapshot)
+
+    # Demonitor all processes atomically
+    cleanup_monitors(monitors_snapshot)
+
+    Logger.debug("Resource cleanup completed")
+    :ok
+  end
+
+  # Private cleanup functions with atomic operations
+
+  defp cleanup_timers(timers_list) do
+    Enum.each(timers_list, fn {label, timer_ref} ->
       case Process.cancel_timer(timer_ref) do
         false ->
           Logger.debug("Timer already expired during cleanup", label: label)
@@ -365,25 +385,36 @@ defmodule Server.ConnectionManager do
           Logger.debug("Cancelled timer during cleanup", label: label, time_left: time_left)
       end
     end)
+  end
 
-    # Close all connections
-    Enum.each(state.connections, fn {label, {conn_pid, _stream_ref}} ->
-      if Process.alive?(conn_pid) do
-        try do
-          :gun.close(conn_pid)
-          Logger.debug("Closed connection during cleanup", label: label)
-        rescue
-          error ->
-            Logger.warning("Error closing connection during cleanup",
-              label: label,
-              error: inspect(error)
-            )
-        end
-      end
-    end)
+  defp cleanup_connections(connections_list) do
+    # Use Task.async_stream with timeout for parallel cleanup with bounded time
+    connections_list
+    |> Task.async_stream(
+      fn {label, {conn_pid, _stream_ref}} ->
+        cleanup_single_connection(label, conn_pid)
+      end,
+      timeout: 5_000,
+      on_timeout: :kill_task,
+      max_concurrency: System.schedulers_online()
+    )
+    |> Stream.run()
+  end
 
-    # Demonitor all processes
-    Enum.each(state.monitors, fn {monitor_ref, {pid, label}} ->
+  defp cleanup_single_connection(label, conn_pid) do
+    # Direct call without Process.alive? check - Gun handles dead processes gracefully
+    :gun.close(conn_pid)
+    Logger.debug("Closed connection during cleanup", label: label)
+  rescue
+    error ->
+      Logger.warning("Error closing connection during cleanup",
+        label: label,
+        error: inspect(error)
+      )
+  end
+
+  defp cleanup_monitors(monitors_list) do
+    Enum.each(monitors_list, fn {monitor_ref, {pid, label}} ->
       case Process.demonitor(monitor_ref, [:flush]) do
         true ->
           Logger.debug("Removed monitor during cleanup", label: label, pid: inspect(pid))
@@ -392,9 +423,6 @@ defmodule Server.ConnectionManager do
           Logger.debug("Monitor already removed during cleanup", label: label)
       end
     end)
-
-    Logger.debug("Resource cleanup completed")
-    :ok
   end
 
   @doc """
