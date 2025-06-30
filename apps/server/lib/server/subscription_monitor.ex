@@ -435,9 +435,24 @@ defmodule Server.SubscriptionMonitor do
   end
 
   @impl true
-  def terminate(_reason, state) do
+  def terminate(reason, state) do
+    Logger.info("SubscriptionMonitor terminating", reason: reason)
+
+    # Cancel timers
     if state.cleanup_timer, do: Process.cancel_timer(state.cleanup_timer)
     if state.health_timer, do: Process.cancel_timer(state.health_timer)
+
+    # Clean up ETS table
+    if state.subscriptions do
+      try do
+        :ets.delete(state.subscriptions)
+        Logger.debug("ETS table cleaned up during termination")
+      rescue
+        error ->
+          Logger.warning("Error cleaning up ETS table", error: inspect(error))
+      end
+    end
+
     :ok
   end
 

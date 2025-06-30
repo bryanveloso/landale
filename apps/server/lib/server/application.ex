@@ -8,22 +8,35 @@ defmodule Server.Application do
 
   @impl true
   def start(_type, _args) do
-    # Set up graceful shutdown handling for Docker
-    setup_signal_handlers()
+    # Set up graceful shutdown handling for Docker (skip in test environment)
+    if Mix.env() != :test do
+      setup_signal_handlers()
+    end
 
-    children = [
+    # Base children for all environments
+    base_children = [
       ServerWeb.Telemetry,
       Server.Repo,
       {DNSCluster, query: Application.get_env(:server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Server.PubSub},
-      # Subscription monitoring
-      Server.SubscriptionMonitor,
-      # Services
-      Server.Services.OBS,
-      Server.Services.Twitch,
       # Start to serve requests, typically the last entry
       ServerWeb.Endpoint
     ]
+
+    # Add production services only in non-test environments
+    children =
+      if Mix.env() == :test do
+        base_children
+      else
+        base_children ++
+          [
+            # Subscription monitoring
+            Server.SubscriptionMonitor,
+            # Services
+            Server.Services.OBS,
+            Server.Services.Twitch
+          ]
+      end
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

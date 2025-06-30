@@ -55,6 +55,7 @@ defmodule Server.Services.OBS do
     :stats_timer,
     :reconnect_timer,
     :pending_requests,
+    :connection_manager,
     uri: nil,
     state: %{
       connection: %{
@@ -335,7 +336,8 @@ defmodule Server.Services.OBS do
 
     state = %__MODULE__{
       uri: uri,
-      pending_requests: %{}
+      pending_requests: %{},
+      connection_manager: Server.ConnectionManager.init_connection_state()
     }
 
     Logger.info("OBS service starting", url: url)
@@ -398,9 +400,17 @@ defmodule Server.Services.OBS do
         {:noreply, new_state}
 
       {:error, new_state} ->
-        # Schedule reconnect
+        # Schedule reconnect with ConnectionManager tracking
         timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
-        new_state = %{new_state | reconnect_timer: timer}
+
+        updated_connection_manager =
+          Server.ConnectionManager.add_timer(
+            new_state.connection_manager,
+            timer,
+            :reconnect
+          )
+
+        new_state = %{new_state | reconnect_timer: timer, connection_manager: updated_connection_manager}
         {:noreply, new_state}
     end
   end
@@ -489,9 +499,17 @@ defmodule Server.Services.OBS do
       # Publish disconnection event
       Server.Events.publish_obs_event("connection_lost", %{})
 
-      # Schedule reconnect
+      # Schedule reconnect with ConnectionManager tracking
       timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
-      state = %{state | reconnect_timer: timer}
+
+      updated_connection_manager =
+        Server.ConnectionManager.add_timer(
+          state.connection_manager,
+          timer,
+          :reconnect
+        )
+
+      state = %{state | reconnect_timer: timer, connection_manager: updated_connection_manager}
 
       {:noreply, state}
     else
@@ -516,9 +534,17 @@ defmodule Server.Services.OBS do
         })
         |> cleanup_connection()
 
-      # Schedule reconnect
+      # Schedule reconnect with ConnectionManager tracking
       timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
-      state = %{state | reconnect_timer: timer}
+
+      updated_connection_manager =
+        Server.ConnectionManager.add_timer(
+          state.connection_manager,
+          timer,
+          :reconnect
+        )
+
+      state = %{state | reconnect_timer: timer, connection_manager: updated_connection_manager}
 
       {:noreply, state}
     else
@@ -542,9 +568,17 @@ defmodule Server.Services.OBS do
         })
         |> cleanup_connection()
 
-      # Schedule reconnect
+      # Schedule reconnect with ConnectionManager tracking
       timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
-      state = %{state | reconnect_timer: timer}
+
+      updated_connection_manager =
+        Server.ConnectionManager.add_timer(
+          state.connection_manager,
+          timer,
+          :reconnect
+        )
+
+      state = %{state | reconnect_timer: timer, connection_manager: updated_connection_manager}
 
       {:noreply, state}
     else
@@ -553,13 +587,23 @@ defmodule Server.Services.OBS do
   end
 
   @impl GenServer
-  def handle_info({:DOWN, _ref, :process, pid, reason}, state) do
+  def handle_info({:DOWN, ref, :process, pid, reason}, state) do
+    # Use ConnectionManager to handle monitor DOWN message
+    updated_connection_manager =
+      Server.ConnectionManager.handle_monitor_down(
+        state.connection_manager,
+        ref,
+        pid,
+        reason
+      )
+
     if pid == state.conn_pid do
       Logger.info("OBS connection process terminated", reason: reason)
 
       # Update connection state and schedule reconnect
       state =
-        update_connection_state(state, %{
+        %{state | connection_manager: updated_connection_manager}
+        |> update_connection_state(%{
           connected: false,
           connection_state: "disconnected"
         })
@@ -571,11 +615,21 @@ defmodule Server.Services.OBS do
 
       # Schedule reconnect
       timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
-      state = %{state | reconnect_timer: timer}
+
+      # Track reconnect timer with ConnectionManager
+      final_connection_manager =
+        Server.ConnectionManager.add_timer(
+          state.connection_manager,
+          timer,
+          :reconnect
+        )
+
+      state = %{state | reconnect_timer: timer, connection_manager: final_connection_manager}
 
       {:noreply, state}
     else
-      {:noreply, state}
+      # Still update connection manager state for other monitored processes
+      {:noreply, %{state | connection_manager: updated_connection_manager}}
     end
   end
 
@@ -589,18 +643,9 @@ defmodule Server.Services.OBS do
   def terminate(_reason, state) do
     Logger.info("OBS service terminating")
 
-    # Cancel timers
-    if state.stats_timer do
-      Process.cancel_timer(state.stats_timer)
-    end
-
-    if state.reconnect_timer do
-      Process.cancel_timer(state.reconnect_timer)
-    end
-
-    # Close WebSocket connection
-    if state.conn_pid do
-      :gun.close(state.conn_pid)
+    # Use ConnectionManager for comprehensive cleanup
+    if state.connection_manager do
+      Server.ConnectionManager.cleanup_all(state.connection_manager)
     end
 
     :ok
@@ -618,8 +663,13 @@ defmodule Server.Services.OBS do
 
     case :gun.open(host, port) do
       {:ok, conn_pid} ->
-        # Monitor the connection
-        Process.monitor(conn_pid)
+        # Use ConnectionManager to track monitor and connection
+        {_monitor_ref, updated_connection_manager} =
+          Server.ConnectionManager.add_monitor(
+            state.connection_manager,
+            conn_pid,
+            :obs_connection
+          )
 
         websocket_config = Server.NetworkConfig.websocket_config()
 
@@ -634,8 +684,17 @@ defmodule Server.Services.OBS do
               path: path
             )
 
+            # Track connection with ConnectionManager
+            final_connection_manager =
+              Server.ConnectionManager.add_connection(
+                updated_connection_manager,
+                conn_pid,
+                stream_ref,
+                :obs_websocket
+              )
+
             new_state =
-              %{state | conn_pid: conn_pid, stream_ref: stream_ref}
+              %{state | conn_pid: conn_pid, stream_ref: stream_ref, connection_manager: final_connection_manager}
               |> update_connection_state(%{
                 connected: false,
                 connection_state: "connecting"
@@ -853,15 +912,27 @@ defmodule Server.Services.OBS do
   # Stats polling
   defp start_stats_polling(state) do
     timer = Process.send_after(self(), :poll_stats, @stats_polling_interval)
-    %{state | stats_timer: timer}
+
+    # Track timer with ConnectionManager
+    updated_connection_manager =
+      Server.ConnectionManager.add_timer(
+        state.connection_manager,
+        timer,
+        :stats_polling
+      )
+
+    %{state | stats_timer: timer, connection_manager: updated_connection_manager}
   end
 
   defp stop_stats_polling(state) do
-    if state.stats_timer do
-      Process.cancel_timer(state.stats_timer)
-    end
+    # Use ConnectionManager to cancel timer properly
+    updated_connection_manager =
+      Server.ConnectionManager.cancel_timer(
+        state.connection_manager,
+        :stats_polling
+      )
 
-    %{state | stats_timer: nil}
+    %{state | stats_timer: nil, connection_manager: updated_connection_manager}
   end
 
   defp request_obs_stats(state) do

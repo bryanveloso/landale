@@ -118,11 +118,16 @@ defmodule ServerWeb.Telemetry do
   end
 
   defp periodic_measurements do
-    [
-      # Service status measurements
-      {Server.Telemetry, :measure_obs_status, []},
-      {Server.Telemetry, :measure_twitch_status, []},
-      {Server.Telemetry, :measure_system_health, []}
-    ]
+    # Only measure services in non-test environments
+    if Mix.env() == :test do
+      []
+    else
+      [
+        # Service status measurements
+        {Server.Telemetry, :measure_obs_status, []},
+        {Server.Telemetry, :measure_twitch_status, []},
+        {Server.Telemetry, :measure_system_health, []}
+      ]
+    end
   end
 end

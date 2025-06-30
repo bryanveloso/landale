@@ -51,7 +51,8 @@ defmodule Server.WebSocketClient do
           reconnect_timer: reference() | nil,
           reconnect_interval: integer(),
           connection_timeout: integer(),
-          telemetry_prefix: [atom()]
+          telemetry_prefix: [atom()],
+          connection_manager: Server.ConnectionManager.connection_state()
         }
 
   # Network configuration is now handled by Server.NetworkConfig
@@ -85,7 +86,8 @@ defmodule Server.WebSocketClient do
       reconnect_timer: nil,
       reconnect_interval: Keyword.get(opts, :reconnect_interval, Server.NetworkConfig.reconnect_interval()),
       connection_timeout: Keyword.get(opts, :connection_timeout, Server.NetworkConfig.connection_timeout()),
-      telemetry_prefix: Keyword.get(opts, :telemetry_prefix, [:server, :websocket])
+      telemetry_prefix: Keyword.get(opts, :telemetry_prefix, [:server, :websocket]),
+      connection_manager: Server.ConnectionManager.init_connection_state()
     }
   end
 
@@ -122,8 +124,13 @@ defmodule Server.WebSocketClient do
 
       case :gun.open(host, port, gun_opts(client.uri.scheme)) do
         {:ok, conn_pid} ->
-          # Monitor the connection process
-          monitor_ref = Process.monitor(conn_pid)
+          # Use ConnectionManager to track monitor and connection
+          {monitor_ref, updated_connection_manager} =
+            Server.ConnectionManager.add_monitor(
+              client.connection_manager,
+              conn_pid,
+              :websocket_connection
+            )
 
           websocket_config = Server.NetworkConfig.websocket_config()
 
@@ -141,7 +148,22 @@ defmodule Server.WebSocketClient do
                 stream_ref: inspect(stream_ref)
               )
 
-              updated_client = %{client | conn_pid: conn_pid, stream_ref: stream_ref, monitor_ref: monitor_ref}
+              # Track connection and update client state
+              final_connection_manager =
+                Server.ConnectionManager.add_connection(
+                  updated_connection_manager,
+                  conn_pid,
+                  stream_ref,
+                  :websocket
+                )
+
+              updated_client = %{
+                client
+                | conn_pid: conn_pid,
+                  stream_ref: stream_ref,
+                  monitor_ref: monitor_ref,
+                  connection_manager: final_connection_manager
+              }
 
               {:ok, updated_client}
 
@@ -209,15 +231,8 @@ defmodule Server.WebSocketClient do
     # Cancel reconnect timer if active
     client = cancel_reconnect_timer(client)
 
-    # Close Gun connection
-    if client.conn_pid do
-      :gun.close(client.conn_pid)
-    end
-
-    # Clean up monitor
-    if client.monitor_ref do
-      Process.demonitor(client.monitor_ref, [:flush])
-    end
+    # Use ConnectionManager for proper cleanup
+    Server.ConnectionManager.cleanup_all(client.connection_manager)
 
     %{client | conn_pid: nil, stream_ref: nil, monitor_ref: nil, connection_start_time: nil}
   end
@@ -241,7 +256,16 @@ defmodule Server.WebSocketClient do
     )
 
     timer = Process.send_after(client.owner_pid, {:websocket_reconnect, client}, client.reconnect_interval)
-    %{client | reconnect_timer: timer}
+
+    # Track timer with ConnectionManager
+    updated_connection_manager =
+      Server.ConnectionManager.add_timer(
+        client.connection_manager,
+        timer,
+        :reconnect
+      )
+
+    %{client | reconnect_timer: timer, connection_manager: updated_connection_manager}
   end
 
   @doc """
@@ -346,11 +370,14 @@ defmodule Server.WebSocketClient do
   defp gun_opts(_), do: %{}
 
   defp cancel_reconnect_timer(client) do
-    if client.reconnect_timer do
-      Process.cancel_timer(client.reconnect_timer)
-    end
+    # Use ConnectionManager to cancel timer properly
+    updated_connection_manager =
+      Server.ConnectionManager.cancel_timer(
+        client.connection_manager,
+        :reconnect
+      )
 
-    %{client | reconnect_timer: nil}
+    %{client | reconnect_timer: nil, connection_manager: updated_connection_manager}
   end
 
   defp emit_connection_failure(client, reason) do

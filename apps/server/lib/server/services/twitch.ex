@@ -461,6 +461,11 @@ defmodule Server.Services.Twitch do
         last_error: inspect(reason)
       })
 
+    # Clean up subscriptions from monitor before clearing local state
+    Enum.each(state.subscriptions, fn {subscription_id, _subscription} ->
+      Server.SubscriptionMonitor.untrack_subscription(subscription_id)
+    end)
+
     # Clear session and subscriptions on disconnect
     state = %{state | session_id: nil, subscriptions: %{}}
 
@@ -493,23 +498,39 @@ defmodule Server.Services.Twitch do
   def terminate(reason, state) do
     Logger.info("Twitch service terminating", reason: reason)
 
+    # Clean up all tracked subscriptions from monitor
+    Enum.each(state.subscriptions, fn {subscription_id, _subscription} ->
+      Server.SubscriptionMonitor.untrack_subscription(subscription_id)
+    end)
+
     # Close WebSocket connection
     if state.ws_client do
       WebSocketClient.close(state.ws_client)
     end
 
-    # Close OAuth token manager
+    # Close OAuth token manager with error handling
     if state.token_manager do
-      OAuthTokenManager.close(state.token_manager)
+      try do
+        OAuthTokenManager.close(state.token_manager)
+      rescue
+        error ->
+          Logger.warning("Error closing OAuth token manager", error: inspect(error))
+      end
     end
 
-    # Cancel timers
+    # Cancel timers with validation
     if state.reconnect_timer do
-      Process.cancel_timer(state.reconnect_timer)
+      case Process.cancel_timer(state.reconnect_timer) do
+        false -> Logger.debug("Reconnect timer already expired")
+        _time_left -> Logger.debug("Cancelled reconnect timer")
+      end
     end
 
     if state.token_refresh_timer do
-      Process.cancel_timer(state.token_refresh_timer)
+      case Process.cancel_timer(state.token_refresh_timer) do
+        false -> Logger.debug("Token refresh timer already expired")
+        _time_left -> Logger.debug("Cancelled token refresh timer")
+      end
     end
 
     :ok
