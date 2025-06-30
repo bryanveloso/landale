@@ -56,8 +56,8 @@ config :server, dev_routes: true
 # OBS WebSocket configuration
 config :server, :obs_websocket_url, "ws://demi:4455"
 
-# Do not include metadata nor timestamps in development logs
-config :logger, :console, format: "[$level] $message\n"
+# Do not include metadata nor timestamps in development logs  
+config :logger, :console, format: "[$level] $message\n", level: :debug
 
 # Set a higher stacktrace during development. Avoid configuring such
 # in production as building large stacktraces may be expensive.

@@ -43,7 +43,9 @@ defmodule Server.MixProject do
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
       {:uuid, "~> 1.1"},
-      {:gun, "~> 2.0"}
+      {:gun, "~> 2.0"},
+      {:dotenvy, "~> 1.0.0"},
+      {:oauth2, "~> 2.1"}
     ]
   end
 

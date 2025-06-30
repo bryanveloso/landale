@@ -1,4 +1,27 @@
 import Config
+import Dotenvy
+
+# Load environment variables from .env files and system environment
+# Manual .env parsing since dotenvy seems to have issues
+
+if File.exists?(".env") do
+  File.read!(".env")
+  |> String.split("\n")
+  |> Enum.filter(fn line -> 
+    line = String.trim(line)
+    line != "" and not String.starts_with?(line, "#")
+  end)
+  |> Enum.each(fn line ->
+    case String.split(line, "=", parts: 2) do
+      [key, value] ->
+        key = String.trim(key)
+        value = String.trim(value)
+        System.put_env(key, value)
+      _ ->
+        :ok
+    end
+  end)
+end
 
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
@@ -6,6 +29,12 @@ import Config
 # and secrets from environment variables or elsewhere. Do not define
 # any compile-time configuration in here, as it won't be applied.
 # The block below contains prod specific runtime configuration.
+
+# Twitch EventSub configuration (loaded from .env for all environments)
+config :server,
+  twitch_client_id: System.get_env("TWITCH_CLIENT_ID"),
+  twitch_client_secret: System.get_env("TWITCH_CLIENT_SECRET"),
+  twitch_user_id: System.get_env("TWITCH_USER_ID")
 
 # ## Using releases
 #
