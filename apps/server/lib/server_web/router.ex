@@ -14,6 +14,7 @@ defmodule ServerWeb.Router do
 
     # Health and system status
     get "/health", HealthController, :detailed
+    get "/health/subscriptions", HealthController, :subscriptions
 
     # OBS controls
     get "/obs/status", OBSController, :status

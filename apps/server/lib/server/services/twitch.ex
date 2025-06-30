@@ -246,6 +246,18 @@ defmodule Server.Services.Twitch do
               new_subscriptions = Map.put(state.subscriptions, subscription["id"], subscription)
               cost = subscription["cost"] || 1
 
+              # Track subscription in monitor
+              Server.SubscriptionMonitor.track_subscription(
+                subscription["id"],
+                event_type,
+                %{
+                  service: :twitch,
+                  user_id: state.user_id,
+                  cost: cost,
+                  condition: condition
+                }
+              )
+
               new_state = %{
                 state
                 | subscriptions: new_subscriptions,
@@ -280,6 +292,9 @@ defmodule Server.Services.Twitch do
         # Remove from local state and update counters
         deleted_subscription = Map.get(state.subscriptions, subscription_id)
         cost = if deleted_subscription, do: deleted_subscription["cost"] || 1, else: 0
+
+        # Untrack subscription from monitor
+        Server.SubscriptionMonitor.untrack_subscription(subscription_id)
 
         new_subscriptions = Map.delete(state.subscriptions, subscription_id)
 
@@ -568,6 +583,11 @@ defmodule Server.Services.Twitch do
       event_type: event_type,
       subscription_id: subscription_id
     )
+
+    # Record event reception in subscription monitor
+    if subscription_id do
+      Server.SubscriptionMonitor.record_event_received(subscription_id)
+    end
 
     # Process the event using EventHandler module
     EventHandler.process_event(event_type, event_data)
