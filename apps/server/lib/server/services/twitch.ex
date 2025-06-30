@@ -50,26 +50,87 @@ defmodule Server.Services.Twitch do
   ]
 
   # Client API
+
+  @doc """
+  Starts the Twitch EventSub service GenServer.
+
+  ## Parameters
+  - `opts` - Keyword list of options (optional)
+    - `:client_id` - Twitch application client ID
+    - `:client_secret` - Twitch application client secret
+
+  ## Returns
+  - `{:ok, pid}` on success
+  - `{:error, reason}` on failure
+  """
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
+  @doc """
+  Gets the current internal state of the Twitch service.
+
+  ## Returns
+  - Map containing connection, subscriptions, and EventSub state
+  """
+  @spec get_state() :: map()
   def get_state do
     GenServer.call(__MODULE__, :get_state)
   end
 
+  @doc """
+  Gets the current status of the Twitch service.
+
+  ## Returns
+  - `{:ok, status}` where status contains connection and subscription information
+  - `{:error, reason}` if service is unavailable
+  """
+  @spec get_status() :: {:ok, map()} | {:error, binary()}
   def get_status do
     GenServer.call(__MODULE__, :get_status)
   end
 
+  @doc """
+  Creates a new Twitch EventSub subscription.
+
+  ## Parameters
+  - `event_type` - The EventSub event type (e.g. "channel.update")
+  - `condition` - Map of conditions for the subscription
+  - `opts` - Additional options (optional)
+
+  ## Returns
+  - `{:ok, subscription}` on success
+  - `{:error, reason}` if creation fails or limits exceeded
+  """
+  @spec create_subscription(binary(), map(), keyword()) :: {:ok, map()} | {:error, binary()}
   def create_subscription(event_type, condition, opts \\ []) do
     GenServer.call(__MODULE__, {:create_subscription, event_type, condition, opts})
   end
 
+  @doc """
+  Deletes an existing Twitch EventSub subscription.
+
+  ## Parameters
+  - `subscription_id` - The ID of the subscription to delete
+
+  ## Returns
+  - `:ok` on success
+  - `{:error, reason}` if deletion fails
+  """
+  @spec delete_subscription(binary()) :: :ok | {:error, binary()}
   def delete_subscription(subscription_id) do
     GenServer.call(__MODULE__, {:delete_subscription, subscription_id})
   end
 
+  @doc """
+  Lists all active Twitch EventSub subscriptions.
+
+  ## Returns
+  - `{:ok, subscriptions}` where subscriptions is a list of subscription maps
+  - `{:error, reason}` if service is unavailable
+  """
+  @spec list_subscriptions() :: {:ok, list(map())} | {:error, binary()}
   def list_subscriptions do
     GenServer.call(__MODULE__, :list_subscriptions)
   end

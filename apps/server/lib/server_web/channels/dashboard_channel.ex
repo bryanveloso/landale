@@ -1,25 +1,52 @@
 defmodule ServerWeb.DashboardChannel do
+  @moduledoc """
+  Phoenix Channel for real-time dashboard communication.
+
+  Handles WebSocket connections from the React dashboard frontend,
+  providing real-time updates for OBS status, system health, and
+  performance metrics.
+
+  ## Events Subscribed To
+  - `obs:events` - OBS WebSocket state changes and events
+  - `system:health` - System health status updates
+  - `system:performance` - Performance metrics updates
+
+  ## Events Sent to Client
+  - `initial_state` - Current system state on connection
+  - `obs_event` - OBS-related events (streaming, recording, scenes)
+  - `health_update` - System health status changes
+  - `performance_update` - Performance metrics updates
+
+  ## Incoming Commands
+  - `obs:get_status` - Request current OBS status
+  - `obs:start_streaming` - Start OBS streaming
+  - `obs:stop_streaming` - Stop OBS streaming
+  - `obs:start_recording` - Start OBS recording
+  - `obs:stop_recording` - Stop OBS recording
+  - `obs:set_current_scene` - Change OBS scene
+  """
+
   use ServerWeb, :channel
 
   require Logger
 
   @impl true
   def join("dashboard:" <> room_id, _payload, socket) do
-    Logger.info("Dashboard channel joined", 
-      room_id: room_id, 
+    Logger.info("Dashboard channel joined",
+      room_id: room_id,
       correlation_id: socket.assigns.correlation_id
     )
-    
+
     socket = assign(socket, :room_id, room_id)
-    
+
     # Subscribe to relevant PubSub topics for real-time updates
     Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
     Phoenix.PubSub.subscribe(Server.PubSub, "system:health")
     Phoenix.PubSub.subscribe(Server.PubSub, "system:performance")
-    
+
     # Send initial state
     send(self(), :send_initial_state)
-    
+
     {:ok, socket}
   end
 
@@ -30,7 +57,7 @@ defmodule ServerWeb.DashboardChannel do
       connected: true,
       timestamp: System.system_time(:second)
     })
-    
+
     {:noreply, socket}
   end
 
@@ -59,7 +86,7 @@ defmodule ServerWeb.DashboardChannel do
     case Server.Services.OBS.get_status() do
       {:ok, status} ->
         {:reply, {:ok, status}, socket}
-      
+
       {:error, reason} ->
         {:reply, {:error, %{message: reason}}, socket}
     end
@@ -70,7 +97,7 @@ defmodule ServerWeb.DashboardChannel do
     case Server.Services.OBS.start_streaming() do
       :ok ->
         {:reply, {:ok, %{success: true}}, socket}
-      
+
       {:error, reason} ->
         {:reply, {:error, %{message: reason}}, socket}
     end
@@ -81,7 +108,7 @@ defmodule ServerWeb.DashboardChannel do
     case Server.Services.OBS.stop_streaming() do
       :ok ->
         {:reply, {:ok, %{success: true}}, socket}
-      
+
       {:error, reason} ->
         {:reply, {:error, %{message: reason}}, socket}
     end
@@ -92,7 +119,7 @@ defmodule ServerWeb.DashboardChannel do
     case Server.Services.OBS.start_recording() do
       :ok ->
         {:reply, {:ok, %{success: true}}, socket}
-      
+
       {:error, reason} ->
         {:reply, {:error, %{message: reason}}, socket}
     end
@@ -103,7 +130,7 @@ defmodule ServerWeb.DashboardChannel do
     case Server.Services.OBS.stop_recording() do
       :ok ->
         {:reply, {:ok, %{success: true}}, socket}
-      
+
       {:error, reason} ->
         {:reply, {:error, %{message: reason}}, socket}
     end
@@ -114,7 +141,7 @@ defmodule ServerWeb.DashboardChannel do
     case Server.Services.OBS.set_current_scene(scene_name) do
       :ok ->
         {:reply, {:ok, %{success: true}}, socket}
-      
+
       {:error, reason} ->
         {:reply, {:error, %{message: reason}}, socket}
     end
@@ -123,12 +150,12 @@ defmodule ServerWeb.DashboardChannel do
   # Catch-all for unhandled messages
   @impl true
   def handle_in(event, payload, socket) do
-    Logger.warning("Unhandled dashboard channel message", 
-      event: event, 
+    Logger.warning("Unhandled dashboard channel message",
+      event: event,
       payload: payload,
       correlation_id: socket.assigns.correlation_id
     )
-    
+
     {:reply, {:error, %{message: "Unknown event: #{event}"}}, socket}
   end
 end
