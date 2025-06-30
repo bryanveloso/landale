@@ -27,6 +27,8 @@ defmodule Server.Services.Twitch do
     :token_table,
     :oauth_client,
     :pending_subscriptions,
+    :user_id,
+    :scopes,
     subscriptions: %{},
     state: %{
       connection: %{
@@ -37,7 +39,9 @@ defmodule Server.Services.Twitch do
         session_id: nil
       },
       subscription_total_cost: 0,
-      subscription_max_cost: 10000  # Twitch default
+      subscription_max_cost: 10,  # Twitch limit per connection
+      subscription_count: 0,
+      subscription_max_count: 300  # Twitch limit per WebSocket connection
     }
   ]
 
@@ -52,6 +56,18 @@ defmodule Server.Services.Twitch do
 
   def get_status do
     GenServer.call(__MODULE__, :get_status)
+  end
+
+  def create_subscription(event_type, condition, opts \\ []) do
+    GenServer.call(__MODULE__, {:create_subscription, event_type, condition, opts})
+  end
+
+  def delete_subscription(subscription_id) do
+    GenServer.call(__MODULE__, {:delete_subscription, subscription_id})
+  end
+
+  def list_subscriptions do
+    GenServer.call(__MODULE__, :list_subscriptions)
   end
 
   # GenServer callbacks
@@ -112,6 +128,80 @@ defmodule Server.Services.Twitch do
       subscription_cost: state.state.subscription_total_cost
     }
     {:reply, {:ok, status}, state}
+  end
+
+  @impl GenServer
+  def handle_call({:create_subscription, event_type, condition, opts}, _from, state) do
+    if state.state.connection.connected && state.session_id do
+      # Check subscription limits before creating
+      if state.state.subscription_count >= state.state.subscription_max_count do
+        {:reply, {:error, "Subscription count limit exceeded (#{state.state.subscription_max_count})"}, state}
+      else
+        # Check for duplicate subscription
+        existing_key = generate_subscription_key(event_type, condition)
+        existing_subscription = Enum.find(state.subscriptions, fn {_id, sub} ->
+          generate_subscription_key(sub["type"], sub["condition"]) == existing_key
+        end)
+        
+        if existing_subscription do
+          {id, subscription} = existing_subscription
+          Logger.warning("Duplicate subscription attempt", 
+            event_type: event_type,
+            existing_id: id,
+            condition: condition
+          )
+          {:reply, {:ok, subscription}, state}
+        else
+          case create_eventsub_subscription(state, event_type, condition, opts) do
+            {:ok, subscription} ->
+              # Store the subscription and update counters
+              new_subscriptions = Map.put(state.subscriptions, subscription["id"], subscription)
+              cost = subscription["cost"] || 1
+              new_state = %{state | 
+                subscriptions: new_subscriptions,
+                state: %{state.state |
+                  subscription_total_cost: state.state.subscription_total_cost + cost,
+                  subscription_count: state.state.subscription_count + 1
+                }
+              }
+              {:reply, {:ok, subscription}, new_state}
+            
+            {:error, reason} ->
+              {:reply, {:error, reason}, state}
+          end
+        end
+      end
+    else
+      {:reply, {:error, "WebSocket not connected"}, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_call({:delete_subscription, subscription_id}, _from, state) do
+    case delete_eventsub_subscription(state, subscription_id) do
+      :ok ->
+        # Remove from local state and update counters
+        deleted_subscription = Map.get(state.subscriptions, subscription_id)
+        cost = if deleted_subscription, do: deleted_subscription["cost"] || 1, else: 0
+        
+        new_subscriptions = Map.delete(state.subscriptions, subscription_id)
+        new_state = %{state | 
+          subscriptions: new_subscriptions,
+          state: %{state.state |
+            subscription_total_cost: max(0, state.state.subscription_total_cost - cost),
+            subscription_count: max(0, state.state.subscription_count - 1)
+          }
+        }
+        {:reply, :ok, new_state}
+      
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_call(:list_subscriptions, _from, state) do
+    {:reply, {:ok, state.subscriptions}, state}
   end
 
   @impl GenServer
@@ -222,8 +312,19 @@ defmodule Server.Services.Twitch do
   @impl GenServer
   def handle_info(:validate_token, state) do
     case validate_twitch_token(state.oauth_client.token.access_token) do
-      {:ok, _token_info} ->
-        Logger.info("Twitch token validation successful")
+      {:ok, token_info} ->
+        Logger.info("Twitch token validation successful", 
+          user_id: token_info["user_id"],
+          client_id: token_info["client_id"],
+          scopes: length(token_info["scopes"] || [])
+        )
+        
+        # Store user ID and scopes in state
+        state = %{state | 
+          user_id: token_info["user_id"],
+          scopes: MapSet.new(token_info["scopes"] || [])
+        }
+        
         send(self(), :connect)
         {:noreply, state}
         
@@ -406,37 +507,126 @@ defmodule Server.Services.Twitch do
   end
 
   @impl GenServer
-  def handle_info({:gun_response, conn_pid, stream_ref, is_fin, status, headers}, state) do
-    if conn_pid == state.conn_pid && stream_ref == state.stream_ref do
-      Logger.info("TWITCH DEBUG: HTTP response during upgrade", 
-        status: status, 
-        is_fin: is_fin, 
-        headers: inspect(headers, pretty: true, limit: :infinity)
+  def handle_info(:create_default_subscriptions, state) do
+    if !state.user_id do
+      Logger.error("Cannot create subscriptions: user_id not available")
+      {:noreply, state}
+    else
+      # Create common Twitch EventSub subscriptions with scope validation
+      default_subscriptions = [
+        {"stream.online", %{"broadcaster_user_id" => state.user_id}, []},
+        {"stream.offline", %{"broadcaster_user_id" => state.user_id}, []},
+        {"channel.follow", %{"broadcaster_user_id" => state.user_id, "moderator_user_id" => state.user_id}, ["moderator:read:followers"]},
+        {"channel.subscribe", %{"broadcaster_user_id" => state.user_id}, ["channel:read:subscriptions"]},
+        {"channel.subscription.gift", %{"broadcaster_user_id" => state.user_id}, ["channel:read:subscriptions"]},
+        {"channel.cheer", %{"broadcaster_user_id" => state.user_id}, ["bits:read"]}
+      ]
+      
+      {successful_count, failed_count} = Enum.reduce(default_subscriptions, {0, 0}, fn {event_type, condition, required_scopes}, {success, failed} ->
+        if validate_scopes_for_subscription(state.scopes, required_scopes) do
+          case create_eventsub_subscription(state, event_type, condition) do
+            {:ok, subscription} ->
+              Logger.info("Created default EventSub subscription", 
+                event_type: event_type, 
+                subscription_id: subscription["id"],
+                status: subscription["status"],
+                cost: subscription["cost"] || 1
+              )
+              {success + 1, failed}
+            {:error, reason} ->
+              Logger.warning("Failed to create default EventSub subscription", 
+                event_type: event_type, 
+                reason: reason
+              )
+              
+              # For specific known issues, provide detailed guidance
+              case event_type do
+                "channel.follow" ->
+                  cond do
+                    String.contains?(to_string(reason), "Forbidden") ->
+                      Logger.info("Channel follow subscription failed", 
+                        reason: "Forbidden - broadcaster may need explicit moderator verification",
+                        note: "This is common when using broadcaster token for moderator-required subscriptions",
+                        workaround: "Consider obtaining separate moderator authorization or treating as optional"
+                      )
+                    String.contains?(to_string(reason), "unauthorized") ->
+                      Logger.info("Channel follow subscription failed", 
+                        reason: "Unauthorized - token may need additional verification",
+                        scope_present: MapSet.member?(state.scopes || MapSet.new(), "moderator:read:followers")
+                      )
+                    true ->
+                      Logger.info("Channel follow subscription failed", 
+                        reason: reason,
+                        condition: inspect(condition),
+                        user_id: state.user_id,
+                        note: "Follow subscriptions require special broadcaster/moderator relationship"
+                      )
+                  end
+                _ ->
+                  Logger.debug("Subscription failed for #{event_type}", reason: reason)
+              end
+              {success, failed + 1}
+          end
+        else
+          Logger.warning("Skipping EventSub subscription due to missing scopes", 
+            event_type: event_type,
+            required_scopes: required_scopes,
+            available_scopes: MapSet.to_list(state.scopes || MapSet.new())
+          )
+          {success, failed + 1}
+        end
+      end)
+      
+      Logger.info("Default EventSub subscriptions complete", 
+        successful: successful_count,
+        failed: failed_count,
+        total_cost: state.state.subscription_total_cost,
+        total_count: state.state.subscription_count
       )
       
-      # Log detailed info about non-successful responses
+      {:noreply, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_info({:gun_response, conn_pid, stream_ref, _is_fin, status, headers}, state) do
+    if conn_pid == state.conn_pid && stream_ref == state.stream_ref do
       if status != 101 do
-        Logger.error("TWITCH DEBUG: WebSocket upgrade failed", 
+        Logger.error("Twitch WebSocket upgrade failed", 
           status: status,
           expected: 101,
-          headers: inspect(headers, pretty: true, limit: :infinity)
+          headers: inspect(headers)
         )
+        
+        # Store the error details in state
+        state = update_connection_state(state, %{
+          connected: false,
+          connection_state: "upgrade_failed",
+          last_error: "HTTP #{status} during WebSocket upgrade"
+        })
+        
+        {:noreply, state}
+      else
+        Logger.debug("Twitch WebSocket upgrade successful", status: status)
+        {:noreply, state}
       end
+    else
+      {:noreply, state}
     end
-    {:noreply, state}
   end
 
   @impl GenServer  
-  def handle_info({:gun_data, conn_pid, stream_ref, is_fin, data}, state) do
+  def handle_info({:gun_data, conn_pid, stream_ref, _is_fin, data}, state) do
     if conn_pid == state.conn_pid && stream_ref == state.stream_ref do
       data_str = if is_binary(data), do: data, else: List.to_string(data)
       
-      Logger.info("TWITCH DEBUG: HTTP data during upgrade", 
-        is_fin: is_fin, 
-        data_length: byte_size(data_str),
-        data_preview: String.slice(data_str, 0, 500),
-        full_data: data_str
-      )
+      # Only log if it's an error response (should be empty for successful WebSocket upgrade)
+      if byte_size(data_str) > 0 do
+        Logger.warning("Twitch unexpected HTTP response data", 
+          data_length: byte_size(data_str),
+          data_preview: String.slice(data_str, 0, 100)
+        )
+      end
     end
     {:noreply, state}
   end
@@ -485,20 +675,44 @@ defmodule Server.Services.Twitch do
     port = uri.port || 443
     path = uri.path || "/ws"
     
-    case :gun.open(host, port, %{transport: :tls}) do
+    # Configure Gun with better TLS options for CloudFront compatibility
+    gun_opts = %{
+      transport: :tls,
+      tls_opts: [
+        # Ensure TLS 1.2+ compatibility
+        {:versions, [:"tlsv1.2", :"tlsv1.3"]},
+        # Verify peer certificate
+        {:verify, :verify_peer},
+        # Use system CA certificates
+        {:cacerts, :public_key.cacerts_get()},
+        # Set proper hostname for verification
+        {:server_name_indication, to_charlist(uri.host)},
+        {:customize_hostname_check, [
+          {:match_fun, :public_key.pkix_verify_hostname_match_fun(:https)}
+        ]}
+      ],
+      # Force HTTP/1.1 to avoid HTTP/2 issues with WebSocket
+      protocols: [:http]
+    }
+    
+    Logger.debug("Twitch Gun connection", host: uri.host, port: port, tls: true)
+    
+    case :gun.open(host, port, gun_opts) do
       {:ok, conn_pid} ->
         # Monitor the connection
         Process.monitor(conn_pid)
         
         case :gun.await_up(conn_pid, 10_000) do
           {:ok, _protocol} ->
-            # Twitch EventSub WebSocket does NOT require auth headers during upgrade
-            # Authentication happens during subscription creation via HTTP API
+            # Let Gun handle WebSocket headers automatically
+            # Only add custom headers that don't interfere with WebSocket protocol
             headers = [
               {"user-agent", "Landale/1.0.0"}
             ]
             
-            # Upgrade to WebSocket without auth headers (per Twitch EventSub spec)
+            Logger.debug("Twitch WebSocket upgrade request", url: @eventsub_websocket_url, path: path)
+            
+            # Let Gun handle the WebSocket upgrade protocol correctly
             stream_ref = :gun.ws_upgrade(conn_pid, path, headers)
             
             Logger.debug("Twitch WebSocket upgrade initiated", 
@@ -721,36 +935,6 @@ defmodule Server.Services.Twitch do
     end
   end
   
-  # Keep the old function as backup
-  defp refresh_oauth_tokens_old(state) do
-    case OAuth2.Client.refresh_token(state.oauth_client) do
-      {:ok, client} ->
-        Logger.info("OAuth2 token refresh successful")
-        
-        # Extract token data for DETS storage
-        token_data = %{
-          access_token: client.token.access_token,
-          refresh_token: client.token.refresh_token,
-          expires_at: client.token.expires_at
-        }
-        
-        # Save updated tokens to DETS
-        save_tokens_to_storage(state.token_table, token_data)
-        
-        # Update state with new OAuth client
-        new_state = %{state | oauth_client: client}
-        {:ok, new_state}
-        
-      {:error, error} ->
-        Logger.error("OAuth2 token refresh detailed error", 
-          error: inspect(error, pretty: true, limit: :infinity),
-          error_type: if(is_tuple(error), do: elem(error, 0), else: "unknown"),
-          refresh_token_present: state.oauth_client.token.refresh_token != nil,
-          token_url: state.oauth_client.token_url
-        )
-        {:error, "OAuth2 token refresh failed: #{inspect(error)}"}
-    end
-  end
 
   defp schedule_token_refresh(state) do
     # Cancel existing timer
@@ -798,8 +982,10 @@ defmodule Server.Services.Twitch do
       session_id: session_id,
       last_connected: DateTime.utc_now()
     })
+    |> Map.put(:session_id, session_id)
 
-    # TODO: Create EventSub subscriptions here
+    # Create default subscriptions
+    send(self(), :create_default_subscriptions)
     Logger.info("Twitch session ready for subscriptions")
     
     state
@@ -811,13 +997,18 @@ defmodule Server.Services.Twitch do
   end
 
   defp handle_eventsub_protocol_message(state, %{"metadata" => %{"message_type" => "notification"}} = message) do
-    # TODO: Handle actual event notifications
     event_type = get_in(message, ["metadata", "subscription_type"])
-    _event_data = message["payload"]["event"]
+    event_data = message["payload"]["event"]
+    subscription_id = get_in(message, ["metadata", "subscription_id"])
     
-    Logger.debug("Twitch event received", event_type: event_type)
+    Logger.info("Twitch event received", 
+      event_type: event_type, 
+      subscription_id: subscription_id
+    )
     
-    # For now, just log - we'll implement specific handlers later
+    # Process the event and publish to PubSub
+    handle_twitch_event(event_type, event_data, subscription_id)
+    
     state
   end
 
@@ -853,14 +1044,6 @@ defmodule Server.Services.Twitch do
     %{state | conn_pid: nil, stream_ref: nil, session_id: nil}
   end
 
-  defp token_expired?(token) do
-    case token do
-      nil -> true
-      %{expires_at: nil} -> false  # No expiry info means don't assume expired
-      %{expires_at: expires_at} ->
-        DateTime.compare(DateTime.utc_now(), expires_at) == :gt
-    end
-  end
 
   defp validate_twitch_token(access_token) do
     headers = [
@@ -892,5 +1075,304 @@ defmodule Server.Services.Twitch do
       {:error, reason} ->
         {:error, "Request failed: #{inspect(reason)}"}
     end
+  end
+
+  # EventSub subscription management via HTTP API
+  defp create_eventsub_subscription(state, event_type, condition, _opts \\ []) do
+    url = "https://api.twitch.tv/helix/eventsub/subscriptions"
+    
+    headers = [
+      {"authorization", "Bearer #{state.oauth_client.token.access_token}"},
+      {"client-id", state.oauth_client.client_id},
+      {"content-type", "application/json"}
+    ]
+    
+    transport = %{
+      "method" => "websocket",
+      "session_id" => state.session_id
+    }
+    
+    # Use version 2 for channel.follow, version 1 for others
+    version = if event_type == "channel.follow", do: "2", else: "1"
+    
+    body = %{
+      "type" => event_type,
+      "version" => version,
+      "condition" => condition,
+      "transport" => transport
+    }
+    
+    json_body = Jason.encode!(body)
+    
+    Logger.debug("Creating EventSub subscription", 
+      event_type: event_type, 
+      condition: condition,
+      session_id: state.session_id,
+      request_body: inspect(body, limit: :infinity),
+      headers: inspect(headers, limit: :infinity)
+    )
+    
+    case :httpc.request(
+      :post, 
+      {url, Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end), 'application/json', to_charlist(json_body)}, 
+      [], 
+      []
+    ) do
+      {:ok, {{_version, 202, _reason_phrase}, _headers, response_body}} ->
+        case Jason.decode(List.to_string(response_body)) do
+          {:ok, %{"data" => [subscription]}} ->
+            Logger.info("EventSub subscription created successfully", 
+              event_type: event_type,
+              subscription_id: subscription["id"],
+              status: subscription["status"],
+              cost: subscription["cost"]
+            )
+            {:ok, subscription}
+          {:ok, response} ->
+            Logger.error("EventSub subscription unexpected response format", 
+              event_type: event_type,
+              response: inspect(response, limit: :infinity)
+            )
+            {:error, "Unexpected response format: #{inspect(response)}"}
+          {:error, reason} ->
+            body_str = List.to_string(response_body)
+            Logger.error("EventSub subscription JSON decode failed", 
+              event_type: event_type,
+              decode_error: inspect(reason),
+              raw_body: body_str
+            )
+            {:error, "JSON decode failed: #{inspect(reason)}"}
+        end
+        
+      {:ok, {{_version, status, _reason_phrase}, _response_headers, response_body}} ->
+        body_str = List.to_string(response_body)
+        
+        # Parse error details if available
+        error_details = case Jason.decode(body_str) do
+          {:ok, %{"error" => error, "message" => message}} ->
+            %{error: error, message: message}
+          {:ok, parsed} ->
+            parsed
+          {:error, _} ->
+            %{raw_body: body_str}
+        end
+        
+        
+        # Handle specific HTTP error codes
+        error_message = case status do
+          400 -> 
+            Logger.error("EventSub subscription bad request", 
+              event_type: event_type,
+              error_details: inspect(error_details, limit: :infinity),
+              condition: inspect(condition)
+            )
+            "Bad request - check subscription parameters"
+          
+          401 ->
+            Logger.error("EventSub subscription unauthorized", 
+              event_type: event_type,
+              error_details: inspect(error_details, limit: :infinity)
+            )
+            "Unauthorized - check access token"
+          
+          403 ->
+            Logger.error("EventSub subscription forbidden", 
+              event_type: event_type,
+              error_details: inspect(error_details, limit: :infinity),
+              user_id: state.user_id
+            )
+            "Forbidden - insufficient permissions or invalid user"
+          
+          409 ->
+            Logger.warning("EventSub subscription conflict", 
+              event_type: event_type,
+              error_details: inspect(error_details, limit: :infinity)
+            )
+            "Conflict - subscription may already exist"
+          
+          429 ->
+            Logger.warning("EventSub subscription rate limited", 
+              event_type: event_type,
+              error_details: inspect(error_details, limit: :infinity)
+            )
+            "Rate limited - retry after delay"
+          
+          _ ->
+            Logger.error("EventSub subscription failed", 
+              event_type: event_type,
+              http_status: status,
+              error_details: inspect(error_details, limit: :infinity),
+              condition: inspect(condition),
+              session_id: state.session_id,
+              user_id: state.user_id
+            )
+            "HTTP #{status}: #{inspect(error_details)}"
+        end
+        
+        {:error, error_message}
+        
+      {:error, reason} ->
+        {:error, "HTTP request failed: #{inspect(reason)}"}
+    end
+  end
+
+  defp delete_eventsub_subscription(state, subscription_id) do
+    url = "https://api.twitch.tv/helix/eventsub/subscriptions?id=#{subscription_id}"
+    
+    headers = [
+      {"authorization", "Bearer #{state.oauth_client.token.access_token}"},
+      {"client-id", state.oauth_client.client_id}
+    ]
+    
+    Logger.debug("Deleting EventSub subscription", subscription_id: subscription_id)
+    
+    case :httpc.request(
+      :delete, 
+      {url, Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)}, 
+      [], 
+      []
+    ) do
+      {:ok, {{_version, 204, _reason_phrase}, _headers, _response_body}} ->
+        Logger.info("EventSub subscription deleted successfully", subscription_id: subscription_id)
+        :ok
+        
+      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} ->
+        body_str = List.to_string(response_body)
+        Logger.error("EventSub subscription deletion failed", 
+          status: status, 
+          response: body_str,
+          subscription_id: subscription_id
+        )
+        {:error, "HTTP #{status}: #{body_str}"}
+        
+      {:error, reason} ->
+        {:error, "HTTP request failed: #{inspect(reason)}"}
+    end
+  end
+
+  # Scope validation for EventSub subscriptions
+  defp validate_scopes_for_subscription(user_scopes, required_scopes) when is_list(required_scopes) do
+    if length(required_scopes) == 0 do
+      true  # No scopes required
+    else
+      user_scopes = user_scopes || MapSet.new()
+      required_set = MapSet.new(required_scopes)
+      MapSet.subset?(required_set, user_scopes)
+    end
+  end
+
+  # Generate unique key for subscription deduplication
+  defp generate_subscription_key(event_type, condition) when is_map(condition) do
+    # Sort condition keys for consistent key generation
+    sorted_condition = condition
+    |> Enum.sort()
+    |> Enum.into(%{})
+    
+    "#{event_type}:#{:erlang.phash2(sorted_condition)}"
+  end
+
+  # Specific event handlers
+  defp handle_twitch_event("stream.online", event_data, _subscription_id) do
+    Logger.info("Stream went online", 
+      title: event_data["title"],
+      category: event_data["category_name"],
+      started_at: event_data["started_at"]
+    )
+    
+    Server.Events.publish_twitch_event("stream_online", %{
+      title: event_data["title"],
+      category: event_data["category_name"],
+      started_at: event_data["started_at"],
+      broadcaster_user_name: event_data["broadcaster_user_name"]
+    })
+  end
+
+  defp handle_twitch_event("stream.offline", event_data, _subscription_id) do
+    Logger.info("Stream went offline", broadcaster: event_data["broadcaster_user_name"])
+    
+    Server.Events.publish_twitch_event("stream_offline", %{
+      broadcaster_user_name: event_data["broadcaster_user_name"]
+    })
+  end
+
+  defp handle_twitch_event("channel.follow", event_data, _subscription_id) do
+    Logger.info("New follower", 
+      user: event_data["user_name"],
+      followed_at: event_data["followed_at"]
+    )
+    
+    Server.Events.publish_twitch_event("new_follower", %{
+      user_id: event_data["user_id"],
+      user_name: event_data["user_name"],
+      user_login: event_data["user_login"],
+      followed_at: event_data["followed_at"]
+    })
+  end
+
+  defp handle_twitch_event("channel.subscribe", event_data, _subscription_id) do
+    Logger.info("New subscriber", 
+      user: event_data["user_name"],
+      tier: event_data["tier"],
+      is_gift: event_data["is_gift"]
+    )
+    
+    Server.Events.publish_twitch_event("new_subscriber", %{
+      user_id: event_data["user_id"],
+      user_name: event_data["user_name"],
+      user_login: event_data["user_login"],
+      tier: event_data["tier"],
+      is_gift: event_data["is_gift"]
+    })
+  end
+
+  defp handle_twitch_event("channel.subscription.gift", event_data, _subscription_id) do
+    Logger.info("Gift subscription", 
+      gifter: event_data["user_name"],
+      tier: event_data["tier"],
+      total: event_data["total"],
+      cumulative_total: event_data["cumulative_total"]
+    )
+    
+    Server.Events.publish_twitch_event("gift_subscription", %{
+      user_id: event_data["user_id"],
+      user_name: event_data["user_name"],
+      user_login: event_data["user_login"],
+      tier: event_data["tier"],
+      total: event_data["total"],
+      cumulative_total: event_data["cumulative_total"],
+      is_anonymous: event_data["is_anonymous"]
+    })
+  end
+
+  defp handle_twitch_event("channel.cheer", event_data, _subscription_id) do
+    Logger.info("Bits cheered", 
+      user: event_data["user_name"],
+      bits: event_data["bits"],
+      message: event_data["message"]
+    )
+    
+    Server.Events.publish_twitch_event("cheer", %{
+      user_id: event_data["user_id"],
+      user_name: event_data["user_name"],
+      user_login: event_data["user_login"],
+      bits: event_data["bits"],
+      message: event_data["message"],
+      is_anonymous: event_data["is_anonymous"]
+    })
+  end
+
+  defp handle_twitch_event(event_type, event_data, subscription_id) do
+    Logger.debug("Unhandled Twitch event", 
+      event_type: event_type,
+      subscription_id: subscription_id,
+      event_data: inspect(event_data, limit: :infinity)
+    )
+    
+    # Publish generic event for unhandled types
+    Server.Events.publish_twitch_event("unknown_event", %{
+      event_type: event_type,
+      event_data: event_data,
+      subscription_id: subscription_id
+    })
   end
 end
