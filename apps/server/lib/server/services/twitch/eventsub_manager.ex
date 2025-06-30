@@ -239,10 +239,7 @@ defmodule Server.Services.Twitch.EventSubManager do
   """
   @spec create_default_subscriptions(map()) :: {integer(), integer()}
   def create_default_subscriptions(state) do
-    if !state.user_id do
-      Logger.error("Cannot create subscriptions: user_id not available")
-      {0, 1}
-    else
+    if state.user_id do
       subscriptions_with_conditions =
         Enum.map(@default_subscriptions, fn
           {event_type, required_scopes, opts} ->
@@ -321,6 +318,9 @@ defmodule Server.Services.Twitch.EventSubManager do
           {success, failed + 1}
         end
       end)
+    else
+      Logger.error("Cannot create subscriptions: user_id not available")
+      {0, 1}
     end
   end
 
