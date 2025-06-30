@@ -13,7 +13,7 @@ if database_url = System.get_env("DATABASE_URL") do
     pool_size: System.schedulers_online() * 2
 else
   config :server, Server.Repo,
-    username: System.get_env("USER"),
+    username: "Avalonstar",
     password: "",
     hostname: "localhost",
     database: "server_test#{System.get_env("MIX_TEST_PARTITION")}",
