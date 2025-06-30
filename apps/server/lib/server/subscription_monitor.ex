@@ -6,6 +6,12 @@ defmodule Server.SubscriptionMonitor do
   tracks subscription status, handles cleanup of orphaned subscriptions, and provides
   health reporting for monitoring dashboards.
 
+  This module follows Elixir best practices:
+  - Uses dependency injection for storage (testable)
+  - Separates business logic from data storage  
+  - Supports multiple instances for testing
+  - Proper supervision and fault tolerance
+
   ## Features
 
   - Subscription health monitoring and status tracking
@@ -39,6 +45,8 @@ defmodule Server.SubscriptionMonitor do
 
   use GenServer
   require Logger
+
+  alias Server.SubscriptionStorage
 
   @type subscription_id :: binary()
   @type event_type :: binary()
@@ -87,10 +95,17 @@ defmodule Server.SubscriptionMonitor do
 
   @doc """
   Starts the subscription monitor GenServer.
+
+  ## Options
+
+  - `:storage` - Storage table name or GenServer (default: :subscriptions)
+  - `:name` - GenServer registration name (default: __MODULE__)
   """
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    storage = Keyword.get(opts, :storage, :subscriptions)
+    name = Keyword.get(opts, :name, __MODULE__)
+    GenServer.start_link(__MODULE__, %{storage: storage}, name: name)
   end
 
   @doc """
@@ -100,13 +115,14 @@ defmodule Server.SubscriptionMonitor do
   - `subscription_id` - Unique subscription identifier
   - `event_type` - Type of event being subscribed to
   - `metadata` - Additional metadata about the subscription
+  - `server` - GenServer to call (default: __MODULE__)
 
   ## Returns
   - `:ok` - Subscription tracked successfully
   """
-  @spec track_subscription(subscription_id(), event_type(), map()) :: :ok
-  def track_subscription(subscription_id, event_type, metadata \\ %{}) do
-    GenServer.call(__MODULE__, {:track_subscription, subscription_id, event_type, metadata})
+  @spec track_subscription(subscription_id(), event_type(), map(), GenServer.server()) :: :ok
+  def track_subscription(subscription_id, event_type, metadata \\ %{}, server \\ __MODULE__) do
+    GenServer.call(server, {:track_subscription, subscription_id, event_type, metadata})
   end
 
   @doc """
@@ -115,14 +131,16 @@ defmodule Server.SubscriptionMonitor do
   ## Parameters
   - `subscription_id` - Subscription identifier
   - `status` - New subscription status
+  - `server` - GenServer to call (default: __MODULE__)
 
   ## Returns
   - `:ok` - Status updated successfully
   - `{:error, :not_found}` - Subscription not found
   """
-  @spec update_subscription_status(subscription_id(), subscription_status()) :: :ok | {:error, :not_found}
-  def update_subscription_status(subscription_id, status) do
-    GenServer.call(__MODULE__, {:update_status, subscription_id, status})
+  @spec update_subscription_status(subscription_id(), subscription_status(), GenServer.server()) ::
+          :ok | {:error, :not_found}
+  def update_subscription_status(subscription_id, status, server \\ __MODULE__) do
+    GenServer.call(server, {:update_status, subscription_id, status})
   end
 
   @doc """
@@ -130,14 +148,15 @@ defmodule Server.SubscriptionMonitor do
 
   ## Parameters
   - `subscription_id` - Subscription identifier
+  - `server` - GenServer to call (default: __MODULE__)
 
   ## Returns
   - `:ok` - Event recorded successfully
   - `{:error, :not_found}` - Subscription not found
   """
-  @spec record_event_received(subscription_id()) :: :ok | {:error, :not_found}
-  def record_event_received(subscription_id) do
-    GenServer.call(__MODULE__, {:record_event, subscription_id})
+  @spec record_event_received(subscription_id(), GenServer.server()) :: :ok | {:error, :not_found}
+  def record_event_received(subscription_id, server \\ __MODULE__) do
+    GenServer.call(server, {:record_event, subscription_id})
   end
 
   @doc """
@@ -146,14 +165,15 @@ defmodule Server.SubscriptionMonitor do
   ## Parameters
   - `subscription_id` - Subscription identifier
   - `reason` - Failure reason
+  - `server` - GenServer to call (default: __MODULE__)
 
   ## Returns
   - `:ok` - Failure recorded successfully
   - `{:error, :not_found}` - Subscription not found
   """
-  @spec record_subscription_failure(subscription_id(), term()) :: :ok | {:error, :not_found}
-  def record_subscription_failure(subscription_id, reason) do
-    GenServer.call(__MODULE__, {:record_failure, subscription_id, reason})
+  @spec record_subscription_failure(subscription_id(), term(), GenServer.server()) :: :ok | {:error, :not_found}
+  def record_subscription_failure(subscription_id, reason, server \\ __MODULE__) do
+    GenServer.call(server, {:record_failure, subscription_id, reason})
   end
 
   @doc """
@@ -161,24 +181,28 @@ defmodule Server.SubscriptionMonitor do
 
   ## Parameters
   - `subscription_id` - Subscription identifier
+  - `server` - GenServer to call (default: __MODULE__)
 
   ## Returns
   - `:ok` - Subscription removed successfully
   """
-  @spec untrack_subscription(subscription_id()) :: :ok
-  def untrack_subscription(subscription_id) do
-    GenServer.call(__MODULE__, {:untrack_subscription, subscription_id})
+  @spec untrack_subscription(subscription_id(), GenServer.server()) :: :ok
+  def untrack_subscription(subscription_id, server \\ __MODULE__) do
+    GenServer.call(server, {:untrack_subscription, subscription_id})
   end
 
   @doc """
   Gets current health report for all monitored subscriptions.
 
+  ## Parameters
+  - `server` - GenServer to call (default: __MODULE__)
+
   ## Returns
   - Health report map with subscription statistics
   """
-  @spec get_health_report() :: health_report()
-  def get_health_report do
-    GenServer.call(__MODULE__, :get_health_report)
+  @spec get_health_report(GenServer.server()) :: health_report()
+  def get_health_report(server \\ __MODULE__) do
+    GenServer.call(server, :get_health_report)
   end
 
   @doc """
@@ -186,14 +210,16 @@ defmodule Server.SubscriptionMonitor do
 
   ## Parameters
   - `subscription_id` - Subscription identifier
+  - `server` - GenServer to call (default: __MODULE__)
 
   ## Returns
   - `{:ok, subscription_info}` - Subscription found
   - `{:error, :not_found}` - Subscription not found
   """
-  @spec get_subscription_info(subscription_id()) :: {:ok, subscription_info()} | {:error, :not_found}
-  def get_subscription_info(subscription_id) do
-    GenServer.call(__MODULE__, {:get_subscription, subscription_id})
+  @spec get_subscription_info(subscription_id(), GenServer.server()) ::
+          {:ok, subscription_info()} | {:error, :not_found}
+  def get_subscription_info(subscription_id, server \\ __MODULE__) do
+    GenServer.call(server, {:get_subscription, subscription_id})
   end
 
   @doc """
@@ -201,52 +227,53 @@ defmodule Server.SubscriptionMonitor do
 
   ## Parameters
   - `filters` - Optional filters (status, event_type, etc.)
+  - `server` - GenServer to call (default: __MODULE__)
 
   ## Returns
   - List of subscription information maps
   """
-  @spec list_subscriptions(keyword()) :: [subscription_info()]
-  def list_subscriptions(filters \\ []) do
-    GenServer.call(__MODULE__, {:list_subscriptions, filters})
+  @spec list_subscriptions(keyword(), GenServer.server()) :: [subscription_info()]
+  def list_subscriptions(filters \\ [], server \\ __MODULE__) do
+    GenServer.call(server, {:list_subscriptions, filters})
   end
 
   @doc """
   Triggers cleanup of orphaned and failed subscriptions.
 
+  ## Parameters
+  - `server` - GenServer to call (default: __MODULE__)
+
   ## Returns
   - `{:ok, cleaned_count}` - Number of subscriptions cleaned up
   """
-  @spec cleanup_orphaned_subscriptions() :: {:ok, integer()}
-  def cleanup_orphaned_subscriptions do
-    GenServer.call(__MODULE__, :cleanup_orphaned_subscriptions)
+  @spec cleanup_orphaned_subscriptions(GenServer.server()) :: {:ok, integer()}
+  def cleanup_orphaned_subscriptions(server \\ __MODULE__) do
+    GenServer.call(server, :cleanup_orphaned_subscriptions)
   end
 
   ## GenServer Implementation
 
   defstruct [
-    :subscriptions,
+    :storage,
     :last_cleanup_at,
     :cleanup_timer,
     :health_timer
   ]
 
   @impl true
-  def init(_opts) do
-    # Initialize ETS table for subscription storage
-    subscriptions = :ets.new(__MODULE__, [:set, :protected, {:keypos, 2}])
-
+  def init(%{storage: storage}) do
     # Schedule periodic cleanup and health checks
     cleanup_timer = Process.send_after(self(), :cleanup_subscriptions, @cleanup_interval_ms)
     health_timer = Process.send_after(self(), :emit_health_metrics, @health_check_interval_ms)
 
     state = %__MODULE__{
-      subscriptions: subscriptions,
+      storage: storage,
       last_cleanup_at: DateTime.utc_now(),
       cleanup_timer: cleanup_timer,
       health_timer: health_timer
     }
 
-    Logger.info("Subscription monitor started")
+    Logger.info("Subscription monitor started with storage: #{inspect(storage)}")
     {:ok, state}
   end
 
@@ -263,7 +290,7 @@ defmodule Server.SubscriptionMonitor do
       metadata: metadata
     }
 
-    :ets.insert(state.subscriptions, {subscription_id, subscription})
+    SubscriptionStorage.put(state.storage, subscription_id, subscription)
 
     Logger.debug("Tracking subscription",
       subscription_id: subscription_id,
@@ -280,11 +307,11 @@ defmodule Server.SubscriptionMonitor do
 
   @impl true
   def handle_call({:update_status, subscription_id, status}, _from, state) do
-    case :ets.lookup(state.subscriptions, subscription_id) do
-      [{^subscription_id, subscription}] ->
+    case SubscriptionStorage.lookup(state.storage, subscription_id) do
+      {:ok, subscription} ->
         updated_subscription = %{subscription | status: status, last_updated: DateTime.utc_now()}
 
-        :ets.insert(state.subscriptions, {subscription_id, updated_subscription})
+        SubscriptionStorage.put(state.storage, subscription_id, updated_subscription)
 
         Logger.debug("Updated subscription status",
           subscription_id: subscription_id,
@@ -298,18 +325,18 @@ defmodule Server.SubscriptionMonitor do
 
         {:reply, :ok, state}
 
-      [] ->
+      :error ->
         {:reply, {:error, :not_found}, state}
     end
   end
 
   @impl true
   def handle_call({:record_event, subscription_id}, _from, state) do
-    case :ets.lookup(state.subscriptions, subscription_id) do
-      [{^subscription_id, subscription}] ->
+    case SubscriptionStorage.lookup(state.storage, subscription_id) do
+      {:ok, subscription} ->
         updated_subscription = %{subscription | last_event_at: DateTime.utc_now(), last_updated: DateTime.utc_now()}
 
-        :ets.insert(state.subscriptions, {subscription_id, updated_subscription})
+        SubscriptionStorage.put(state.storage, subscription_id, updated_subscription)
 
         emit_telemetry([:subscription, :event_received], %{}, %{
           subscription_id: subscription_id
@@ -317,22 +344,22 @@ defmodule Server.SubscriptionMonitor do
 
         {:reply, :ok, state}
 
-      [] ->
+      :error ->
         {:reply, {:error, :not_found}, state}
     end
   end
 
   @impl true
   def handle_call({:record_failure, subscription_id, reason}, _from, state) do
-    case :ets.lookup(state.subscriptions, subscription_id) do
-      [{^subscription_id, subscription}] ->
+    case SubscriptionStorage.lookup(state.storage, subscription_id) do
+      {:ok, subscription} ->
         updated_subscription = %{
           subscription
           | failure_count: subscription.failure_count + 1,
             last_updated: DateTime.utc_now()
         }
 
-        :ets.insert(state.subscriptions, {subscription_id, updated_subscription})
+        SubscriptionStorage.put(state.storage, subscription_id, updated_subscription)
 
         Logger.warning("Subscription failure recorded",
           subscription_id: subscription_id,
@@ -348,14 +375,14 @@ defmodule Server.SubscriptionMonitor do
 
         {:reply, :ok, state}
 
-      [] ->
+      :error ->
         {:reply, {:error, :not_found}, state}
     end
   end
 
   @impl true
   def handle_call({:untrack_subscription, subscription_id}, _from, state) do
-    :ets.delete(state.subscriptions, subscription_id)
+    SubscriptionStorage.delete(state.storage, subscription_id)
 
     Logger.debug("Untracked subscription", subscription_id: subscription_id)
 
@@ -374,11 +401,11 @@ defmodule Server.SubscriptionMonitor do
 
   @impl true
   def handle_call({:get_subscription, subscription_id}, _from, state) do
-    case :ets.lookup(state.subscriptions, subscription_id) do
-      [{^subscription_id, subscription}] ->
+    case SubscriptionStorage.lookup(state.storage, subscription_id) do
+      {:ok, subscription} ->
         {:reply, {:ok, subscription}, state}
 
-      [] ->
+      :error ->
         {:reply, {:error, :not_found}, state}
     end
   end
@@ -386,9 +413,8 @@ defmodule Server.SubscriptionMonitor do
   @impl true
   def handle_call({:list_subscriptions, filters}, _from, state) do
     subscriptions =
-      state.subscriptions
-      |> :ets.tab2list()
-      |> Enum.map(fn {_id, subscription} -> subscription end)
+      state.storage
+      |> SubscriptionStorage.list_all()
       |> apply_filters(filters)
 
     {:reply, subscriptions, state}
@@ -442,29 +468,16 @@ defmodule Server.SubscriptionMonitor do
     if state.cleanup_timer, do: Process.cancel_timer(state.cleanup_timer)
     if state.health_timer, do: Process.cancel_timer(state.health_timer)
 
-    # Clean up ETS table
-    if state.subscriptions do
-      try do
-        :ets.delete(state.subscriptions)
-        Logger.debug("ETS table cleaned up during termination")
-      rescue
-        error ->
-          Logger.warning("Error cleaning up ETS table", error: inspect(error))
-      end
-    end
-
     :ok
   end
 
   ## Private Functions
 
   defp generate_health_report(state) do
-    all_subscriptions = :ets.tab2list(state.subscriptions)
+    all_subscriptions = SubscriptionStorage.list_all(state.storage)
 
-    subscriptions_data = Enum.map(all_subscriptions, fn {_id, sub} -> sub end)
-
-    total_count = length(subscriptions_data)
-    enabled_count = Enum.count(subscriptions_data, &(&1.status == :enabled))
+    total_count = length(all_subscriptions)
+    enabled_count = Enum.count(all_subscriptions, &(&1.status == :enabled))
 
     failed_statuses = [
       :webhook_callback_verification_failed,
@@ -475,13 +488,13 @@ defmodule Server.SubscriptionMonitor do
       :version_removed
     ]
 
-    failed_count = Enum.count(subscriptions_data, &(&1.status in failed_statuses))
+    failed_count = Enum.count(all_subscriptions, &(&1.status in failed_statuses))
 
     # Count orphaned subscriptions (no events for a long time)
     now = DateTime.utc_now()
 
     orphaned_count =
-      Enum.count(subscriptions_data, fn sub ->
+      Enum.count(all_subscriptions, fn sub ->
         case sub.last_event_at do
           nil ->
             # No events ever received, consider orphaned if created more than threshold ago
@@ -493,16 +506,16 @@ defmodule Server.SubscriptionMonitor do
       end)
 
     # Group by event type
-    by_type = Enum.group_by(subscriptions_data, & &1.event_type)
+    by_type = Enum.group_by(all_subscriptions, & &1.event_type)
     subscriptions_by_type = Map.new(by_type, fn {type, subs} -> {type, length(subs)} end)
 
     # Group by status
-    by_status = Enum.group_by(subscriptions_data, & &1.status)
+    by_status = Enum.group_by(all_subscriptions, & &1.status)
     subscriptions_by_status = Map.new(by_status, fn {status, subs} -> {status, length(subs)} end)
 
     # Find oldest subscription
     oldest_subscription =
-      subscriptions_data
+      all_subscriptions
       |> Enum.map(& &1.created_at)
       |> Enum.min(DateTime, fn -> nil end)
 
@@ -519,28 +532,28 @@ defmodule Server.SubscriptionMonitor do
   end
 
   defp perform_cleanup(state) do
-    all_subscriptions = :ets.tab2list(state.subscriptions)
+    all_subscriptions = SubscriptionStorage.list_all(state.storage)
     now = DateTime.utc_now()
 
     # Find subscriptions that should be cleaned up
     to_cleanup =
-      Enum.filter(all_subscriptions, fn {_id, subscription} ->
+      Enum.filter(all_subscriptions, fn subscription ->
         should_cleanup_subscription?(subscription, now)
       end)
 
     # Remove them from tracking
-    Enum.each(to_cleanup, fn {subscription_id, subscription} ->
-      :ets.delete(state.subscriptions, subscription_id)
+    Enum.each(to_cleanup, fn subscription ->
+      SubscriptionStorage.delete(state.storage, subscription.id)
 
       Logger.info("Cleaned up subscription",
-        subscription_id: subscription_id,
+        subscription_id: subscription.id,
         event_type: subscription.event_type,
         status: subscription.status,
         reason: get_cleanup_reason(subscription, now)
       )
 
       emit_telemetry([:subscription, :cleaned_up], %{}, %{
-        subscription_id: subscription_id,
+        subscription_id: subscription.id,
         event_type: subscription.event_type,
         status: subscription.status
       })

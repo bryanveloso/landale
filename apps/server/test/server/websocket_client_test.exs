@@ -17,8 +17,8 @@ defmodule Server.WebSocketClientTest do
       assert client.uri.scheme == "ws"
       assert client.conn_pid == nil
       assert client.stream_ref == nil
-      assert client.reconnect_interval == 5_000
-      assert client.connection_timeout == 10_000
+      assert client.reconnect_interval == 2_000
+      assert client.connection_timeout == 5_000
       assert client.telemetry_prefix == [:server, :websocket]
     end
 

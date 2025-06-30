@@ -205,14 +205,35 @@ defmodule Server.RetryStrategy do
           {:error, reason, attempt}
         end
 
-      other ->
-        Logger.warning("Unexpected return value from retry function",
-          value: inspect(other),
-          attempt: attempt
+      result ->
+        Logger.warning("Unexpected return value from retry function", result: inspect(result))
+        {:error, {:unexpected_return, result}, attempt}
+    end
+  rescue
+    exception ->
+      reason = {exception.__struct__, exception.message}
+
+      if attempt < config.max_attempts and should_retry?(reason, config) do
+        delay = calculate_delay(attempt, config)
+
+        Logger.debug("Retrying after exception",
+          attempt: attempt,
+          max_attempts: config.max_attempts,
+          delay: delay,
+          exception: inspect(exception)
         )
 
-        {:error, {:unexpected_return, other}, attempt}
-    end
+        emit_telemetry(config, [:retry], %{
+          attempt: attempt,
+          delay: delay,
+          exception: inspect(exception)
+        })
+
+        :timer.sleep(delay)
+        do_retry(fun, config, attempt + 1)
+      else
+        {:error, reason, attempt}
+      end
   end
 
   defp do_retry(_fun, _config, attempt) do
@@ -275,8 +296,11 @@ defmodule Server.RetryStrategy do
       :nxdomain ->
         true
 
-      # HTTP status codes that should be retried
+      # HTTP status codes that should be retried (with or without message)
       {:http_error, status} when status in [429, 500, 502, 503, 504] ->
+        true
+
+      {:http_error, status, _message} when status in [429, 500, 502, 503, 504] ->
         true
 
       # String-based error detection
@@ -291,8 +315,11 @@ defmodule Server.RetryStrategy do
 
   defp retryable_error?(reason) do
     case reason do
-      # Twitch-specific rate limit errors
+      # Twitch-specific rate limit errors (with or without message)
       {:http_error, 429} ->
+        true
+
+      {:http_error, 429, _message} ->
         true
 
       reason when is_binary(reason) ->
@@ -309,8 +336,11 @@ defmodule Server.RetryStrategy do
       :econnreset ->
         true
 
-      # HTTP 5xx errors (server issues)
+      # HTTP 5xx errors (server issues) - with or without message
       {:http_error, status} when status >= 500 and status < 600 ->
+        true
+
+      {:http_error, status, _message} when status >= 500 and status < 600 ->
         true
 
       _ ->

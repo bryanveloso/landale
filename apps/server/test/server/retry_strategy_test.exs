@@ -186,12 +186,15 @@ defmodule Server.RetryStrategyTest do
       case :ets.whereis(:circuit_breaker_state) do
         :undefined ->
           :ets.new(:circuit_breaker_state, [:set, :public, :named_table])
+
         _ ->
           # Clear existing entries for test isolation
           :ets.delete_all_objects(:circuit_breaker_state)
       end
+
       :ok
     end
+
     test "allows calls when circuit is closed" do
       {:ok, result} =
         RetryStrategy.retry_with_circuit_breaker(:test_service, fn ->
