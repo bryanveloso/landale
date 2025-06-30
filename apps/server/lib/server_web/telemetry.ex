@@ -71,23 +71,58 @@ defmodule ServerWeb.Telemetry do
       ),
       summary("server.repo.query.idle_time",
         unit: {:native, :millisecond},
-        description:
-          "The time the connection spent waiting before being checked out for the query"
+        description: "The time the connection spent waiting before being checked out for the query"
       ),
 
       # VM Metrics
       summary("vm.memory.total", unit: {:byte, :kilobyte}),
       summary("vm.total_run_queue_lengths.total"),
       summary("vm.total_run_queue_lengths.cpu"),
-      summary("vm.total_run_queue_lengths.io")
+      summary("vm.total_run_queue_lengths.io"),
+
+      # OBS Service Metrics
+      counter("server.obs.connection.attempts"),
+      counter("server.obs.connection.successes"),
+      counter("server.obs.connection.failures"),
+      summary("server.obs.connection.duration", unit: {:native, :millisecond}),
+      counter("server.obs.requests.total", tags: [:request_type]),
+      counter("server.obs.requests.success", tags: [:request_type]),
+      counter("server.obs.requests.failure", tags: [:request_type]),
+      summary("server.obs.requests.duration", tags: [:request_type], unit: {:native, :millisecond}),
+      last_value("server.obs.connection.status", tags: [:state]),
+
+      # Twitch Service Metrics
+      counter("server.twitch.connection.attempts"),
+      counter("server.twitch.connection.successes"),
+      counter("server.twitch.connection.failures"),
+      summary("server.twitch.connection.duration", unit: {:native, :millisecond}),
+      counter("server.twitch.subscriptions.created", tags: [:event_type]),
+      counter("server.twitch.subscriptions.deleted", tags: [:event_type]),
+      counter("server.twitch.subscriptions.failed", tags: [:event_type, :reason]),
+      last_value("server.twitch.subscriptions.active"),
+      last_value("server.twitch.subscriptions.cost"),
+      counter("server.twitch.events.received", tags: [:event_type]),
+      counter("server.twitch.oauth.refresh.attempts"),
+      counter("server.twitch.oauth.refresh.successes"),
+      counter("server.twitch.oauth.refresh.failures"),
+
+      # Event System Metrics
+      counter("server.events.published", tags: [:event_type, :topic]),
+      counter("server.events.subscribers", tags: [:topic]),
+
+      # Health Check Metrics
+      counter("server.health.checks", tags: [:endpoint]),
+      summary("server.health.response_time", tags: [:endpoint], unit: {:native, :millisecond}),
+      last_value("server.health.status", tags: [:service])
     ]
   end
 
   defp periodic_measurements do
     [
-      # A module, function and arguments to be invoked periodically.
-      # This function must call :telemetry.execute/3 and a metric must be added above.
-      # {ServerWeb, :count_users, []}
+      # Service status measurements
+      {Server.Telemetry, :measure_obs_status, []},
+      {Server.Telemetry, :measure_twitch_status, []},
+      {Server.Telemetry, :measure_system_health, []}
     ]
   end
 end

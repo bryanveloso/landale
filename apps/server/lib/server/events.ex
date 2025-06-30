@@ -39,6 +39,9 @@ defmodule Server.Events do
 
     Logger.debug("Publishing OBS event", event: event)
     Phoenix.PubSub.broadcast(@pubsub, @obs_events, {:obs_event, event})
+
+    # Emit telemetry for published event
+    Server.Telemetry.event_published(event_type, "obs:events")
   end
 
   # Twitch Event Publishing
@@ -61,6 +64,9 @@ defmodule Server.Events do
 
     Logger.debug("Publishing Twitch event", event: event)
     Phoenix.PubSub.broadcast(@pubsub, @twitch_events, {:twitch_event, event})
+
+    # Emit telemetry for published event
+    Server.Telemetry.event_published(event_type, "twitch:events")
   end
 
   # IronMON Event Publishing
@@ -83,6 +89,9 @@ defmodule Server.Events do
 
     Logger.debug("Publishing IronMON event", event: event)
     Phoenix.PubSub.broadcast(@pubsub, @ironmon_events, {:ironmon_event, event})
+
+    # Emit telemetry for published event
+    Server.Telemetry.event_published(event_type, "ironmon:events")
   end
 
   # System Event Publishing
@@ -105,6 +114,9 @@ defmodule Server.Events do
 
     Logger.debug("Publishing system event", event: event)
     Phoenix.PubSub.broadcast(@pubsub, @system_events, {:system_event, event})
+
+    # Emit telemetry for published event
+    Server.Telemetry.event_published(event_type, "system:events")
   end
 
   # Health Monitoring Events
