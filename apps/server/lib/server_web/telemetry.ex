@@ -119,7 +119,7 @@ defmodule ServerWeb.Telemetry do
 
   defp periodic_measurements do
     # Only measure services in non-test environments
-    if Mix.env() == :test do
+    if Application.get_env(:server, :env, :dev) == :test do
       []
     else
       [

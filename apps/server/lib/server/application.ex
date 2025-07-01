@@ -9,7 +9,7 @@ defmodule Server.Application do
   @impl true
   def start(_type, _args) do
     # Set up graceful shutdown handling for Docker (skip in test environment)
-    if Mix.env() != :test do
+    if Application.get_env(:server, :env) != :test do
       setup_signal_handlers()
     end
 
@@ -25,7 +25,7 @@ defmodule Server.Application do
 
     # Add production services only in non-test environments
     children =
-      if Mix.env() == :test do
+      if Application.get_env(:server, :env) == :test do
         base_children
       else
         base_children ++

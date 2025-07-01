@@ -98,7 +98,7 @@ defmodule ServerWeb.HealthController do
           System.system_time(:second) -
             Application.get_env(:server, :start_time, System.system_time(:second)),
         version: Application.spec(:server, :vsn) |> to_string(),
-        environment: Mix.env() |> to_string()
+        environment: Application.get_env(:server, :env, :dev) |> to_string()
       }
     }
 

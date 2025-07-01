@@ -78,7 +78,7 @@ defmodule Server.NetworkConfig do
   def detect_environment do
     cond do
       in_docker?() -> :docker
-      Mix.env() == :prod -> :production
+      Application.get_env(:server, :env, :dev) == :prod -> :production
       true -> :development
     end
   end

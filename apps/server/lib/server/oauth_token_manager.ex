@@ -444,7 +444,7 @@ defmodule Server.OAuthTokenManager do
   end
 
   defp get_default_storage_path(storage_key) do
-    case Mix.env() do
+    case Application.get_env(:server, :env, :dev) do
       :prod ->
         # Docker production environment
         "/app/data/#{storage_key}.dets"
@@ -567,12 +567,6 @@ defmodule Server.OAuthTokenManager do
       storage_key: manager.storage_key,
       backup_file: backup_file
     )
-  rescue
-    error ->
-      Logger.warning("Token backup failed",
-        error: inspect(error),
-        storage_key: manager.storage_key
-      )
   rescue
     error ->
       Logger.warning("Token backup failed",
