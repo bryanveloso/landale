@@ -13,7 +13,6 @@
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.6",
     "@landale/logger": "workspace:*",
-    "@landale/server": "workspace:*",
     "@landale/shared": "workspace:*",
     "@rive-app/react-canvas": "^4.21.4",
     "@tailwindcss/vite": "^4.1.11",
