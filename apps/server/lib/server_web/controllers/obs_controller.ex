@@ -2,6 +2,18 @@ defmodule ServerWeb.OBSController do
   @moduledoc "Controller for OBS WebSocket operations and status monitoring."
 
   use ServerWeb, :controller
+  use OpenApiSpex.ControllerSpecs
+
+  alias ServerWeb.Schemas
+
+  operation(:status,
+    summary: "Get OBS WebSocket status",
+    description: "Returns current OBS WebSocket connection status and state information",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
 
   def status(conn, _params) do
     case Server.Services.OBS.get_state() do
@@ -15,6 +27,16 @@ defmodule ServerWeb.OBSController do
     end
   end
 
+  operation(:start_streaming,
+    summary: "Start OBS streaming",
+    description: "Starts streaming in OBS Studio",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      400 => {"Bad Request", "application/json", Schemas.ErrorResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   def start_streaming(conn, _params) do
     case Server.Services.OBS.start_streaming() do
       {:ok, _} ->
@@ -26,6 +48,16 @@ defmodule ServerWeb.OBSController do
         |> json(%{success: false, error: reason})
     end
   end
+
+  operation(:stop_streaming,
+    summary: "Stop OBS streaming",
+    description: "Stops streaming in OBS Studio",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      400 => {"Bad Request", "application/json", Schemas.ErrorResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
 
   def stop_streaming(conn, _params) do
     case Server.Services.OBS.stop_streaming() do
@@ -39,6 +71,16 @@ defmodule ServerWeb.OBSController do
     end
   end
 
+  operation(:start_recording,
+    summary: "Start OBS recording",
+    description: "Starts recording in OBS Studio",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      400 => {"Bad Request", "application/json", Schemas.ErrorResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   def start_recording(conn, _params) do
     case Server.Services.OBS.start_recording() do
       {:ok, _} ->
@@ -51,6 +93,16 @@ defmodule ServerWeb.OBSController do
     end
   end
 
+  operation(:stop_recording,
+    summary: "Stop OBS recording",
+    description: "Stops recording in OBS Studio",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      400 => {"Bad Request", "application/json", Schemas.ErrorResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   def stop_recording(conn, _params) do
     case Server.Services.OBS.stop_recording() do
       {:ok, _} ->
@@ -62,6 +114,19 @@ defmodule ServerWeb.OBSController do
         |> json(%{success: false, error: reason})
     end
   end
+
+  operation(:set_scene,
+    summary: "Set OBS scene",
+    description: "Changes the current scene in OBS Studio",
+    parameters: [
+      scene_name: [in: :path, description: "Name of the scene to switch to", type: :string, required: true]
+    ],
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      400 => {"Bad Request", "application/json", Schemas.ErrorResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
 
   def set_scene(conn, %{"scene_name" => scene_name}) do
     case Server.Services.OBS.set_current_scene(scene_name) do
@@ -77,6 +142,15 @@ defmodule ServerWeb.OBSController do
 
   # Enhanced endpoints for dashboard metrics
 
+  operation(:scenes,
+    summary: "Get OBS scenes",
+    description: "Returns list of available scenes and current scene information",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   def scenes(conn, _params) do
     case Server.Services.OBS.get_scene_list() do
       {:ok, scenes_data} ->
@@ -88,6 +162,15 @@ defmodule ServerWeb.OBSController do
         |> json(%{success: false, error: reason})
     end
   end
+
+  operation(:stream_status,
+    summary: "Get OBS stream status",
+    description: "Returns detailed streaming status including bitrate, duration, and connection info",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
 
   def stream_status(conn, _params) do
     case Server.Services.OBS.get_stream_status() do
@@ -101,6 +184,15 @@ defmodule ServerWeb.OBSController do
     end
   end
 
+  operation(:record_status,
+    summary: "Get OBS recording status",
+    description: "Returns current recording status and information",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   def record_status(conn, _params) do
     case Server.Services.OBS.get_record_status() do
       {:ok, record_data} ->
@@ -112,6 +204,15 @@ defmodule ServerWeb.OBSController do
         |> json(%{success: false, error: reason})
     end
   end
+
+  operation(:stats,
+    summary: "Get OBS statistics",
+    description: "Returns comprehensive OBS performance statistics and metrics",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
 
   def stats(conn, _params) do
     # This endpoint can combine GetStats with current state for comprehensive metrics
@@ -137,6 +238,15 @@ defmodule ServerWeb.OBSController do
     end
   end
 
+  operation(:version,
+    summary: "Get OBS version",
+    description: "Returns OBS Studio version information",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   def version(conn, _params) do
     case Server.Services.OBS.get_version() do
       {:ok, version_data} ->
@@ -149,6 +259,15 @@ defmodule ServerWeb.OBSController do
     end
   end
 
+  operation(:virtual_cam,
+    summary: "Get OBS virtual camera status",
+    description: "Returns virtual camera status and configuration",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   def virtual_cam(conn, _params) do
     case Server.Services.OBS.get_virtual_cam_status() do
       {:ok, virtual_cam_data} ->
@@ -160,6 +279,15 @@ defmodule ServerWeb.OBSController do
         |> json(%{success: false, error: reason})
     end
   end
+
+  operation(:outputs,
+    summary: "Get OBS outputs",
+    description: "Returns information about all OBS outputs (streaming, recording, etc.)",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
 
   def outputs(conn, _params) do
     case Server.Services.OBS.get_output_list() do

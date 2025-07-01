@@ -152,7 +152,8 @@ defmodule Server.OAuthTokenManager do
         Logger.error("Failed to open OAuth token storage",
           storage_key: manager.storage_key,
           path: manager.storage_path,
-          reason: reason
+          reason: reason,
+          file_exists: File.exists?(manager.storage_path)
         )
 
         manager
@@ -232,18 +233,23 @@ defmodule Server.OAuthTokenManager do
   def get_valid_token(manager) do
     case manager.token_info do
       nil ->
+        Logger.debug("No token info available in manager", storage_key: manager.storage_key)
         {:error, "No token available"}
 
       token_info ->
         if token_needs_refresh?(token_info, manager.refresh_buffer_ms) do
+          Logger.debug("Token needs refresh", storage_key: manager.storage_key)
+
           case refresh_token(manager) do
             {:ok, updated_manager} ->
               {:ok, updated_manager.token_info.access_token, updated_manager}
 
             {:error, reason} ->
+              Logger.debug("Token refresh failed", storage_key: manager.storage_key, reason: reason)
               {:error, reason}
           end
         else
+          Logger.debug("Using existing valid token", storage_key: manager.storage_key)
           {:ok, token_info.access_token, manager}
         end
     end
@@ -351,6 +357,13 @@ defmodule Server.OAuthTokenManager do
             {:ok, data, updated_manager}
 
           {:error, reason} ->
+            Logger.error("Token validation failed",
+              storage_key: manager.storage_key,
+              validate_url: validate_url,
+              reason: inspect(reason),
+              access_token_prefix: String.slice(access_token, 0, 10)
+            )
+
             {:error, reason}
         end
     end

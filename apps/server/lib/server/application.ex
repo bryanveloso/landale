@@ -35,7 +35,7 @@ defmodule Server.Application do
             # Services
             Server.Services.OBS,
             Server.Services.Twitch,
-            Server.Services.IronmonTCP
+            {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]}
           ]
       end
 

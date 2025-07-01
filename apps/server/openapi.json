@@ -1,0 +1,1093 @@
+{
+  "components": {
+    "responses": {},
+    "schemas": {
+      "CreateTwitchSubscription": {
+        "$ref": "#/components/schemas/CreateTwitchSubscription"
+      },
+      "ErrorResponse": {
+        "$ref": "#/components/schemas/ErrorResponse"
+      },
+      "HealthStatus": {
+        "$ref": "#/components/schemas/HealthStatus"
+      },
+      "IronmonChallenge": {
+        "$ref": "#/components/schemas/IronmonChallenge"
+      },
+      "IronmonCheckpoint": {
+        "$ref": "#/components/schemas/IronmonCheckpoint"
+      },
+      "IronmonResult": {
+        "$ref": "#/components/schemas/IronmonResult"
+      },
+      "OBSScenes": {
+        "$ref": "#/components/schemas/OBSScenes"
+      },
+      "OBSStatus": {
+        "$ref": "#/components/schemas/OBSStatus"
+      },
+      "OBSStreamStatus": {
+        "$ref": "#/components/schemas/OBSStreamStatus"
+      },
+      "ServiceStatus": {
+        "$ref": "#/components/schemas/ServiceStatus"
+      },
+      "SuccessResponse": {
+        "$ref": "#/components/schemas/SuccessResponse"
+      },
+      "TwitchStatus": {
+        "$ref": "#/components/schemas/TwitchStatus"
+      },
+      "TwitchSubscription": {
+        "$ref": "#/components/schemas/TwitchSubscription"
+      },
+      "TwitchSubscriptionTypes": {
+        "$ref": "#/components/schemas/TwitchSubscriptionTypes"
+      }
+    }
+  },
+  "info": {
+    "description": "REST API for the Landale streaming overlay system.\n\nThis API provides endpoints for:\n- OBS WebSocket integration and controls\n- Twitch EventSub subscription management  \n- IronMON Pokemon challenge data\n- System health and monitoring\n- Real-time dashboard communication\n\nAll endpoints return JSON and follow RESTful conventions.\n",
+    "title": "Landale Streaming Server API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/control/ping": {
+      "post": {
+        "callbacks": {},
+        "description": "Simple keep-alive endpoint that returns server timestamp",
+        "operationId": "ServerWeb.ControlController.ping",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          }
+        },
+        "summary": "Ping endpoint",
+        "tags": []
+      }
+    },
+    "/api/control/services": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns detailed status and metrics for all system services",
+        "operationId": "ServerWeb.ControlController.services",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          }
+        },
+        "summary": "Get detailed service information",
+        "tags": []
+      }
+    },
+    "/api/control/status": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns overall system status including uptime, memory usage, and service health",
+        "operationId": "ServerWeb.ControlController.status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          }
+        },
+        "summary": "Get control system status",
+        "tags": []
+      }
+    },
+    "/api/health": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns comprehensive health data including all services and system metrics",
+        "operationId": "ServerWeb.HealthController.detailed",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            },
+            "description": "Healthy"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Detailed health check",
+        "tags": []
+      }
+    },
+    "/api/health/subscriptions": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns detailed subscription health information including counts, statuses, and recommendations",
+        "operationId": "ServerWeb.HealthController.subscriptions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Subscription Health"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Subscription Issues"
+          }
+        },
+        "summary": "EventSub subscription health",
+        "tags": []
+      }
+    },
+    "/api/ironmon/challenges": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns all available IronMON challenges",
+        "operationId": "ServerWeb.IronmonController.list_challenges",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          }
+        },
+        "summary": "List IronMON challenges",
+        "tags": []
+      }
+    },
+    "/api/ironmon/challenges/{id}/checkpoints": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns all checkpoints for a specific challenge",
+        "operationId": "ServerWeb.IronmonController.list_checkpoints",
+        "parameters": [
+          {
+            "description": "Challenge ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "List challenge checkpoints",
+        "tags": []
+      }
+    },
+    "/api/ironmon/checkpoints/{id}/stats": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns statistics for a specific checkpoint",
+        "operationId": "ServerWeb.IronmonController.checkpoint_stats",
+        "parameters": [
+          {
+            "description": "Checkpoint ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Get checkpoint statistics",
+        "tags": []
+      }
+    },
+    "/api/ironmon/results/recent": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns recent challenge results with optional pagination",
+        "operationId": "ServerWeb.IronmonController.recent_results",
+        "parameters": [
+          {
+            "description": "Number of results to return",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Pagination cursor",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          }
+        },
+        "summary": "Get recent IronMON results",
+        "tags": []
+      }
+    },
+    "/api/ironmon/seeds/{id}/challenge": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns the active challenge associated with a specific seed ID",
+        "operationId": "ServerWeb.IronmonController.active_challenge",
+        "parameters": [
+          {
+            "description": "Seed ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "summary": "Get active challenge for seed",
+        "tags": []
+      }
+    },
+    "/api/obs/outputs": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns information about all OBS outputs (streaming, recording, etc.)",
+        "operationId": "ServerWeb.OBSController.outputs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get OBS outputs",
+        "tags": []
+      }
+    },
+    "/api/obs/record-status": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns current recording status and information",
+        "operationId": "ServerWeb.OBSController.record_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get OBS recording status",
+        "tags": []
+      }
+    },
+    "/api/obs/recording/start": {
+      "post": {
+        "callbacks": {},
+        "description": "Starts recording in OBS Studio",
+        "operationId": "ServerWeb.OBSController.start_recording",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Start OBS recording",
+        "tags": []
+      }
+    },
+    "/api/obs/recording/stop": {
+      "post": {
+        "callbacks": {},
+        "description": "Stops recording in OBS Studio",
+        "operationId": "ServerWeb.OBSController.stop_recording",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Stop OBS recording",
+        "tags": []
+      }
+    },
+    "/api/obs/scene/{scene_name}": {
+      "post": {
+        "callbacks": {},
+        "description": "Changes the current scene in OBS Studio",
+        "operationId": "ServerWeb.OBSController.set_scene",
+        "parameters": [
+          {
+            "description": "Name of the scene to switch to",
+            "in": "path",
+            "name": "scene_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Set OBS scene",
+        "tags": []
+      }
+    },
+    "/api/obs/scenes": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns list of available scenes and current scene information",
+        "operationId": "ServerWeb.OBSController.scenes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get OBS scenes",
+        "tags": []
+      }
+    },
+    "/api/obs/stats": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns comprehensive OBS performance statistics and metrics",
+        "operationId": "ServerWeb.OBSController.stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get OBS statistics",
+        "tags": []
+      }
+    },
+    "/api/obs/status": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns current OBS WebSocket connection status and state information",
+        "operationId": "ServerWeb.OBSController.status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get OBS WebSocket status",
+        "tags": []
+      }
+    },
+    "/api/obs/stream-status": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns detailed streaming status including bitrate, duration, and connection info",
+        "operationId": "ServerWeb.OBSController.stream_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get OBS stream status",
+        "tags": []
+      }
+    },
+    "/api/obs/streaming/start": {
+      "post": {
+        "callbacks": {},
+        "description": "Starts streaming in OBS Studio",
+        "operationId": "ServerWeb.OBSController.start_streaming",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Start OBS streaming",
+        "tags": []
+      }
+    },
+    "/api/obs/streaming/stop": {
+      "post": {
+        "callbacks": {},
+        "description": "Stops streaming in OBS Studio",
+        "operationId": "ServerWeb.OBSController.stop_streaming",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Stop OBS streaming",
+        "tags": []
+      }
+    },
+    "/api/obs/version": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns OBS Studio version information",
+        "operationId": "ServerWeb.OBSController.version",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get OBS version",
+        "tags": []
+      }
+    },
+    "/api/obs/virtual-cam": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns virtual camera status and configuration",
+        "operationId": "ServerWeb.OBSController.virtual_cam",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get OBS virtual camera status",
+        "tags": []
+      }
+    },
+    "/api/twitch/status": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns current Twitch EventSub connection status and metrics",
+        "operationId": "ServerWeb.TwitchController.status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Twitch service status",
+        "tags": []
+      }
+    },
+    "/api/twitch/subscription-types": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns all available Twitch EventSub subscription types with descriptions and required scopes",
+        "operationId": "ServerWeb.TwitchController.subscription_types",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwitchSubscriptionTypes"
+                }
+              }
+            },
+            "description": "Success"
+          }
+        },
+        "summary": "Get available EventSub subscription types",
+        "tags": []
+      }
+    },
+    "/api/twitch/subscriptions": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns all active Twitch EventSub subscriptions",
+        "operationId": "ServerWeb.TwitchController.subscriptions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Twitch EventSub subscriptions",
+        "tags": []
+      },
+      "post": {
+        "callbacks": {},
+        "description": "Creates a new EventSub subscription for the specified event type",
+        "operationId": "ServerWeb.TwitchController.create_subscription",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTwitchSubscription"
+              }
+            }
+          },
+          "description": "Subscription details",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Create Twitch EventSub subscription",
+        "tags": []
+      }
+    },
+    "/api/twitch/subscriptions/{id}": {
+      "delete": {
+        "callbacks": {},
+        "description": "Deletes a specific EventSub subscription by ID",
+        "operationId": "ServerWeb.TwitchController.delete_subscription",
+        "parameters": [
+          {
+            "description": "Subscription ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          }
+        },
+        "summary": "Delete Twitch EventSub subscription",
+        "tags": []
+      }
+    },
+    "/health": {
+      "get": {
+        "callbacks": {},
+        "description": "Always returns 200 OK with minimal response for simple uptime monitoring",
+        "operationId": "ServerWeb.HealthController.check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Healthy"
+          }
+        },
+        "summary": "Basic health check",
+        "tags": []
+      }
+    },
+    "/ready": {
+      "get": {
+        "callbacks": {},
+        "description": "Returns 200 if service is ready to accept traffic, 503 otherwise",
+        "operationId": "ServerWeb.HealthController.ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            },
+            "description": "Ready"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Ready"
+          }
+        },
+        "summary": "Readiness probe",
+        "tags": []
+      }
+    }
+  },
+  "security": [],
+  "servers": [
+    {
+      "url": "http://localhost:7175",
+      "variables": {}
+    }
+  ],
+  "tags": []
+}

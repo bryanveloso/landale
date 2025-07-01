@@ -85,7 +85,7 @@ defmodule Server.Services.IronmonTCP do
   @impl GenServer
   def init(opts) do
     port = Keyword.get(opts, :port, @default_port)
-    hostname = Keyword.get(opts, :hostname, @default_hostname) |> to_charlist()
+    hostname = Keyword.get(opts, :hostname, @default_hostname)
 
     state = %__MODULE__{
       port: port,
@@ -191,22 +191,28 @@ defmodule Server.Services.IronmonTCP do
   # Private Functions
 
   defp start_tcp_server(state) do
-    tcp_options = [
-      :binary,
-      {:packet, :raw},
-      {:active, true},
-      {:reuseaddr, true},
-      {:ip, :inet.parse_address(to_string(state.hostname)) |> elem(1)}
-    ]
+    case :inet.parse_address(to_charlist(state.hostname)) do
+      {:ok, ip_address} ->
+        tcp_options = [
+          :binary,
+          {:packet, :raw},
+          {:active, true},
+          {:reuseaddr, true},
+          {:ip, ip_address}
+        ]
 
-    case :gen_tcp.listen(state.port, tcp_options) do
-      {:ok, listen_socket} ->
-        # Start accepting connections
-        spawn_link(fn -> accept_connections(listen_socket, self()) end)
-        {:ok, %{state | listen_socket: listen_socket}}
+        case :gen_tcp.listen(state.port, tcp_options) do
+          {:ok, listen_socket} ->
+            # Start accepting connections
+            spawn_link(fn -> accept_connections(listen_socket, self()) end)
+            {:ok, %{state | listen_socket: listen_socket}}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
 
       {:error, reason} ->
-        {:error, reason}
+        {:error, {:invalid_ip_address, reason}}
     end
   end
 

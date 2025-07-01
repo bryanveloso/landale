@@ -14,12 +14,23 @@ defmodule ServerWeb.HealthController do
   """
 
   use ServerWeb, :controller
+  use OpenApiSpex.ControllerSpecs
+
+  alias ServerWeb.Schemas
 
   @doc """
   Basic health check endpoint.
 
   Always returns 200 OK with minimal response for simple uptime monitoring.
   """
+  operation(:check,
+    summary: "Basic health check",
+    description: "Always returns 200 OK with minimal response for simple uptime monitoring",
+    responses: %{
+      200 => {"Healthy", "application/json", Schemas.SuccessResponse}
+    }
+  )
+
   @spec check(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def check(conn, _params) do
     start_time = System.monotonic_time(:millisecond)
@@ -40,6 +51,15 @@ defmodule ServerWeb.HealthController do
   Returns comprehensive health data including all services and system metrics.
   Returns HTTP 503 if any critical services are unhealthy.
   """
+  operation(:detailed,
+    summary: "Detailed health check",
+    description: "Returns comprehensive health data including all services and system metrics",
+    responses: %{
+      200 => {"Healthy", "application/json", Schemas.HealthStatus},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   @spec detailed(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def detailed(conn, _params) do
     start_time = System.monotonic_time(:millisecond)
@@ -100,6 +120,15 @@ defmodule ServerWeb.HealthController do
   Returns 200 if service is ready to accept traffic, 503 otherwise.
   Currently only checks database connectivity.
   """
+  operation(:ready,
+    summary: "Readiness probe",
+    description: "Returns 200 if service is ready to accept traffic, 503 otherwise",
+    responses: %{
+      200 => {"Ready", "application/json", Schemas.SuccessResponse},
+      503 => {"Not Ready", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   @spec ready(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def ready(conn, _params) do
     start_time = System.monotonic_time(:millisecond)
@@ -135,6 +164,15 @@ defmodule ServerWeb.HealthController do
   Returns detailed subscription health information including counts,
   statuses, and recommendations for subscription management.
   """
+  operation(:subscriptions,
+    summary: "EventSub subscription health",
+    description: "Returns detailed subscription health information including counts, statuses, and recommendations",
+    responses: %{
+      200 => {"Subscription Health", "application/json", Schemas.SuccessResponse},
+      503 => {"Subscription Issues", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   @spec subscriptions(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def subscriptions(conn, _params) do
     start_time = System.monotonic_time(:millisecond)
