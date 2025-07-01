@@ -20,24 +20,6 @@ defmodule Server.ProcessSupervisor.Saya do
 
   alias Server.ProcessSupervisorBehaviour
 
-  # Input validation helpers
-  defp validate_process_name(name) when is_binary(name) do
-    cond do
-      String.length(name) > 50 ->
-        {:error, :process_name_too_long}
-
-      not Regex.match?(~r/^[a-zA-Z0-9_-]+$/, name) ->
-        {:error, :invalid_process_name_format}
-
-      not Map.has_key?(@managed_processes, name) ->
-        {:error, :process_not_managed}
-
-      true ->
-        {:ok, name}
-    end
-  end
-
-  defp validate_process_name(_), do: {:error, :invalid_process_name_type}
 
   # Simple Docker Compose stack management
   # OrbStack handles the individual containers beautifully, so we just manage the entire stack
@@ -126,7 +108,7 @@ defmodule Server.ProcessSupervisor.Saya do
       {:error, "System error: #{inspect(error)}"}
   end
 
-  def get_process(process_name) do
+  def get_process(_process_name) do
     {:error, "Only 'stack' management supported. Use OrbStack UI for individual containers."}
   end
 
@@ -152,7 +134,7 @@ defmodule Server.ProcessSupervisor.Saya do
       {:error, "System error: #{inspect(error)}"}
   end
 
-  def start_process(process_name) do
+  def start_process(_process_name) do
     {:error, "Only 'stack' management supported. Use OrbStack UI for individual containers."}
   end
 
@@ -178,7 +160,7 @@ defmodule Server.ProcessSupervisor.Saya do
       {:error, "System error: #{inspect(error)}"}
   end
 
-  def stop_process(process_name) do
+  def stop_process(_process_name) do
     {:error, "Only 'stack' management supported. Use OrbStack UI for individual containers."}
   end
 
@@ -197,11 +179,22 @@ defmodule Server.ProcessSupervisor.Saya do
     end
   end
 
-  def restart_process(process_name) do
+  def restart_process(_process_name) do
     {:error, "Only 'stack' management supported. Use OrbStack UI for individual containers."}
   end
 
   @impl ProcessSupervisorBehaviour
-  def managed_process?("stack"), do: true
-  def managed_process?(_), do: false
+  def process_running?("stack") do
+    case get_process("stack") do
+      {:ok, %{status: :running}} -> true
+      _ -> false
+    end
+  end
+  def process_running?(_), do: false
+
+  @impl ProcessSupervisorBehaviour
+  def cleanup do
+    Logger.info("Saya ProcessSupervisor cleanup completed")
+    :ok
+  end
 end

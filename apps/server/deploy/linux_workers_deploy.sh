@@ -14,11 +14,12 @@ RELEASE_NODE=server@saya
 PHX_SERVER=false
 WORKER_NODE=true
 
-# Cluster configuration
+# Cluster configuration (use Tailscale interface)
 CLUSTER_STRATEGY=Cluster.Strategy.Gossip
 CLUSTER_HOSTS=server@zelan,server@demi,server@saya,server@alys
-CLUSTER_IF_ADDR=100.0.0.0/8
+CLUSTER_IF_ADDR=tailscale0
 CLUSTER_PORT=45892
+BIND_IP=100.87.170.6
 
 # Logging
 LOG_LEVEL=info
@@ -31,11 +32,12 @@ RELEASE_NODE=server@alys
 PHX_SERVER=false
 WORKER_NODE=true
 
-# Cluster configuration
+# Cluster configuration (use Tailscale interface)
 CLUSTER_STRATEGY=Cluster.Strategy.Gossip
 CLUSTER_HOSTS=server@zelan,server@demi,server@saya,server@alys
-CLUSTER_IF_ADDR=100.0.0.0/8
+CLUSTER_IF_ADDR=tailscale0
 CLUSTER_PORT=45892
+BIND_IP=100.106.79.5
 
 # Logging
 LOG_LEVEL=info

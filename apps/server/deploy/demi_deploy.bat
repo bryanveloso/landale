@@ -15,11 +15,12 @@ echo set RELEASE_NODE=server@demi
 echo set PHX_SERVER=false
 echo set WORKER_NODE=true
 echo.
-echo rem Cluster configuration
+echo rem Cluster configuration (use Tailscale interface)
 echo set CLUSTER_STRATEGY=Cluster.Strategy.Gossip
 echo set CLUSTER_HOSTS=server@zelan,server@demi,server@saya,server@alys
-echo set CLUSTER_IF_ADDR=100.0.0.0/8
+echo set CLUSTER_IF_ADDR=Tailscale
 echo set CLUSTER_PORT=45892
+echo set BIND_IP=100.106.173.14
 echo.
 echo rem Logging
 echo set LOG_LEVEL=info
