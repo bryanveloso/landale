@@ -8,7 +8,9 @@ parse_bind_ip = fn
       # Fallback to localhost
       {:error, _} -> {127, 0, 0, 1}
     end
-  _ -> {127, 0, 0, 1}
+
+  _ ->
+    {127, 0, 0, 1}
 end
 
 # Load environment variables from .env files (development) or system environment (Docker)
@@ -53,86 +55,47 @@ config :server,
   twitch_client_secret: System.get_env("TWITCH_CLIENT_SECRET"),
   twitch_user_id: System.get_env("TWITCH_USER_ID")
 
-# ## Using releases
-#
-# Controller nodes (zelan) run the full Phoenix server with web endpoints
-# Worker nodes (demi, saya, alys) only run the process supervisor service
-is_worker_node = System.get_env("WORKER_NODE") == "true"
-enable_server = System.get_env("PHX_SERVER") == "true" or not is_worker_node
-
-if enable_server do
-  config :server, ServerWeb.Endpoint, server: true
-end
-
-# Cluster configuration for distributed process management
-if cluster_hosts = System.get_env("CLUSTER_HOSTS") do
-  hosts =
-    cluster_hosts
-    |> String.split(",")
-    |> Enum.map(&String.to_atom/1)
-
-  config :libcluster,
-    topologies: [
-      landale_cluster: [
-        strategy: Cluster.Strategy.Gossip,
-        config: [
-          hosts: hosts,
-          if_addr: System.get_env("CLUSTER_IF_ADDR") || "100.0.0.0/8",
-          port: String.to_integer(System.get_env("CLUSTER_PORT") || "45892"),
-          multicast_addr: System.get_env("CLUSTER_MULTICAST_ADDR") || "233.252.1.32",
-          multicast_ttl: String.to_integer(System.get_env("CLUSTER_MULTICAST_TTL") || "1")
-        ]
-      ]
-    ]
-end
-
 if config_env() == :prod do
-  # Worker nodes don't need database or Phoenix configuration
-  is_worker_node = System.get_env("WORKER_NODE") == "true"
-  
-  unless is_worker_node do
-    database_url =
-      System.get_env("DATABASE_URL") ||
-        raise """
-        environment variable DATABASE_URL is missing.
-        For example: ecto://USER:PASS@HOST/DATABASE
-        """
+  # Database is required for IronMON functionality
+  database_url =
+    System.get_env("DATABASE_URL") ||
+      raise """
+      environment variable DATABASE_URL is missing.
+      For example: ecto://USER:PASS@HOST/DATABASE
+      """
 
-    maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
+  maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
-    config :server, Server.Repo,
-      # ssl: true,
-      url: database_url,
-      pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-      socket_options: maybe_ipv6
+  config :server, Server.Repo,
+    # ssl: true,
+    url: database_url,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+    socket_options: maybe_ipv6
 
-    # The secret key base is used to sign/encrypt cookies and other secrets.
-    # A default value is used in config/dev.exs and config/test.exs but you
-    # want to use a different value for prod and you most likely don't want
-    # to check this value into version control, so we use an environment
-    # variable instead.
-    secret_key_base =
-      System.get_env("SECRET_KEY_BASE") ||
-        raise """
-        environment variable SECRET_KEY_BASE is missing.
-        You can generate one by calling: mix phx.gen.secret
-        """
+  # The secret key base is used to sign/encrypt cookies and other secrets.
+  # A default value is used in config/dev.exs and config/test.exs but you
+  # want to use a different value for prod and you most likely don't want
+  # to check this value into version control, so we use an environment
+  # variable instead.
+  secret_key_base =
+    System.get_env("SECRET_KEY_BASE") ||
+      raise """
+      environment variable SECRET_KEY_BASE is missing.
+      You can generate one by calling: mix phx.gen.secret
+      """
 
-    host = System.get_env("PHX_HOST") || "example.com"
-    port = String.to_integer(System.get_env("PORT") || "4000")
+  host = System.get_env("PHX_HOST") || "example.com"
+  port = String.to_integer(System.get_env("PORT") || "4000")
 
-    config :server, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :server, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-    config :server, ServerWeb.Endpoint,
-      url: [host: host, port: 443, scheme: "https"],
-      http: [
-        # Bind to Tailscale interface only for security
-        # Use 127.0.0.1 for local development, or Tailscale IP for production
-        ip: parse_bind_ip.(System.get_env("BIND_IP", "127.0.0.1")),
-        port: port
-      ],
-      secret_key_base: secret_key_base
-  end
+  config :server, ServerWeb.Endpoint,
+    url: [host: host, port: 443, scheme: "https"],
+    http: [
+      ip: parse_bind_ip.(System.get_env("BIND_IP", "127.0.0.1")),
+      port: port
+    ],
+    secret_key_base: secret_key_base
 
   # ## SSL Support
   #

@@ -2,10 +2,10 @@ import Config
 
 # Configure your database
 config :server, Server.Repo,
-  username: System.get_env("DATABASE_USERNAME", "landale"),
-  password: System.get_env("DATABASE_PASSWORD", "landale"),
-  hostname: "saya",
-  port: 5433,
+  username: "Avalonstar",
+  password: "",
+  hostname: "localhost",
+  port: 5432,
   database: "landale",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
@@ -57,7 +57,7 @@ config :server, dev_routes: true
 # OBS WebSocket configuration
 config :server, :obs_websocket_url, "ws://demi:4455"
 
-# Do not include metadata nor timestamps in development logs  
+# Do not include metadata nor timestamps in development logs
 config :logger, :console, format: "[$level] $message\n", level: :debug
 
 # Set a higher stacktrace during development. Avoid configuring such

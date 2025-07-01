@@ -34,10 +34,6 @@ server-*.tar
 .env.production
 .env.development
 
-# Deployment environment files (contain secrets)
-deploy/.env.*
-deploy/env_*.bat
-
 # OS-specific files
 .DS_Store
 Thumbs.db
