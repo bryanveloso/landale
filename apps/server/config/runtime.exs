@@ -1,5 +1,14 @@
 import Config
 
+# Helper function to parse bind IP address
+defp parse_bind_ip(ip_string) when is_binary(ip_string) do
+  case :inet.parse_address(String.to_charlist(ip_string)) do
+    {:ok, ip_tuple} -> ip_tuple
+    # Fallback to localhost
+    {:error, _} -> {127, 0, 0, 1}
+  end
+end
+
 # Load environment variables from .env files (development) or system environment (Docker)
 # This gracefully handles both scenarios:
 # - Development: Loads from .env file if it exists
@@ -44,15 +53,35 @@ config :server,
 
 # ## Using releases
 #
-# If you use `mix release`, you need to explicitly enable the server
-# by passing the PHX_SERVER=true when you start it:
-#
-#     PHX_SERVER=true bin/server start
-#
-# Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
-# script that automatically sets the env var above.
-if System.get_env("PHX_SERVER") do
+# Controller nodes (zelan) run the full Phoenix server with web endpoints
+# Worker nodes (demi, saya, alys) only run the process supervisor service
+is_worker_node = System.get_env("WORKER_NODE") == "true"
+enable_server = System.get_env("PHX_SERVER") == "true" or not is_worker_node
+
+if enable_server do
   config :server, ServerWeb.Endpoint, server: true
+end
+
+# Cluster configuration for distributed process management
+if cluster_hosts = System.get_env("CLUSTER_HOSTS") do
+  hosts =
+    cluster_hosts
+    |> String.split(",")
+    |> Enum.map(&String.to_atom/1)
+
+  config :libcluster,
+    topologies: [
+      landale_cluster: [
+        strategy: String.to_existing_atom(System.get_env("CLUSTER_STRATEGY") || "Cluster.Strategy.Gossip"),
+        config: [
+          hosts: hosts,
+          if_addr: System.get_env("CLUSTER_IF_ADDR") || "100.0.0.0/8",
+          port: String.to_integer(System.get_env("CLUSTER_PORT") || "45892"),
+          multicast_addr: System.get_env("CLUSTER_MULTICAST_ADDR") || "233.252.1.32",
+          multicast_ttl: String.to_integer(System.get_env("CLUSTER_MULTICAST_TTL") || "1")
+        ]
+      ]
+    ]
 end
 
 if config_env() == :prod do
@@ -91,11 +120,9 @@ if config_env() == :prod do
   config :server, ServerWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
-      # Enable IPv6 and bind on all interfaces.
-      # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.
-      # See the documentation on https://hexdocs.pm/bandit/Bandit.html#t:options/0
-      # for details about using IPv6 vs IPv4 and loopback vs public addresses.
-      ip: {0, 0, 0, 0, 0, 0, 0, 0},
+      # Bind to Tailscale interface only for security
+      # Use 127.0.0.1 for local development, or Tailscale IP for production
+      ip: parse_bind_ip(System.get_env("BIND_IP", "127.0.0.1")),
       port: port
     ],
     secret_key_base: secret_key_base

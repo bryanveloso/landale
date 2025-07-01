@@ -8,43 +8,24 @@ defmodule ServerWeb.ProcessController do
   """
 
   use ServerWeb, :controller
+  use OpenApiSpex.ControllerSpecs
 
   require Logger
 
   alias Server.Services.ProcessSupervisor
+  alias ServerWeb.Schemas
 
-  @doc """
-  Get the status of all processes across the entire cluster.
+  tags(["Process Management"])
 
-  ## Example Response
+  operation(:cluster_status,
+    summary: "Get cluster-wide process status",
+    description: "Returns the status of all managed processes across all nodes in the distributed cluster",
+    responses: [
+      ok: {"Cluster status", "application/json", Schemas.ClusterStatus},
+      internal_server_error: {"Server error", "application/json", Schemas.ErrorResponse}
+    ]
+  )
 
-      {
-        "status": "success",
-        "cluster": {
-          "zelan": [
-            {
-              "name": "terminal",
-              "display_name": "Terminal",
-              "status": "running", 
-              "pid": 1234,
-              "memory_mb": 45.2,
-              "cpu_percent": 1.5
-            }
-          ],
-          "demi": [
-            {
-              "name": "obs",
-              "display_name": "OBS Studio",
-              "status": "stopped",
-              "pid": null,
-              "memory_mb": 0,
-              "cpu_percent": 0.0
-            }
-          ]
-        },
-        "nodes": ["zelan", "demi", "saya", "alys"]
-      }
-  """
   def cluster_status(conn, _params) do
     cluster_data = ProcessSupervisor.cluster_status()
     nodes = ProcessSupervisor.get_cluster_nodes()
@@ -68,26 +49,19 @@ defmodule ServerWeb.ProcessController do
       })
   end
 
-  @doc """
-  Get all processes for a specific node.
+  operation(:node_processes,
+    summary: "Get processes for a specific node",
+    description: "Returns all managed processes on the specified cluster node",
+    parameters: [
+      node: [in: :path, description: "Node name (e.g. 'demi', 'alys', 'saya', 'zelan')", type: :string, example: "demi"]
+    ],
+    responses: [
+      ok: {"Node processes", "application/json", Schemas.NodeProcesses},
+      not_found: {"Node not found", "application/json", Schemas.ErrorResponse},
+      internal_server_error: {"Server error", "application/json", Schemas.ErrorResponse}
+    ]
+  )
 
-  ## Example Response
-
-      {
-        "status": "success",
-        "node": "demi",
-        "processes": [
-          {
-            "name": "obs",
-            "display_name": "OBS Studio", 
-            "status": "running",
-            "pid": 5678,
-            "memory_mb": 256.7,
-            "cpu_percent": 12.3
-          }
-        ]
-      }
-  """
   def node_processes(conn, %{"node" => node_name}) do
     case ProcessSupervisor.list_processes(node_name) do
       {:ok, processes} ->
@@ -134,24 +108,20 @@ defmodule ServerWeb.ProcessController do
       })
   end
 
-  @doc """
-  Get status of a specific process on a specific node.
+  operation(:process_status,
+    summary: "Get status of a specific process",
+    description: "Returns detailed status information for a specific process on a specific node",
+    parameters: [
+      node: [in: :path, description: "Node name", type: :string, example: "demi"],
+      process: [in: :path, description: "Process name", type: :string, example: "obs-studio"]
+    ],
+    responses: [
+      ok: {"Process status", "application/json", Schemas.ProcessStatus},
+      not_found: {"Process or node not found", "application/json", Schemas.ErrorResponse},
+      service_unavailable: {"Node unavailable", "application/json", Schemas.ErrorResponse}
+    ]
+  )
 
-  ## Example Response
-
-      {
-        "status": "success",
-        "node": "demi",
-        "process": {
-          "name": "obs",
-          "display_name": "OBS Studio",
-          "status": "running",
-          "pid": 5678, 
-          "memory_mb": 256.7,
-          "cpu_percent": 12.3
-        }
-      }
-  """
   def process_status(conn, %{"node" => node_name, "process" => process_name}) do
     case ProcessSupervisor.get_process_info(node_name, process_name) do
       {:ok, process_info} ->
@@ -212,18 +182,21 @@ defmodule ServerWeb.ProcessController do
       })
   end
 
-  @doc """
-  Start a process on a specific node.
+  operation(:start_process,
+    summary: "Start a process on a node",
+    description: "Starts the specified process on the specified cluster node",
+    parameters: [
+      node: [in: :path, description: "Node name", type: :string, example: "demi"],
+      process: [in: :path, description: "Process name", type: :string, example: "obs-studio"]
+    ],
+    responses: [
+      ok: {"Process started", "application/json", Schemas.ProcessActionResponse},
+      not_found: {"Process or node not found", "application/json", Schemas.ErrorResponse},
+      service_unavailable: {"Node unavailable", "application/json", Schemas.ErrorResponse},
+      internal_server_error: {"Start failed", "application/json", Schemas.ErrorResponse}
+    ]
+  )
 
-  ## Example Response
-
-      {
-        "status": "success",
-        "message": "Process started successfully",
-        "node": "demi",
-        "process": "obs"
-      }
-  """
   def start_process(conn, %{"node" => node_name, "process" => process_name}) do
     Logger.info("Starting process via API",
       node: node_name,
@@ -290,18 +263,21 @@ defmodule ServerWeb.ProcessController do
       })
   end
 
-  @doc """
-  Stop a process on a specific node.
+  operation(:stop_process,
+    summary: "Stop a process on a node",
+    description: "Stops the specified process on the specified cluster node",
+    parameters: [
+      node: [in: :path, description: "Node name", type: :string, example: "demi"],
+      process: [in: :path, description: "Process name", type: :string, example: "obs-studio"]
+    ],
+    responses: [
+      ok: {"Process stopped", "application/json", Schemas.ProcessActionResponse},
+      not_found: {"Process or node not found", "application/json", Schemas.ErrorResponse},
+      service_unavailable: {"Node unavailable", "application/json", Schemas.ErrorResponse},
+      internal_server_error: {"Stop failed", "application/json", Schemas.ErrorResponse}
+    ]
+  )
 
-  ## Example Response
-
-      {
-        "status": "success",
-        "message": "Process stopped successfully",
-        "node": "demi",
-        "process": "obs"
-      }
-  """
   def stop_process(conn, %{"node" => node_name, "process" => process_name}) do
     Logger.info("Stopping process via API",
       node: node_name,
@@ -368,18 +344,21 @@ defmodule ServerWeb.ProcessController do
       })
   end
 
-  @doc """
-  Restart a process on a specific node.
+  operation(:restart_process,
+    summary: "Restart a process on a node",
+    description: "Stops and then starts the specified process on the specified cluster node",
+    parameters: [
+      node: [in: :path, description: "Node name", type: :string, example: "demi"],
+      process: [in: :path, description: "Process name", type: :string, example: "obs-studio"]
+    ],
+    responses: [
+      ok: {"Process restarted", "application/json", Schemas.ProcessActionResponse},
+      not_found: {"Process or node not found", "application/json", Schemas.ErrorResponse},
+      service_unavailable: {"Node unavailable", "application/json", Schemas.ErrorResponse},
+      internal_server_error: {"Restart failed", "application/json", Schemas.ErrorResponse}
+    ]
+  )
 
-  ## Example Response
-
-      {
-        "status": "success",
-        "message": "Process restarted successfully",
-        "node": "demi",
-        "process": "obs"
-      }
-  """
   def restart_process(conn, %{"node" => node_name, "process" => process_name}) do
     Logger.info("Restarting process via API",
       node: node_name,

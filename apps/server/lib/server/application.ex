@@ -27,20 +27,32 @@ defmodule Server.Application do
 
     # Add production services only in non-test environments
     children =
-      if Mix.env() == :test do
-        base_children
-      else
-        base_children ++
+      cond do
+        Mix.env() == :test ->
+          base_children
+
+        System.get_env("WORKER_NODE") == "true" ->
+          # Worker nodes only run cluster formation and process supervision
           [
-            # Subscription monitoring
-            Server.SubscriptionMonitor,
-            # Services
-            Server.Services.OBS,
-            Server.Services.Twitch,
-            {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]},
-            # Distributed process supervision
+            ServerWeb.Telemetry,
+            {Phoenix.PubSub, name: Server.PubSub},
+            {Cluster.Supervisor, [Application.get_env(:libcluster, :topologies, []), [name: Server.ClusterSupervisor]]},
             Server.Services.ProcessSupervisor
           ]
+
+        true ->
+          # Controller node runs all services
+          base_children ++
+            [
+              # Subscription monitoring
+              Server.SubscriptionMonitor,
+              # Services
+              Server.Services.OBS,
+              Server.Services.Twitch,
+              {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]},
+              # Distributed process supervision
+              Server.Services.ProcessSupervisor
+            ]
       end
 
     # See https://hexdocs.pm/elixir/Supervisor.html

@@ -17,7 +17,8 @@ defmodule Server.MixProject do
         "coveralls.post": :test,
         "coveralls.html": :test,
         "coveralls.cobertura": :test
-      ]
+      ],
+      releases: releases()
     ]
   end
 
@@ -79,6 +80,47 @@ defmodule Server.MixProject do
       # Server management
       "dev.server": ["phx.server"],
       "dev.console": ["run --no-halt"]
+    ]
+  end
+
+  # Release configuration for distributed deployment
+  defp releases do
+    [
+      # Full controller node (zelan - Mac Studio)
+      server: [
+        version: "0.1.0",
+        applications: [server: :permanent],
+        include_executables_for: [:unix],
+        include_erts: true,
+        rel_templates_path: "rel/controller",
+        overlays: ["rel/controller"]
+      ],
+
+      # Worker nodes (saya/alys - Linux) 
+      worker: [
+        version: "0.1.0",
+        applications: [server: :permanent],
+        include_executables_for: [:unix],
+        include_erts: true,
+        rel_templates_path: "rel/worker",
+        overlays: ["rel/worker"],
+        config_providers: [
+          {Config.Reader, {:system, "RELEASE_ROOT", "/etc/worker.exs"}}
+        ]
+      ],
+
+      # Windows-specific worker node
+      worker_windows: [
+        version: "0.1.0",
+        applications: [server: :permanent],
+        include_executables_for: [:win32],
+        include_erts: true,
+        rel_templates_path: "rel/worker_windows",
+        overlays: ["rel/worker_windows"],
+        config_providers: [
+          {Config.Reader, {:system, "RELEASE_ROOT", "/etc/worker.exs"}}
+        ]
+      ]
     ]
   end
 end
