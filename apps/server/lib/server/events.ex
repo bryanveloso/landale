@@ -8,6 +8,7 @@ defmodule Server.Events do
   """
 
   require Logger
+  alias Server.CorrelationId
 
   @pubsub Server.PubSub
 
@@ -28,18 +29,29 @@ defmodule Server.Events do
   ## Parameters
   - `event_type` - Type of OBS event (e.g. "connection_established", "stream_started")
   - `data` - Event data payload
+  - `opts` - Options including :priority (:critical or :normal), :batch (true/false)
   """
-  @spec publish_obs_event(binary(), map()) :: :ok
-  def publish_obs_event(event_type, data) do
+  @spec publish_obs_event(binary(), map(), keyword()) :: :ok
+  def publish_obs_event(event_type, data, opts \\ []) do
     event = %{
       type: event_type,
       data: data,
       timestamp: System.system_time(:second),
-      correlation_id: UUID.uuid4()
+      correlation_id: get_correlation_id()
     }
 
-    Logger.debug("Publishing OBS event", event: event)
-    Phoenix.PubSub.broadcast(@pubsub, @obs_events, {:obs_event, event})
+    # Determine if this should be batched
+    should_batch = Keyword.get(opts, :batch, true)
+    priority = get_event_priority(event_type, opts)
+
+    if should_batch do
+      # Use batch publisher for dashboard efficiency
+      Server.Events.BatchPublisher.publish(@obs_events, {:obs_event, event}, priority: priority)
+    else
+      # Direct publish for immediate delivery
+      Logger.debug("Publishing OBS event", event: event)
+      Phoenix.PubSub.broadcast(@pubsub, @obs_events, {:obs_event, event})
+    end
 
     # Emit telemetry for published event
     Server.Telemetry.event_published(event_type, "obs:events")
@@ -53,18 +65,29 @@ defmodule Server.Events do
   ## Parameters
   - `event_type` - Type of Twitch event (e.g. "channel.update", "stream.online")
   - `data` - Event data payload from EventSub
+  - `opts` - Options including :priority (:critical or :normal), :batch (true/false)
   """
-  @spec publish_twitch_event(binary(), map()) :: :ok
-  def publish_twitch_event(event_type, data) do
+  @spec publish_twitch_event(binary(), map(), keyword()) :: :ok
+  def publish_twitch_event(event_type, data, opts \\ []) do
     event = %{
       type: event_type,
       data: data,
       timestamp: System.system_time(:second),
-      correlation_id: UUID.uuid4()
+      correlation_id: get_correlation_id()
     }
 
-    Logger.debug("Publishing Twitch event", event: event)
-    Phoenix.PubSub.broadcast(@pubsub, @twitch_events, {:twitch_event, event})
+    # Determine if this should be batched
+    should_batch = Keyword.get(opts, :batch, true)
+    priority = get_event_priority(event_type, opts)
+
+    if should_batch do
+      # Use batch publisher for dashboard efficiency
+      Server.Events.BatchPublisher.publish(@twitch_events, {:twitch_event, event}, priority: priority)
+    else
+      # Direct publish for immediate delivery
+      Logger.debug("Publishing Twitch event", event: event)
+      Phoenix.PubSub.broadcast(@pubsub, @twitch_events, {:twitch_event, event})
+    end
 
     # Emit telemetry for published event
     Server.Telemetry.event_published(event_type, "twitch:events")
@@ -78,18 +101,29 @@ defmodule Server.Events do
   ## Parameters
   - `event_type` - Type of IronMON event (e.g. "run_started", "checkpoint_reached")
   - `data` - Event data payload
+  - `opts` - Options including :priority (:critical or :normal), :batch (true/false)
   """
-  @spec publish_ironmon_event(binary(), map()) :: :ok
-  def publish_ironmon_event(event_type, data) do
+  @spec publish_ironmon_event(binary(), map(), keyword()) :: :ok
+  def publish_ironmon_event(event_type, data, opts \\ []) do
     event = %{
       type: event_type,
       data: data,
       timestamp: System.system_time(:second),
-      correlation_id: UUID.uuid4()
+      correlation_id: get_correlation_id()
     }
 
-    Logger.debug("Publishing IronMON event", event: event)
-    Phoenix.PubSub.broadcast(@pubsub, @ironmon_events, {:ironmon_event, event})
+    # Determine if this should be batched
+    should_batch = Keyword.get(opts, :batch, true)
+    priority = get_event_priority(event_type, opts)
+
+    if should_batch do
+      # Use batch publisher for dashboard efficiency
+      Server.Events.BatchPublisher.publish(@ironmon_events, {:ironmon_event, event}, priority: priority)
+    else
+      # Direct publish for immediate delivery
+      Logger.debug("Publishing IronMON event", event: event)
+      Phoenix.PubSub.broadcast(@pubsub, @ironmon_events, {:ironmon_event, event})
+    end
 
     # Emit telemetry for published event
     Server.Telemetry.event_published(event_type, "ironmon:events")
@@ -126,19 +160,29 @@ defmodule Server.Events do
   ## Parameters
   - `event_type` - Type of Rainwave event (e.g. "song_change", "station_change")
   - `data` - Event data payload
-  - `correlation_id` - Optional correlation ID for tracking
+  - `opts` - Options including :correlation_id, :priority (:critical or :normal), :batch (true/false)
   """
-  @spec publish_rainwave_event(binary(), map(), binary() | nil) :: :ok
-  def publish_rainwave_event(event_type, data, correlation_id \\ nil) do
+  @spec publish_rainwave_event(binary(), map(), keyword()) :: :ok
+  def publish_rainwave_event(event_type, data, opts \\ []) do
     event = %{
       type: event_type,
       data: data,
       timestamp: System.system_time(:second),
-      correlation_id: correlation_id || UUID.uuid4()
+      correlation_id: Keyword.get(opts, :correlation_id) || get_correlation_id()
     }
 
-    Logger.debug("Publishing Rainwave event", event: event)
-    Phoenix.PubSub.broadcast(@pubsub, @rainwave_events, {:rainwave_event, event})
+    # Determine if this should be batched
+    should_batch = Keyword.get(opts, :batch, true)
+    priority = get_event_priority(event_type, opts)
+
+    if should_batch do
+      # Use batch publisher for dashboard efficiency
+      Server.Events.BatchPublisher.publish(@rainwave_events, {:rainwave_event, event}, priority: priority)
+    else
+      # Direct publish for immediate delivery
+      Logger.debug("Publishing Rainwave event", event: event)
+      Phoenix.PubSub.broadcast(@pubsub, @rainwave_events, {:rainwave_event, event})
+    end
 
     # Emit telemetry for published event
     Server.Telemetry.event_published(event_type, "rainwave:events")
@@ -152,18 +196,29 @@ defmodule Server.Events do
   ## Parameters
   - `event_type` - Type of system event (e.g. "startup", "shutdown", "error")
   - `data` - Event data payload
+  - `opts` - Options including :priority (:critical or :normal), :batch (true/false)
   """
-  @spec publish_system_event(binary(), map()) :: :ok
-  def publish_system_event(event_type, data) do
+  @spec publish_system_event(binary(), map(), keyword()) :: :ok
+  def publish_system_event(event_type, data, opts \\ []) do
     event = %{
       type: event_type,
       data: data,
       timestamp: System.system_time(:second),
-      correlation_id: UUID.uuid4()
+      correlation_id: get_correlation_id()
     }
 
-    Logger.debug("Publishing system event", event: event)
-    Phoenix.PubSub.broadcast(@pubsub, @system_events, {:system_event, event})
+    # Determine if this should be batched
+    should_batch = Keyword.get(opts, :batch, true)
+    priority = get_event_priority(event_type, opts)
+
+    if should_batch do
+      # Use batch publisher for dashboard efficiency
+      Server.Events.BatchPublisher.publish(@system_events, {:system_event, event}, priority: priority)
+    else
+      # Direct publish for immediate delivery
+      Logger.debug("Publishing system event", event: event)
+      Phoenix.PubSub.broadcast(@pubsub, @system_events, {:system_event, event})
+    end
 
     # Emit telemetry for published event
     Server.Telemetry.event_published(event_type, "system:events")
@@ -284,5 +339,53 @@ defmodule Server.Events do
 
   def unsubscribe_from_performance_events do
     Phoenix.PubSub.unsubscribe(@pubsub, @performance_events)
+  end
+
+  # Private helper functions
+
+  defp get_correlation_id do
+    # Use pool for high-frequency event generation, fallback to direct generation
+    case Process.whereis(Server.CorrelationIdPool) do
+      nil -> CorrelationId.generate()
+      _pid -> Server.CorrelationIdPool.get()
+    end
+  end
+
+  defp get_event_priority(event_type, opts) do
+    # Check explicit priority first
+    case Keyword.get(opts, :priority) do
+      nil -> determine_priority_by_type(event_type)
+      priority -> priority
+    end
+  end
+
+  defp determine_priority_by_type(event_type) do
+    critical_events = [
+      # Connection events
+      "connection_lost",
+      "connection_failed", 
+      "websocket_disconnected",
+      "authentication_failed",
+      # Streaming events  
+      "stream_stopped",
+      "recording_stopped",
+      "stream_started",
+      "recording_started",
+      # Service events
+      "service_error",
+      "service_unavailable",
+      "startup",
+      "shutdown",
+      # Health events
+      "unhealthy",
+      "degraded",
+      "service_down"
+    ]
+
+    if event_type in critical_events do
+      :critical
+    else
+      :normal
+    end
   end
 end

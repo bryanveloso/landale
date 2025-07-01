@@ -97,6 +97,13 @@ defmodule ServerWeb.DashboardChannel do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_info({:event_batch, batch}, socket) do
+    # Handle batched events efficiently
+    push(socket, "event_batch", batch)
+    {:noreply, socket}
+  end
+
   # Handle incoming messages from client
   @impl true
   def handle_in("obs:get_status", _payload, socket) do

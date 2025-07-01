@@ -30,6 +30,9 @@ defmodule Server.Application do
       else
         base_children ++
           [
+            # Performance optimizations
+            Server.CorrelationIdPool,
+            Server.Events.BatchPublisher,
             # Subscription monitoring
             Server.SubscriptionMonitor,
             # Services
