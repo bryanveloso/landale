@@ -311,4 +311,68 @@ defmodule ServerWeb.Schemas do
       required: [:type, :condition]
     })
   end
+
+  defmodule RainwaveStatus do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        success: %Schema{type: :boolean, example: true},
+        data: %Schema{
+          type: :object,
+          properties: %{
+            rainwave: %Schema{
+              type: :object,
+              properties: %{
+                enabled: %Schema{type: :boolean, example: true},
+                listening: %Schema{type: :boolean, example: true},
+                station_id: %Schema{type: :integer, example: 3},
+                station_name: %Schema{type: :string, example: "Covers"},
+                has_credentials: %Schema{type: :boolean, example: true},
+                current_song: %Schema{
+                  type: :object,
+                  nullable: true,
+                  properties: %{
+                    title: %Schema{type: :string, example: "Song Title"},
+                    artist: %Schema{type: :string, example: "Artist Name"},
+                    album: %Schema{type: :string, example: "Album Name"},
+                    length: %Schema{type: :integer, example: 240},
+                    start_time: %Schema{type: :integer, example: 1_640_995_200},
+                    end_time: %Schema{type: :integer, example: 1_640_995_440},
+                    url: %Schema{type: :string, example: "https://rainwave.cc/song/12345"},
+                    album_art: %Schema{type: :string, nullable: true, example: "https://rainwave.cc/path/art_320.jpg"}
+                  }
+                }
+              },
+              required: [:enabled, :listening, :station_id, :station_name, :has_credentials]
+            },
+            timestamp: %Schema{type: :string, format: :"date-time"}
+          },
+          required: [:rainwave, :timestamp]
+        }
+      },
+      required: [:success, :data]
+    })
+  end
+
+  defmodule RainwaveConfig do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        enabled: %Schema{type: :boolean, example: true, description: "Enable or disable the Rainwave service"},
+        station_id: %Schema{
+          type: :integer,
+          example: 3,
+          description: "Rainwave station ID (1=Game, 2=OCRemix, 3=Covers, 4=Chiptunes, 5=All)",
+          minimum: 1,
+          maximum: 5
+        }
+      }
+    })
+  end
 end

@@ -65,6 +65,10 @@ defmodule ServerWeb.Router do
     get "/ironmon/results/recent", IronmonController, :recent_results
     get "/ironmon/seeds/:id/challenge", IronmonController, :active_challenge
 
+    # Rainwave music service
+    get "/rainwave/status", RainwaveController, :status
+    post "/rainwave/config", RainwaveController, :update_config
+
     # Control system
     get "/control/status", ControlController, :status
     get "/control/services", ControlController, :services
