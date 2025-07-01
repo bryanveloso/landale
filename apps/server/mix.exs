@@ -53,6 +53,7 @@ defmodule Server.MixProject do
       {:uuid, "~> 1.1"},
       {:gun, "~> 2.0"},
       {:open_api_spex, "~> 3.21"},
+      {:libcluster, "~> 3.3"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
       {:mox, "~> 1.0", only: :test}
