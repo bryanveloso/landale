@@ -110,85 +110,97 @@ defmodule Server.WebSocketClient do
       Logger.warning("WebSocket client already connected", url: client.url)
       {:ok, client}
     else
-      Logger.info("Initiating WebSocket connection", url: client.url)
-
-      # Emit telemetry for connection attempt
-      emit_telemetry(client, [:connection, :attempt], %{})
-
-      host = to_charlist(client.uri.host)
-      port = client.uri.port || default_port(client.uri.scheme)
-      path = client.uri.path || "/"
-
-      connection_start_time = System.monotonic_time(:millisecond)
-      client = %{client | connection_start_time: connection_start_time}
-
-      case :gun.open(host, port, gun_opts(client.uri.scheme)) do
-        {:ok, conn_pid} ->
-          # Use ConnectionManager to track monitor and connection
-          {monitor_ref, updated_connection_manager} =
-            Server.ConnectionManager.add_monitor(
-              client.connection_manager,
-              conn_pid,
-              :websocket_connection
-            )
-
-          websocket_config = Server.NetworkConfig.websocket_config()
-
-          case :gun.await_up(conn_pid, websocket_config.timeout) do
-            {:ok, _protocol} ->
-              headers = Keyword.get(opts, :headers, [])
-              protocols = Keyword.get(opts, :protocols, [])
-
-              ws_opts = if protocols != [], do: %{protocols: protocols}, else: %{}
-              stream_ref = :gun.ws_upgrade(conn_pid, path, headers, ws_opts)
-
-              Logger.debug("WebSocket upgrade initiated",
-                url: client.url,
-                conn_pid: inspect(conn_pid),
-                stream_ref: inspect(stream_ref)
-              )
-
-              # Track connection and update client state
-              final_connection_manager =
-                Server.ConnectionManager.add_connection(
-                  updated_connection_manager,
-                  conn_pid,
-                  stream_ref,
-                  :websocket
-                )
-
-              updated_client = %{
-                client
-                | conn_pid: conn_pid,
-                  stream_ref: stream_ref,
-                  monitor_ref: monitor_ref,
-                  connection_manager: final_connection_manager
-              }
-
-              {:ok, updated_client}
-
-            {:error, reason} ->
-              Logger.error("WebSocket connection failed during await_up",
-                url: client.url,
-                reason: reason
-              )
-
-              :gun.close(conn_pid)
-              emit_connection_failure(client, reason)
-
-              {:error, client, reason}
-          end
-
-        {:error, reason} ->
-          Logger.error("WebSocket connection failed during open",
-            url: client.url,
-            reason: reason
-          )
-
-          emit_connection_failure(client, reason)
-          {:error, client, reason}
-      end
+      perform_connection(client, opts)
     end
+  end
+
+  defp perform_connection(client, opts) do
+    Logger.info("Initiating WebSocket connection", url: client.url)
+
+    # Emit telemetry for connection attempt
+    emit_telemetry(client, [:connection, :attempt], %{})
+
+    host = to_charlist(client.uri.host)
+    port = client.uri.port || default_port(client.uri.scheme)
+    path = client.uri.path || "/"
+
+    connection_start_time = System.monotonic_time(:millisecond)
+    client = %{client | connection_start_time: connection_start_time}
+
+    case :gun.open(host, port, gun_opts(client.uri.scheme)) do
+      {:ok, conn_pid} ->
+        establish_websocket_connection(client, conn_pid, path, opts)
+
+      {:error, reason} ->
+        Logger.error("WebSocket connection failed during open",
+          url: client.url,
+          reason: reason
+        )
+
+        emit_connection_failure(client, reason)
+        {:error, client, reason}
+    end
+  end
+
+  defp establish_websocket_connection(client, conn_pid, path, opts) do
+    # Use ConnectionManager to track monitor and connection
+    {monitor_ref, updated_connection_manager} =
+      Server.ConnectionManager.add_monitor(
+        client.connection_manager,
+        conn_pid,
+        :websocket_connection
+      )
+
+    websocket_config = Server.NetworkConfig.websocket_config()
+
+    case :gun.await_up(conn_pid, websocket_config.timeout) do
+      {:ok, _protocol} ->
+        complete_websocket_setup(client, conn_pid, monitor_ref, updated_connection_manager, path, opts)
+
+      {:error, reason} ->
+        Logger.error("WebSocket connection failed during await_up",
+          url: client.url,
+          reason: reason
+        )
+
+        :gun.close(conn_pid)
+        emit_connection_failure(client, reason)
+
+        {:error, client, reason}
+    end
+  end
+
+  defp complete_websocket_setup(client, conn_pid, monitor_ref, updated_connection_manager, path, opts) do
+    headers = Keyword.get(opts, :headers, [])
+    protocols = Keyword.get(opts, :protocols, [])
+
+    ws_opts = if protocols != [], do: %{protocols: protocols}, else: %{}
+    stream_ref = :gun.ws_upgrade(conn_pid, path, headers, ws_opts)
+
+    Logger.debug("WebSocket upgrade initiated",
+      url: client.url,
+      conn_pid: inspect(conn_pid),
+      stream_ref: inspect(stream_ref)
+    )
+
+    # Track connection and update client state
+    final_connection_manager =
+      Server.ConnectionManager.add_connection(
+        updated_connection_manager,
+        conn_pid,
+        stream_ref,
+        :websocket
+      )
+
+    updated_client = %{
+      client
+      | conn_pid: conn_pid,
+        stream_ref: stream_ref,
+        monitor_ref: monitor_ref,
+        connection_manager: final_connection_manager
+    }
+
+    {:ok, updated_client}
   end
 
   @doc """

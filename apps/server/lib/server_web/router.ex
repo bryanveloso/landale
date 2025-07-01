@@ -8,6 +8,12 @@ defmodule ServerWeb.Router do
     plug OpenApiSpex.Plug.PutApiSpec, module: ServerWeb.ApiSpec
   end
 
+  pipeline :authenticated_api do
+    plug :accepts, ["json"]
+    plug ServerWeb.Plugs.ApiAuth
+    plug OpenApiSpex.Plug.PutApiSpec, module: ServerWeb.ApiSpec
+  end
+
   pipeline :browser do
     plug :accepts, ["html"]
   end
@@ -28,7 +34,7 @@ defmodule ServerWeb.Router do
   end
 
   scope "/api", ServerWeb do
-    pipe_through :api
+    pipe_through :authenticated_api
 
     # Health and system status
     get "/health", HealthController, :detailed

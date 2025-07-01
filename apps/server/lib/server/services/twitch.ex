@@ -214,76 +214,88 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_call({:create_subscription, event_type, condition, opts}, _from, state) do
-    if state.state.connection.connected && state.session_id do
-      # Check subscription limits before creating
-      if state.state.subscription_count >= state.state.subscription_max_count do
+    cond do
+      not (state.state.connection.connected && state.session_id) ->
+        {:reply, {:error, "WebSocket not connected"}, state}
+
+      state.state.subscription_count >= state.state.subscription_max_count ->
         {:reply, {:error, "Subscription count limit exceeded (#{state.state.subscription_max_count})"}, state}
-      else
-        # Check for duplicate subscription
-        existing_key = EventSubManager.generate_subscription_key(event_type, condition)
 
-        existing_subscription =
-          Enum.find(state.subscriptions, fn {_id, sub} ->
-            EventSubManager.generate_subscription_key(sub["type"], sub["condition"]) == existing_key
-          end)
-
-        if existing_subscription do
-          {id, subscription} = existing_subscription
-
-          Logger.warning("Duplicate subscription attempt",
-            event_type: event_type,
-            existing_id: id,
-            condition: condition
-          )
-
-          {:reply, {:ok, subscription}, state}
-        else
-          # Create subscription using EventSubManager
-          manager_state = %{
-            session_id: state.session_id,
-            oauth2_client: state.token_manager.oauth2_client,
-            scopes: state.scopes,
-            user_id: state.user_id
-          }
-
-          case EventSubManager.create_subscription(manager_state, event_type, condition, opts) do
-            {:ok, subscription} ->
-              # Store the subscription and update counters
-              new_subscriptions = Map.put(state.subscriptions, subscription["id"], subscription)
-              cost = subscription["cost"] || 1
-
-              # Track subscription in monitor
-              Server.SubscriptionMonitor.track_subscription(
-                subscription["id"],
-                event_type,
-                %{
-                  service: :twitch,
-                  user_id: state.user_id,
-                  cost: cost,
-                  condition: condition
-                }
-              )
-
-              new_state = %{
-                state
-                | subscriptions: new_subscriptions,
-                  state: %{
-                    state.state
-                    | subscription_total_cost: state.state.subscription_total_cost + cost,
-                      subscription_count: state.state.subscription_count + 1
-                  }
-              }
-
-              {:reply, {:ok, subscription}, new_state}
-
-            {:error, reason} ->
-              {:reply, {:error, reason}, state}
-          end
-        end
-      end
-    else
-      {:reply, {:error, "WebSocket not connected"}, state}
+      true ->
+        handle_subscription_creation(event_type, condition, opts, state)
     end
+  end
+
+  defp handle_subscription_creation(event_type, condition, opts, state) do
+    # Check for duplicate subscription
+    existing_key = EventSubManager.generate_subscription_key(event_type, condition)
+
+    existing_subscription =
+      Enum.find(state.subscriptions, fn {_id, sub} ->
+        EventSubManager.generate_subscription_key(sub["type"], sub["condition"]) == existing_key
+      end)
+
+    case existing_subscription do
+      {id, subscription} ->
+        Logger.warning("Duplicate subscription attempt",
+          event_type: event_type,
+          existing_id: id,
+          condition: condition
+        )
+
+        {:reply, {:ok, subscription}, state}
+
+      nil ->
+        create_new_subscription(event_type, condition, opts, state)
+    end
+  end
+
+  defp create_new_subscription(event_type, condition, opts, state) do
+    # Create subscription using EventSubManager
+    manager_state = %{
+      session_id: state.session_id,
+      oauth2_client: state.token_manager.oauth2_client,
+      scopes: state.scopes,
+      user_id: state.user_id
+    }
+
+    case EventSubManager.create_subscription(manager_state, event_type, condition, opts) do
+      {:ok, subscription} ->
+        add_subscription_to_state(subscription, event_type, condition, state)
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  defp add_subscription_to_state(subscription, event_type, condition, state) do
+    # Store the subscription and update counters
+    new_subscriptions = Map.put(state.subscriptions, subscription["id"], subscription)
+    cost = subscription["cost"] || 1
+
+    # Track subscription in monitor
+    Server.SubscriptionMonitor.track_subscription(
+      subscription["id"],
+      event_type,
+      %{
+        service: :twitch,
+        user_id: state.user_id,
+        cost: cost,
+        condition: condition
+      }
+    )
+
+    new_state = %{
+      state
+      | subscriptions: new_subscriptions,
+        state: %{
+          state.state
+          | subscription_total_cost: state.state.subscription_total_cost + cost,
+            subscription_count: state.state.subscription_count + 1
+        }
+    }
+
+    {:reply, {:ok, subscription}, new_state}
   end
 
   @impl GenServer

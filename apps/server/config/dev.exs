@@ -2,8 +2,8 @@ import Config
 
 # Configure your database
 config :server, Server.Repo,
-  username: "landale",
-  password: "landale",
+  username: System.get_env("DATABASE_USERNAME", "landale"),
+  password: System.get_env("DATABASE_PASSWORD", "landale"),
   hostname: "saya",
   port: 5433,
   database: "landale",
@@ -24,7 +24,8 @@ config :server, ServerWeb.Endpoint,
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "n+b/75+noZv72qfKLSiLirB8af8MDiXd2W5RRHDIxHTEPgIVli4x1a9RgSzs7pOG",
+  secret_key_base:
+    System.get_env("SECRET_KEY_BASE_DEV", "n+b/75+noZv72qfKLSiLirB8af8MDiXd2W5RRHDIxHTEPgIVli4x1a9RgSzs7pOG"),
   watchers: []
 
 # ## SSL Support

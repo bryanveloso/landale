@@ -1,0 +1,12 @@
+#!/bin/bash
+cd -P -- "$(dirname -- "$0")"
+
+# Set node name based on hostname or environment
+export RELEASE_NODE="${RELEASE_NODE:-server@$(hostname)}"
+
+# Set cluster configuration
+export CLUSTER_STRATEGY="${CLUSTER_STRATEGY:-Cluster.Strategy.Gossip}"
+export CLUSTER_HOSTS="${CLUSTER_HOSTS:-server@zelan,server@demi,server@saya,server@alys}"
+
+# Start the server
+exec ./server start

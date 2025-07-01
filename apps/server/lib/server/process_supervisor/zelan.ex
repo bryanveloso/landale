@@ -1,8 +1,8 @@
-defmodule Server.ProcessSupervisor.MacOS do
+defmodule Server.ProcessSupervisor.Zelan do
   @moduledoc """
-  macOS-specific process supervision implementation.
+  Process supervision for zelan (Mac Studio controller + AI services).
 
-  Uses macOS system commands (ps, kill, open, etc.) to manage processes
+  Manages AI services: phononmaser, analysis, LM Studio
   on macOS machines in the distributed Elixir cluster.
 
   ## Managed Processes
@@ -21,49 +21,62 @@ defmodule Server.ProcessSupervisor.MacOS do
 
   alias Server.ProcessSupervisorBehaviour
 
-  # Process definitions for macOS
+  # Input validation helpers
+  defp validate_process_name(name) when is_binary(name) do
+    cond do
+      String.length(name) > 50 ->
+        {:error, :process_name_too_long}
+
+      not Regex.match?(~r/^[a-zA-Z0-9_-]+$/, name) ->
+        {:error, :invalid_process_name_format}
+
+      not Map.has_key?(@managed_processes, name) ->
+        {:error, :process_not_managed}
+
+      true ->
+        {:ok, name}
+    end
+  end
+
+  defp validate_process_name(_), do: {:error, :invalid_process_name_type}
+
+  # Process definitions for macOS (zelan - Mac Studio with AI services)
   @managed_processes %{
-    "terminal" => %{
-      name: "terminal",
-      display_name: "Terminal",
-      app_name: "Terminal",
-      bundle_id: "com.apple.Terminal",
-      app_path: "/System/Applications/Utilities/Terminal.app"
+    "phononmaser" => %{
+      name: "phononmaser",
+      display_name: "Phononmaser Audio Processing",
+      type: :python_service,
+      script_path: "/Users/Avalonstar/Code/bryanveloso/landale/apps/phononmaser/.venv/bin/python",
+      args: ["-m", "src.main"],
+      cwd: "/Users/Avalonstar/Code/bryanveloso/landale/apps/phononmaser",
+      env: %{
+        "PYTHONUNBUFFERED" => "1",
+        "LOG_LEVEL" => "info",
+        "PHONONMASER_PORT" => "8889",
+        "PHONONMASER_HEALTH_PORT" => "8890"
+      }
     },
-    "finder" => %{
-      name: "finder",
-      display_name: "Finder",
-      app_name: "Finder",
-      bundle_id: "com.apple.finder",
-      app_path: "/System/Library/CoreServices/Finder.app"
+    "analysis" => %{
+      name: "analysis",
+      display_name: "Analysis Service",
+      type: :python_service,
+      script_path: "/Users/Avalonstar/Code/bryanveloso/landale/apps/analysis/.venv/bin/python",
+      args: ["-m", "src.main"],
+      cwd: "/Users/Avalonstar/Code/bryanveloso/landale/apps/analysis",
+      env: %{
+        "PYTHONUNBUFFERED" => "1",
+        "LOG_LEVEL" => "info",
+        "SERVER_HOST" => "saya",
+        "PHONONMASER_HOST" => "zelan"
+      }
     },
-    "safari" => %{
-      name: "safari",
-      display_name: "Safari",
-      app_name: "Safari",
-      bundle_id: "com.apple.Safari",
-      app_path: "/Applications/Safari.app"
-    },
-    "chrome" => %{
-      name: "chrome",
-      display_name: "Google Chrome",
-      app_name: "Google Chrome",
-      bundle_id: "com.google.Chrome",
-      app_path: "/Applications/Google Chrome.app"
-    },
-    "vscode" => %{
-      name: "vscode",
-      display_name: "Visual Studio Code",
-      app_name: "Visual Studio Code",
-      bundle_id: "com.microsoft.VSCode",
-      app_path: "/Applications/Visual Studio Code.app"
-    },
-    "streamdeck" => %{
-      name: "streamdeck",
-      display_name: "Stream Deck",
-      app_name: "Stream Deck",
-      bundle_id: "com.elgato.StreamDeck",
-      app_path: "/Applications/Stream Deck.app"
+    "lms" => %{
+      name: "lms",
+      display_name: "LM Studio Server",
+      type: :command_service,
+      command: "lms",
+      args: ["server", "start", "--port", "1234"],
+      env: %{}
     }
   }
 

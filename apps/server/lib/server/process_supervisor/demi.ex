@@ -1,8 +1,8 @@
-defmodule Server.ProcessSupervisor.Windows do
+defmodule Server.ProcessSupervisor.Demi do
   @moduledoc """
-  Windows-specific process supervision implementation.
+  Process supervision for demi (Windows streaming machine).
 
-  Uses Windows system commands (tasklist, taskkill, etc.) to manage processes
+  Manages streaming applications: OBS Studio, VTube Studio, TITS Launcher
   on Windows machines in the distributed Elixir cluster.
 
   ## Managed Processes
@@ -19,35 +19,50 @@ defmodule Server.ProcessSupervisor.Windows do
 
   alias Server.ProcessSupervisorBehaviour
 
-  # Process definitions for Windows
+  # Input validation helpers
+  defp validate_process_name(name) when is_binary(name) do
+    cond do
+      String.length(name) > 50 ->
+        {:error, :process_name_too_long}
+
+      not Regex.match?(~r/^[a-zA-Z0-9_-]+$/, name) ->
+        {:error, :invalid_process_name_format}
+
+      not Map.has_key?(@managed_processes, name) ->
+        {:error, :process_not_managed}
+
+      true ->
+        {:ok, name}
+    end
+  end
+
+  defp validate_process_name(_), do: {:error, :invalid_process_name_type}
+
+  # Process definitions for Windows (demi - streaming machine)
   @managed_processes %{
-    "obs" => %{
-      name: "obs",
+    "obs-studio" => %{
+      name: "obs-studio",
       display_name: "OBS Studio",
       executable: "obs64.exe",
-      start_command: ~s["C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe"],
-      process_name: "obs64.exe"
+      start_command: ~s["C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe" --enable-media-stream],
+      process_name: "obs64.exe",
+      cwd: "C:\\Program Files\\obs-studio\\bin\\64bit"
     },
-    "streamdeck" => %{
-      name: "streamdeck",
-      display_name: "Stream Deck",
-      executable: "StreamDeck.exe",
-      start_command: ~s["C:\\Program Files\\Elgato\\StreamDeck\\StreamDeck.exe"],
-      process_name: "StreamDeck.exe"
+    "vtube-studio" => %{
+      name: "vtube-studio",
+      display_name: "VTube Studio",
+      executable: "VTube Studio.exe",
+      start_command: ~s["D:\\Steam\\steamapps\\common\\VTube Studio\\VTube Studio.exe"],
+      process_name: "VTube Studio.exe",
+      cwd: "D:\\Steam\\steamapps\\common\\VTube Studio"
     },
-    "discord" => %{
-      name: "discord",
-      display_name: "Discord",
-      executable: "Discord.exe",
-      start_command: ~s["%LOCALAPPDATA%\\Discord\\Update.exe" --processStart Discord.exe],
-      process_name: "Discord.exe"
-    },
-    "chrome" => %{
-      name: "chrome",
-      display_name: "Google Chrome",
-      executable: "chrome.exe",
-      start_command: ~s["C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"],
-      process_name: "chrome.exe"
+    "tits" => %{
+      name: "tits",
+      display_name: "TITS Launcher",
+      executable: "TITS Launcher.exe",
+      start_command: ~s["D:\\Applications\\TITS\\TITS Launcher.exe"],
+      process_name: "TITS Launcher.exe",
+      cwd: "D:\\Applications\\TITS"
     }
   }
 

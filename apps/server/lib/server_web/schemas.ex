@@ -314,4 +314,100 @@ defmodule ServerWeb.Schemas do
       required: [:event_type, :condition]
     })
   end
+
+  defmodule ProcessStatus do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        name: %Schema{type: :string, example: "obs-studio"},
+        display_name: %Schema{type: :string, example: "OBS Studio"},
+        status: %Schema{type: :string, enum: [:running, :stopped, :managed_by_orbstack], example: "running"},
+        pid: %Schema{type: :integer, example: 1234, nullable: true},
+        memory_mb: %Schema{type: :integer, example: 128, nullable: true},
+        cpu_percent: %Schema{type: :number, example: 5.2, nullable: true},
+        containers: %Schema{type: :integer, example: 4, nullable: true},
+        description: %Schema{type: :string, example: "Streaming software for content creation"}
+      },
+      required: [:name, :display_name, :status]
+    })
+  end
+
+  defmodule ClusterStatus do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        status: %Schema{type: :string, example: "success"},
+        nodes: %Schema{
+          type: :array,
+          items: %Schema{type: :string, example: "demi"},
+          example: ["zelan", "demi", "saya", "alys"]
+        },
+        cluster: %Schema{
+          type: :object,
+          additionalProperties: %Schema{
+            type: :array,
+            items: %Schema{type: :string}
+          },
+          example: %{
+            "demi" => ["obs-studio", "vtube-studio", "tits"],
+            "alys" => ["streamer-bot"],
+            "saya" => ["stack"],
+            "zelan" => ["phononmaser", "analysis", "lms"]
+          }
+        }
+      },
+      required: [:status, :nodes, :cluster]
+    })
+  end
+
+  defmodule NodeProcesses do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        status: %Schema{type: :string, example: "success"},
+        node: %Schema{type: :string, example: "demi"},
+        processes: %Schema{
+          type: :array,
+          items: ProcessStatus,
+          example: [
+            %{
+              name: "obs-studio",
+              display_name: "OBS Studio",
+              status: "running",
+              pid: 1234,
+              memory_mb: 128,
+              cpu_percent: 5.2
+            }
+          ]
+        }
+      },
+      required: [:status, :node, :processes]
+    })
+  end
+
+  defmodule ProcessActionResponse do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        status: %Schema{type: :string, example: "success"},
+        action: %Schema{type: :string, enum: ["start", "stop", "restart"], example: "start"},
+        process: %Schema{type: :string, example: "obs-studio"},
+        node: %Schema{type: :string, example: "demi"},
+        message: %Schema{type: :string, example: "Process started successfully"}
+      },
+      required: [:status, :action, :process, :node]
+    })
+  end
 end
