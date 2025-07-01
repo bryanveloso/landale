@@ -53,6 +53,8 @@ defmodule Server.MixProject do
       {:uuid, "~> 1.1"},
       {:gun, "~> 2.0"},
       {:open_api_spex, "~> 3.21"},
+      {:benchee, "~> 1.3", only: [:dev, :test], runtime: false},
+      {:benchee_html, "~> 1.0", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
       {:mox, "~> 1.0", only: :test}
@@ -75,6 +77,10 @@ defmodule Server.MixProject do
       quality: ["format", "credo --strict", "test"],
       "quality.fix": ["format", "credo --strict --fix-only"],
       check: ["compile --warnings-as-errors", "format --check-formatted", "credo --strict"],
+      # Performance testing
+      benchmark: ["run -e 'Server.Performance.run_benchmarks()'"],
+      "perf.load": ["run -e 'Server.Performance.simulate_realistic_load(60)'"],
+      "perf.websocket": ["run -e 'Server.Performance.test_websocket_load(10)'"],
       # Server management
       "dev.server": ["phx.server"],
       "dev.console": ["run --no-halt"]

@@ -72,7 +72,11 @@ if config_env() == :prod do
   config :server, Server.Repo,
     # ssl: true,
     url: database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "20"),
+    queue_target: 50,
+    queue_interval: 1_000,
+    timeout: 15_000,
+    ownership_timeout: 20_000,
     socket_options: maybe_ipv6
 
   # The secret key base is used to sign/encrypt cookies and other secrets.

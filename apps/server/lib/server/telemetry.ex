@@ -79,12 +79,14 @@ defmodule Server.Telemetry do
     memory_info = :erlang.memory()
     total_memory = memory_info[:total]
     process_memory = memory_info[:processes]
+    ets_memory = memory_info[:ets]
 
     :telemetry.execute(
       [:server, :system, :memory],
       %{
         total: total_memory,
-        processes: process_memory
+        processes: process_memory,
+        ets: ets_memory
       },
       %{}
     )
@@ -92,6 +94,15 @@ defmodule Server.Telemetry do
     # Measure process count
     process_count = :erlang.system_info(:process_count)
     :telemetry.execute([:server, :system, :processes], %{count: process_count}, %{})
+
+    # Measure service GenServer status
+    measure_genserver_health()
+
+    # Measure database connection pool usage
+    measure_database_pool()
+
+    # Measure ETS table metrics
+    measure_ets_tables()
 
     # Measure scheduler utilization
     case :scheduler.sample_all() do
@@ -110,6 +121,109 @@ defmodule Server.Telemetry do
         # Skip measurement if scheduler data format is unexpected
         :ok
     end
+  end
+
+  @doc """
+  Measures GenServer health for core services.
+  """
+  def measure_genserver_health do
+    services = [
+      {Server.Services.OBS, :obs},
+      {Server.Services.Twitch, :twitch},
+      {Server.Services.IronmonTCP, :ironmon_tcp},
+      {Server.Services.Rainwave, :rainwave}
+    ]
+
+    Enum.each(services, fn {module, service_name} ->
+      case Process.whereis(module) do
+        nil ->
+          :telemetry.execute([:server, :genserver, :status], %{value: 0}, %{service: service_name})
+
+        pid when is_pid(pid) ->
+          :telemetry.execute([:server, :genserver, :status], %{value: 1}, %{service: service_name})
+
+          # Measure mailbox size
+          {:message_queue_len, mailbox_size} = Process.info(pid, :message_queue_len)
+          :telemetry.execute([:server, :genserver, :mailbox_size], %{size: mailbox_size}, %{service: service_name})
+
+          # Measure memory usage
+          {:memory, memory_usage} = Process.info(pid, :memory)
+          :telemetry.execute([:server, :genserver, :memory], %{bytes: memory_usage}, %{service: service_name})
+      end
+    end)
+  end
+
+  @doc """
+  Measures database connection pool metrics.
+  """
+  def measure_database_pool do
+    try do
+      # Get pool status directly from DBConnection
+      case DBConnection.status(Server.Repo) do
+        :ok ->
+          # Repo is running, emit basic health metric
+          :telemetry.execute([:server, :database, :status], %{value: 1}, %{})
+
+          # For more detailed pool metrics, we'd need to access internal pool state
+          # For single-user system, basic connectivity is sufficient
+          :ok
+
+        _ ->
+          :telemetry.execute([:server, :database, :status], %{value: 0}, %{})
+      end
+    rescue
+      _ ->
+        # Fallback measurement - check if repo process is alive
+        repo_alive = if Process.whereis(Server.Repo), do: 1, else: 0
+        :telemetry.execute([:server, :database, :status], %{value: repo_alive}, %{})
+    end
+  end
+
+  @doc """
+  Measures ETS table metrics for performance monitoring.
+  """
+  def measure_ets_tables do
+    # List all ETS tables owned by the application
+    all_tables = :ets.all()
+
+    app_tables =
+      Enum.filter(all_tables, fn table ->
+        try do
+          info = :ets.info(table)
+          owner = info[:owner]
+          # Check if owner process is part of our application
+          case Process.info(owner, :dictionary) do
+            {:dictionary, dict} ->
+              # Look for application context in process dictionary
+              Enum.any?(dict, fn {key, _} ->
+                is_atom(key) and Atom.to_string(key) =~ "server"
+              end)
+
+            _ ->
+              false
+          end
+        rescue
+          _ -> false
+        end
+      end)
+
+    total_memory =
+      Enum.reduce(app_tables, 0, fn table, acc ->
+        case :ets.info(table, :memory) do
+          :undefined -> acc
+          memory when is_integer(memory) -> acc + memory * :erlang.system_info(:wordsize)
+          _ -> acc
+        end
+      end)
+
+    :telemetry.execute(
+      [:server, :ets, :tables],
+      %{
+        count: length(app_tables),
+        total_memory: total_memory
+      },
+      %{}
+    )
   end
 
   @doc """
