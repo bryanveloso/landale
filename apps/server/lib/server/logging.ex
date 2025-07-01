@@ -112,33 +112,34 @@ defmodule Server.Logging do
   Logs unhandled messages with helpful debugging context.
   """
   def log_unhandled(component, item_type, item, additional_metadata \\ []) do
-    metadata = [
-      component: component,
-      item_type: item_type,
-      item_summary: summarize_item(item)
-    ] ++ additional_metadata
-    
+    metadata =
+      [
+        component: component,
+        item_type: item_type,
+        item_summary: summarize_item(item)
+      ] ++ additional_metadata
+
     Logger.debug("Item unhandled", metadata)
   end
-  
+
   # Private helper to summarize complex data for debugging
   defp summarize_item(item) when is_map(item) do
     keys = Map.keys(item)
     "map(#{length(keys)}): #{inspect(Enum.take(keys, 5))}"
   end
-  
+
   defp summarize_item(item) when is_tuple(item) do
     "tuple(#{tuple_size(item)}): #{inspect(elem(item, 0))}"
   end
-  
+
   defp summarize_item(item) when is_list(item) do
     "list(#{length(item)})"
   end
-  
+
   defp summarize_item(item) when is_atom(item) do
     "atom: #{item}"
   end
-  
+
   defp summarize_item(item) do
     "#{inspect(item.__struct__ || :unknown)}"
   end

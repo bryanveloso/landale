@@ -31,6 +31,7 @@ defmodule Server.Services.Twitch do
     :user_id,
     :scopes,
     subscriptions: %{},
+    cloudfront_retry_count: 0,
     state: %{
       connection: %{
         connected: false,
@@ -135,6 +136,9 @@ defmodule Server.Services.Twitch do
   # GenServer callbacks
   @impl GenServer
   def init(opts) do
+    # Trap exits to ensure proper cleanup of DETS tables
+    Process.flag(:trap_exit, true)
+
     client_id = Keyword.get(opts, :client_id) || get_client_id()
     client_secret = Keyword.get(opts, :client_secret) || get_client_secret()
 
@@ -363,7 +367,17 @@ defmodule Server.Services.Twitch do
   def handle_info(:connect, state) do
     Logger.info("WebSocket connection started")
 
-    case WebSocketClient.connect(state.ws_client) do
+    # Add CloudFront-compatible headers to fix 400 errors
+    websocket_key = :base64.encode(:crypto.strong_rand_bytes(16))
+
+    headers = [
+      {"user-agent", "Mozilla/5.0 (compatible; TwitchEventSub/1.0)"},
+      {"origin", "https://eventsub.wss.twitch.tv"},
+      {"sec-websocket-key", websocket_key},
+      {"sec-websocket-version", "13"}
+    ]
+
+    case WebSocketClient.connect(state.ws_client, headers: headers) do
       {:ok, updated_client} ->
         state = %{state | ws_client: updated_client}
 
@@ -398,6 +412,8 @@ defmodule Server.Services.Twitch do
     if state.token_validation_task do
       Task.shutdown(state.token_validation_task, :brutal_kill)
     end
+
+    Logger.info("Token validation started", storage_key: state.token_manager.storage_key)
 
     # Start async token validation
     task =
@@ -437,15 +453,43 @@ defmodule Server.Services.Twitch do
         )
 
         # Store user ID and scopes in state
+        user_id = token_info["user_id"]
+        scopes = MapSet.new(token_info["scopes"] || [])
+
+        # Update logging context immediately with user_id
+        Logging.set_service_context(:twitch, user_id: user_id)
+
         state = %{
           state
           | token_manager: updated_manager,
-            user_id: token_info["user_id"],
-            scopes: MapSet.new(token_info["scopes"] || []),
+            user_id: user_id,
+            scopes: scopes,
             token_validation_task: nil
         }
 
-        send(self(), :connect)
+        Logger.info("State updated with user_id after token validation",
+          user_id: state.user_id,
+          has_session: state.session_id != nil
+        )
+
+        # If we already have a session established but deferred subscriptions, trigger them now
+        if state.session_id do
+          Logger.info("Token validation completed with active session",
+            user_id: state.user_id,
+            session_id: state.session_id
+          )
+
+          # Trigger immediately - no delay for critical timing
+          send(self(), {:create_subscriptions_with_validated_token, state.session_id})
+        else
+          # Token validation completed, now start WebSocket connection
+          Logger.info("Token validation completed, starting WebSocket connection",
+            user_id: state.user_id
+          )
+
+          send(self(), :connect)
+        end
+
         {:noreply, state}
 
       {:error, reason} ->
@@ -501,7 +545,7 @@ defmodule Server.Services.Twitch do
   def handle_info({:websocket_connected, client}, state) do
     Logger.info("WebSocket connection established")
 
-    state = %{state | ws_client: client}
+    state = %{state | ws_client: client, cloudfront_retry_count: 0}
 
     state =
       update_connection_state(state, %{
@@ -568,10 +612,311 @@ defmodule Server.Services.Twitch do
     # Create new WebSocket client with the new URL
     new_client = WebSocketClient.new(url, self())
 
+    # Add CloudFront-compatible headers for reconnection
+    websocket_key = :base64.encode(:crypto.strong_rand_bytes(16))
+
+    headers = [
+      {"user-agent", "Mozilla/5.0 (compatible; TwitchEventSub/1.0)"},
+      {"origin", "https://eventsub.wss.twitch.tv"},
+      {"sec-websocket-key", websocket_key},
+      {"sec-websocket-version", "13"}
+    ]
+
     # Initiate connection
-    WebSocketClient.connect(new_client)
+    WebSocketClient.connect(new_client, headers: headers)
 
     state = %{state | ws_client: new_client, session_id: nil}
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:gun_response, conn_pid, stream_ref, is_fin, status, headers}, state) do
+    case status do
+      400 ->
+        # CloudFront 400 error - check retry count to prevent infinite loops
+        retry_count = state.cloudfront_retry_count
+
+        if retry_count < 2 do
+          Logger.error("CloudFront rejected WebSocket upgrade request",
+            status: status,
+            error: "CloudFront 400 error, attempting retry #{retry_count + 1}/2",
+            headers: inspect(headers, limit: 200)
+          )
+
+          # Schedule retry with enhanced headers
+          Process.send_after(self(), {:retry_with_enhanced_headers, retry_count + 1}, 1000)
+          {:noreply, state}
+        else
+          Logger.error("CloudFront continues rejecting after retries",
+            status: status,
+            error: "Max retries reached, falling back to normal reconnect",
+            retry_count: retry_count
+          )
+
+          # Fall back to normal reconnect cycle
+          timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+          new_state = %{state | reconnect_timer: timer, cloudfront_retry_count: 0}
+          {:noreply, new_state}
+        end
+
+      403 ->
+        Logger.error("WebSocket upgrade forbidden",
+          status: status,
+          error: "CloudFront/Twitch rejected connection - check authentication",
+          headers: inspect(headers, limit: 200)
+        )
+
+        # For 403, retry after token refresh
+        send(self(), :refresh_token)
+        {:noreply, state}
+
+      401 ->
+        Logger.error("WebSocket upgrade unauthorized",
+          status: status,
+          error: "Invalid or expired token",
+          headers: inspect(headers, limit: 200)
+        )
+
+        # For 401, refresh token immediately
+        send(self(), :refresh_token)
+        {:noreply, state}
+
+      _ ->
+        Logger.error("WebSocket HTTP error response",
+          status: status,
+          is_fin: is_fin,
+          headers: inspect(headers, limit: 200),
+          conn_pid: inspect(conn_pid),
+          stream_ref: inspect(stream_ref),
+          error: "Expected WebSocket upgrade but got HTTP response"
+        )
+
+        # For other errors, retry with backoff
+        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+        new_state = %{state | reconnect_timer: timer}
+        {:noreply, new_state}
+    end
+  end
+
+  @impl GenServer
+  def handle_info({:gun_data, conn_pid, stream_ref, is_fin, data}, state) do
+    # Extract CloudFront error details for debugging
+    cloudfront_error =
+      if String.contains?(data, "CloudFront") do
+        # Try to extract specific error from CloudFront response
+        cond do
+          String.contains?(data, "Bad request") -> "CloudFront Bad Request - invalid request format"
+          String.contains?(data, "403 ERROR") -> "CloudFront 403 - request forbidden"
+          String.contains?(data, "404 ERROR") -> "CloudFront 404 - endpoint not found"
+          String.contains?(data, "502 ERROR") -> "CloudFront 502 - bad gateway from origin"
+          true -> "CloudFront generic error"
+        end
+      else
+        "Non-CloudFront HTTP error"
+      end
+
+    Logger.error("WebSocket HTTP error data",
+      data_preview: String.slice(data, 0, 400),
+      cloudfront_error: cloudfront_error,
+      is_fin: is_fin,
+      conn_pid: inspect(conn_pid),
+      stream_ref: inspect(stream_ref),
+      error: "Received HTTP error page instead of WebSocket data"
+    )
+
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:gun_error, conn_pid, stream_ref, reason}, state) do
+    Logger.error("WebSocket stream error",
+      error: inspect(reason),
+      conn_pid: inspect(conn_pid),
+      stream_ref: inspect(stream_ref)
+    )
+
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:retry_with_enhanced_headers, retry_count}, state) do
+    Logger.info("Retrying WebSocket connection with enhanced headers", retry_count: retry_count)
+
+    # Close existing connection first
+    _closed_client = WebSocketClient.close(state.ws_client)
+
+    # Create new client for retry
+    new_client = WebSocketClient.new(@eventsub_websocket_url, self(), telemetry_prefix: [:server, :twitch, :websocket])
+
+    # Try different header combinations based on retry count
+    websocket_key = :base64.encode(:crypto.strong_rand_bytes(16))
+
+    headers =
+      case retry_count do
+        1 ->
+          # First retry: curl user agent with complete WebSocket headers
+          [
+            {"user-agent", "curl/7.68.0"},
+            {"origin", "https://eventsub.wss.twitch.tv"},
+            {"sec-websocket-key", websocket_key},
+            {"sec-websocket-version", "13"},
+            {"connection", "upgrade"},
+            {"upgrade", "websocket"}
+          ]
+
+        2 ->
+          # Second retry: different browser user agent with complete headers
+          [
+            {"user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"},
+            {"origin", "https://eventsub.wss.twitch.tv"},
+            {"sec-websocket-key", websocket_key},
+            {"sec-websocket-version", "13"},
+            {"connection", "upgrade"},
+            {"upgrade", "websocket"},
+            {"cache-control", "no-cache"},
+            {"pragma", "no-cache"}
+          ]
+      end
+
+    case WebSocketClient.connect(new_client, headers: headers) do
+      {:ok, updated_client} ->
+        state = %{state | ws_client: updated_client, cloudfront_retry_count: retry_count}
+
+        state =
+          update_connection_state(state, %{
+            connection_state: "connecting"
+          })
+
+        {:noreply, state}
+
+      {:error, updated_client, reason} ->
+        Logger.error("WebSocket connection failed with enhanced headers",
+          error: reason,
+          retry_count: retry_count
+        )
+
+        state = %{state | ws_client: updated_client, cloudfront_retry_count: retry_count}
+
+        state =
+          update_connection_state(state, %{
+            connected: false,
+            connection_state: "error",
+            last_error: inspect(reason)
+          })
+
+        # Schedule normal reconnect after enhanced retry fails
+        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+        state = %{state | reconnect_timer: timer, cloudfront_retry_count: 0}
+        {:noreply, state}
+    end
+  end
+
+  # Gun WebSocket upgrade success
+  @impl GenServer
+  def handle_info({:gun_upgrade, _conn_pid, stream_ref, protocols, headers}, state) do
+    Logger.debug("WebSocket upgrade successful",
+      protocols: protocols,
+      headers: inspect(headers, limit: 300)
+    )
+
+    # Handle the upgrade with WebSocketClient
+    updated_client = WebSocketClient.handle_upgrade(state.ws_client, stream_ref)
+    {:noreply, %{state | ws_client: updated_client}}
+  end
+
+  # Gun WebSocket messages
+  @impl GenServer
+  def handle_info({:gun_ws, _conn_pid, stream_ref, frame}, state) do
+    # Handle the message with WebSocketClient
+    updated_client = WebSocketClient.handle_message(state.ws_client, stream_ref, frame)
+    {:noreply, %{state | ws_client: updated_client}}
+  end
+
+  # Create subscriptions immediately after token validation completes
+  @impl GenServer
+  def handle_info({:create_subscriptions_with_validated_token, session_id}, state) do
+    Logger.info("Creating subscriptions with validated token",
+      user_id: state.user_id,
+      session_id: session_id,
+      has_scopes: state.scopes != nil
+    )
+
+    if state.user_id && state.session_id == session_id do
+      manager_state = %{
+        session_id: session_id,
+        token_manager: state.token_manager,
+        oauth2_client: state.token_manager.oauth2_client,
+        scopes: state.scopes,
+        user_id: state.user_id
+      }
+
+      {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
+
+      Logger.info("Default subscriptions created after token validation",
+        success: success_count,
+        failed: failed_count
+      )
+    else
+      Logger.warning("Subscription creation skipped",
+        reason: "invalid state",
+        has_user_id: state.user_id != nil,
+        session_matches: state.session_id == session_id
+      )
+    end
+
+    {:noreply, state}
+  end
+
+  # Retry default subscriptions when user_id becomes available
+  @impl GenServer
+  def handle_info({:retry_default_subscriptions, session_id}, state) do
+    Logger.info("Retry default subscriptions check",
+      has_user_id: state.user_id != nil,
+      user_id: inspect(state.user_id),
+      has_session_id: state.session_id != nil,
+      session_id: inspect(state.session_id),
+      expected_session_id: inspect(session_id),
+      session_matches: state.session_id == session_id
+    )
+
+    if state.user_id && state.session_id == session_id do
+      Logger.info("Retrying default subscriptions creation",
+        user_id: state.user_id,
+        session_id: session_id
+      )
+
+      manager_state = %{
+        session_id: session_id,
+        token_manager: state.token_manager,
+        oauth2_client: state.token_manager.oauth2_client,
+        scopes: state.scopes,
+        user_id: state.user_id
+      }
+
+      {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
+
+      Logger.info("Default subscriptions created",
+        success: success_count,
+        failed: failed_count
+      )
+    else
+      if state.session_id == session_id do
+        # Still no user_id, retry again after a longer delay
+        Logger.info("Default subscriptions retry deferred",
+          reason: "user_id still not available, will retry again"
+        )
+
+        Process.send_after(self(), {:retry_default_subscriptions, session_id}, 2000)
+      else
+        # Session ID changed, abandon this retry
+        Logger.info("Default subscriptions retry abandoned",
+          reason: "session changed",
+          old_session: session_id,
+          current_session: state.session_id
+        )
+      end
+    end
+
     {:noreply, state}
   end
 
@@ -580,31 +925,41 @@ defmodule Server.Services.Twitch do
   def handle_info(message, state) do
     case message do
       {ref, _result} when is_reference(ref) ->
-        Logger.debug("Task result ignored", 
+        Logger.debug("Task result ignored",
           task_ref: inspect(ref),
           has_validation_task: state.token_validation_task != nil,
           has_refresh_task: state.token_refresh_task != nil,
           reason: "task completed but not tracked"
         )
-        
+
       {:DOWN, ref, :process, pid, reason} ->
-        Logger.debug("Process monitor ignored",
+        # Check if this is for one of our tracked tasks
+        task_info =
+          cond do
+            state.token_validation_task && state.token_validation_task.ref == ref ->
+              "validation_task"
+
+            state.token_refresh_task && state.token_refresh_task.ref == ref ->
+              "refresh_task"
+
+            true ->
+              "untracked_process"
+          end
+
+        Logger.debug("Process monitor notification",
+          task_type: task_info,
           monitor_ref: inspect(ref),
           pid: inspect(pid),
           reason: inspect(reason),
-          tracked_tasks: %{
-            validation: state.token_validation_task != nil,
-            refresh: state.token_refresh_task != nil
-          }
+          action: if(task_info == "untracked_process", do: "ignored", else: "should_be_handled_elsewhere")
         )
-        
+
       other ->
-        Logger.debug("Message unhandled", 
-          message_type: message_type(other),
-          message: inspect(other, limit: 200)
-        )
+        # Simple logging to avoid metadata issues
+        Logger.debug("UNHANDLED MESSAGE: #{inspect(other, limit: 500)}")
+        Logger.debug("Message type classification: #{message_type(other)}")
     end
-    
+
     {:noreply, state}
   end
 
@@ -662,8 +1017,22 @@ defmodule Server.Services.Twitch do
   # Private functions
 
   defp handle_eventsub_message(state, message_json) do
+    # DEBUG: Log all incoming EventSub messages
+    Logger.debug("EventSub message received",
+      message_size: byte_size(message_json),
+      message_preview: String.slice(message_json, 0, 100)
+    )
+
     case Jason.decode(message_json) do
       {:ok, message} ->
+        # DEBUG: Log the decoded message structure
+        Logger.debug("EventSub message decoded",
+          message_type: get_in(message, ["metadata", "message_type"]),
+          subscription_type: get_in(message, ["metadata", "subscription_type"]),
+          has_payload: Map.has_key?(message, "payload"),
+          metadata_keys: Map.keys(message["metadata"] || %{})
+        )
+
         handle_eventsub_protocol_message(state, message)
 
       {:error, reason} ->
@@ -691,19 +1060,43 @@ defmodule Server.Services.Twitch do
       |> Map.put(:session_id, session_id)
 
     # Create default subscriptions using EventSubManager
-    manager_state = %{
-      session_id: session_id,
-      oauth2_client: state.token_manager.oauth2_client,
-      scopes: state.scopes,
-      user_id: state.user_id
-    }
+    # Check if user_id is available from token validation or token manager
+    user_id = state.user_id || get_user_id_from_token_manager(state.token_manager)
+    scopes = state.scopes || get_scopes_from_token_manager(state.token_manager)
 
-    {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
-
-    Logger.info("Default subscriptions created",
-      success: success_count,
-      failed: failed_count
+    Logger.info("Session welcome subscription check",
+      has_user_id: user_id != nil,
+      user_id: inspect(user_id),
+      session_id: inspect(session_id),
+      has_scopes: scopes != nil,
+      scope_count: if(scopes, do: MapSet.size(scopes), else: 0),
+      source: if(state.user_id, do: "state", else: "token_manager")
     )
+
+    if user_id do
+      manager_state = %{
+        session_id: session_id,
+        token_manager: state.token_manager,
+        oauth2_client: state.token_manager.oauth2_client,
+        scopes: scopes,
+        user_id: user_id
+      }
+
+      {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
+
+      Logger.info("Default subscriptions created",
+        success: success_count,
+        failed: failed_count
+      )
+    else
+      # user_id not available yet, schedule retry after token validation completes
+      Logger.info("Default subscriptions deferred",
+        reason: "user_id not available, will retry after token validation"
+      )
+
+      # Reduced delay for faster subscription creation
+      Process.send_after(self(), {:retry_default_subscriptions, session_id}, 500)
+    end
 
     state
   end
@@ -766,14 +1159,15 @@ defmodule Server.Services.Twitch do
   defp handle_eventsub_protocol_message(state, message) do
     message_type = get_in(message, ["metadata", "message_type"])
     subscription_type = get_in(message, ["metadata", "subscription_type"])
-    
-    Logger.debug("EventSub message unhandled", 
+
+    Logger.debug("EventSub message unhandled",
       message_type: message_type,
       subscription_type: subscription_type,
       has_payload: Map.has_key?(message, "payload"),
       metadata_keys: Map.keys(message["metadata"] || %{}),
       reason: "no handler implemented"
     )
+
     state
   end
 
@@ -808,6 +1202,22 @@ defmodule Server.Services.Twitch do
     end
   end
 
+  # Extract user_id from token manager if not available in state
+  defp get_user_id_from_token_manager(token_manager) do
+    case token_manager.token_info do
+      nil -> nil
+      token_info -> token_info.user_id
+    end
+  end
+
+  # Extract scopes from token manager if not available in state
+  defp get_scopes_from_token_manager(token_manager) do
+    case token_manager.token_info do
+      nil -> nil
+      token_info -> token_info.scopes
+    end
+  end
+
   # Helper functions for configuration
   defp get_client_id do
     System.get_env("TWITCH_CLIENT_ID")
@@ -816,7 +1226,7 @@ defmodule Server.Services.Twitch do
   defp get_client_secret do
     System.get_env("TWITCH_CLIENT_SECRET")
   end
-  
+
   # Helper to identify message types for better debugging
   defp message_type({:websocket_connected, _}), do: "websocket_connected"
   defp message_type({:websocket_disconnected, _, _}), do: "websocket_disconnected"
