@@ -240,7 +240,7 @@ defmodule Server.Services.Twitch do
           # Create subscription using EventSubManager
           manager_state = %{
             session_id: state.session_id,
-            oauth_client: state.token_manager.oauth_client,
+            oauth2_client: state.token_manager.oauth2_client,
             scopes: state.scopes,
             user_id: state.user_id
           }
@@ -289,7 +289,7 @@ defmodule Server.Services.Twitch do
   def handle_call({:delete_subscription, subscription_id}, _from, state) do
     # Create manager state for EventSubManager
     manager_state = %{
-      oauth_client: state.token_manager.oauth_client
+      oauth2_client: state.token_manager.oauth2_client
     }
 
     case EventSubManager.delete_subscription(manager_state, subscription_id) do
@@ -641,7 +641,7 @@ defmodule Server.Services.Twitch do
     # Create default subscriptions using EventSubManager
     manager_state = %{
       session_id: session_id,
-      oauth_client: state.token_manager.oauth_client,
+      oauth2_client: state.token_manager.oauth2_client,
       scopes: state.scopes,
       user_id: state.user_id
     }

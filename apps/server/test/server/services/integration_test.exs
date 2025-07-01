@@ -33,7 +33,7 @@ defmodule Server.Services.IntegrationTest do
         )
 
       assert manager.storage_key == :test_tokens
-      assert manager.oauth_client.client_id == "test_client_id"
+      assert manager.oauth2_client.client_id == "test_client_id"
 
       # Test loading tokens (should succeed even with no existing tokens)
       updated_manager = Server.OAuthTokenManager.load_tokens(manager)

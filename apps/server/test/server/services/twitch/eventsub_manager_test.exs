@@ -1,16 +1,50 @@
 defmodule Server.Services.Twitch.EventSubManagerTest do
   use ExUnit.Case, async: true
+  import Mox
 
+  alias Server.MockOAuthTokenManager
   alias Server.Services.Twitch.EventSubManager
+
+  # Make sure mocks are verified when the test exits
+  setup :verify_on_exit!
 
   # Mock state for testing
   defp mock_state(opts \\ []) do
     %{
       session_id: Keyword.get(opts, :session_id, "test_session_id"),
-      oauth_client: %{
-        token: %{access_token: "test_token"},
-        client_id: "test_client_id"
+      oauth2_client: %{
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        auth_url: "https://id.twitch.tv/oauth2/authorize",
+        token_url: "https://id.twitch.tv/oauth2/token",
+        validate_url: "https://id.twitch.tv/oauth2/validate",
+        timeout: 10_000,
+        telemetry_prefix: [:server, :oauth2]
       },
+      token_manager:
+        Keyword.get(opts, :token_manager, %{
+          storage_key: :test_tokens,
+          storage_path: "./data/test_tokens.dets",
+          dets_table: nil,
+          oauth2_client: %{
+            client_id: "test_client_id",
+            client_secret: "test_client_secret",
+            auth_url: "https://id.twitch.tv/oauth2/authorize",
+            token_url: "https://id.twitch.tv/oauth2/token",
+            validate_url: "https://id.twitch.tv/oauth2/validate",
+            timeout: 10_000,
+            telemetry_prefix: [:server, :oauth2]
+          },
+          token_info: %{
+            access_token: "test_token",
+            refresh_token: "test_refresh_token",
+            expires_at: DateTime.add(DateTime.utc_now(), 3600, :second),
+            scopes: MapSet.new(["channel:read:subscriptions"]),
+            user_id: "test_user_id"
+          },
+          refresh_buffer_ms: 300_000,
+          telemetry_prefix: [:server, :oauth]
+        }),
       scopes: Keyword.get(opts, :scopes, MapSet.new(["channel:read:subscriptions"])),
       user_id: Keyword.get(opts, :user_id, "test_user_id")
     }
@@ -92,12 +126,19 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
     end
 
     test "processes subscriptions based on available scopes" do
-      # Mock a state with limited scopes
       state = mock_state(scopes: MapSet.new(["channel:read:subscriptions"]))
 
-      # This will attempt to create subscriptions but fail due to missing HTTP endpoints
-      # We're testing the scope filtering logic
-      {success, failed} = EventSubManager.create_default_subscriptions(state)
+      # Mock token manager to return a valid token for multiple calls
+      stub(MockOAuthTokenManager, :get_valid_token, fn _manager ->
+        {:ok, "test_access_token", state.token_manager}
+      end)
+
+      # This will attempt to create subscriptions but fail due to HTTP calls
+      # We're testing the scope filtering and token retrieval logic
+      {success, failed} =
+        EventSubManager.create_default_subscriptions(state,
+          token_manager_module: MockOAuthTokenManager
+        )
 
       # Should have attempted some subscriptions based on scopes
       assert is_integer(success)
@@ -110,7 +151,15 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
       # Mock a state with no scopes
       state = mock_state(scopes: MapSet.new([]))
 
-      {success, failed} = EventSubManager.create_default_subscriptions(state)
+      # Mock token manager to return a valid token for the few subscriptions that don't require scopes
+      stub(MockOAuthTokenManager, :get_valid_token, fn _manager ->
+        {:ok, "test_access_token", state.token_manager}
+      end)
+
+      {success, failed} =
+        EventSubManager.create_default_subscriptions(state,
+          token_manager_module: MockOAuthTokenManager
+        )
 
       # Should skip most subscriptions due to missing scopes
       assert success == 0
@@ -127,24 +176,33 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
       event_type = "channel.follow"
       condition = %{"broadcaster_user_id" => "123", "moderator_user_id" => "123"}
 
-      # This test would fail due to actual HTTP request, but we can test parameter preparation
-      # In a real implementation, you'd mock :httpc.request
-      result = EventSubManager.create_subscription(state, event_type, condition)
+      # Mock token manager to return a valid token
+      expect(MockOAuthTokenManager, :get_valid_token, fn _manager ->
+        {:ok, "test_access_token", state.token_manager}
+      end)
 
-      # Should return error since we're not mocking HTTP
+      # This will fail at HTTP level but we've verified token retrieval works
+      result =
+        EventSubManager.create_subscription(state, event_type, condition, token_manager_module: MockOAuthTokenManager)
+
+      # Should return error since we're not mocking HTTP client
       assert {:error, _reason} = result
     end
 
     test "uses version 2 for channel.follow events" do
-      # This is testing the internal logic
-      # Would need to mock HTTP client to fully test
       state = mock_state()
       event_type = "channel.follow"
       condition = %{"broadcaster_user_id" => "123", "moderator_user_id" => "123"}
 
-      result = EventSubManager.create_subscription(state, event_type, condition)
+      # Mock token manager to return a valid token
+      expect(MockOAuthTokenManager, :get_valid_token, fn _manager ->
+        {:ok, "test_access_token", state.token_manager}
+      end)
 
-      # Should attempt the request (and fail due to no mocking)
+      result =
+        EventSubManager.create_subscription(state, event_type, condition, token_manager_module: MockOAuthTokenManager)
+
+      # Should attempt the request (and fail due to no HTTP mocking)
       assert {:error, _reason} = result
     end
   end
@@ -154,8 +212,13 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
       state = mock_state()
       subscription_id = "test_subscription_id"
 
-      # This will fail due to actual HTTP request without mocking
-      result = EventSubManager.delete_subscription(state, subscription_id)
+      # Mock token manager to return a valid token
+      expect(MockOAuthTokenManager, :get_valid_token, fn _manager ->
+        {:ok, "test_access_token", state.token_manager}
+      end)
+
+      # This will fail at HTTP level but we've verified token retrieval works
+      result = EventSubManager.delete_subscription(state, subscription_id, token_manager_module: MockOAuthTokenManager)
 
       assert {:error, _reason} = result
     end

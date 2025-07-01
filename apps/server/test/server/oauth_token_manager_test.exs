@@ -32,8 +32,8 @@ defmodule Server.OAuthTokenManagerTest do
       assert {:ok, manager} = OAuthTokenManager.new(opts)
       assert manager.storage_key == :test_tokens
       assert manager.storage_path == @test_storage_path
-      assert manager.oauth_client.client_id == "test_client_id"
-      assert manager.oauth_client.client_secret == "test_client_secret"
+      assert manager.oauth2_client.client_id == "test_client_id"
+      assert manager.oauth2_client.client_secret == "test_client_secret"
       # default
       assert manager.refresh_buffer_ms == 300_000
     end
@@ -59,8 +59,7 @@ defmodule Server.OAuthTokenManagerTest do
         # missing client_secret and token_url
       ]
 
-      assert {:error, reason} = OAuthTokenManager.new(opts)
-      assert reason =~ "Missing required option"
+      assert {:error, {:missing_required_option, _}} = OAuthTokenManager.new(opts)
     end
 
     test "accepts custom telemetry prefix" do
@@ -186,7 +185,7 @@ defmodule Server.OAuthTokenManagerTest do
     end
 
     test "returns error when no token is available", %{manager: manager} do
-      assert {:error, "No token available"} = OAuthTokenManager.get_valid_token(manager)
+      assert {:error, :no_token_available} = OAuthTokenManager.get_valid_token(manager)
     end
 
     test "returns token when it's valid and not expired", %{manager: manager} do
@@ -269,7 +268,7 @@ defmodule Server.OAuthTokenManagerTest do
     end
 
     test "returns error when no token info is available", %{manager: manager} do
-      assert {:error, "No token info available for refresh"} = OAuthTokenManager.refresh_token(manager)
+      assert {:error, :no_token_for_refresh} = OAuthTokenManager.refresh_token(manager)
     end
 
     test "returns error when no refresh token is available", %{manager: manager} do
@@ -283,7 +282,7 @@ defmodule Server.OAuthTokenManagerTest do
 
       manager = %{manager | token_info: token_info}
 
-      assert {:error, "No refresh token available"} = OAuthTokenManager.refresh_token(manager)
+      assert {:error, :no_refresh_token} = OAuthTokenManager.refresh_token(manager)
     end
 
     # Note: Testing actual refresh would require mocking the OAuth2 library
@@ -308,7 +307,7 @@ defmodule Server.OAuthTokenManagerTest do
     test "returns error when no token is available", %{manager: manager} do
       validate_url = "https://example.com/oauth/validate"
 
-      assert {:error, "No token available for validation"} = OAuthTokenManager.validate_token(manager, validate_url)
+      assert {:error, :no_token_for_validation} = OAuthTokenManager.validate_token(manager, validate_url)
     end
 
     # Note: Testing actual validation would require mocking :httpc

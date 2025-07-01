@@ -48,6 +48,8 @@ defmodule Server.OAuthTokenManager do
 
   require Logger
 
+  @behaviour Server.OAuthTokenManagerBehaviour
+
   @type token_info :: %{
           access_token: binary(),
           refresh_token: binary() | nil,
@@ -60,7 +62,7 @@ defmodule Server.OAuthTokenManager do
           storage_key: atom(),
           storage_path: binary(),
           dets_table: atom() | nil,
-          oauth_client: OAuth2.Client.t(),
+          oauth2_client: Server.OAuth2Client.client_config(),
           token_info: token_info() | nil,
           refresh_buffer_ms: integer(),
           telemetry_prefix: [atom()]
@@ -95,19 +97,20 @@ defmodule Server.OAuthTokenManager do
          {:ok, token_url} <- validate_required_opt(opts, :token_url) do
       storage_path = Keyword.get(opts, :storage_path) || get_default_storage_path(storage_key)
 
-      oauth_client =
-        OAuth2.Client.new(
-          strategy: OAuth2.Strategy.Refresh,
+      {:ok, oauth2_client} =
+        Server.OAuth2Client.new(%{
+          auth_url: "https://id.twitch.tv/oauth2/authorize",
+          token_url: token_url,
+          validate_url: Keyword.get(opts, :validate_url),
           client_id: client_id,
-          client_secret: client_secret,
-          token_url: token_url
-        )
+          client_secret: client_secret
+        })
 
       manager = %{
         storage_key: storage_key,
         storage_path: storage_path,
         dets_table: nil,
-        oauth_client: oauth_client,
+        oauth2_client: oauth2_client,
         token_info: nil,
         refresh_buffer_ms: Keyword.get(opts, :refresh_buffer_ms, @default_refresh_buffer),
         telemetry_prefix: Keyword.get(opts, :telemetry_prefix, [:server, :oauth])
@@ -190,7 +193,7 @@ defmodule Server.OAuthTokenManager do
           {:error, reason}
       end
     else
-      {:error, "No DETS table or token info available"}
+      {:error, :no_storage_or_token}
     end
   end
 
@@ -234,7 +237,7 @@ defmodule Server.OAuthTokenManager do
     case manager.token_info do
       nil ->
         Logger.debug("No token info available in manager", storage_key: manager.storage_key)
-        {:error, "No token available"}
+        {:error, :no_token_available}
 
       token_info ->
         if token_needs_refresh?(token_info, manager.refresh_buffer_ms) do
@@ -269,33 +272,25 @@ defmodule Server.OAuthTokenManager do
   def refresh_token(manager) do
     case manager.token_info do
       nil ->
-        {:error, "No token info available for refresh"}
+        {:error, :no_token_for_refresh}
 
       %{refresh_token: nil} ->
-        {:error, "No refresh token available"}
+        {:error, :no_refresh_token}
 
       %{refresh_token: refresh_token} ->
         Logger.info("Refreshing OAuth token", storage_key: manager.storage_key)
         emit_telemetry(manager, [:refresh, :attempt])
 
-        # Create OAuth2 client with current refresh token
-        token = %OAuth2.AccessToken{
-          access_token: manager.token_info.access_token,
-          refresh_token: refresh_token
-        }
-
-        client = %{manager.oauth_client | token: token}
-
-        case OAuth2.Client.refresh_token(client) do
-          {:ok, %OAuth2.Client{token: new_token}} ->
+        case Server.OAuth2Client.refresh_token(manager.oauth2_client, refresh_token) do
+          {:ok, new_tokens} ->
             Logger.info("OAuth token refreshed successfully", storage_key: manager.storage_key)
             emit_telemetry(manager, [:refresh, :success])
 
             # Update token info
             new_token_info = %{
-              access_token: new_token.access_token,
-              refresh_token: new_token.refresh_token || refresh_token,
-              expires_at: calculate_expires_at(new_token.expires_at),
+              access_token: new_tokens.access_token,
+              refresh_token: new_tokens.refresh_token || refresh_token,
+              expires_at: calculate_expires_in(new_tokens.expires_in),
               scopes: manager.token_info.scopes,
               user_id: manager.token_info.user_id
             }
@@ -332,29 +327,28 @@ defmodule Server.OAuthTokenManager do
   def validate_token(manager, validate_url) do
     case manager.token_info do
       nil ->
-        {:error, "No token available for validation"}
+        {:error, :no_token_for_validation}
 
       %{access_token: access_token} ->
-        headers = [
+        _headers = [
           {"Authorization", "Bearer #{access_token}"},
           {"Content-Type", "application/json"}
         ]
 
-        case Server.RetryStrategy.retry(fn ->
-               make_validation_request(validate_url, headers)
-             end) do
-          {:ok, {data, _body}} ->
+        case Server.OAuth2Client.validate_token(manager.oauth2_client, access_token) do
+          {:ok, validation_data} ->
             # Update token info with validation data
             updated_token_info =
               Map.merge(manager.token_info, %{
-                user_id: data["user_id"],
-                scopes: MapSet.new(data["scopes"] || [])
+                user_id: validation_data.user_id,
+                scopes:
+                  if(validation_data.scopes, do: MapSet.new(validation_data.scopes), else: manager.token_info.scopes)
               })
 
             updated_manager = %{manager | token_info: updated_token_info}
             save_tokens(updated_manager)
 
-            {:ok, data, updated_manager}
+            {:ok, validation_data, updated_manager}
 
           {:error, reason} ->
             Logger.error("Token validation failed",
@@ -391,7 +385,7 @@ defmodule Server.OAuthTokenManager do
 
   defp validate_required_opt(opts, key) do
     case Keyword.get(opts, key) do
-      nil -> {:error, "Missing required option: #{key}"}
+      nil -> {:error, {:missing_required_option, key}}
       value -> {:ok, value}
     end
   end
@@ -454,11 +448,11 @@ defmodule Server.OAuthTokenManager do
   defp parse_scopes(%{"scope" => scope}) when is_binary(scope), do: MapSet.new(String.split(scope, " "))
   defp parse_scopes(_), do: nil
 
-  defp calculate_expires_at(expires_at) when is_integer(expires_at) do
-    DateTime.from_unix!(expires_at)
+  defp calculate_expires_in(expires_in) when is_integer(expires_in) do
+    DateTime.add(DateTime.utc_now(), expires_in, :second)
   end
 
-  defp calculate_expires_at(_), do: nil
+  defp calculate_expires_in(_), do: nil
 
   defp parse_stored_datetime(datetime_string) when is_binary(datetime_string) do
     case DateTime.from_iso8601(datetime_string) do
@@ -483,33 +477,5 @@ defmodule Server.OAuthTokenManager do
   defp emit_telemetry(manager, event_suffix, metadata \\ %{}) do
     event = manager.telemetry_prefix ++ event_suffix
     :telemetry.execute(event, %{}, Map.put(metadata, :storage_key, manager.storage_key))
-  end
-
-  # Private helper function for making validation requests with proper error handling
-  defp make_validation_request(validate_url, headers) do
-    http_config = Server.NetworkConfig.http_config()
-
-    case :httpc.request(:get, {String.to_charlist(validate_url), headers}, [{:timeout, http_config.timeout}], []) do
-      {:ok, {{_version, 200, _reason}, _headers, body}} ->
-        case Jason.decode(List.to_string(body)) do
-          {:ok, data} ->
-            {:ok, {data, body}}
-
-          {:error, reason} ->
-            {:error, "Failed to parse validation response: #{inspect(reason)}"}
-        end
-
-      {:ok, {{_version, 429, _reason}, _headers, body}} ->
-        {:error, {:http_error, 429, List.to_string(body)}}
-
-      {:ok, {{_version, status, _reason}, _headers, body}} when status >= 500 ->
-        {:error, {:http_error, status, List.to_string(body)}}
-
-      {:ok, {{_version, status, _reason}, _headers, body}} ->
-        {:error, "Token validation failed with status #{status}: #{List.to_string(body)}"}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
   end
 end
