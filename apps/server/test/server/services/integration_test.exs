@@ -28,6 +28,7 @@ defmodule Server.Services.IntegrationTest do
           storage_key: :test_tokens,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
+          auth_url: "https://id.twitch.tv/oauth2/authorize",
           token_url: "https://id.twitch.tv/oauth2/token",
           validate_url: "https://id.twitch.tv/oauth2/validate"
         )

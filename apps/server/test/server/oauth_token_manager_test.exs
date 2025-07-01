@@ -25,6 +25,7 @@ defmodule Server.OAuthTokenManagerTest do
         storage_key: :test_tokens,
         client_id: "test_client_id",
         client_secret: "test_client_secret",
+        auth_url: "https://example.com/oauth/authorize",
         token_url: "https://example.com/oauth/token",
         storage_path: @test_storage_path
       ]
@@ -43,6 +44,7 @@ defmodule Server.OAuthTokenManagerTest do
         storage_key: :test_tokens,
         client_id: "test_client_id",
         client_secret: "test_client_secret",
+        auth_url: "https://example.com/oauth/authorize",
         token_url: "https://example.com/oauth/token",
         refresh_buffer_ms: 600_000,
         storage_path: @test_storage_path
@@ -67,6 +69,7 @@ defmodule Server.OAuthTokenManagerTest do
         storage_key: :test_tokens,
         client_id: "test_client_id",
         client_secret: "test_client_secret",
+        auth_url: "https://example.com/oauth/authorize",
         token_url: "https://example.com/oauth/token",
         telemetry_prefix: [:custom, :prefix],
         storage_path: @test_storage_path
@@ -84,6 +87,7 @@ defmodule Server.OAuthTokenManagerTest do
           storage_key: :test_tokens,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
+          auth_url: "https://example.com/oauth/authorize",
           token_url: "https://example.com/oauth/token",
           storage_path: @test_storage_path
         )
@@ -104,6 +108,7 @@ defmodule Server.OAuthTokenManagerTest do
           storage_key: :test_tokens,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
+          auth_url: "https://example.com/oauth/authorize",
           token_url: "https://example.com/oauth/token",
           storage_path: storage_path
         )
@@ -126,6 +131,7 @@ defmodule Server.OAuthTokenManagerTest do
           storage_key: :test_tokens,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
+          auth_url: "https://example.com/oauth/authorize",
           token_url: "https://example.com/oauth/token",
           storage_path: @test_storage_path
         )
@@ -176,6 +182,7 @@ defmodule Server.OAuthTokenManagerTest do
           storage_key: :test_tokens,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
+          auth_url: "https://example.com/oauth/authorize",
           token_url: "https://example.com/oauth/token",
           storage_path: @test_storage_path
         )
@@ -229,6 +236,7 @@ defmodule Server.OAuthTokenManagerTest do
           storage_key: :test_tokens,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
+          auth_url: "https://example.com/oauth/authorize",
           token_url: "https://example.com/oauth/token",
           storage_path: @test_storage_path
         )
@@ -244,6 +252,7 @@ defmodule Server.OAuthTokenManagerTest do
           storage_key: :test_tokens,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
+          auth_url: "https://example.com/oauth/authorize",
           token_url: "https://example.com/oauth/token",
           storage_path: @test_storage_path
         )
@@ -259,6 +268,7 @@ defmodule Server.OAuthTokenManagerTest do
           storage_key: :test_tokens,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
+          auth_url: "https://example.com/oauth/authorize",
           token_url: "https://example.com/oauth/token",
           storage_path: @test_storage_path
         )
@@ -296,6 +306,7 @@ defmodule Server.OAuthTokenManagerTest do
           storage_key: :test_tokens,
           client_id: "test_client_id",
           client_secret: "test_client_secret",
+          auth_url: "https://example.com/oauth/authorize",
           token_url: "https://example.com/oauth/token",
           storage_path: @test_storage_path
         )
