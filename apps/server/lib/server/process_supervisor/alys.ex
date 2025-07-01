@@ -12,24 +12,6 @@ defmodule Server.ProcessSupervisor.Alys do
 
   alias Server.ProcessSupervisorBehaviour
 
-  # Input validation helpers
-  defp validate_process_name(name) when is_binary(name) do
-    cond do
-      String.length(name) > 50 ->
-        {:error, :process_name_too_long}
-
-      not Regex.match?(~r/^[a-zA-Z0-9_-]+$/, name) ->
-        {:error, :invalid_process_name_format}
-
-      not Map.has_key?(@managed_processes, name) ->
-        {:error, :process_not_managed}
-
-      true ->
-        {:ok, name}
-    end
-  end
-
-  defp validate_process_name(_), do: {:error, :invalid_process_name_type}
 
   # Process definitions for Windows (alys - gaming machine)
   @managed_processes %{
@@ -99,13 +81,12 @@ defmodule Server.ProcessSupervisor.Alys do
 
   @impl ProcessSupervisorBehaviour
   def get_process(process_name) do
-    with {:ok, validated_name} <- validate_process_name(process_name),
-         {:ok, process_config} <- get_process_config(validated_name) do
+    with {:ok, process_config} <- get_process_config(process_name) do
       case find_running_process(process_config.process_name) do
         nil ->
           {:ok,
            %{
-             name: validated_name,
+             name: process_name,
              display_name: process_config.display_name,
              status: :stopped,
              pid: nil,
@@ -123,15 +104,14 @@ defmodule Server.ProcessSupervisor.Alys do
 
   @impl ProcessSupervisorBehaviour
   def start_process(process_name) do
-    with {:ok, validated_name} <- validate_process_name(process_name),
-         {:ok, process_config} <- get_process_config(validated_name) do
+    with {:ok, process_config} <- get_process_config(process_name) do
       # Check if already running
       case find_running_process(process_config.process_name) do
         nil ->
           execute_start_command(process_config)
 
         _running ->
-          Logger.info("Process already running", process: validated_name)
+          Logger.info("Process already running", process: process_name)
           :ok
       end
     else
@@ -141,15 +121,14 @@ defmodule Server.ProcessSupervisor.Alys do
 
   @impl ProcessSupervisorBehaviour
   def stop_process(process_name) do
-    with {:ok, validated_name} <- validate_process_name(process_name),
-         {:ok, process_config} <- get_process_config(validated_name) do
+    with {:ok, process_config} <- get_process_config(process_name) do
       case find_running_process(process_config.process_name) do
         nil ->
-          Logger.info("Process not running", process: validated_name)
+          Logger.info("Process not running", process: process_name)
           :ok
 
         process_info ->
-          terminate_process(process_info.pid, validated_name)
+          terminate_process(process_info.pid, process_name)
       end
     else
       {:error, reason} -> {:error, reason}
@@ -170,8 +149,17 @@ defmodule Server.ProcessSupervisor.Alys do
   end
 
   @impl ProcessSupervisorBehaviour
-  def managed_process?(process_name) do
-    Map.has_key?(@managed_processes, process_name)
+  def process_running?(process_name) do
+    case get_process(process_name) do
+      {:ok, %{status: :running}} -> true
+      _ -> false
+    end
+  end
+
+  @impl ProcessSupervisorBehaviour
+  def cleanup do
+    Logger.info("Windows Alys ProcessSupervisor cleanup completed")
+    :ok
   end
 
   # Private helper functions

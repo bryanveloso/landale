@@ -21,24 +21,6 @@ defmodule Server.ProcessSupervisor.Zelan do
 
   alias Server.ProcessSupervisorBehaviour
 
-  # Input validation helpers
-  defp validate_process_name(name) when is_binary(name) do
-    cond do
-      String.length(name) > 50 ->
-        {:error, :process_name_too_long}
-
-      not Regex.match?(~r/^[a-zA-Z0-9_-]+$/, name) ->
-        {:error, :invalid_process_name_format}
-
-      not Map.has_key?(@managed_processes, name) ->
-        {:error, :process_not_managed}
-
-      true ->
-        {:ok, name}
-    end
-  end
-
-  defp validate_process_name(_), do: {:error, :invalid_process_name_type}
 
   # Process definitions for macOS (zelan - Mac Studio with AI services)
   @managed_processes %{

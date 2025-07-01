@@ -15,19 +15,20 @@ RELEASE_NODE=server@zelan
 PHX_SERVER=true
 WORKER_NODE=false
 
-# Database configuration
+# Database configuration (use localhost since PostgreSQL runs on zelan)
 DATABASE_URL=ecto://postgres:postgres@localhost/landale_prod
 POOL_SIZE=10
 
-# Phoenix configuration
+# Phoenix configuration (use Tailscale hostname)
 SECRET_KEY_BASE=$(mix phx.gen.secret)
-PHX_HOST=zelan.local
+PHX_HOST=zelan
 PORT=4000
+BIND_IP=100.112.39.113
 
-# Cluster configuration
+# Cluster configuration (use Tailscale interface and node names)
 CLUSTER_STRATEGY=Cluster.Strategy.Gossip
 CLUSTER_HOSTS=server@zelan,server@demi,server@saya,server@alys
-CLUSTER_IF_ADDR=100.0.0.0/8
+CLUSTER_IF_ADDR=utun6
 CLUSTER_PORT=45892
 
 # Twitch configuration (if needed)

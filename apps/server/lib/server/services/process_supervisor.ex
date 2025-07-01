@@ -327,10 +327,21 @@ defmodule Server.Services.ProcessSupervisor do
   # Private Functions
 
   defp determine_platform_supervisor do
-    case :os.type() do
-      {:win32, _} -> Server.ProcessSupervisor.Windows
-      {:unix, :darwin} -> Server.ProcessSupervisor.MacOS
-      {:unix, _} -> Server.ProcessSupervisor.Linux
+    # Determine supervisor based on node name (computer name)
+    node_string = Node.self() |> Atom.to_string()
+    
+    cond do
+      String.contains?(node_string, "zelan") -> Server.ProcessSupervisor.Zelan
+      String.contains?(node_string, "demi") -> Server.ProcessSupervisor.Demi
+      String.contains?(node_string, "saya") -> Server.ProcessSupervisor.Saya
+      String.contains?(node_string, "alys") -> Server.ProcessSupervisor.Alys
+      true ->
+        # Fallback to OS-based detection for development
+        case :os.type() do
+          {:win32, _} -> Server.ProcessSupervisor.Demi
+          {:unix, :darwin} -> Server.ProcessSupervisor.Zelan
+          {:unix, _} -> Server.ProcessSupervisor.Saya
+        end
     end
   end
 
