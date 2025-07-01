@@ -19,6 +19,8 @@ defmodule Server.Application do
       Server.Repo,
       {DNSCluster, query: Application.get_env(:server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Server.PubSub},
+      # Cluster formation for distributed process management
+      {Cluster.Supervisor, [Application.get_env(:libcluster, :topologies, []), [name: Server.ClusterSupervisor]]},
       # Start to serve requests, typically the last entry
       ServerWeb.Endpoint
     ]
@@ -35,7 +37,9 @@ defmodule Server.Application do
             # Services
             Server.Services.OBS,
             Server.Services.Twitch,
-            {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]}
+            {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]},
+            # Distributed process supervision
+            Server.Services.ProcessSupervisor
           ]
       end
 

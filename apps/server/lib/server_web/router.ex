@@ -69,5 +69,13 @@ defmodule ServerWeb.Router do
     get "/control/status", ControlController, :status
     get "/control/services", ControlController, :services
     post "/control/ping", ControlController, :ping
+
+    # Distributed process management
+    get "/processes/cluster", ProcessController, :cluster_status
+    get "/processes/:node", ProcessController, :node_processes
+    get "/processes/:node/:process", ProcessController, :process_status
+    post "/processes/:node/:process/start", ProcessController, :start_process
+    post "/processes/:node/:process/stop", ProcessController, :stop_process
+    post "/processes/:node/:process/restart", ProcessController, :restart_process
   end
 end
