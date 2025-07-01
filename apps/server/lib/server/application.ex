@@ -35,7 +35,8 @@ defmodule Server.Application do
             # Services
             Server.Services.OBS,
             Server.Services.Twitch,
-            {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]}
+            {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]},
+            Server.Services.Rainwave
           ]
       end
 
@@ -123,7 +124,7 @@ defmodule Server.Application do
 
   defp graceful_service_shutdown do
     # Allow services to clean up their resources
-    services = [Server.Services.OBS, Server.Services.Twitch, Server.Services.IronmonTCP]
+    services = [Server.Services.OBS, Server.Services.Twitch, Server.Services.IronmonTCP, Server.Services.Rainwave]
 
     Enum.each(services, fn service ->
       try do

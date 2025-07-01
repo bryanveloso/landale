@@ -15,6 +15,7 @@ defmodule Server.Events do
   @obs_events "obs:events"
   @twitch_events "twitch:events"
   @ironmon_events "ironmon:events"
+  @rainwave_events "rainwave:events"
   @system_events "system:events"
   @health_events "system:health"
   @performance_events "system:performance"
@@ -92,6 +93,55 @@ defmodule Server.Events do
 
     # Emit telemetry for published event
     Server.Telemetry.event_published(event_type, "ironmon:events")
+  end
+
+  # Rainwave Event Publishing
+
+  @doc """
+  General event emitter function matching the original TypeScript API.
+
+  ## Parameters
+  - `event_name` - Event identifier (e.g. "rainwave:update", "obs:status")
+  - `data` - Event data payload
+  - `correlation_id` - Optional correlation ID for tracking
+  """
+  @spec emit(binary(), map(), binary() | nil) :: :ok
+  def emit(event_name, data, correlation_id \\ nil)
+
+  def emit("rainwave:update", data, correlation_id) do
+    publish_rainwave_event("update", data, correlation_id)
+  end
+
+  def emit(event_name, data, correlation_id) do
+    Logger.warning("Unhandled event emission",
+      event_name: event_name,
+      data: inspect(data, limit: :infinity),
+      correlation_id: correlation_id
+    )
+  end
+
+  @doc """
+  Publishes a Rainwave music event to all subscribers.
+
+  ## Parameters
+  - `event_type` - Type of Rainwave event (e.g. "song_change", "station_change")
+  - `data` - Event data payload
+  - `correlation_id` - Optional correlation ID for tracking
+  """
+  @spec publish_rainwave_event(binary(), map(), binary() | nil) :: :ok
+  def publish_rainwave_event(event_type, data, correlation_id \\ nil) do
+    event = %{
+      type: event_type,
+      data: data,
+      timestamp: System.system_time(:second),
+      correlation_id: correlation_id || UUID.uuid4()
+    }
+
+    Logger.debug("Publishing Rainwave event", event: event)
+    Phoenix.PubSub.broadcast(@pubsub, @rainwave_events, {:rainwave_event, event})
+
+    # Emit telemetry for published event
+    Server.Telemetry.event_published(event_type, "rainwave:events")
   end
 
   # System Event Publishing
@@ -183,6 +233,12 @@ defmodule Server.Events do
     Phoenix.PubSub.subscribe(@pubsub, @ironmon_events)
   end
 
+  @doc "Subscribes the current process to Rainwave events."
+  @spec subscribe_to_rainwave_events() :: :ok
+  def subscribe_to_rainwave_events do
+    Phoenix.PubSub.subscribe(@pubsub, @rainwave_events)
+  end
+
   @doc "Subscribes the current process to system events."
   @spec subscribe_to_system_events() :: :ok
   def subscribe_to_system_events do
@@ -212,6 +268,10 @@ defmodule Server.Events do
 
   def unsubscribe_from_ironmon_events do
     Phoenix.PubSub.unsubscribe(@pubsub, @ironmon_events)
+  end
+
+  def unsubscribe_from_rainwave_events do
+    Phoenix.PubSub.unsubscribe(@pubsub, @rainwave_events)
   end
 
   def unsubscribe_from_system_events do

@@ -20,6 +20,7 @@ defmodule ServerWeb.EventsChannel do
         Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
         Phoenix.PubSub.subscribe(Server.PubSub, "twitch:events")
         Phoenix.PubSub.subscribe(Server.PubSub, "ironmon:events")
+        Phoenix.PubSub.subscribe(Server.PubSub, "rainwave:events")
         Phoenix.PubSub.subscribe(Server.PubSub, "system:events")
 
       specific_topic ->
@@ -55,6 +56,17 @@ defmodule ServerWeb.EventsChannel do
   def handle_info({:ironmon_event, event}, socket) do
     push(socket, "event", %{
       type: "ironmon",
+      data: event,
+      timestamp: System.system_time(:second)
+    })
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:rainwave_event, event}, socket) do
+    push(socket, "event", %{
+      type: "rainwave",
       data: event,
       timestamp: System.system_time(:second)
     })

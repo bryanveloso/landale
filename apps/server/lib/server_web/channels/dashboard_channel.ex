@@ -8,12 +8,14 @@ defmodule ServerWeb.DashboardChannel do
 
   ## Events Subscribed To
   - `obs:events` - OBS WebSocket state changes and events
+  - `rainwave:events` - Rainwave music service updates
   - `system:health` - System health status updates
   - `system:performance` - Performance metrics updates
 
   ## Events Sent to Client
   - `initial_state` - Current system state on connection
   - `obs_event` - OBS-related events (streaming, recording, scenes)
+  - `rainwave_event` - Rainwave music updates (song changes, station changes)
   - `health_update` - System health status changes
   - `performance_update` - Performance metrics updates
 
@@ -24,6 +26,9 @@ defmodule ServerWeb.DashboardChannel do
   - `obs:start_recording` - Start OBS recording
   - `obs:stop_recording` - Stop OBS recording
   - `obs:set_current_scene` - Change OBS scene
+  - `rainwave:get_status` - Request current Rainwave status
+  - `rainwave:set_enabled` - Enable/disable Rainwave service
+  - `rainwave:set_station` - Change active Rainwave station
   """
 
   use ServerWeb, :channel
@@ -47,6 +52,7 @@ defmodule ServerWeb.DashboardChannel do
 
     # Subscribe to relevant PubSub topics for real-time updates
     Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
+    Phoenix.PubSub.subscribe(Server.PubSub, "rainwave:events")
     Phoenix.PubSub.subscribe(Server.PubSub, "system:health")
     Phoenix.PubSub.subscribe(Server.PubSub, "system:performance")
 
@@ -82,6 +88,12 @@ defmodule ServerWeb.DashboardChannel do
   @impl true
   def handle_info({:performance_update, data}, socket) do
     push(socket, "performance_update", data)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:rainwave_event, event}, socket) do
+    push(socket, "rainwave_event", event)
     {:noreply, socket}
   end
 
@@ -167,6 +179,37 @@ defmodule ServerWeb.DashboardChannel do
       {:error, reason} ->
         {:reply, {:error, %{message: reason}}, socket}
     end
+  end
+
+  @impl true
+  def handle_in("rainwave:get_status", _payload, socket) do
+    correlation_id = socket.assigns.correlation_id
+
+    CorrelationId.with_context(correlation_id, fn ->
+      Logger.debug("Handling Rainwave status request")
+
+      case Server.Services.Rainwave.get_status() do
+        {:ok, status} ->
+          Logger.debug("Rainwave status request successful")
+          {:reply, {:ok, status}, socket}
+
+        {:error, reason} ->
+          Logger.warning("Rainwave status request failed", reason: inspect(reason))
+          {:reply, {:error, %{message: inspect(reason)}}, socket}
+      end
+    end)
+  end
+
+  @impl true
+  def handle_in("rainwave:set_enabled", %{"enabled" => enabled}, socket) do
+    Server.Services.Rainwave.set_enabled(enabled)
+    {:reply, {:ok, %{success: true}}, socket}
+  end
+
+  @impl true
+  def handle_in("rainwave:set_station", %{"station_id" => station_id}, socket) do
+    Server.Services.Rainwave.set_station(station_id)
+    {:reply, {:ok, %{success: true}}, socket}
   end
 
   # Test event handlers
