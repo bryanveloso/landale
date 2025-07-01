@@ -1,5 +1,8 @@
 import Config
 
+# Configure environment for runtime checks
+config :server, env: :test
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used

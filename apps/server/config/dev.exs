@@ -1,5 +1,8 @@
 import Config
 
+# Configure environment for runtime checks
+config :server, env: :dev
+
 # Configure your database
 config :server, Server.Repo,
   username: "Avalonstar",

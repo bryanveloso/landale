@@ -1,5 +1,8 @@
 import Config
 
+# Configure environment for runtime checks
+config :server, env: :prod
+
 # Do not print debug messages in production
 config :logger, level: :info
 

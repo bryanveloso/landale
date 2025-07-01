@@ -55,6 +55,9 @@ config :server,
   twitch_client_secret: System.get_env("TWITCH_CLIENT_SECRET"),
   twitch_user_id: System.get_env("TWITCH_USER_ID")
 
+# OBS WebSocket configuration for all environments
+config :server, :obs_websocket_url, "ws://demi:4455"
+
 if config_env() == :prod do
   # Database is required for IronMON functionality
   database_url =
