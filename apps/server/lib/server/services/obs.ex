@@ -912,11 +912,30 @@ defmodule Server.Services.OBS do
   end
 
   defp handle_obs_protocol_message(state, 7, %{"d" => %{"requestId" => request_id} = response}) do
-    # Request response
-    case Map.pop(state.pending_requests, request_id) do
-      {nil, _} ->
-        Logger.warning("Response for unknown request", request_id: request_id)
-        state
+    # Request response - check if this is a stats request first
+    request_type = response["requestType"]
+    
+    if request_type == "GetStats" do
+      # Stats requests are fire-and-forget, don't track responses
+      Logger.debug("Stats response received", 
+        request_id: request_id,
+        fps: get_in(response, ["responseData", "activeFps"]),
+        cpu_usage: get_in(response, ["responseData", "cpuUsage"])
+      )
+      state
+    else
+      # Handle tracked requests
+      case Map.pop(state.pending_requests, request_id) do
+        {nil, pending_requests} ->
+          Logger.warning("Response for unknown request", 
+            request_id: request_id,
+            response_type: request_type,
+            response_status: response["requestStatus"]["result"],
+            pending_count: map_size(pending_requests),
+            pending_requests: Map.keys(pending_requests) |> Enum.take(5),
+            reason: "request not found in pending map"
+          )
+          state
 
       {from, remaining_requests} ->
         result =
@@ -935,6 +954,7 @@ defmodule Server.Services.OBS do
 
         GenServer.reply(from, result)
         %{state | pending_requests: remaining_requests}
+      end
     end
   end
 
@@ -1061,6 +1081,8 @@ defmodule Server.Services.OBS do
       }
     }
 
+    # Don't add stats requests to pending map since we don't wait for response
+    Logger.debug("Requesting OBS stats", request_id: request_id)
     send_websocket_message(state, message)
   end
 
