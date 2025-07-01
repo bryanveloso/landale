@@ -171,6 +171,17 @@ defmodule Server.WebSocketClient do
     protocols = Keyword.get(opts, :protocols, [])
 
     ws_opts = if protocols != [], do: %{protocols: protocols}, else: %{}
+
+    Logger.debug("WebSocket upgrade request details",
+      url: client.url,
+      host: client.uri.host,
+      port: client.uri.port,
+      path: path,
+      headers: inspect(headers),
+      ws_opts: inspect(ws_opts),
+      headers_count: length(headers)
+    )
+
     stream_ref = :gun.ws_upgrade(conn_pid, path, headers, ws_opts)
 
     Logger.debug("WebSocket upgrade initiated",
@@ -375,8 +386,8 @@ defmodule Server.WebSocketClient do
   defp default_port("wss"), do: 443
   defp default_port(_), do: 80
 
-  defp gun_opts("wss"), do: %{transport: :tls}
-  defp gun_opts(_), do: %{}
+  defp gun_opts("wss"), do: %{transport: :tls, protocols: [:http]}
+  defp gun_opts(_), do: %{protocols: [:http]}
 
   defp cancel_reconnect_timer(client) do
     # Use ConnectionManager to cancel timer properly

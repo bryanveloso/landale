@@ -914,20 +914,21 @@ defmodule Server.Services.OBS do
   defp handle_obs_protocol_message(state, 7, %{"d" => %{"requestId" => request_id} = response}) do
     # Request response - check if this is a stats request first
     request_type = response["requestType"]
-    
+
     if request_type == "GetStats" do
       # Stats requests are fire-and-forget, don't track responses
-      Logger.debug("Stats response received", 
+      Logger.debug("Stats response received",
         request_id: request_id,
         fps: get_in(response, ["responseData", "activeFps"]),
         cpu_usage: get_in(response, ["responseData", "cpuUsage"])
       )
+
       state
     else
       # Handle tracked requests
       case Map.pop(state.pending_requests, request_id) do
         {nil, pending_requests} ->
-          Logger.warning("Response for unknown request", 
+          Logger.warning("Response for unknown request",
             request_id: request_id,
             response_type: request_type,
             response_status: response["requestStatus"]["result"],
@@ -935,25 +936,26 @@ defmodule Server.Services.OBS do
             pending_requests: Map.keys(pending_requests) |> Enum.take(5),
             reason: "request not found in pending map"
           )
+
           state
 
-      {from, remaining_requests} ->
-        result =
-          if response["requestStatus"]["result"] do
-            {:ok, response["responseData"] || %{}}
-          else
-            comment = response["requestStatus"]["comment"] || "Request failed"
+        {from, remaining_requests} ->
+          result =
+            if response["requestStatus"]["result"] do
+              {:ok, response["responseData"] || %{}}
+            else
+              comment = response["requestStatus"]["comment"] || "Request failed"
 
-            error =
-              ServiceError.new(:obs, "request", :invalid_request, comment,
-                details: %{request_id: request_id, response: response}
-              )
+              error =
+                ServiceError.new(:obs, "request", :invalid_request, comment,
+                  details: %{request_id: request_id, response: response}
+                )
 
-            {:error, error}
-          end
+              {:error, error}
+            end
 
-        GenServer.reply(from, result)
-        %{state | pending_requests: remaining_requests}
+          GenServer.reply(from, result)
+          %{state | pending_requests: remaining_requests}
       end
     end
   end

@@ -35,8 +35,6 @@ defmodule Server.Services.Twitch.EventSubManager do
   - `channel.subscription.message` - Subscription messages
   - `channel.cheer` - Bits cheered
   - `channel.raid` - Incoming raids
-  - `channel.ban` / `channel.unban` - User bans/unbans
-  - `channel.moderator.add` / `channel.moderator.remove` - Moderator changes
   - `channel.guest_star_session.begin` / `channel.guest_star_session.end` - Guest star sessions
   - `channel.guest_star_guest.update` - Guest star updates
   - `channel.channel_points_custom_reward.add` - Custom reward creation
@@ -48,23 +46,12 @@ defmodule Server.Services.Twitch.EventSubManager do
   - `channel.prediction.begin` / `channel.prediction.progress` / `channel.prediction.lock` / `channel.prediction.end` - Predictions
   - `channel.charity_campaign.donate` / `channel.charity_campaign.progress` - Charity campaigns
   - `channel.hype_train.begin` / `channel.hype_train.progress` / `channel.hype_train.end` - Hype trains
-  - `channel.shield_mode.begin` / `channel.shield_mode.end` - Shield mode
   - `channel.shoutout.create` / `channel.shoutout.receive` - Shoutouts
-  - `channel.suspicious_user.message` / `channel.suspicious_user.update` - Suspicious users
   - `channel.vip.add` / `channel.vip.remove` - VIP changes
-  - `channel.warning.acknowledge` / `channel.warning.send` - Warnings
   - `channel.goal.begin` / `channel.goal.progress` / `channel.goal.end` - Goals
 
   ### User Events
-  - `user.authorization.grant` / `user.authorization.revoke` - Authorization changes
   - `user.update` - User information updates
-  - `user.whisper.message` - Whisper messages
-
-  ### Drop Events
-  - `drop.entitlement.grant` - Drop entitlements
-
-  ### Extension Events
-  - `extension.bits_transaction.create` - Extension bits transactions
   """
 
   require Logger
@@ -91,12 +78,6 @@ defmodule Server.Services.Twitch.EventSubManager do
 
     # Raid events
     {"channel.raid", [], []},
-
-    # Moderation events
-    {"channel.ban", ["channel:moderate"], []},
-    {"channel.unban", ["channel:moderate"], []},
-    {"channel.moderator.add", ["moderation:read"], []},
-    {"channel.moderator.remove", ["moderation:read"], []},
 
     # Chat events
     {"channel.chat.clear", ["moderator:read:chat_settings"], []},
@@ -138,10 +119,6 @@ defmodule Server.Services.Twitch.EventSubManager do
     {"channel.goal.progress", ["channel:read:goals"], []},
     {"channel.goal.end", ["channel:read:goals"], []},
 
-    # Shield mode events
-    {"channel.shield_mode.begin", ["moderator:read:shield_mode"], []},
-    {"channel.shield_mode.end", ["moderator:read:shield_mode"], []},
-
     # Shoutout events
     {"channel.shoutout.create", ["moderator:read:shoutouts"], []},
     {"channel.shoutout.receive", ["moderator:read:shoutouts"], []},
@@ -149,14 +126,6 @@ defmodule Server.Services.Twitch.EventSubManager do
     # VIP events
     {"channel.vip.add", ["channel:read:vips"], []},
     {"channel.vip.remove", ["channel:read:vips"], []},
-
-    # Warning events
-    {"channel.warning.acknowledge", ["moderator:read:warnings"], []},
-    {"channel.warning.send", ["moderator:read:warnings"], []},
-
-    # Suspicious user events
-    {"channel.suspicious_user.message", ["moderator:read:suspicious_users"], []},
-    {"channel.suspicious_user.update", ["moderator:read:suspicious_users"], []},
 
     # Guest star events
     {"channel.guest_star_session.begin", ["channel:read:guest_star"], []},
@@ -167,18 +136,7 @@ defmodule Server.Services.Twitch.EventSubManager do
     {"channel.ad_break.begin", ["channel:read:ads"], []},
 
     # User events
-    {"user.authorization.grant", ["user:read:subscriptions"], []},
-    {"user.authorization.revoke", ["user:read:subscriptions"], []},
-    {"user.update", [], []},
-
-    # Whisper events
-    {"user.whisper.message", ["user:read:whispers"], []},
-
-    # Drop events
-    {"drop.entitlement.grant", ["user:read:subscriptions"], []},
-
-    # Extension events
-    {"extension.bits_transaction.create", ["user:read:subscriptions"], []}
+    {"user.update", [], []}
   ]
 
   @doc """
@@ -247,7 +205,7 @@ defmodule Server.Services.Twitch.EventSubManager do
            make_subscription_request(url, headers, json_body)
          end) do
       {:ok, response_body} ->
-        case Jason.decode(List.to_string(response_body)) do
+        case Jason.decode(response_body) do
           {:ok, %{"data" => [subscription]}} ->
             Logger.info("Subscription created",
               event_type: event_type,
@@ -272,7 +230,7 @@ defmodule Server.Services.Twitch.EventSubManager do
             Logger.error("Subscription response parse failed",
               error: inspect(reason),
               event_type: event_type,
-              body: List.to_string(response_body)
+              body: response_body
             )
 
             {:error, {:json_decode_error, reason}}
@@ -297,9 +255,14 @@ defmodule Server.Services.Twitch.EventSubManager do
 
     gun_headers = Enum.map(headers, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end)
 
-    with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
+    # Ensure port is set correctly
+    port = uri.port || if uri.scheme == "https", do: 443, else: 80
+    host = String.to_charlist(uri.host)
+    path = String.to_charlist(uri.path || "/")
+
+    with {:ok, conn_pid} <- :gun.open(host, port, gun_opts(uri)),
          {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, http_config.timeout),
-         stream_ref <- :gun.post(conn_pid, String.to_charlist(uri.path), gun_headers, json_body),
+         stream_ref <- :gun.post(conn_pid, path, gun_headers, json_body),
          {:ok, response} <- await_response(conn_pid, stream_ref, http_config.timeout) do
       :gun.close(conn_pid)
       parse_subscription_response(response)
@@ -370,9 +333,14 @@ defmodule Server.Services.Twitch.EventSubManager do
 
     gun_headers = Enum.map(headers, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end)
 
-    with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
+    # Ensure port is set correctly
+    port = uri.port || if uri.scheme == "https", do: 443, else: 80
+    host = String.to_charlist(uri.host)
+    path_with_query = String.to_charlist("#{uri.path || "/"}#{if uri.query, do: "?#{uri.query}", else: ""}")
+
+    with {:ok, conn_pid} <- :gun.open(host, port, gun_opts(uri)),
          {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, http_config.timeout),
-         stream_ref <- :gun.delete(conn_pid, String.to_charlist("#{uri.path}?#{uri.query}"), gun_headers),
+         stream_ref <- :gun.delete(conn_pid, path_with_query, gun_headers),
          {:ok, response} <- await_response(conn_pid, stream_ref, http_config.timeout) do
       :gun.close(conn_pid)
       parse_delete_response(response)
@@ -420,7 +388,7 @@ defmodule Server.Services.Twitch.EventSubManager do
   # Creates a single subscription and handles the result
   defp create_single_subscription(state, {event_type, condition, required_scopes, _sub_opts}, {success, failed}, opts) do
     if validate_scopes_for_subscription(state.scopes, required_scopes) do
-      case create_subscription(state, event_type, condition, opts) do
+      case create_subscription_with_retry(state, event_type, condition, opts) do
         {:ok, subscription} ->
           log_successful_subscription(event_type, subscription)
           {success + 1, failed}
@@ -433,6 +401,55 @@ defmodule Server.Services.Twitch.EventSubManager do
       log_skipped_subscription(event_type, required_scopes, state.scopes)
       {success, failed + 1}
     end
+  end
+
+  # Creates a subscription with retry logic for critical events
+  defp create_subscription_with_retry(state, event_type, condition, opts) do
+    # Critical events that should be retried more aggressively
+    critical_events = ["stream.online", "stream.offline", "channel.update", "channel.follow"]
+
+    max_retries = if event_type in critical_events, do: 3, else: 1
+
+    create_subscription_with_retry(state, event_type, condition, opts, 0, max_retries)
+  end
+
+  defp create_subscription_with_retry(state, event_type, condition, opts, attempt, max_retries)
+       when attempt < max_retries do
+    case create_subscription(state, event_type, condition, opts) do
+      {:ok, subscription} ->
+        if attempt > 0 do
+          Logger.info("Subscription created after retry",
+            event_type: event_type,
+            attempt: attempt + 1,
+            subscription_id: subscription["id"]
+          )
+        end
+
+        {:ok, subscription}
+
+      {:error, reason} ->
+        if attempt + 1 < max_retries do
+          # Wait before retry with exponential backoff
+          delay = min(1000 * :math.pow(2, attempt), 5000) |> round()
+          Process.sleep(delay)
+
+          Logger.debug("Retrying subscription creation",
+            event_type: event_type,
+            attempt: attempt + 1,
+            max_retries: max_retries,
+            delay: delay
+          )
+
+          create_subscription_with_retry(state, event_type, condition, opts, attempt + 1, max_retries)
+        else
+          {:error, reason}
+        end
+    end
+  end
+
+  defp create_subscription_with_retry(_state, _event_type, _condition, _opts, attempt, max_retries)
+       when attempt >= max_retries do
+    {:error, :max_retries_exceeded}
   end
 
   # Logs successful subscription creation
@@ -485,11 +502,13 @@ defmodule Server.Services.Twitch.EventSubManager do
 
   # Logs skipped subscription due to missing scopes
   defp log_skipped_subscription(event_type, required_scopes, user_scopes) do
-    Logger.info("Subscription creation skipped",
-      error: "missing required scopes",
+    user_scope_list = MapSet.to_list(user_scopes || MapSet.new())
+    missing_scopes = required_scopes -- user_scope_list
+
+    Logger.info("Subscription creation skipped for #{event_type} - missing scopes: #{inspect(missing_scopes)}",
       event_type: event_type,
-      required_scopes: required_scopes,
-      user_scopes: MapSet.to_list(user_scopes || MapSet.new())
+      missing_scopes: missing_scopes,
+      required_scopes: required_scopes
     )
   end
 
@@ -544,29 +563,13 @@ defmodule Server.Services.Twitch.EventSubManager do
       "channel.follow" ->
         %{"broadcaster_user_id" => user_id, "moderator_user_id" => user_id}
 
-      # Chat events that require user_id instead of broadcaster_user_id
-      "user.authorization.grant" ->
-        %{"client_id" => get_client_id()}
-
-      "user.authorization.revoke" ->
-        %{"client_id" => get_client_id()}
-
+      # User events that require user_id instead of broadcaster_user_id
       "user.update" ->
         %{"user_id" => user_id}
 
-      "user.whisper.message" ->
-        %{"user_id" => user_id}
-
-      # Drop events that require organization_id and category_id (would need to be configured)
-      "drop.entitlement.grant" ->
-        %{
-          "organization_id" => get_organization_id(),
-          "category_id" => get_category_id()
-        }
-
-      # Extension events that require extension_client_id
-      "extension.bits_transaction.create" ->
-        %{"extension_client_id" => get_extension_client_id()}
+      # Raid events require specific condition parameters (to_broadcaster_user_id for incoming raids)
+      "channel.raid" ->
+        %{"to_broadcaster_user_id" => user_id}
 
       # All other events use broadcaster_user_id
       _ ->
@@ -574,38 +577,22 @@ defmodule Server.Services.Twitch.EventSubManager do
     end
   end
 
-  # Helper functions for configuration values (these would need to be configured in environment)
-  defp get_client_id do
-    System.get_env("TWITCH_CLIENT_ID") || ""
-  end
-
-  defp get_organization_id do
-    System.get_env("TWITCH_ORGANIZATION_ID") || ""
-  end
-
-  defp get_category_id do
-    System.get_env("TWITCH_CATEGORY_ID") || ""
-  end
-
-  defp get_extension_client_id do
-    System.get_env("TWITCH_EXTENSION_CLIENT_ID") || ""
-  end
-
   # Helper function to determine the correct API version for each event type
   defp get_api_version_for_event_type("channel.follow"), do: "2"
+  defp get_api_version_for_event_type("channel.update"), do: "2"
   defp get_api_version_for_event_type(_event_type), do: "1"
 
   # Gun HTTP client helper functions
   defp gun_opts(%URI{scheme: "https"}), do: %{transport: :tls}
   defp gun_opts(_), do: %{}
 
-  defp await_response(_conn_pid, stream_ref, timeout) do
-    case :gun.await(stream_ref, timeout) do
+  defp await_response(conn_pid, stream_ref, timeout) do
+    case :gun.await(conn_pid, stream_ref, timeout) do
       {:response, :fin, status, headers} ->
         {:ok, {status, headers, ""}}
 
       {:response, :nofin, status, headers} ->
-        case :gun.await_body(stream_ref, timeout) do
+        case :gun.await_body(conn_pid, stream_ref, timeout) do
           {:ok, body} -> {:ok, {status, headers, body}}
           {:error, reason} -> {:error, reason}
         end

@@ -184,13 +184,21 @@ defmodule Server.OAuthTokenManager do
 
       case :dets.insert(manager.dets_table, {:token, serialized}) do
         :ok ->
-          :dets.sync(manager.dets_table)
-          Logger.debug("Tokens saved to storage", storage_key: manager.storage_key)
-          :ok
+          # Force sync to disk immediately to prevent corruption
+          case :dets.sync(manager.dets_table) do
+            :ok ->
+              Logger.debug("Tokens saved and synced to storage", storage_key: manager.storage_key)
+              # Create automatic JSON backup to prevent DETS corruption loss
+              create_json_backup(manager)
+              :ok
+
+            {:error, sync_reason} ->
+              Logging.log_error("Token sync failed", sync_reason, storage_key: manager.storage_key)
+              {:error, sync_reason}
+          end
 
         {:error, reason} ->
           Logging.log_error("Token save failed", reason, storage_key: manager.storage_key)
-
           {:error, reason}
       end
     else
@@ -242,19 +250,9 @@ defmodule Server.OAuthTokenManager do
 
       token_info ->
         if token_needs_refresh?(token_info, manager.refresh_buffer_ms) do
-          Logger.debug("Token refresh required", storage_key: manager.storage_key)
-
-          case refresh_token(manager) do
-            {:ok, updated_manager} ->
-              {:ok, updated_manager.token_info.access_token, updated_manager}
-
-            {:error, reason} ->
-              Logger.debug("Token refresh failed", error: reason, storage_key: manager.storage_key)
-              {:error, reason}
-          end
+          handle_token_refresh(manager, token_info)
         else
-          Logger.debug("Token validation skipped", storage_key: manager.storage_key)
-          {:ok, token_info.access_token, manager}
+          return_current_valid_token(manager, token_info)
         end
     end
   end
@@ -372,13 +370,71 @@ defmodule Server.OAuthTokenManager do
   @spec close(manager_state()) :: :ok
   def close(manager) do
     if manager.dets_table do
-      :dets.close(manager.dets_table)
+      try do
+        # Sync before closing to ensure data is written
+        :dets.sync(manager.dets_table)
+        :dets.close(manager.dets_table)
+        Logger.debug("DETS table closed successfully", storage_key: manager.storage_key)
+      rescue
+        error ->
+          Logger.warning("DETS close failed",
+            error: inspect(error),
+            storage_key: manager.storage_key
+          )
+      end
     end
 
     :ok
   end
 
   # Private helper functions
+
+  defp handle_token_refresh(manager, token_info) do
+    Logger.info("Token refresh required",
+      storage_key: manager.storage_key,
+      expires_at: token_info.expires_at,
+      time_until_expiry: time_until_expiry(token_info.expires_at),
+      refresh_buffer_ms: manager.refresh_buffer_ms
+    )
+
+    case refresh_token(manager) do
+      {:ok, updated_manager} ->
+        Logger.info("Token refreshed successfully",
+          storage_key: manager.storage_key,
+          new_expires_at: updated_manager.token_info.expires_at
+        )
+
+        {:ok, updated_manager.token_info.access_token, updated_manager}
+
+      {:error, reason} ->
+        handle_failed_refresh(manager, token_info, reason)
+    end
+  end
+
+  defp handle_failed_refresh(manager, token_info, reason) do
+    Logger.warning("Token refresh failed, using existing token",
+      error: reason,
+      storage_key: manager.storage_key,
+      token_valid_for: time_until_expiry(token_info.expires_at)
+    )
+
+    # Return existing token if refresh fails but token is still valid
+    if DateTime.compare(token_info.expires_at, DateTime.utc_now()) == :gt do
+      Logger.info("Using existing valid token despite refresh failure", storage_key: manager.storage_key)
+      {:ok, token_info.access_token, manager}
+    else
+      {:error, reason}
+    end
+  end
+
+  defp return_current_valid_token(manager, token_info) do
+    Logger.debug("Token still valid",
+      storage_key: manager.storage_key,
+      time_until_expiry: time_until_expiry(token_info.expires_at)
+    )
+
+    {:ok, token_info.access_token, manager}
+  end
 
   defp validate_required_opt(opts, key) do
     case Keyword.get(opts, key) do
@@ -474,5 +530,54 @@ defmodule Server.OAuthTokenManager do
   defp emit_telemetry(manager, event_suffix, metadata \\ %{}) do
     event = manager.telemetry_prefix ++ event_suffix
     :telemetry.execute(event, %{}, Map.put(metadata, :storage_key, manager.storage_key))
+  end
+
+  defp time_until_expiry(nil), do: "unknown"
+
+  defp time_until_expiry(expires_at) do
+    case DateTime.compare(expires_at, DateTime.utc_now()) do
+      :gt ->
+        diff = DateTime.diff(expires_at, DateTime.utc_now(), :second)
+        "#{diff} seconds"
+
+      _ ->
+        "expired"
+    end
+  end
+
+  # Creates an automatic JSON backup to prevent DETS corruption data loss
+  defp create_json_backup(manager) do
+    backup_data = %{
+      access_token: manager.token_info.access_token,
+      refresh_token: manager.token_info.refresh_token,
+      expires_at: manager.token_info.expires_at && DateTime.to_iso8601(manager.token_info.expires_at),
+      scopes: manager.token_info.scopes && MapSet.to_list(manager.token_info.scopes),
+      user_id: manager.token_info.user_id,
+      backup_timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+
+    # Create backup file path
+    storage_dir = Path.dirname(manager.storage_path)
+    backup_file = Path.join(storage_dir, "#{manager.storage_key}_backup.json")
+
+    json_data = Jason.encode!(backup_data, pretty: true)
+    File.write!(backup_file, json_data)
+
+    Logger.debug("Token backup created",
+      storage_key: manager.storage_key,
+      backup_file: backup_file
+    )
+  rescue
+    error ->
+      Logger.warning("Token backup failed",
+        error: inspect(error),
+        storage_key: manager.storage_key
+      )
+  rescue
+    error ->
+      Logger.warning("Token backup failed",
+        error: inspect(error),
+        storage_key: manager.storage_key
+      )
   end
 end
