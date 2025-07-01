@@ -30,31 +30,6 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-# Cluster configuration for distributed process management
-config :libcluster,
-  topologies: [
-    landale_cluster: [
-      strategy: Cluster.Strategy.Gossip,
-      config: [
-        # Define all nodes in the cluster
-        hosts: [
-          :server@zelan,
-          :server@demi,
-          :server@saya,
-          :server@alys
-        ],
-        # Use Tailscale network range
-        # This will bind to any interface in the 100.x.x.x range
-        if_addr: "100.0.0.0/8",
-        # Custom port for cluster communication
-        port: 45892,
-        # Multicast settings for node discovery
-        multicast_addr: "233.252.1.32",
-        multicast_ttl: 1
-      ]
-    ]
-  ]
-
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

@@ -12,28 +12,34 @@ defmodule Server.Telemetry do
   Measures OBS service status and emits telemetry events.
   """
   def measure_obs_status do
-    case Server.Services.OBS.get_status() do
-      {:ok, status} ->
-        # Emit connection status
-        connection_value = if status.connected, do: 1, else: 0
+    # Only measure if OBS service is started
+    if Process.whereis(Server.Services.OBS) do
+      case Server.Services.OBS.get_status() do
+        {:ok, status} ->
+          # Emit connection status
+          connection_value = if status.connected, do: 1, else: 0
 
-        :telemetry.execute([:server, :obs, :connection, :status], %{value: connection_value}, %{
-          state: status.connection_state
-        })
+          :telemetry.execute([:server, :obs, :connection, :status], %{value: connection_value}, %{
+            state: status.connection_state
+          })
 
-        # Get detailed state for additional metrics
-        state = Server.Services.OBS.get_state()
+          # Get detailed state for additional metrics
+          state = Server.Services.OBS.get_state()
 
-        # Emit streaming status
-        streaming_value = if state.streaming.active, do: 1, else: 0
-        :telemetry.execute([:server, :obs, :streaming, :status], %{value: streaming_value}, %{})
+          # Emit streaming status
+          streaming_value = if state.streaming.active, do: 1, else: 0
+          :telemetry.execute([:server, :obs, :streaming, :status], %{value: streaming_value}, %{})
 
-        # Emit recording status
-        recording_value = if state.recording.active, do: 1, else: 0
-        :telemetry.execute([:server, :obs, :recording, :status], %{value: recording_value}, %{})
+          # Emit recording status
+          recording_value = if state.recording.active, do: 1, else: 0
+          :telemetry.execute([:server, :obs, :recording, :status], %{value: recording_value}, %{})
 
-      {:error, _reason} ->
-        :telemetry.execute([:server, :obs, :connection, :status], %{value: 0}, %{state: "error"})
+        {:error, _reason} ->
+          :telemetry.execute([:server, :obs, :connection, :status], %{value: 0}, %{state: "error"})
+      end
+    else
+      # Service not started yet, emit unavailable status
+      :telemetry.execute([:server, :obs, :connection, :status], %{value: 0}, %{state: "service_not_started"})
     end
   end
 
@@ -41,21 +47,27 @@ defmodule Server.Telemetry do
   Measures Twitch service status and emits telemetry events.
   """
   def measure_twitch_status do
-    case Server.Services.Twitch.get_status() do
-      {:ok, status} ->
-        # Emit connection status
-        connection_value = if status.connected, do: 1, else: 0
+    # Only measure if Twitch service is started
+    if Process.whereis(Server.Services.Twitch) do
+      case Server.Services.Twitch.get_status() do
+        {:ok, status} ->
+          # Emit connection status
+          connection_value = if status.connected, do: 1, else: 0
 
-        :telemetry.execute([:server, :twitch, :connection, :status], %{value: connection_value}, %{
-          state: status.connection_state
-        })
+          :telemetry.execute([:server, :twitch, :connection, :status], %{value: connection_value}, %{
+            state: status.connection_state
+          })
 
-        # Emit subscription metrics
-        :telemetry.execute([:server, :twitch, :subscriptions, :active], %{value: status.subscription_count}, %{})
-        :telemetry.execute([:server, :twitch, :subscriptions, :cost], %{value: status.subscription_cost}, %{})
+          # Emit subscription metrics
+          :telemetry.execute([:server, :twitch, :subscriptions, :active], %{value: status.subscription_count}, %{})
+          :telemetry.execute([:server, :twitch, :subscriptions, :cost], %{value: status.subscription_cost}, %{})
 
-      {:error, _reason} ->
-        :telemetry.execute([:server, :twitch, :connection, :status], %{value: 0}, %{state: "error"})
+        {:error, _reason} ->
+          :telemetry.execute([:server, :twitch, :connection, :status], %{value: 0}, %{state: "error"})
+      end
+    else
+      # Service not started yet, emit unavailable status
+      :telemetry.execute([:server, :twitch, :connection, :status], %{value: 0}, %{state: "service_not_started"})
     end
   end
 

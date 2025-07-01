@@ -226,6 +226,46 @@ defmodule Server.Services.Twitch do
     end
   end
 
+  @impl GenServer
+  def handle_call({:delete_subscription, subscription_id}, _from, state) do
+    # Create manager state for EventSubManager
+    manager_state = %{
+      oauth2_client: state.token_manager.oauth2_client
+    }
+
+    case EventSubManager.delete_subscription(manager_state, subscription_id) do
+      :ok ->
+        # Remove from local state and update counters
+        deleted_subscription = Map.get(state.subscriptions, subscription_id)
+        cost = if deleted_subscription, do: deleted_subscription["cost"] || 1, else: 0
+
+        # Untrack subscription from monitor
+        Server.SubscriptionMonitor.untrack_subscription(subscription_id)
+
+        new_subscriptions = Map.delete(state.subscriptions, subscription_id)
+
+        new_state = %{
+          state
+          | subscriptions: new_subscriptions,
+            state: %{
+              state.state
+              | subscription_total_cost: max(0, state.state.subscription_total_cost - cost),
+                subscription_count: max(0, state.state.subscription_count - 1)
+            }
+        }
+
+        {:reply, :ok, new_state}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_call(:list_subscriptions, _from, state) do
+    {:reply, {:ok, state.subscriptions}, state}
+  end
+
   defp handle_subscription_creation(event_type, condition, opts, state) do
     # Check for duplicate subscription
     existing_key = EventSubManager.generate_subscription_key(event_type, condition)
@@ -296,46 +336,6 @@ defmodule Server.Services.Twitch do
     }
 
     {:reply, {:ok, subscription}, new_state}
-  end
-
-  @impl GenServer
-  def handle_call({:delete_subscription, subscription_id}, _from, state) do
-    # Create manager state for EventSubManager
-    manager_state = %{
-      oauth2_client: state.token_manager.oauth2_client
-    }
-
-    case EventSubManager.delete_subscription(manager_state, subscription_id) do
-      :ok ->
-        # Remove from local state and update counters
-        deleted_subscription = Map.get(state.subscriptions, subscription_id)
-        cost = if deleted_subscription, do: deleted_subscription["cost"] || 1, else: 0
-
-        # Untrack subscription from monitor
-        Server.SubscriptionMonitor.untrack_subscription(subscription_id)
-
-        new_subscriptions = Map.delete(state.subscriptions, subscription_id)
-
-        new_state = %{
-          state
-          | subscriptions: new_subscriptions,
-            state: %{
-              state.state
-              | subscription_total_cost: max(0, state.state.subscription_total_cost - cost),
-                subscription_count: max(0, state.state.subscription_count - 1)
-            }
-        }
-
-        {:reply, :ok, new_state}
-
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-    end
-  end
-
-  @impl GenServer
-  def handle_call(:list_subscriptions, _from, state) do
-    {:reply, {:ok, state.subscriptions}, state}
   end
 
   @impl GenServer
@@ -569,6 +569,13 @@ defmodule Server.Services.Twitch do
     {:noreply, state}
   end
 
+  # Catch-all for unhandled messages
+  @impl GenServer
+  def handle_info(message, state) do
+    Logger.debug("Unhandled message in Twitch service", message: inspect(message))
+    {:noreply, state}
+  end
+
   @impl GenServer
   def terminate(reason, state) do
     Logger.info("Twitch service terminating", reason: reason)
@@ -758,13 +765,6 @@ defmodule Server.Services.Twitch do
         timer = Process.send_after(self(), :refresh_token, 1000)
         %{state | token_refresh_timer: timer}
     end
-  end
-
-  # Catch-all for unhandled messages
-  @impl GenServer
-  def handle_info(message, state) do
-    Logger.debug("Unhandled message in Twitch service", message: inspect(message))
-    {:noreply, state}
   end
 
   # Helper functions for configuration

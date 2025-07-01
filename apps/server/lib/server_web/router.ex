@@ -8,12 +8,6 @@ defmodule ServerWeb.Router do
     plug OpenApiSpex.Plug.PutApiSpec, module: ServerWeb.ApiSpec
   end
 
-  pipeline :authenticated_api do
-    plug :accepts, ["json"]
-    plug ServerWeb.Plugs.ApiAuth
-    plug OpenApiSpex.Plug.PutApiSpec, module: ServerWeb.ApiSpec
-  end
-
   pipeline :browser do
     plug :accepts, ["html"]
   end
@@ -34,7 +28,7 @@ defmodule ServerWeb.Router do
   end
 
   scope "/api", ServerWeb do
-    pipe_through :authenticated_api
+    pipe_through :api
 
     # Health and system status
     get "/health", HealthController, :detailed
@@ -75,13 +69,5 @@ defmodule ServerWeb.Router do
     get "/control/status", ControlController, :status
     get "/control/services", ControlController, :services
     post "/control/ping", ControlController, :ping
-
-    # Distributed process management
-    get "/processes/cluster", ProcessController, :cluster_status
-    get "/processes/:node", ProcessController, :node_processes
-    get "/processes/:node/:process", ProcessController, :process_status
-    post "/processes/:node/:process/start", ProcessController, :start_process
-    post "/processes/:node/:process/stop", ProcessController, :stop_process
-    post "/processes/:node/:process/restart", ProcessController, :restart_process
   end
 end

@@ -20,11 +20,9 @@ defmodule ServerWeb.ApiSpec do
         - OBS WebSocket integration and controls
         - Twitch EventSub subscription management  
         - IronMON Pokemon challenge data
-        - Distributed process management across cluster nodes
         - System health and monitoring
         - Real-time dashboard communication
 
-        All endpoints require API key authentication via X-API-Key header.
         All endpoints return JSON and follow RESTful conventions.
         """,
         version: "1.0.0"
@@ -68,12 +66,6 @@ defmodule ServerWeb.ApiSpec do
       "IronmonChallenge" => Schemas.IronmonChallenge,
       "IronmonCheckpoint" => Schemas.IronmonCheckpoint,
       "IronmonResult" => Schemas.IronmonResult,
-
-      # Process management schemas
-      "ProcessStatus" => Schemas.ProcessStatus,
-      "ClusterStatus" => Schemas.ClusterStatus,
-      "NodeProcesses" => Schemas.NodeProcesses,
-      "ProcessActionResponse" => Schemas.ProcessActionResponse,
 
       # Request schemas
       "CreateTwitchSubscription" => Schemas.CreateTwitchSubscription

@@ -19,40 +19,24 @@ defmodule Server.Application do
       Server.Repo,
       {DNSCluster, query: Application.get_env(:server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Server.PubSub},
-      # Cluster formation for distributed process management
-      {Cluster.Supervisor, [Application.get_env(:libcluster, :topologies, []), [name: Server.ClusterSupervisor]]},
       # Start to serve requests, typically the last entry
       ServerWeb.Endpoint
     ]
 
     # Add production services only in non-test environments
     children =
-      cond do
-        Mix.env() == :test ->
-          base_children
-
-        System.get_env("WORKER_NODE") == "true" ->
-          # Worker nodes only run cluster formation and process supervision
+      if Mix.env() == :test do
+        base_children
+      else
+        base_children ++
           [
-            ServerWeb.Telemetry,
-            {Phoenix.PubSub, name: Server.PubSub},
-            {Cluster.Supervisor, [Application.get_env(:libcluster, :topologies, []), [name: Server.ClusterSupervisor]]},
-            Server.Services.ProcessSupervisor
+            # Subscription monitoring
+            Server.SubscriptionMonitor,
+            # Services
+            Server.Services.OBS,
+            Server.Services.Twitch,
+            {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]}
           ]
-
-        true ->
-          # Controller node runs all services
-          base_children ++
-            [
-              # Subscription monitoring
-              Server.SubscriptionMonitor,
-              # Services
-              Server.Services.OBS,
-              Server.Services.Twitch,
-              {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]},
-              # Distributed process supervision
-              Server.Services.ProcessSupervisor
-            ]
       end
 
     # See https://hexdocs.pm/elixir/Supervisor.html
