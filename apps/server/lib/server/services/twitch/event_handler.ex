@@ -40,7 +40,7 @@ defmodule Server.Services.Twitch.EventHandler do
   """
   @spec process_event(binary(), map(), keyword()) :: :ok | {:error, term()}
   def process_event(event_type, event_data, _opts \\ []) do
-    Logger.debug("Processing EventSub event",
+    Logger.debug("Event processing started",
       event_type: event_type,
       event_id: event_data["id"],
       broadcaster_id: event_data["broadcaster_user_id"]
@@ -51,7 +51,7 @@ defmodule Server.Services.Twitch.EventHandler do
       publish_event(event_type, normalized_event)
       emit_telemetry(event_type, normalized_event)
 
-      Logger.info("EventSub event processed successfully",
+      Logger.info("Event processing completed",
         event_type: event_type,
         event_id: event_data["id"]
       )
@@ -59,10 +59,10 @@ defmodule Server.Services.Twitch.EventHandler do
       :ok
     rescue
       error ->
-        Logger.error("Failed to process EventSub event",
+        Logger.error("Event processing failed",
+          error: inspect(error),
           event_type: event_type,
           event_id: event_data["id"],
-          error: inspect(error),
           stacktrace: Exception.format_stacktrace(__STACKTRACE__)
         )
 
@@ -199,7 +199,7 @@ defmodule Server.Services.Twitch.EventHandler do
         :ok
     end
 
-    Logger.debug("Published EventSub event to PubSub",
+    Logger.debug("Event published to PubSub",
       event_type: event_type,
       event_id: normalized_event.id
     )

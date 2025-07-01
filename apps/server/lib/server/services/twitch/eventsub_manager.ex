@@ -235,7 +235,7 @@ defmodule Server.Services.Twitch.EventSubManager do
 
     json_body = Jason.encode!(body)
 
-    Logger.debug("Creating EventSub subscription",
+    Logger.debug("Subscription creation started",
       event_type: event_type,
       condition: condition,
       session_id: state.session_id,
@@ -249,7 +249,7 @@ defmodule Server.Services.Twitch.EventSubManager do
       {:ok, response_body} ->
         case Jason.decode(List.to_string(response_body)) do
           {:ok, %{"data" => [subscription]}} ->
-            Logger.info("EventSub subscription created successfully",
+            Logger.info("Subscription created",
               event_type: event_type,
               subscription_id: subscription["id"],
               status: subscription["status"],
@@ -260,7 +260,8 @@ defmodule Server.Services.Twitch.EventSubManager do
             {:ok, subscription}
 
           {:ok, response} ->
-            Logger.error("Unexpected EventSub subscription response format",
+            Logger.error("Subscription creation failed",
+              error: "unexpected response format",
               event_type: event_type,
               response: inspect(response, limit: :infinity)
             )
@@ -268,9 +269,9 @@ defmodule Server.Services.Twitch.EventSubManager do
             {:error, :unexpected_response_format}
 
           {:error, reason} ->
-            Logger.error("Failed to parse EventSub subscription response",
+            Logger.error("Subscription response parse failed",
+              error: inspect(reason),
               event_type: event_type,
-              reason: inspect(reason),
               body: List.to_string(response_body)
             )
 
@@ -278,9 +279,9 @@ defmodule Server.Services.Twitch.EventSubManager do
         end
 
       {:error, reason} ->
-        Logger.error("EventSub subscription creation failed after retries",
-          event_type: event_type,
-          reason: inspect(reason)
+        Logger.error("Subscription creation failed after retries",
+          error: inspect(reason),
+          event_type: event_type
         )
 
         Server.Telemetry.twitch_subscription_failed(event_type, inspect(reason))
@@ -342,19 +343,19 @@ defmodule Server.Services.Twitch.EventSubManager do
 
   @spec delete_subscription_with_headers(binary(), list(), binary()) :: :ok | {:error, term()}
   defp delete_subscription_with_headers(url, headers, subscription_id) do
-    Logger.debug("Deleting EventSub subscription", subscription_id: subscription_id)
+    Logger.debug("Subscription deletion started", subscription_id: subscription_id)
 
     case Server.RetryStrategy.retry(fn ->
            make_delete_request(url, headers)
          end) do
       {:ok, :success} ->
-        Logger.info("EventSub subscription deleted successfully", subscription_id: subscription_id)
+        Logger.info("Subscription deleted", subscription_id: subscription_id)
         :ok
 
       {:error, reason} ->
-        Logger.error("EventSub subscription deletion failed after retries",
-          subscription_id: subscription_id,
-          reason: inspect(reason)
+        Logger.error("Subscription deletion failed after retries",
+          error: inspect(reason),
+          subscription_id: subscription_id
         )
 
         {:error, reason}
@@ -396,7 +397,7 @@ defmodule Server.Services.Twitch.EventSubManager do
       subscriptions_with_conditions = prepare_default_subscriptions(state.user_id)
       process_subscription_list(state, subscriptions_with_conditions, opts)
     else
-      Logger.error("Cannot create subscriptions: user_id not available")
+      Logger.error("Default subscriptions creation failed", error: "user_id not available")
       {0, 1}
     end
   end
@@ -436,7 +437,7 @@ defmodule Server.Services.Twitch.EventSubManager do
 
   # Logs successful subscription creation
   defp log_successful_subscription(event_type, subscription) do
-    Logger.info("Created default EventSub subscription",
+    Logger.info("Default subscription created",
       event_type: event_type,
       subscription_id: subscription["id"],
       status: subscription["status"],
@@ -446,9 +447,9 @@ defmodule Server.Services.Twitch.EventSubManager do
 
   # Logs failed subscription creation with specific guidance
   defp log_failed_subscription(state, event_type, condition, reason) do
-    Logger.warning("Failed to create default EventSub subscription",
-      event_type: event_type,
-      reason: reason
+    Logger.warning("Default subscription creation failed",
+      error: reason,
+      event_type: event_type
     )
 
     log_subscription_failure_guidance(state, event_type, condition, reason)
@@ -459,19 +460,19 @@ defmodule Server.Services.Twitch.EventSubManager do
     cond do
       String.contains?(to_string(reason), "Forbidden") ->
         Logger.info("Channel follow subscription failed",
-          reason: "Forbidden - broadcaster may need explicit moderator verification",
+          error: "Forbidden - broadcaster may need explicit moderator verification",
           note: "This is common when using broadcaster token for moderator-required subscriptions"
         )
 
       String.contains?(to_string(reason), "unauthorized") ->
         Logger.info("Channel follow subscription failed",
-          reason: "Unauthorized - token may need additional verification",
+          error: "Unauthorized - token may need additional verification",
           scope_present: MapSet.member?(state.scopes || MapSet.new(), "moderator:read:followers")
         )
 
       true ->
         Logger.info("Channel follow subscription failed",
-          reason: reason,
+          error: reason,
           condition: inspect(condition),
           user_id: state.user_id
         )
@@ -479,12 +480,13 @@ defmodule Server.Services.Twitch.EventSubManager do
   end
 
   defp log_subscription_failure_guidance(_state, event_type, _condition, reason) do
-    Logger.debug("Subscription failed for #{event_type}", reason: reason)
+    Logger.debug("Subscription failed for #{event_type}", error: reason)
   end
 
   # Logs skipped subscription due to missing scopes
   defp log_skipped_subscription(event_type, required_scopes, user_scopes) do
-    Logger.info("Skipping EventSub subscription due to missing scopes",
+    Logger.info("Subscription creation skipped",
+      error: "missing required scopes",
       event_type: event_type,
       required_scopes: required_scopes,
       user_scopes: MapSet.to_list(user_scopes || MapSet.new())

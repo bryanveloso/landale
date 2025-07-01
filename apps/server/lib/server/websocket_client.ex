@@ -40,6 +40,8 @@ defmodule Server.WebSocketClient do
 
   require Logger
 
+  alias Server.Logging
+
   @type client_state :: %{
           url: binary(),
           uri: URI.t(),
@@ -107,7 +109,7 @@ defmodule Server.WebSocketClient do
   @spec connect(client_state(), keyword()) :: {:ok, client_state()} | {:error, client_state(), term()}
   def connect(client, opts \\ []) do
     if client.conn_pid do
-      Logger.warning("WebSocket client already connected", url: client.url)
+      Logger.warning("Connection already established", url: client.url)
       {:ok, client}
     else
       perform_connection(client, opts)
@@ -115,7 +117,7 @@ defmodule Server.WebSocketClient do
   end
 
   defp perform_connection(client, opts) do
-    Logger.info("Initiating WebSocket connection", url: client.url)
+    Logger.info("Connection initiated", url: client.url)
 
     # Emit telemetry for connection attempt
     emit_telemetry(client, [:connection, :attempt], %{})
@@ -132,10 +134,7 @@ defmodule Server.WebSocketClient do
         establish_websocket_connection(client, conn_pid, path, opts)
 
       {:error, reason} ->
-        Logger.error("WebSocket connection failed during open",
-          url: client.url,
-          reason: reason
-        )
+        Logging.log_error("Connection failed during open", reason, url: client.url)
 
         emit_connection_failure(client, reason)
         {:error, client, reason}
@@ -158,10 +157,7 @@ defmodule Server.WebSocketClient do
         complete_websocket_setup(client, conn_pid, monitor_ref, updated_connection_manager, path, opts)
 
       {:error, reason} ->
-        Logger.error("WebSocket connection failed during await_up",
-          url: client.url,
-          reason: reason
-        )
+        Logging.log_error("Connection failed during await_up", reason, url: client.url)
 
         :gun.close(conn_pid)
         emit_connection_failure(client, reason)
@@ -262,7 +258,7 @@ defmodule Server.WebSocketClient do
   def schedule_reconnect(client) do
     client = cancel_reconnect_timer(client)
 
-    Logger.info("Scheduling WebSocket reconnection",
+    Logger.info("Reconnection scheduled",
       url: client.url,
       interval: client.reconnect_interval
     )
@@ -288,7 +284,7 @@ defmodule Server.WebSocketClient do
   @spec handle_upgrade(client_state(), reference()) :: client_state()
   def handle_upgrade(client, stream_ref) do
     if stream_ref == client.stream_ref do
-      Logger.info("WebSocket connection established", url: client.url)
+      Logger.info("Connection established", url: client.url)
 
       # Emit telemetry for successful connection
       if client.connection_start_time do
@@ -301,7 +297,8 @@ defmodule Server.WebSocketClient do
 
       client
     else
-      Logger.warning("Received upgrade for unknown stream",
+      Logger.warning("Upgrade for unknown stream",
+        error: "stream mismatch",
         url: client.url,
         expected: client.stream_ref,
         received: stream_ref
@@ -327,7 +324,7 @@ defmodule Server.WebSocketClient do
           send(client.owner_pid, {:websocket_binary, client, data})
 
         {:close, code, reason} ->
-          Logger.info("WebSocket closed by remote",
+          Logger.info("Connection closed by remote",
             url: client.url,
             code: code,
             reason: reason
@@ -336,7 +333,7 @@ defmodule Server.WebSocketClient do
           send(client.owner_pid, {:websocket_closed, client, {code, reason}})
 
         other ->
-          Logger.debug("Unhandled WebSocket frame",
+          Logger.debug("Frame unhandled",
             url: client.url,
             frame: inspect(other)
           )
@@ -355,7 +352,7 @@ defmodule Server.WebSocketClient do
   """
   @spec handle_connection_failure(client_state(), term()) :: client_state()
   def handle_connection_failure(client, reason) do
-    Logger.warning("WebSocket connection lost", url: client.url, reason: reason)
+    Logger.warning("Connection lost", error: reason, url: client.url)
 
     # Emit telemetry for connection failure
     if client.connection_start_time do

@@ -13,7 +13,7 @@ defmodule Server.Services.Twitch do
   require Logger
 
   alias Server.Services.Twitch.{EventHandler, EventSubManager}
-  alias Server.{OAuthTokenManager, WebSocketClient}
+  alias Server.{Logging, OAuthTokenManager, WebSocketClient}
 
   # Twitch EventSub constants
   @eventsub_websocket_url "wss://eventsub.wss.twitch.tv/ws"
@@ -140,7 +140,8 @@ defmodule Server.Services.Twitch do
 
     # Ensure we have required credentials
     if !client_id || !client_secret do
-      Logger.error("Twitch service missing required credentials",
+      Logger.error("Service configuration invalid",
+        error: "missing required credentials",
         has_client_id: client_id != nil,
         has_client_secret: client_secret != nil
       )
@@ -177,18 +178,22 @@ defmodule Server.Services.Twitch do
       token_refresh_task: nil
     }
 
-    Logger.info("Twitch service starting", client_id: client_id)
+    # Set service context for all log messages from this process
+    Logging.set_service_context(:twitch, user_id: System.get_env("TWITCH_USER_ID"))
+    correlation_id = Logging.set_correlation_id()
+
+    Logger.info("Service starting", client_id: client_id, correlation_id: correlation_id)
 
     # Start connection process if we have tokens
     case OAuthTokenManager.get_valid_token(token_manager) do
       {:ok, _token, updated_manager} ->
-        Logger.info("Valid OAuth tokens found, starting connection")
+        Logger.info("Token validation started")
         state = %{state | token_manager: updated_manager}
         send(self(), :validate_token)
         {:ok, state}
 
       {:error, reason} ->
-        Logger.info("No valid tokens available, will retry connection later", reason: reason)
+        Logger.info("Connection retry scheduled", error: reason)
         timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval())
         {:ok, %{state | reconnect_timer: timer}}
     end
@@ -277,7 +282,8 @@ defmodule Server.Services.Twitch do
 
     case existing_subscription do
       {id, subscription} ->
-        Logger.warning("Duplicate subscription attempt",
+        Logger.warning("Subscription creation skipped",
+          error: "duplicate detected",
           event_type: event_type,
           existing_id: id,
           condition: condition
@@ -347,7 +353,7 @@ defmodule Server.Services.Twitch do
         {:noreply, state}
 
       {:error, reason} ->
-        Logger.info("Still no valid tokens available", reason: reason)
+        Logger.info("Connection retry rescheduled", error: reason)
         timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval())
         {:noreply, %{state | reconnect_timer: timer}}
     end
@@ -355,7 +361,7 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_info(:connect, state) do
-    Logger.info("Initiating Twitch WebSocket connection")
+    Logger.info("WebSocket connection started")
 
     case WebSocketClient.connect(state.ws_client) do
       {:ok, updated_client} ->
@@ -369,7 +375,7 @@ defmodule Server.Services.Twitch do
         {:noreply, state}
 
       {:error, updated_client, reason} ->
-        Logger.error("Twitch WebSocket connection failed", reason: reason)
+        Logger.error("WebSocket connection failed", error: reason)
         state = %{state | ws_client: updated_client}
 
         state =
@@ -424,7 +430,7 @@ defmodule Server.Services.Twitch do
     # Token validation task completed
     case result do
       {:ok, token_info, updated_manager} ->
-        Logger.info("Twitch token validation successful",
+        Logger.info("Token validation completed",
           user_id: token_info["user_id"],
           client_id: token_info["client_id"],
           scopes: length(token_info["scopes"] || [])
@@ -443,7 +449,7 @@ defmodule Server.Services.Twitch do
         {:noreply, state}
 
       {:error, reason} ->
-        Logger.error("Twitch token validation failed", error: reason)
+        Logging.log_error("Token validation failed", reason)
 
         # Try to refresh the token first
         state = %{state | token_validation_task: nil}
@@ -457,7 +463,7 @@ defmodule Server.Services.Twitch do
     # Token refresh task completed
     case result do
       {:ok, updated_manager} ->
-        Logger.info("Twitch OAuth tokens refreshed")
+        Logger.info("Token refresh completed")
         state = %{state | token_manager: updated_manager, token_refresh_task: nil}
         state = schedule_token_refresh(state)
         # Validate new token after successful refresh
@@ -465,7 +471,7 @@ defmodule Server.Services.Twitch do
         {:noreply, state}
 
       {:error, reason} ->
-        Logger.error("Twitch OAuth token refresh failed", error: reason)
+        Logging.log_error("Token refresh failed", reason)
         # Try again in a shorter interval
         timer = Process.send_after(self(), :refresh_token, Server.NetworkConfig.reconnect_interval())
         state = %{state | token_refresh_timer: timer, token_refresh_task: nil}
@@ -476,7 +482,7 @@ defmodule Server.Services.Twitch do
   # Handle task DOWN messages (task crashed)
   @impl GenServer
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{token_validation_task: %Task{ref: ref}} = state) do
-    Logger.error("Token validation task crashed", reason: inspect(reason))
+    Logging.log_error("Token validation task crashed", inspect(reason))
     # Retry validation after a delay
     timer = Process.send_after(self(), :validate_token, Server.NetworkConfig.reconnect_interval())
     {:noreply, %{state | token_validation_task: nil, reconnect_timer: timer}}
@@ -484,7 +490,7 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{token_refresh_task: %Task{ref: ref}} = state) do
-    Logger.error("Token refresh task crashed", reason: inspect(reason))
+    Logging.log_error("Token refresh task crashed", inspect(reason))
     # Retry refresh after a delay
     timer = Process.send_after(self(), :refresh_token, Server.NetworkConfig.reconnect_interval())
     {:noreply, %{state | token_refresh_task: nil, token_refresh_timer: timer}}
@@ -493,7 +499,7 @@ defmodule Server.Services.Twitch do
   # WebSocketClient event handlers
   @impl GenServer
   def handle_info({:websocket_connected, client}, state) do
-    Logger.info("Twitch WebSocket connection established")
+    Logger.info("WebSocket connection established")
 
     state = %{state | ws_client: client}
 
@@ -512,7 +518,7 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_info({:websocket_disconnected, client, reason}, state) do
-    Logger.warning("Twitch WebSocket disconnected", reason: reason)
+    Logger.warning("WebSocket connection lost", error: reason)
 
     state = %{state | ws_client: client}
 
@@ -550,14 +556,14 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_info({:websocket_reconnect, client}, state) do
-    Logger.info("Attempting Twitch WebSocket reconnection")
+    Logger.info("WebSocket reconnection started")
     state = %{state | ws_client: client}
     send(self(), :connect)
     {:noreply, state}
   end
 
   def handle_info({:reconnect_to_url, url}, state) do
-    Logger.info("Reconnecting to new Twitch EventSub URL", url: url)
+    Logger.info("EventSub reconnection requested", url: url)
 
     # Create new WebSocket client with the new URL
     new_client = WebSocketClient.new(url, self())
@@ -572,13 +578,13 @@ defmodule Server.Services.Twitch do
   # Catch-all for unhandled messages
   @impl GenServer
   def handle_info(message, state) do
-    Logger.debug("Unhandled message in Twitch service", message: inspect(message))
+    Logger.debug("Message unhandled", message: inspect(message))
     {:noreply, state}
   end
 
   @impl GenServer
   def terminate(reason, state) do
-    Logger.info("Twitch service terminating", reason: reason)
+    Logger.info("Service terminating", reason: reason)
 
     # Clean up all tracked subscriptions from monitor
     Enum.each(state.subscriptions, fn {subscription_id, _subscription} ->
@@ -596,7 +602,7 @@ defmodule Server.Services.Twitch do
         OAuthTokenManager.close(state.token_manager)
       rescue
         error ->
-          Logger.warning("Error closing OAuth token manager", error: inspect(error))
+          Logger.warning("Token manager cleanup failed", error: inspect(error))
       end
     end
 
@@ -612,15 +618,15 @@ defmodule Server.Services.Twitch do
     # Cancel timers with validation
     if state.reconnect_timer do
       case Process.cancel_timer(state.reconnect_timer) do
-        false -> Logger.debug("Reconnect timer already expired")
-        _time_left -> Logger.debug("Cancelled reconnect timer")
+        false -> Logger.debug("Timer cleanup skipped", timer: "reconnect", reason: "already expired")
+        _time_left -> Logger.debug("Timer cleanup completed", timer: "reconnect")
       end
     end
 
     if state.token_refresh_timer do
       case Process.cancel_timer(state.token_refresh_timer) do
-        false -> Logger.debug("Token refresh timer already expired")
-        _time_left -> Logger.debug("Cancelled token refresh timer")
+        false -> Logger.debug("Timer cleanup skipped", timer: "token_refresh", reason: "already expired")
+        _time_left -> Logger.debug("Timer cleanup completed", timer: "token_refresh")
       end
     end
 
@@ -635,7 +641,7 @@ defmodule Server.Services.Twitch do
         handle_eventsub_protocol_message(state, message)
 
       {:error, reason} ->
-        Logger.error("Twitch message decode failed", error: reason, message: message_json)
+        Logger.error("EventSub message decode failed", error: reason, message: message_json)
         state
     end
   end
@@ -647,7 +653,7 @@ defmodule Server.Services.Twitch do
     session_data = message["payload"]["session"]
     session_id = session_data["id"]
 
-    Logger.info("Twitch session welcome received", session_id: session_id)
+    Logger.info("EventSub session established", session_id: session_id)
 
     state =
       update_connection_state(state, %{
@@ -668,7 +674,7 @@ defmodule Server.Services.Twitch do
 
     {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
 
-    Logger.info("Twitch default subscriptions created",
+    Logger.info("Default subscriptions created",
       success: success_count,
       failed: failed_count
     )
@@ -679,7 +685,7 @@ defmodule Server.Services.Twitch do
   defp handle_eventsub_protocol_message(state, %{
          "metadata" => %{"message_type" => "session_keepalive"}
        }) do
-    Logger.debug("Twitch keepalive received")
+    Logger.debug("EventSub keepalive received")
     state
   end
 
@@ -691,7 +697,7 @@ defmodule Server.Services.Twitch do
     event_data = message["payload"]["event"]
     subscription_id = get_in(message, ["metadata", "subscription_id"])
 
-    Logger.info("Twitch event received",
+    Logger.info("EventSub notification received",
       event_type: event_type,
       subscription_id: subscription_id
     )
@@ -712,16 +718,16 @@ defmodule Server.Services.Twitch do
          %{"metadata" => %{"message_type" => "session_reconnect"}} = message
        ) do
     reconnect_url = get_in(message, ["payload", "session", "reconnect_url"])
-    Logger.info("Twitch session reconnect requested", reconnect_url: reconnect_url)
+    Logger.info("EventSub reconnection requested", reconnect_url: reconnect_url)
 
     # Initiate reconnection to new URL
     case reconnect_url do
       nil ->
-        Logger.error("No reconnect URL provided in session_reconnect message")
+        Logger.error("EventSub reconnection failed", error: "no URL provided")
         state
 
       url when is_binary(url) ->
-        Logger.info("Initiating reconnection to new URL", url: url)
+        Logger.info("EventSub reconnection initiated", url: url)
         # Close current connection and reconnect to new URL
         :ok = WebSocketClient.close(state.ws_client)
         new_state = %{state | session_id: nil}
@@ -732,7 +738,7 @@ defmodule Server.Services.Twitch do
   end
 
   defp handle_eventsub_protocol_message(state, message) do
-    Logger.debug("Twitch message unhandled", message: message)
+    Logger.debug("EventSub message unhandled", message: message)
     state
   end
 

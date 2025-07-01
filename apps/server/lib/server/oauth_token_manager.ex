@@ -49,6 +49,8 @@ defmodule Server.OAuthTokenManager do
 
   require Logger
 
+  alias Server.Logging
+
   @behaviour Server.OAuthTokenManagerBehaviour
 
   @type token_info :: %{
@@ -146,19 +148,18 @@ defmodule Server.OAuthTokenManager do
         # Load existing token
         case :dets.lookup(table, :token) do
           [{:token, token_data}] ->
-            Logger.info("Loaded existing OAuth tokens", storage_key: manager.storage_key)
+            Logger.info("Tokens loaded from storage", storage_key: manager.storage_key)
             %{manager | token_info: deserialize_token(token_data)}
 
           [] ->
-            Logger.info("No existing OAuth tokens found", storage_key: manager.storage_key)
+            Logger.info("Token storage empty", storage_key: manager.storage_key)
             manager
         end
 
       {:error, reason} ->
-        Logger.error("Failed to open OAuth token storage",
+        Logging.log_error("Token storage open failed", reason,
           storage_key: manager.storage_key,
           path: manager.storage_path,
-          reason: reason,
           file_exists: File.exists?(manager.storage_path)
         )
 
@@ -184,14 +185,11 @@ defmodule Server.OAuthTokenManager do
       case :dets.insert(manager.dets_table, {:token, serialized}) do
         :ok ->
           :dets.sync(manager.dets_table)
-          Logger.debug("OAuth tokens saved to storage", storage_key: manager.storage_key)
+          Logger.debug("Tokens saved to storage", storage_key: manager.storage_key)
           :ok
 
         {:error, reason} ->
-          Logger.error("Failed to save OAuth tokens",
-            storage_key: manager.storage_key,
-            reason: reason
-          )
+          Logging.log_error("Token save failed", reason, storage_key: manager.storage_key)
 
           {:error, reason}
       end
@@ -239,23 +237,23 @@ defmodule Server.OAuthTokenManager do
   def get_valid_token(manager) do
     case manager.token_info do
       nil ->
-        Logger.debug("No token info available in manager", storage_key: manager.storage_key)
+        Logger.debug("Token info unavailable", storage_key: manager.storage_key)
         {:error, :no_token_available}
 
       token_info ->
         if token_needs_refresh?(token_info, manager.refresh_buffer_ms) do
-          Logger.debug("Token needs refresh", storage_key: manager.storage_key)
+          Logger.debug("Token refresh required", storage_key: manager.storage_key)
 
           case refresh_token(manager) do
             {:ok, updated_manager} ->
               {:ok, updated_manager.token_info.access_token, updated_manager}
 
             {:error, reason} ->
-              Logger.debug("Token refresh failed", storage_key: manager.storage_key, reason: reason)
+              Logger.debug("Token refresh failed", error: reason, storage_key: manager.storage_key)
               {:error, reason}
           end
         else
-          Logger.debug("Using existing valid token", storage_key: manager.storage_key)
+          Logger.debug("Token validation skipped", storage_key: manager.storage_key)
           {:ok, token_info.access_token, manager}
         end
     end
@@ -281,12 +279,12 @@ defmodule Server.OAuthTokenManager do
         {:error, :no_refresh_token}
 
       %{refresh_token: refresh_token} ->
-        Logger.info("Refreshing OAuth token", storage_key: manager.storage_key)
+        Logger.info("Token refresh started", storage_key: manager.storage_key)
         emit_telemetry(manager, [:refresh, :attempt])
 
         case Server.OAuth2Client.refresh_token(manager.oauth2_client, refresh_token) do
           {:ok, new_tokens} ->
-            Logger.info("OAuth token refreshed successfully", storage_key: manager.storage_key)
+            Logger.info("Token refresh completed", storage_key: manager.storage_key)
             emit_telemetry(manager, [:refresh, :success])
 
             # Update token info
@@ -304,10 +302,7 @@ defmodule Server.OAuthTokenManager do
             {:ok, updated_manager}
 
           {:error, reason} ->
-            Logger.error("OAuth token refresh failed",
-              storage_key: manager.storage_key,
-              reason: inspect(reason)
-            )
+            Logging.log_error("Token refresh failed", inspect(reason), storage_key: manager.storage_key)
 
             emit_telemetry(manager, [:refresh, :failure], %{reason: inspect(reason)})
             {:error, reason}
@@ -354,10 +349,9 @@ defmodule Server.OAuthTokenManager do
             {:ok, validation_data, updated_manager}
 
           {:error, reason} ->
-            Logger.error("Token validation failed",
+            Logging.log_error("Token validation failed", inspect(reason),
               storage_key: manager.storage_key,
               validate_url: validate_url,
-              reason: inspect(reason),
               access_token_prefix: String.slice(access_token, 0, 10)
             )
 
