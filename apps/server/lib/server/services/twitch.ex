@@ -578,7 +578,33 @@ defmodule Server.Services.Twitch do
   # Catch-all for unhandled messages
   @impl GenServer
   def handle_info(message, state) do
-    Logger.debug("Message unhandled", message: inspect(message))
+    case message do
+      {ref, _result} when is_reference(ref) ->
+        Logger.debug("Task result ignored", 
+          task_ref: inspect(ref),
+          has_validation_task: state.token_validation_task != nil,
+          has_refresh_task: state.token_refresh_task != nil,
+          reason: "task completed but not tracked"
+        )
+        
+      {:DOWN, ref, :process, pid, reason} ->
+        Logger.debug("Process monitor ignored",
+          monitor_ref: inspect(ref),
+          pid: inspect(pid),
+          reason: inspect(reason),
+          tracked_tasks: %{
+            validation: state.token_validation_task != nil,
+            refresh: state.token_refresh_task != nil
+          }
+        )
+        
+      other ->
+        Logger.debug("Message unhandled", 
+          message_type: message_type(other),
+          message: inspect(other, limit: 200)
+        )
+    end
+    
     {:noreply, state}
   end
 
@@ -738,7 +764,16 @@ defmodule Server.Services.Twitch do
   end
 
   defp handle_eventsub_protocol_message(state, message) do
-    Logger.debug("EventSub message unhandled", message: message)
+    message_type = get_in(message, ["metadata", "message_type"])
+    subscription_type = get_in(message, ["metadata", "subscription_type"])
+    
+    Logger.debug("EventSub message unhandled", 
+      message_type: message_type,
+      subscription_type: subscription_type,
+      has_payload: Map.has_key?(message, "payload"),
+      metadata_keys: Map.keys(message["metadata"] || %{}),
+      reason: "no handler implemented"
+    )
     state
   end
 
@@ -781,4 +816,16 @@ defmodule Server.Services.Twitch do
   defp get_client_secret do
     System.get_env("TWITCH_CLIENT_SECRET")
   end
+  
+  # Helper to identify message types for better debugging
+  defp message_type({:websocket_connected, _}), do: "websocket_connected"
+  defp message_type({:websocket_disconnected, _, _}), do: "websocket_disconnected"
+  defp message_type({:websocket_message, _, _}), do: "websocket_message"
+  defp message_type({:websocket_reconnect, _}), do: "websocket_reconnect"
+  defp message_type({:reconnect_to_url, _}), do: "reconnect_to_url"
+  defp message_type({ref, _}) when is_reference(ref), do: "task_result"
+  defp message_type({:DOWN, _, _, _, _}), do: "process_down"
+  defp message_type(atom) when is_atom(atom), do: to_string(atom)
+  defp message_type(tuple) when is_tuple(tuple), do: "tuple(#{tuple_size(tuple)})"
+  defp message_type(other), do: "#{inspect(other.__struct__ || :unknown)}"
 end
