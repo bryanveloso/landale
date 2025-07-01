@@ -185,7 +185,7 @@ defmodule Server.Services.Twitch.EventSubManager do
   Creates a Twitch EventSub subscription via HTTP API.
 
   ## Parameters
-  - `state` - Twitch service state containing session_id and OAuth client
+  - `state` - Twitch service state containing session_id and oauth2_client
   - `event_type` - EventSub event type (e.g. "channel.update")
   - `condition` - Subscription condition map (e.g. %{"broadcaster_user_id" => "123"})
   - `opts` - Additional options (currently unused)
@@ -195,15 +195,29 @@ defmodule Server.Services.Twitch.EventSubManager do
   - `{:error, reason}` - Creation failed
   """
   @spec create_subscription(map(), binary(), map(), keyword()) :: {:ok, map()} | {:error, term()}
-  def create_subscription(state, event_type, condition, _opts \\ []) do
-    url = "https://api.twitch.tv/helix/eventsub/subscriptions"
+  def create_subscription(state, event_type, condition, opts \\ []) do
+    token_manager_module = Keyword.get(opts, :token_manager_module, Server.OAuthTokenManager)
 
-    headers = [
-      {"authorization", "Bearer #{state.oauth_client.token.access_token}"},
-      {"client-id", state.oauth_client.client_id},
-      {"content-type", "application/json"}
-    ]
+    # Get access token from token manager
+    case token_manager_module.get_valid_token(state.token_manager) do
+      {:ok, access_token, _updated_manager} ->
+        url = "https://api.twitch.tv/helix/eventsub/subscriptions"
 
+        headers = [
+          {"authorization", "Bearer #{access_token}"},
+          {"client-id", state.oauth2_client.client_id},
+          {"content-type", "application/json"}
+        ]
+
+        create_subscription_with_headers(state, event_type, condition, headers, url)
+
+      {:error, reason} ->
+        {:error, {:token_unavailable, reason}}
+    end
+  end
+
+  @spec create_subscription_with_headers(map(), binary(), map(), list(), binary()) :: {:ok, map()} | {:error, term()}
+  defp create_subscription_with_headers(state, event_type, condition, headers, url) do
     transport = %{
       "method" => "websocket",
       "session_id" => state.session_id
@@ -251,7 +265,7 @@ defmodule Server.Services.Twitch.EventSubManager do
               response: inspect(response, limit: :infinity)
             )
 
-            {:error, "Unexpected response format"}
+            {:error, :unexpected_response_format}
 
           {:error, reason} ->
             Logger.error("Failed to parse EventSub subscription response",
@@ -260,7 +274,7 @@ defmodule Server.Services.Twitch.EventSubManager do
               body: List.to_string(response_body)
             )
 
-            {:error, "Failed to parse response: #{inspect(reason)}"}
+            {:error, {:json_decode_error, reason}}
         end
 
       {:error, reason} ->
@@ -275,34 +289,20 @@ defmodule Server.Services.Twitch.EventSubManager do
   end
 
   # Private helper function for making subscription requests with proper error handling
+  @spec make_subscription_request(binary(), list(), binary()) :: {:ok, binary()} | {:error, term()}
   defp make_subscription_request(url, headers, json_body) do
+    uri = URI.parse(url)
     http_config = Server.NetworkConfig.http_config()
 
-    case :httpc.request(
-           :post,
-           {url, Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end), ~c"application/json",
-            to_charlist(json_body)},
-           [{:timeout, http_config.timeout}],
-           []
-         ) do
-      {:ok, {{_version, 202, _reason_phrase}, _headers, response_body}} ->
-        {:ok, response_body}
+    gun_headers = Enum.map(headers, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end)
 
-      {:ok, {{_version, 429, _reason_phrase}, _headers, response_body}} ->
-        {:error, {:http_error, 429, List.to_string(response_body)}}
-
-      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} when status >= 500 ->
-        {:error, {:http_error, status, List.to_string(response_body)}}
-
-      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} ->
-        response_string = List.to_string(response_body)
-
-        case Jason.decode(response_string) do
-          {:ok, %{"message" => message}} -> {:error, message}
-          {:ok, %{"error" => error}} -> {:error, error}
-          _ -> {:error, "HTTP #{status}: #{response_string}"}
-        end
-
+    with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
+         {:ok, :http} <- :gun.await_up(conn_pid, http_config.timeout),
+         stream_ref <- :gun.post(conn_pid, String.to_charlist(uri.path), gun_headers, json_body),
+         {:ok, response} <- await_response(conn_pid, stream_ref, http_config.timeout) do
+      :gun.close(conn_pid)
+      parse_subscription_response(response)
+    else
       {:error, reason} ->
         {:error, reason}
     end
@@ -319,15 +319,29 @@ defmodule Server.Services.Twitch.EventSubManager do
   - `:ok` - Subscription deleted successfully
   - `{:error, reason}` - Deletion failed
   """
-  @spec delete_subscription(map(), binary()) :: :ok | {:error, term()}
-  def delete_subscription(state, subscription_id) do
-    url = "https://api.twitch.tv/helix/eventsub/subscriptions?id=#{subscription_id}"
+  @spec delete_subscription(map(), binary(), keyword()) :: :ok | {:error, term()}
+  def delete_subscription(state, subscription_id, opts \\ []) do
+    token_manager_module = Keyword.get(opts, :token_manager_module, Server.OAuthTokenManager)
 
-    headers = [
-      {"authorization", "Bearer #{state.oauth_client.token.access_token}"},
-      {"client-id", state.oauth_client.client_id}
-    ]
+    # Get access token from token manager
+    case token_manager_module.get_valid_token(state.token_manager) do
+      {:ok, access_token, _updated_manager} ->
+        url = "https://api.twitch.tv/helix/eventsub/subscriptions?id=#{subscription_id}"
 
+        headers = [
+          {"authorization", "Bearer #{access_token}"},
+          {"client-id", state.oauth2_client.client_id}
+        ]
+
+        delete_subscription_with_headers(url, headers, subscription_id)
+
+      {:error, reason} ->
+        {:error, {:token_unavailable, reason}}
+    end
+  end
+
+  @spec delete_subscription_with_headers(binary(), list(), binary()) :: :ok | {:error, term()}
+  defp delete_subscription_with_headers(url, headers, subscription_id) do
     Logger.debug("Deleting EventSub subscription", subscription_id: subscription_id)
 
     case Server.RetryStrategy.retry(fn ->
@@ -348,28 +362,20 @@ defmodule Server.Services.Twitch.EventSubManager do
   end
 
   # Private helper function for making delete requests with proper error handling
+  @spec make_delete_request(binary(), list()) :: {:ok, atom()} | {:error, term()}
   defp make_delete_request(url, headers) do
+    uri = URI.parse(url)
     http_config = Server.NetworkConfig.http_config()
 
-    case :httpc.request(
-           :delete,
-           {url, Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)},
-           [{:timeout, http_config.timeout}],
-           []
-         ) do
-      {:ok, {{_version, 204, _reason_phrase}, _headers, _body}} ->
-        {:ok, :success}
+    gun_headers = Enum.map(headers, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end)
 
-      {:ok, {{_version, 429, _reason_phrase}, _headers, response_body}} ->
-        {:error, {:http_error, 429, List.to_string(response_body)}}
-
-      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} when status >= 500 ->
-        {:error, {:http_error, status, List.to_string(response_body)}}
-
-      {:ok, {{_version, status, _reason_phrase}, _headers, response_body}} ->
-        response_string = List.to_string(response_body)
-        {:error, "HTTP #{status}: #{response_string}"}
-
+    with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
+         {:ok, :http} <- :gun.await_up(conn_pid, http_config.timeout),
+         stream_ref <- :gun.delete(conn_pid, String.to_charlist("#{uri.path}?#{uri.query}"), gun_headers),
+         {:ok, response} <- await_response(conn_pid, stream_ref, http_config.timeout) do
+      :gun.close(conn_pid)
+      parse_delete_response(response)
+    else
       {:error, reason} ->
         {:error, reason}
     end
@@ -384,11 +390,11 @@ defmodule Server.Services.Twitch.EventSubManager do
   ## Returns
   - `{successful_count, failed_count}` - Tuple of success/failure counts
   """
-  @spec create_default_subscriptions(map()) :: {integer(), integer()}
-  def create_default_subscriptions(state) do
+  @spec create_default_subscriptions(map(), keyword()) :: {integer(), integer()}
+  def create_default_subscriptions(state, opts \\ []) do
     if state.user_id do
       subscriptions_with_conditions = prepare_default_subscriptions(state.user_id)
-      process_subscription_list(state, subscriptions_with_conditions)
+      process_subscription_list(state, subscriptions_with_conditions, opts)
     else
       Logger.error("Cannot create subscriptions: user_id not available")
       {0, 1}
@@ -404,14 +410,14 @@ defmodule Server.Services.Twitch.EventSubManager do
   end
 
   # Processes the subscription list and creates subscriptions
-  defp process_subscription_list(state, subscriptions) do
+  defp process_subscription_list(state, subscriptions, opts) do
     Enum.reduce(subscriptions, {0, 0}, fn subscription, acc ->
-      create_single_subscription(state, subscription, acc)
+      create_single_subscription(state, subscription, acc, opts)
     end)
   end
 
   # Creates a single subscription and handles the result
-  defp create_single_subscription(state, {event_type, condition, required_scopes, opts}, {success, failed}) do
+  defp create_single_subscription(state, {event_type, condition, required_scopes, _sub_opts}, {success, failed}, opts) do
     if validate_scopes_for_subscription(state.scopes, required_scopes) do
       case create_subscription(state, event_type, condition, opts) do
         {:ok, subscription} ->
@@ -586,4 +592,60 @@ defmodule Server.Services.Twitch.EventSubManager do
   # Helper function to determine the correct API version for each event type
   defp get_api_version_for_event_type("channel.follow"), do: "2"
   defp get_api_version_for_event_type(_event_type), do: "1"
+
+  # Gun HTTP client helper functions
+  defp gun_opts(%URI{scheme: "https"}), do: %{transport: :tls}
+  defp gun_opts(_), do: %{}
+
+  defp await_response(_conn_pid, stream_ref, timeout) do
+    case :gun.await(stream_ref, timeout) do
+      {:response, :fin, status, headers} ->
+        {:ok, {status, headers, ""}}
+
+      {:response, :nofin, status, headers} ->
+        case :gun.await_body(stream_ref, timeout) do
+          {:ok, body} -> {:ok, {status, headers, body}}
+          {:error, reason} -> {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp parse_subscription_response({202, _headers, response_body}) do
+    {:ok, response_body}
+  end
+
+  defp parse_subscription_response({429, _headers, response_body}) do
+    {:error, {:http_error, 429, response_body}}
+  end
+
+  defp parse_subscription_response({status, _headers, response_body}) when status >= 500 do
+    {:error, {:http_error, status, response_body}}
+  end
+
+  defp parse_subscription_response({status, _headers, response_body}) do
+    case Jason.decode(response_body) do
+      {:ok, %{"message" => message}} -> {:error, message}
+      {:ok, %{"error" => error}} -> {:error, error}
+      _ -> {:error, {:http_error, status, response_body}}
+    end
+  end
+
+  defp parse_delete_response({204, _headers, _body}) do
+    {:ok, :success}
+  end
+
+  defp parse_delete_response({429, _headers, response_body}) do
+    {:error, {:http_error, 429, response_body}}
+  end
+
+  defp parse_delete_response({status, _headers, response_body}) when status >= 500 do
+    {:error, {:http_error, status, response_body}}
+  end
+
+  defp parse_delete_response({status, _headers, response_body}) do
+    {:error, {:http_error, status, response_body}}
+  end
 end
