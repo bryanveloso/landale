@@ -21,6 +21,7 @@ defmodule Server.OAuthTokenManager do
         storage_key: :twitch_tokens,
         client_id: "your_client_id",
         client_secret: "your_client_secret",
+        auth_url: "https://id.twitch.tv/oauth2/authorize",
         token_url: "https://id.twitch.tv/oauth2/token",
         validate_url: "https://id.twitch.tv/oauth2/validate",
         telemetry_prefix: [:server, :twitch, :oauth]
@@ -79,6 +80,7 @@ defmodule Server.OAuthTokenManager do
     - `:storage_key` - Unique key for DETS storage (required)
     - `:client_id` - OAuth2 client ID (required)
     - `:client_secret` - OAuth2 client secret (required)
+    - `:auth_url` - OAuth2 authorization endpoint URL (required)
     - `:token_url` - OAuth2 token endpoint URL (required)
     - `:validate_url` - Token validation endpoint URL (optional)
     - `:storage_path` - Custom storage path (optional, auto-detected)
@@ -94,12 +96,13 @@ defmodule Server.OAuthTokenManager do
     with {:ok, storage_key} <- validate_required_opt(opts, :storage_key),
          {:ok, client_id} <- validate_required_opt(opts, :client_id),
          {:ok, client_secret} <- validate_required_opt(opts, :client_secret),
+         {:ok, auth_url} <- validate_required_opt(opts, :auth_url),
          {:ok, token_url} <- validate_required_opt(opts, :token_url) do
       storage_path = Keyword.get(opts, :storage_path) || get_default_storage_path(storage_key)
 
       {:ok, oauth2_client} =
         Server.OAuth2Client.new(%{
-          auth_url: "https://id.twitch.tv/oauth2/authorize",
+          auth_url: auth_url,
           token_url: token_url,
           validate_url: Keyword.get(opts, :validate_url),
           client_id: client_id,

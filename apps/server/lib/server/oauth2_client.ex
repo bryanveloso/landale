@@ -279,7 +279,7 @@ defmodule Server.OAuth2Client do
     body = URI.encode_query(params)
 
     with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
-         {:ok, :http} <- :gun.await_up(conn_pid, client.timeout),
+         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, client.timeout),
          stream_ref <- :gun.post(conn_pid, String.to_charlist(uri.path), headers, body),
          {:ok, response} <- await_response(conn_pid, stream_ref, client.timeout) do
       :gun.close(conn_pid)
@@ -300,7 +300,7 @@ defmodule Server.OAuth2Client do
     ]
 
     with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
-         {:ok, :http} <- :gun.await_up(conn_pid, client.timeout),
+         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, client.timeout),
          stream_ref <- :gun.get(conn_pid, String.to_charlist(uri.path), headers),
          {:ok, response} <- await_response(conn_pid, stream_ref, client.timeout) do
       :gun.close(conn_pid)
@@ -315,13 +315,13 @@ defmodule Server.OAuth2Client do
   defp gun_opts(%URI{scheme: "https"}), do: %{transport: :tls}
   defp gun_opts(_), do: %{}
 
-  defp await_response(_conn_pid, stream_ref, timeout) do
-    case :gun.await(stream_ref, timeout) do
+  defp await_response(conn_pid, stream_ref, timeout) do
+    case :gun.await(conn_pid, stream_ref, timeout) do
       {:response, :fin, status, headers} ->
         {:ok, {status, headers, ""}}
 
       {:response, :nofin, status, headers} ->
-        case :gun.await_body(stream_ref, timeout) do
+        case :gun.await_body(conn_pid, stream_ref, timeout) do
           {:ok, body} -> {:ok, {status, headers, body}}
           {:error, reason} -> {:error, reason}
         end

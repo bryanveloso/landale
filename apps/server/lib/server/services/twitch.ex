@@ -152,6 +152,7 @@ defmodule Server.Services.Twitch do
         storage_key: :twitch_tokens,
         client_id: client_id,
         client_secret: client_secret,
+        auth_url: "https://id.twitch.tv/oauth2/authorize",
         token_url: "https://id.twitch.tv/oauth2/token",
         validate_url: "https://id.twitch.tv/oauth2/validate",
         telemetry_prefix: [:server, :twitch, :oauth]

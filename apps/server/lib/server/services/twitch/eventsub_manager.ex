@@ -297,7 +297,7 @@ defmodule Server.Services.Twitch.EventSubManager do
     gun_headers = Enum.map(headers, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end)
 
     with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
-         {:ok, :http} <- :gun.await_up(conn_pid, http_config.timeout),
+         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, http_config.timeout),
          stream_ref <- :gun.post(conn_pid, String.to_charlist(uri.path), gun_headers, json_body),
          {:ok, response} <- await_response(conn_pid, stream_ref, http_config.timeout) do
       :gun.close(conn_pid)
@@ -370,7 +370,7 @@ defmodule Server.Services.Twitch.EventSubManager do
     gun_headers = Enum.map(headers, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end)
 
     with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
-         {:ok, :http} <- :gun.await_up(conn_pid, http_config.timeout),
+         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, http_config.timeout),
          stream_ref <- :gun.delete(conn_pid, String.to_charlist("#{uri.path}?#{uri.query}"), gun_headers),
          {:ok, response} <- await_response(conn_pid, stream_ref, http_config.timeout) do
       :gun.close(conn_pid)

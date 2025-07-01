@@ -139,7 +139,7 @@ defmodule Server.WebSocketClient do
               headers = Keyword.get(opts, :headers, [])
               protocols = Keyword.get(opts, :protocols, [])
 
-              ws_opts = if protocols != [], do: [{:protocols, protocols}], else: []
+              ws_opts = if protocols != [], do: %{protocols: protocols}, else: %{}
               stream_ref = :gun.ws_upgrade(conn_pid, path, headers, ws_opts)
 
               Logger.debug("WebSocket upgrade initiated",
