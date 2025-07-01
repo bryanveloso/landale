@@ -42,7 +42,7 @@ defmodule Server.Services.OBS do
   use GenServer
   require Logger
 
-  alias Server.{Logging, ServiceError}
+  alias Server.{CorrelationId, Logging, ServiceError}
 
   # OBS WebSocket protocol constants
   # Subscribe to all events
@@ -471,7 +471,7 @@ defmodule Server.Services.OBS do
   @impl GenServer
   def handle_call({:obs_call, request_type, request_data}, from, state) do
     if state.state.connection.connected and state.conn_pid and state.stream_ref do
-      request_id = UUID.uuid4()
+      request_id = CorrelationId.generate()
 
       message = %{
         # Request opcode
@@ -1072,7 +1072,7 @@ defmodule Server.Services.OBS do
 
   defp request_obs_stats(state) do
     # Request GetStats from OBS for performance monitoring
-    request_id = UUID.uuid4()
+    request_id = CorrelationId.generate()
 
     message = %{
       op: 6,

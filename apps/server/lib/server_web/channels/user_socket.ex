@@ -3,6 +3,7 @@ defmodule ServerWeb.UserSocket do
 
   use Phoenix.Socket
   require Logger
+  alias Server.CorrelationId
 
   # Channels
   channel "dashboard:*", ServerWeb.DashboardChannel
@@ -22,7 +23,7 @@ defmodule ServerWeb.UserSocket do
   @impl true
   def connect(_params, socket, _connect_info) do
     # Generate a correlation ID for this connection
-    correlation_id = UUID.uuid4()
+    correlation_id = CorrelationId.generate()
 
     socket = assign(socket, :correlation_id, correlation_id)
 
