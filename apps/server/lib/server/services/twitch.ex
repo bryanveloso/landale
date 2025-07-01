@@ -181,12 +181,13 @@ defmodule Server.Services.Twitch do
     # Start connection process if we have tokens
     case OAuthTokenManager.get_valid_token(token_manager) do
       {:ok, _token, updated_manager} ->
+        Logger.info("Valid OAuth tokens found, starting connection")
         state = %{state | token_manager: updated_manager}
         send(self(), :validate_token)
         {:ok, state}
 
-      {:error, _reason} ->
-        Logger.info("No valid tokens available, will retry connection later")
+      {:error, reason} ->
+        Logger.info("No valid tokens available, will retry connection later", reason: reason)
         timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval())
         {:ok, %{state | reconnect_timer: timer}}
     end
@@ -744,6 +745,13 @@ defmodule Server.Services.Twitch do
         timer = Process.send_after(self(), :refresh_token, 1000)
         %{state | token_refresh_timer: timer}
     end
+  end
+
+  # Catch-all for unhandled messages
+  @impl GenServer
+  def handle_info(message, state) do
+    Logger.debug("Unhandled message in Twitch service", message: inspect(message))
+    {:noreply, state}
   end
 
   # Helper functions for configuration

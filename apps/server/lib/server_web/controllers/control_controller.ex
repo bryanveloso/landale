@@ -4,6 +4,17 @@ defmodule ServerWeb.ControlController do
   """
 
   use ServerWeb, :controller
+  use OpenApiSpex.ControllerSpecs
+
+  alias ServerWeb.Schemas
+
+  operation(:status,
+    summary: "Get control system status",
+    description: "Returns overall system status including uptime, memory usage, and service health",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse}
+    }
+  )
 
   def status(conn, _params) do
     # Get basic system status
@@ -44,8 +55,16 @@ defmodule ServerWeb.ControlController do
 
     # Could add telemetry here if needed
 
-    json(conn, status_data)
+    json(conn, %{success: true, data: status_data})
   end
+
+  operation(:ping,
+    summary: "Ping endpoint",
+    description: "Simple keep-alive endpoint that returns server timestamp",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse}
+    }
+  )
 
   def ping(conn, _params) do
     # Simple keep-alive endpoint for dashboard
@@ -57,8 +76,16 @@ defmodule ServerWeb.ControlController do
       server_time: DateTime.from_unix!(timestamp) |> DateTime.to_iso8601()
     }
 
-    json(conn, response)
+    json(conn, %{success: true, data: response})
   end
+
+  operation(:services,
+    summary: "Get detailed service information",
+    description: "Returns detailed status and metrics for all system services",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse}
+    }
+  )
 
   def services(conn, _params) do
     # Detailed service information
@@ -69,7 +96,7 @@ defmodule ServerWeb.ControlController do
       database: get_detailed_service_info(:database)
     }
 
-    json(conn, services)
+    json(conn, %{success: true, data: services})
   end
 
   # Private helper functions

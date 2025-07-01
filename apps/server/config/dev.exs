@@ -65,3 +65,6 @@ config :phoenix, :stacktrace_depth, 20
 
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
+
+# IronMON TCP server port
+config :server, :ironmon_tcp_port, String.to_integer(System.get_env("IRONMON_TCP_PORT") || "8080")

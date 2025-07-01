@@ -82,11 +82,21 @@ defmodule Server.Telemetry do
     :telemetry.execute([:server, :system, :processes], %{count: process_count}, %{})
 
     # Measure scheduler utilization
-    scheduler_usage = :scheduler.sample_all()
+    case :scheduler.sample_all() do
+      {:scheduler_wall_time_all, scheduler_list} when is_list(scheduler_list) ->
+        total_usage =
+          Enum.reduce(scheduler_list, 0, fn
+            {_id, usage, _}, acc -> acc + usage
+            {_id, usage, _, _}, acc -> acc + usage
+            _, acc -> acc
+          end)
 
-    if scheduler_usage do
-      avg_usage = Enum.reduce(scheduler_usage, 0, fn {_id, usage, _}, acc -> acc + usage end) / length(scheduler_usage)
-      :telemetry.execute([:server, :system, :scheduler_usage], %{average: avg_usage}, %{})
+        avg_usage = total_usage / length(scheduler_list)
+        :telemetry.execute([:server, :system, :scheduler_usage], %{average: avg_usage}, %{})
+
+      _ ->
+        # Skip measurement if scheduler data format is unexpected
+        :ok
     end
   end
 

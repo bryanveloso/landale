@@ -2,6 +2,9 @@ defmodule ServerWeb.TwitchController do
   @moduledoc "Controller for Twitch EventSub operations and subscription management."
 
   use ServerWeb, :controller
+  use OpenApiSpex.ControllerSpecs
+
+  alias ServerWeb.Schemas
 
   @subscription_types %{
     stream: [
@@ -45,16 +48,44 @@ defmodule ServerWeb.TwitchController do
     ]
   }
 
+  @doc """
+  Get Twitch service status.
+
+  Returns the current connection state, session information, and subscription metrics.
+  """
   def status(conn, _params) do
     conn
     |> handle_service_result(Server.Services.Twitch.get_status())
   end
+
+  operation(:status,
+    summary: "Get Twitch service status",
+    description: "Returns current Twitch EventSub connection status and metrics",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
+  operation(:subscriptions,
+    summary: "List Twitch EventSub subscriptions",
+    description: "Returns all active Twitch EventSub subscriptions",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
 
   def subscriptions(conn, _params) do
     conn
     |> handle_service_result(Server.Services.Twitch.list_subscriptions())
   end
 
+  @doc """
+  Create a new Twitch EventSub subscription.
+
+  Creates a subscription for the specified event type with the given conditions.
+  """
   def create_subscription(conn, %{"event_type" => event_type, "condition" => condition} = params) do
     opts = Map.get(params, "opts", [])
 
@@ -69,11 +100,33 @@ defmodule ServerWeb.TwitchController do
     end
   end
 
+  operation(:create_subscription,
+    summary: "Create Twitch EventSub subscription",
+    description: "Creates a new EventSub subscription for the specified event type",
+    request_body: {"Subscription details", "application/json", Schemas.CreateTwitchSubscription, required: true},
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      400 => {"Bad Request", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
   def create_subscription(conn, _params) do
     conn
     |> put_status(:bad_request)
     |> json(%{success: false, error: "Missing required parameters: event_type, condition"})
   end
+
+  operation(:delete_subscription,
+    summary: "Delete Twitch EventSub subscription",
+    description: "Deletes a specific EventSub subscription by ID",
+    parameters: [
+      id: [in: :path, description: "Subscription ID", type: :string, required: true]
+    ],
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      400 => {"Bad Request", "application/json", Schemas.ErrorResponse}
+    }
+  )
 
   def delete_subscription(conn, %{"id" => subscription_id}) do
     case Server.Services.Twitch.delete_subscription(subscription_id) do
@@ -92,6 +145,14 @@ defmodule ServerWeb.TwitchController do
     |> put_status(:bad_request)
     |> json(%{success: false, error: "Missing required parameter: id"})
   end
+
+  operation(:subscription_types,
+    summary: "Get available EventSub subscription types",
+    description: "Returns all available Twitch EventSub subscription types with descriptions and required scopes",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.TwitchSubscriptionTypes}
+    }
+  )
 
   def subscription_types(conn, _params) do
     json(conn, %{success: true, data: @subscription_types})

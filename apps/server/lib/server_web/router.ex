@@ -5,11 +5,27 @@ defmodule ServerWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug OpenApiSpex.Plug.PutApiSpec, module: ServerWeb.ApiSpec
+  end
+
+  pipeline :browser do
+    plug :accepts, ["html"]
   end
 
   # Health check endpoints for Docker/Kubernetes
   get "/health", ServerWeb.HealthController, :check
   get "/ready", ServerWeb.HealthController, :ready
+
+  # API Documentation
+  scope "/docs" do
+    pipe_through :browser
+    get "/", OpenApiSpex.Plug.SwaggerUI, path: "/api/openapi"
+  end
+
+  scope "/api" do
+    pipe_through :api
+    get "/openapi", OpenApiSpex.Plug.RenderSpec, []
+  end
 
   scope "/api", ServerWeb do
     pipe_through :api
