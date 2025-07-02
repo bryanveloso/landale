@@ -1,4 +1,6 @@
 defmodule Server.Services.IronmonTCP do
+  @behaviour Server.Services.IronmonTCPBehaviour
+
   @moduledoc """
   IronMON TCP server integration using Elixir GenServer.
 

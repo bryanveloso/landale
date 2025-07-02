@@ -1,4 +1,6 @@
 defmodule Server.Services.Rainwave do
+  @behaviour Server.Services.RainwaveBehaviour
+
   @moduledoc """
   Rainwave music service integration.
 

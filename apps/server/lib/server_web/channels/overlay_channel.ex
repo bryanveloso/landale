@@ -81,6 +81,12 @@ defmodule ServerWeb.OverlayChannel do
   alias Server.CorrelationId
   alias ServerWeb.Helpers.SystemHelpers
 
+  # Service module configuration helpers
+  defp obs_service, do: Application.get_env(:server, :services, [])[:obs] || Server.Services.OBS
+  defp twitch_service, do: Application.get_env(:server, :services, [])[:twitch] || Server.Services.Twitch
+  defp ironmon_service, do: Application.get_env(:server, :services, [])[:ironmon_tcp] || Server.Services.IronmonTCP
+  defp rainwave_service, do: Application.get_env(:server, :services, [])[:rainwave] || Server.Services.Rainwave
+
   # Helper function for common service command execution pattern
   defp execute_service_command(service_module, function, args, socket) do
     case apply(service_module, function, args) do
@@ -164,56 +170,56 @@ defmodule ServerWeb.OverlayChannel do
   @impl true
   def handle_in("obs:status", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.OBS, :get_status, [], socket)
+      execute_service_command(obs_service(), :get_status, [], socket)
     end)
   end
 
   @impl true
   def handle_in("obs:scenes", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.OBS, :get_scene_list, [], socket)
+      execute_service_command(obs_service(), :get_scene_list, [], socket)
     end)
   end
 
   @impl true
   def handle_in("obs:stream_status", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.OBS, :get_stream_status, [], socket)
+      execute_service_command(obs_service(), :get_stream_status, [], socket)
     end)
   end
 
   @impl true
   def handle_in("obs:record_status", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.OBS, :get_record_status, [], socket)
+      execute_service_command(obs_service(), :get_record_status, [], socket)
     end)
   end
 
   @impl true
   def handle_in("obs:stats", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.OBS, :get_stats, [], socket)
+      execute_service_command(obs_service(), :get_stats, [], socket)
     end)
   end
 
   @impl true
   def handle_in("obs:version", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.OBS, :get_version, [], socket)
+      execute_service_command(obs_service(), :get_version, [], socket)
     end)
   end
 
   @impl true
   def handle_in("obs:virtual_cam", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.OBS, :get_virtual_cam_status, [], socket)
+      execute_service_command(obs_service(), :get_virtual_cam_status, [], socket)
     end)
   end
 
   @impl true
   def handle_in("obs:outputs", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.OBS, :get_output_list, [], socket)
+      execute_service_command(obs_service(), :get_output_list, [], socket)
     end)
   end
 
@@ -222,7 +228,7 @@ defmodule ServerWeb.OverlayChannel do
   @impl true
   def handle_in("twitch:status", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.Twitch, :get_status, [], socket)
+      execute_service_command(twitch_service(), :get_status, [], socket)
     end)
   end
 
@@ -231,14 +237,14 @@ defmodule ServerWeb.OverlayChannel do
   @impl true
   def handle_in("ironmon:status", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.IronmonTCP, :get_status, [], socket)
+      execute_service_command(ironmon_service(), :get_status, [], socket)
     end)
   end
 
   @impl true
   def handle_in("ironmon:challenges", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.IronmonTCP, :list_challenges, [], socket)
+      execute_service_command(ironmon_service(), :list_challenges, [], socket)
     end)
   end
 
@@ -247,7 +253,7 @@ defmodule ServerWeb.OverlayChannel do
     with_correlation_context(socket, fn ->
       with :ok <- validate_params(payload, ["challenge_id"]),
            {:ok, challenge_id} <- validate_integer_param(payload, "challenge_id") do
-        case Server.Services.IronmonTCP.list_checkpoints(challenge_id) do
+        case ironmon_service().list_checkpoints(challenge_id) do
           {:ok, checkpoints} ->
             {:reply, {:ok, checkpoints}, socket}
 
@@ -266,7 +272,7 @@ defmodule ServerWeb.OverlayChannel do
     with_correlation_context(socket, fn ->
       with :ok <- validate_params(payload, ["checkpoint_id"]),
            {:ok, checkpoint_id} <- validate_integer_param(payload, "checkpoint_id") do
-        case Server.Services.IronmonTCP.get_checkpoint_stats(checkpoint_id) do
+        case ironmon_service().get_checkpoint_stats(checkpoint_id) do
           {:ok, stats} ->
             {:reply, {:ok, stats}, socket}
 
@@ -285,7 +291,7 @@ defmodule ServerWeb.OverlayChannel do
     with_correlation_context(socket, fn ->
       case validate_limit_param(payload) do
         {:ok, limit} ->
-          case Server.Services.IronmonTCP.get_recent_results(limit) do
+          case ironmon_service().get_recent_results(limit) do
             {:ok, results} ->
               {:reply, {:ok, results}, socket}
 
@@ -304,7 +310,7 @@ defmodule ServerWeb.OverlayChannel do
     with_correlation_context(socket, fn ->
       with :ok <- validate_params(payload, ["seed_id"]),
            {:ok, seed_id} <- validate_integer_param(payload, "seed_id") do
-        case Server.Services.IronmonTCP.get_active_challenge(seed_id) do
+        case ironmon_service().get_active_challenge(seed_id) do
           {:ok, challenge} ->
             {:reply, {:ok, challenge}, socket}
 
@@ -323,7 +329,7 @@ defmodule ServerWeb.OverlayChannel do
   @impl true
   def handle_in("rainwave:status", _payload, socket) do
     with_correlation_context(socket, fn ->
-      execute_service_command(Server.Services.Rainwave, :get_status, [], socket)
+      execute_service_command(rainwave_service(), :get_status, [], socket)
     end)
   end
 
@@ -408,7 +414,7 @@ defmodule ServerWeb.OverlayChannel do
     # Send initial state based on overlay type
     case overlay_type do
       "obs" ->
-        case Server.Services.OBS.get_status() do
+        case obs_service().get_status() do
           {:ok, status} ->
             push(socket, "initial_state", %{type: "obs", data: status})
 
@@ -417,7 +423,7 @@ defmodule ServerWeb.OverlayChannel do
         end
 
       "twitch" ->
-        case Server.Services.Twitch.get_status() do
+        case twitch_service().get_status() do
           {:ok, status} ->
             push(socket, "initial_state", %{type: "twitch", data: status})
 
@@ -565,7 +571,7 @@ defmodule ServerWeb.OverlayChannel do
   # Service status helpers (copied from ControlController)
 
   defp get_service_status(:obs) do
-    case Server.Services.OBS.get_status() do
+    case obs_service().get_status() do
       {:ok, status} -> %{connected: true, status: status}
       {:error, reason} -> %{connected: false, error: format_error(reason)}
     end
@@ -576,7 +582,7 @@ defmodule ServerWeb.OverlayChannel do
   end
 
   defp get_service_status(:twitch) do
-    case Server.Services.Twitch.get_status() do
+    case twitch_service().get_status() do
       {:ok, status} -> %{connected: true, status: status}
       {:error, reason} -> %{connected: false, error: format_error(reason)}
     end
@@ -608,7 +614,7 @@ defmodule ServerWeb.OverlayChannel do
 
     additional_info =
       if base_status.connected do
-        case Server.Services.OBS.get_scene_list() do
+        case obs_service().get_scene_list() do
           {:ok, scenes_data} ->
             %{
               service_type: "obs_websocket",
@@ -647,7 +653,7 @@ defmodule ServerWeb.OverlayChannel do
 
     additional_info =
       if base_status.connected do
-        case Server.Services.IronmonTCP.get_status() do
+        case ironmon_service().get_status() do
           {:ok, status} ->
             %{
               service_type: "tcp_server",

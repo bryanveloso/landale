@@ -1,4 +1,6 @@
 defmodule Server.Services.Twitch do
+  @behaviour Server.Services.TwitchBehaviour
+
   @moduledoc """
   Main Twitch EventSub service coordinating WebSocket connection and subscription management.
 
