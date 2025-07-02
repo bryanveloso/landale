@@ -1266,7 +1266,6 @@ defmodule Server.Services.Twitch do
     new_state
   end
 
-
   # Cache invalidation helper
   defp invalidate_twitch_caches(cache_keys) do
     Enum.each(cache_keys, fn key ->
