@@ -246,6 +246,12 @@ defmodule Server.Services.IronmonTCP do
   end
 
   @impl GenServer
+  def handle_info(message, state) do
+    Logger.debug("Unhandled message received", message: inspect(message))
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def terminate(reason, state) do
     Logger.info("Service terminating", reason: inspect(reason))
 
@@ -454,19 +460,19 @@ defmodule Server.Services.IronmonTCP do
       "init" ->
         game_name = Map.get(@games, metadata.game, "Unknown")
         Logger.info("Game initialized", version: metadata.version, game: game_name)
-        Events.publish_ironmon_event(type, event_data)
+        Events.publish_ironmon_event(type, event_data, batch: false)
 
       "seed" ->
         Logger.debug("Seed count updated", count: metadata.count)
-        Events.publish_ironmon_event(type, event_data)
+        Events.publish_ironmon_event(type, event_data, batch: false)
 
       "checkpoint" ->
         Logger.info("Checkpoint cleared", id: metadata.id, name: metadata.name, seed: Map.get(metadata, :seed))
-        Events.publish_ironmon_event(type, event_data)
+        Events.publish_ironmon_event(type, event_data, batch: false)
 
       "location" ->
         Logger.debug("Location changed", id: metadata.id)
-        Events.publish_ironmon_event(type, event_data)
+        Events.publish_ironmon_event(type, event_data, batch: false)
     end
 
     :ok
