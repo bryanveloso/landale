@@ -27,6 +27,18 @@ defmodule Server.Performance do
         end,
         "Telemetry emission" => fn ->
           benchmark_telemetry_emission()
+        end,
+        "Cache hit (ETS)" => fn ->
+          benchmark_cache_hit()
+        end,
+        "Cache miss with computation" => fn ->
+          benchmark_cache_miss()
+        end,
+        "Cache invalidation" => fn ->
+          benchmark_cache_invalidation()
+        end,
+        "Bulk cache operations" => fn ->
+          benchmark_bulk_cache_operations()
         end
       },
       time: 10,
@@ -35,6 +47,51 @@ defmodule Server.Performance do
       formatters: [
         Benchee.Formatters.Console,
         {Benchee.Formatters.HTML, file: "priv/benchmarks/results.html"}
+      ]
+    )
+  end
+
+  @doc """
+  Runs comprehensive cache performance benchmarks.
+
+  Compares cached vs uncached operations to demonstrate performance gains.
+  """
+  def run_cache_benchmarks do
+    Logger.info("Starting cache performance benchmarks")
+
+    # Setup test data
+    setup_cache_benchmarks()
+
+    Benchee.run(
+      %{
+        "OBS status (cached)" => fn ->
+          benchmark_obs_status_cached()
+        end,
+        "OBS status (uncached)" => fn ->
+          benchmark_obs_status_uncached()
+        end,
+        "Twitch subscription data (cached)" => fn ->
+          benchmark_twitch_data_cached()
+        end,
+        "Twitch subscription data (uncached)" => fn ->
+          benchmark_twitch_data_uncached()
+        end,
+        "Pure ETS read" => fn ->
+          benchmark_pure_ets_read()
+        end,
+        "Cache with TTL check" => fn ->
+          benchmark_cache_with_ttl()
+        end,
+        "Concurrent cache access" => fn ->
+          benchmark_concurrent_cache_access()
+        end
+      },
+      time: 10,
+      memory_time: 2,
+      warmup: 2,
+      formatters: [
+        Benchee.Formatters.Console,
+        {Benchee.Formatters.HTML, file: "priv/benchmarks/cache_results.html"}
       ]
     )
   end
@@ -281,5 +338,138 @@ defmodule Server.Performance do
       },
       process_count_delta: final_process_count - initial_metrics.initial_process_count
     }
+  end
+
+  # Cache Benchmark Implementations
+
+  defp setup_cache_benchmarks do
+    # Ensure cache is running
+    case Process.whereis(Server.Cache) do
+      nil ->
+        {:ok, _pid} = Server.Cache.start_link([])
+        :ok
+
+      _pid ->
+        :ok
+    end
+
+    # Pre-populate cache with test data
+    Server.Cache.set(:obs_service, :benchmark_status, sample_obs_status(), ttl_seconds: 300)
+    Server.Cache.set(:twitch_service, :benchmark_subscriptions, sample_twitch_subscriptions(), ttl_seconds: 300)
+    Server.Cache.set(:benchmark_namespace, :pure_ets_test, "benchmark_value", ttl_seconds: 300)
+  end
+
+  defp benchmark_cache_hit do
+    Server.Cache.get(:obs_service, :benchmark_status)
+  end
+
+  defp benchmark_cache_miss do
+    Server.Cache.get_or_compute(
+      :test_namespace,
+      :missing_key,
+      fn ->
+        # Simulate computation work
+        Process.sleep(1)
+        %{computed: true, timestamp: System.system_time()}
+      end,
+      ttl_seconds: 10
+    )
+  end
+
+  defp benchmark_cache_invalidation do
+    key = :random_key
+    Server.Cache.set(:benchmark_namespace, key, "test_value", ttl_seconds: 60)
+    Server.Cache.invalidate(:benchmark_namespace, key)
+  end
+
+  defp benchmark_bulk_cache_operations do
+    entries = Enum.map(1..10, fn i -> {"key_#{i}", "value_#{i}"} end)
+    Server.Cache.bulk_set(:bulk_benchmark, entries, ttl_seconds: 60)
+  end
+
+  defp benchmark_obs_status_cached do
+    Server.Cache.get(:obs_service, :benchmark_status)
+  end
+
+  defp benchmark_obs_status_uncached do
+    # Simulate the expensive OBS status call without cache
+    simulate_obs_status_computation()
+  end
+
+  defp benchmark_twitch_data_cached do
+    Server.Cache.get(:twitch_service, :benchmark_subscriptions)
+  end
+
+  defp benchmark_twitch_data_uncached do
+    # Simulate expensive Twitch API call without cache
+    simulate_twitch_computation()
+  end
+
+  defp benchmark_pure_ets_read do
+    # Direct ETS access without Cache module overhead
+    case :ets.lookup(:server_cache, {:benchmark_namespace, :pure_ets_test}) do
+      [{_key, value, expires_at}] ->
+        current_time = System.system_time(:second)
+        if current_time < expires_at, do: {:ok, value}, else: :error
+
+      [] ->
+        :error
+    end
+  end
+
+  defp benchmark_cache_with_ttl do
+    Server.Cache.get(:benchmark_namespace, :pure_ets_test)
+  end
+
+  defp benchmark_concurrent_cache_access do
+    # Spawn multiple processes to test concurrent access
+    tasks =
+      Enum.map(1..5, fn _i ->
+        Task.async(fn ->
+          Server.Cache.get(:obs_service, :benchmark_status)
+        end)
+      end)
+
+    Task.await_many(tasks, 1000)
+  end
+
+  # Sample data generators
+  defp sample_obs_status do
+    %{
+      connected: true,
+      streaming: %{active: false, time_code: "00:00:00"},
+      recording: %{active: true, time_code: "01:23:45"},
+      current_scene: "Scene 1",
+      stats: %{
+        fps: 60.0,
+        cpu_usage: 15.2,
+        memory_usage: 512.0,
+        available_disk_space: 50.0
+      }
+    }
+  end
+
+  defp sample_twitch_subscriptions do
+    %{
+      total_count: 12,
+      max_total_cost: 100,
+      data: [
+        %{id: "sub-1", type: "channel.update", cost: 1},
+        %{id: "sub-2", type: "stream.online", cost: 1},
+        %{id: "sub-3", type: "stream.offline", cost: 1}
+      ]
+    }
+  end
+
+  defp simulate_obs_status_computation do
+    # Simulate network latency and JSON parsing for OBS WebSocket call
+    Process.sleep(2)
+    sample_obs_status()
+  end
+
+  defp simulate_twitch_computation do
+    # Simulate HTTP request latency and JSON parsing for Twitch API
+    Process.sleep(5)
+    sample_twitch_subscriptions()
   end
 end

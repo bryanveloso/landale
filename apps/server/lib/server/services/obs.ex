@@ -1106,7 +1106,6 @@ defmodule Server.Services.OBS do
     new_state
   end
 
-
   # Cache invalidation helper
   defp invalidate_obs_caches(cache_keys) do
     Enum.each(cache_keys, fn key ->

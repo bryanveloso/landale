@@ -281,4 +281,3 @@ defmodule Server.CacheTest do
     end
   end
 end
-
