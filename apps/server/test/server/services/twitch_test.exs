@@ -1,5 +1,7 @@
 defmodule Server.Services.TwitchTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
+
+  alias Server.Services.Twitch
 
   setup do
     # Set test environment variables
@@ -20,12 +22,26 @@ defmodule Server.Services.TwitchTest do
     end)
   end
 
-  # TODO: Replace with proper unit tests using mocks
-  # - Mock Twitch API responses and test business logic
-  # - Add contract tests for API response parsing
-  # - Test retry strategies with simulated failures
-  # - Test subscription management with mocked WebSocket events
-  #
-  # Current integration tests removed as they test environmental connectivity
-  # rather than actual functionality. See: https://github.com/bryanveloso/landale/issues/xxx
+  describe "GenServer lifecycle" do
+    test "starts successfully with environment config" do
+      assert {:ok, pid} = GenServer.start_link(Twitch, [])
+      assert Process.alive?(pid)
+      GenServer.stop(pid)
+    end
+  end
+
+  describe "public API functions" do
+    setup do
+      {:ok, pid} = GenServer.start_link(Twitch, [])
+      on_exit(fn -> GenServer.stop(pid) end)
+      %{pid: pid}
+    end
+
+    test "get_status/0 returns service status" do
+      result = Twitch.get_status()
+      assert {:ok, status} = result
+      assert is_map(status)
+      assert Map.has_key?(status, :connected)
+    end
+  end
 end

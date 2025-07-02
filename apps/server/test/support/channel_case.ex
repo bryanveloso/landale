@@ -30,6 +30,16 @@ defmodule ServerWeb.ChannelCase do
 
   setup tags do
     Server.DataCase.setup_sandbox(tags)
+
+    # Start cache for tests that need it
+    unless Process.whereis(Server.Cache) do
+      {:ok, _} = Server.Cache.start_link([])
+    end
+
+    # Verify mocks are properly stubbed before each test
+    import Hammox
+    verify_on_exit!()
+
     :ok
   end
 end

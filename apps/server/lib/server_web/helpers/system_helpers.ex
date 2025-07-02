@@ -45,7 +45,9 @@ defmodule ServerWeb.Helpers.SystemHelpers do
   """
   @spec get_system_status() :: map()
   def get_system_status do
-    uptime_seconds = :erlang.system_info(:uptime) / 1000
+    # Calculate uptime since app start (fallback to 0 if start time not set)
+    start_time = Application.get_env(:server, :start_time, System.system_time(:second))
+    uptime_seconds = System.system_time(:second) - start_time
     memory = :erlang.memory()
 
     %{

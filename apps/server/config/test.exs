@@ -36,3 +36,10 @@ config :logger, level: :warning
 
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
+
+# Configure mock modules for testing
+config :server, :services,
+  obs: Server.Mocks.OBSMock,
+  twitch: Server.Mocks.TwitchMock,
+  ironmon_tcp: Server.Mocks.IronmonTCPMock,
+  rainwave: Server.Mocks.RainwaveMock

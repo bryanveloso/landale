@@ -1,4 +1,6 @@
 defmodule Server.Services.OBS do
+  @behaviour Server.Services.OBSBehaviour
+
   @moduledoc """
   OBS WebSocket integration service using Gun WebSocket client.
 
