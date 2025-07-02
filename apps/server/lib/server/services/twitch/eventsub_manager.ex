@@ -556,6 +556,32 @@ defmodule Server.Services.Twitch.EventSubManager do
       "channel.follow" ->
         %{"broadcaster_user_id" => user_id, "moderator_user_id" => user_id}
 
+      # Chat events that require both broadcaster_user_id and user_id
+      "channel.chat.clear" ->
+        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
+
+      "channel.chat.clear_user_messages" ->
+        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
+
+      "channel.chat.message" ->
+        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
+
+      "channel.chat.message_delete" ->
+        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
+
+      "channel.chat.notification" ->
+        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
+
+      "channel.chat_settings.update" ->
+        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
+
+      # Moderation events that require both broadcaster_user_id and moderator_user_id
+      "channel.shoutout.create" ->
+        %{"broadcaster_user_id" => user_id, "moderator_user_id" => user_id}
+
+      "channel.shoutout.receive" ->
+        %{"broadcaster_user_id" => user_id, "moderator_user_id" => user_id}
+
       # User events that require user_id instead of broadcaster_user_id
       "user.update" ->
         %{"user_id" => user_id}
