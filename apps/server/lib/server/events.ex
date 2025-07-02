@@ -363,10 +363,10 @@ defmodule Server.Events do
     critical_events = [
       # Connection events
       "connection_lost",
-      "connection_failed", 
+      "connection_failed",
       "websocket_disconnected",
       "authentication_failed",
-      # Streaming events  
+      # Streaming events
       "stream_stopped",
       "recording_stopped",
       "stream_started",

@@ -37,8 +37,6 @@ defmodule Server.Services.Rainwave do
   @api_base_url "https://rainwave.cc/api4"
   # 10 seconds
   @poll_interval 10_000
-  # 10 seconds
-  @request_timeout 10_000
 
   # State structure
   defstruct [
@@ -280,10 +278,12 @@ defmodule Server.Services.Rainwave do
       {"accept", "application/json"}
     ]
 
+    http_config = Server.NetworkConfig.http_config()
+
     with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
-         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, @request_timeout),
+         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, http_config.timeout),
          stream_ref <- :gun.post(conn_pid, String.to_charlist(uri.path), headers, body),
-         {:ok, response} <- await_response(conn_pid, stream_ref, @request_timeout) do
+         {:ok, response} <- await_response(conn_pid, stream_ref, http_config.receive_timeout) do
       :gun.close(conn_pid)
       parse_api_response(response)
     else
