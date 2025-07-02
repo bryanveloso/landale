@@ -34,16 +34,16 @@ defmodule Server.NetworkConfigTest do
     test "returns development configuration" do
       config = NetworkConfig.get_config_for_environment(:development)
 
-      assert config.connection_timeout == 5_000
-      assert config.reconnect_interval == 2_000
-      assert config.websocket.timeout == 15_000
-      assert config.websocket.keepalive == 30_000
-      assert config.websocket.retry_limit == 5
-      assert config.http.timeout == 10_000
-      assert config.http.receive_timeout == 20_000
-      assert config.http.pool_size == 5
+      assert config.connection_timeout == 3_000
+      assert config.reconnect_interval == 1_000
+      assert config.websocket.timeout == 8_000
+      assert config.websocket.keepalive == 15_000
+      assert config.websocket.retry_limit == 3
+      assert config.http.timeout == 5_000
+      assert config.http.receive_timeout == 10_000
+      assert config.http.pool_size == 3
       assert config.telemetry.enabled == true
-      assert config.telemetry.reporting_interval == 30_000
+      assert config.telemetry.reporting_interval == 15_000
     end
 
     test "returns Docker configuration" do

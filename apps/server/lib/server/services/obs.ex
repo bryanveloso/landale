@@ -1106,30 +1106,6 @@ defmodule Server.Services.OBS do
     new_state
   end
 
-  defp update_recording_state(state, updates) do
-    recording = Map.merge(state.state.recording, updates)
-    new_state = put_in(state.state.recording, recording)
-
-    # Invalidate caches that include recording data
-    invalidate_obs_caches([:basic_status, :full_state])
-
-    Server.Events.publish_obs_event("recording_updated", recording)
-
-    new_state
-  end
-
-  defp update_other_state(state, field, updates) do
-    current_field_state = Map.get(state.state, field, %{})
-    new_field_state = Map.merge(current_field_state, updates)
-    new_state = put_in(state.state[field], new_field_state)
-
-    # For non-core state changes, only invalidate full state cache
-    invalidate_obs_caches([:full_state])
-
-    Server.Events.publish_obs_event("#{field}_updated", new_field_state)
-
-    new_state
-  end
 
   # Cache invalidation helper
   defp invalidate_obs_caches(cache_keys) do
