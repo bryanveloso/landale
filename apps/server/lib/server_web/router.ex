@@ -40,6 +40,7 @@ defmodule ServerWeb.Router do
     post "/obs/streaming/stop", OBSController, :stop_streaming
     post "/obs/recording/start", OBSController, :start_recording
     post "/obs/recording/stop", OBSController, :stop_recording
+    get "/obs/scene/current", OBSController, :current_scene
     post "/obs/scene/:scene_name", OBSController, :set_scene
 
     # Enhanced OBS endpoints for dashboard metrics

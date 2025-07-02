@@ -597,14 +597,10 @@ defmodule ServerWeb.OverlayChannel do
   end
 
   defp get_service_status(:database) do
-    case Server.Repo.query("SELECT 1", []) do
+    case safe_database_query("SELECT 1", []) do
       {:ok, _} -> %{connected: true, status: "healthy"}
-      {:error, reason} -> %{connected: false, error: format_error(reason)}
+      {:error, reason} -> %{connected: false, error: reason}
     end
-  rescue
-    e in Postgrex.Error -> %{connected: false, error: "Database error: #{e.message}"}
-    e in DBConnection.ConnectionError -> %{connected: false, error: "Database connection failed: #{e.message}"}
-    _other -> %{connected: false, error: "Database unavailable"}
   end
 
   defp get_detailed_service_info(:obs) do
@@ -674,19 +670,35 @@ defmodule ServerWeb.OverlayChannel do
 
     additional_info =
       if base_status.connected do
-        try do
-          {:ok, result} = Server.Repo.query("SELECT COUNT(*) FROM seeds", [])
-          [[seed_count]] = result.rows
-          %{seed_count: seed_count}
-        rescue
-          e in Postgrex.Error -> %{seed_count: "query_error", error: e.message}
-          e in DBConnection.ConnectionError -> %{seed_count: "connection_error", error: e.message}
-          _other -> %{seed_count: "unknown"}
+        # Use a safe database query with proper timeout and error handling
+        case safe_database_query("SELECT COUNT(*) FROM seeds", []) do
+          {:ok, seed_count} -> %{seed_count: seed_count}
+          {:error, reason} -> %{seed_count: "unavailable", error: reason}
         end
       else
         %{}
       end
 
     Map.merge(base_status, additional_info)
+  end
+
+  # Safe database query wrapper that handles connection pool issues
+  defp safe_database_query(query, params) do
+    try do
+      # Use a shorter timeout to avoid connection pool conflicts
+      case Server.Repo.query(query, params, timeout: 5000) do
+        {:ok, %{rows: [[count]]}} when is_integer(count) -> {:ok, count}
+        # For health checks like "SELECT 1"
+        {:ok, result} -> {:ok, result}
+        {:error, reason} -> {:error, inspect(reason)}
+      end
+    rescue
+      e in Postgrex.Error -> {:error, "database_error: #{e.message}"}
+      e in DBConnection.ConnectionError -> {:error, "connection_error: #{e.message}"}
+      e in DBConnection.OwnershipError -> {:error, "ownership_error: #{e.message}"}
+      _other -> {:error, "unknown_error"}
+    catch
+      :exit, reason -> {:error, "process_exit: #{inspect(reason)}"}
+    end
   end
 end

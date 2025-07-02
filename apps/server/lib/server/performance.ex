@@ -182,9 +182,15 @@ defmodule Server.Performance do
 
   defp benchmark_database_query do
     # Simple database operation benchmark
-    case Server.Repo.query("SELECT 1") do
-      {:ok, _result} -> :ok
-      {:error, _reason} -> :error
+    try do
+      case Server.Repo.query("SELECT 1", [], timeout: 5000) do
+        {:ok, _result} -> :ok
+        {:error, _reason} -> :error
+      end
+    rescue
+      _error -> :error
+    catch
+      :exit, _reason -> :error
     end
   end
 
@@ -281,9 +287,15 @@ defmodule Server.Performance do
   defp simulate_db_loop(end_time, count) do
     if System.monotonic_time(:millisecond) < end_time do
       # Simulate periodic database queries (health checks, etc.)
-      case Server.Repo.query("SELECT COUNT(*) FROM ironmon_challenges") do
-        {:ok, _result} -> :ok
-        {:error, _reason} -> :ok
+      try do
+        case Server.Repo.query("SELECT COUNT(*) FROM ironmon_challenges", [], timeout: 5000) do
+          {:ok, _result} -> :ok
+          {:error, _reason} -> :ok
+        end
+      rescue
+        _error -> :ok
+      catch
+        :exit, _reason -> :ok
       end
 
       # Every 2 seconds

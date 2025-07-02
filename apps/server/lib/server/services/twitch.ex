@@ -125,11 +125,11 @@ defmodule Server.Services.Twitch do
         state = GenServer.call(__MODULE__, :get_internal_state)
 
         %{
-          connected: state.connection.connected,
-          connection_state: state.connection.connection_state,
-          session_id: state.connection.session_id,
-          last_connected: state.connection.last_connected,
-          websocket_url: state.connection.websocket_url
+          connected: state.state.connection.connected,
+          connection_state: state.state.connection.connection_state,
+          session_id: state.state.connection.session_id,
+          last_connected: state.state.connection.last_connected,
+          websocket_url: state.state.connection.websocket_url
         }
       end,
       ttl_seconds: 10

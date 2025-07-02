@@ -102,21 +102,33 @@ defmodule ServerWeb.ControlController do
   # Private helper functions
 
   defp get_service_status(:obs) do
-    case Server.Services.OBS.get_status() do
-      {:ok, status} -> %{connected: true, status: status}
-      {:error, reason} -> %{connected: false, error: to_string(reason)}
+    try do
+      case Server.Services.OBS.get_status() do
+        {:ok, status} -> %{connected: true, status: status}
+        {:error, reason} -> %{connected: false, error: to_string(reason)}
+      end
+    rescue
+      e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
+      e in GenServer.CallError -> %{connected: false, error: "Service call failed: #{e.message}"}
+      _other -> %{connected: false, error: "Service unavailable"}
+    catch
+      :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
     end
-  rescue
-    _ -> %{connected: false, error: "Service unavailable"}
   end
 
   defp get_service_status(:twitch) do
-    case Server.Services.Twitch.get_status() do
-      {:ok, status} -> %{connected: true, status: status}
-      {:error, reason} -> %{connected: false, error: to_string(reason)}
+    try do
+      case Server.Services.Twitch.get_status() do
+        {:ok, status} -> %{connected: true, status: status}
+        {:error, reason} -> %{connected: false, error: to_string(reason)}
+      end
+    rescue
+      e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
+      e in GenServer.CallError -> %{connected: false, error: "Service call failed: #{e.message}"}
+      _other -> %{connected: false, error: "Service unavailable"}
+    catch
+      :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
     end
-  rescue
-    _ -> %{connected: false, error: "Service unavailable"}
   end
 
   defp get_service_status(:ironmon_tcp) do
@@ -130,12 +142,19 @@ defmodule ServerWeb.ControlController do
   end
 
   defp get_service_status(:database) do
-    case Server.Repo.query("SELECT 1", []) do
-      {:ok, _} -> %{connected: true, status: "healthy"}
-      {:error, reason} -> %{connected: false, error: to_string(reason)}
+    try do
+      case Server.Repo.query("SELECT 1", [], timeout: 5000) do
+        {:ok, _} -> %{connected: true, status: "healthy"}
+        {:error, reason} -> %{connected: false, error: to_string(reason)}
+      end
+    rescue
+      e in Postgrex.Error -> %{connected: false, error: "Database error: #{e.message}"}
+      e in DBConnection.ConnectionError -> %{connected: false, error: "Connection error: #{e.message}"}
+      e in DBConnection.OwnershipError -> %{connected: false, error: "Ownership error: #{e.message}"}
+      _other -> %{connected: false, error: "Database unavailable"}
+    catch
+      :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
     end
-  rescue
-    _ -> %{connected: false, error: "Database unavailable"}
   end
 
   defp get_detailed_service_info(:obs) do
@@ -166,10 +185,16 @@ defmodule ServerWeb.ControlController do
 
     additional_info =
       if base_status.connected do
-        %{
-          subscriptions:
-            Server.SubscriptionMonitor.get_health_report() |> Map.take([:total_subscriptions, :enabled_subscriptions])
-        }
+        try do
+          %{
+            subscriptions:
+              Server.SubscriptionMonitor.get_health_report() |> Map.take([:total_subscriptions, :enabled_subscriptions])
+          }
+        rescue
+          _error -> %{subscriptions: %{error: "Twitch subscription monitoring temporarily unavailable"}}
+        catch
+          :exit, _reason -> %{subscriptions: %{error: "Twitch subscription monitoring temporarily unavailable"}}
+        end
       else
         %{}
       end
@@ -196,11 +221,18 @@ defmodule ServerWeb.ControlController do
     additional_info =
       if base_status.connected do
         try do
-          {:ok, result} = Server.Repo.query("SELECT COUNT(*) FROM seeds", [])
-          [[seed_count]] = result.rows
-          %{seed_count: seed_count}
+          case Server.Repo.query("SELECT COUNT(*) FROM seeds", [], timeout: 5000) do
+            {:ok, %{rows: [[count]]}} when is_integer(count) -> %{seed_count: count}
+            {:ok, _} -> %{seed_count: "unexpected_result"}
+            {:error, _} -> %{seed_count: "query_error"}
+          end
         rescue
-          _ -> %{seed_count: "unknown"}
+          e in Postgrex.Error -> %{seed_count: "database_error", error: e.message}
+          e in DBConnection.ConnectionError -> %{seed_count: "connection_error", error: e.message}
+          e in DBConnection.OwnershipError -> %{seed_count: "ownership_error", error: e.message}
+          _other -> %{seed_count: "unknown"}
+        catch
+          :exit, reason -> %{seed_count: "process_exit", error: inspect(reason)}
         end
       else
         %{}

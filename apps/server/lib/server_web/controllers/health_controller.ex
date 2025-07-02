@@ -63,21 +63,11 @@ defmodule ServerWeb.HealthController do
   @spec detailed(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def detailed(conn, _params) do
     start_time = System.monotonic_time(:millisecond)
-    # Detailed system health including all services
-    obs_status =
-      case Server.Services.OBS.get_status() do
-        {:ok, status} -> status
-        {:error, _} -> %{connected: false, error: "Service unavailable"}
-      end
-
-    twitch_status =
-      case Server.Services.Twitch.get_status() do
-        {:ok, status} -> status
-        {:error, _} -> %{connected: false, error: "Service unavailable"}
-      end
-
-    database_status = get_database_status()
-    subscription_status = get_subscription_status()
+    # Detailed system health including all services with defensive error handling
+    obs_status = safe_get_service_status(:obs)
+    twitch_status = safe_get_service_status(:twitch)
+    database_status = safe_get_database_status()
+    subscription_status = safe_get_subscription_status()
 
     # Determine overall health status
     overall_status = determine_overall_status([obs_status, twitch_status, database_status, subscription_status])
@@ -177,52 +167,52 @@ defmodule ServerWeb.HealthController do
   def subscriptions(conn, _params) do
     start_time = System.monotonic_time(:millisecond)
 
-    try do
-      report = Server.SubscriptionMonitor.get_health_report()
+    # Use the safe helper function consistently with other endpoints
+    case safe_get_subscription_health() do
+      {:ok, report} ->
+        # Determine subscription health status
+        health_status =
+          cond do
+            report.total_subscriptions == 0 -> "no_subscriptions"
+            report.failed_subscriptions > report.enabled_subscriptions -> "degraded"
+            report.failed_subscriptions > 0 -> "warning"
+            true -> "healthy"
+          end
 
-      # Determine subscription health status
-      health_status =
-        cond do
-          report.total_subscriptions == 0 -> "no_subscriptions"
-          report.failed_subscriptions > report.enabled_subscriptions -> "degraded"
-          report.failed_subscriptions > 0 -> "warning"
-          true -> "healthy"
-        end
+        # Generate recommendations
+        recommendations = generate_subscription_recommendations(report)
 
-      # Generate recommendations
-      recommendations = generate_subscription_recommendations(report)
-
-      response = %{
-        status: health_status,
-        timestamp: System.system_time(:second),
-        subscription_health: report,
-        recommendations: recommendations,
-        summary: %{
-          health_score: calculate_health_score(report),
-          critical_issues: count_critical_issues(report),
-          last_cleanup: report.last_cleanup_at
+        response = %{
+          status: health_status,
+          timestamp: System.system_time(:second),
+          subscription_health: report,
+          recommendations: recommendations,
+          summary: %{
+            health_score: calculate_health_score(report),
+            critical_issues: count_critical_issues(report),
+            last_cleanup: report.last_cleanup_at
+          }
         }
-      }
 
-      # Determine HTTP status code
-      status_code =
-        case health_status do
-          "healthy" -> 200
-          "warning" -> 200
-          "no_subscriptions" -> 200
-          "degraded" -> 503
-          _ -> 503
-        end
+        # Determine HTTP status code
+        status_code =
+          case health_status do
+            "healthy" -> 200
+            "warning" -> 200
+            "no_subscriptions" -> 200
+            "degraded" -> 503
+            _ -> 503
+          end
 
-      # Emit telemetry
-      duration = System.monotonic_time(:millisecond) - start_time
-      Server.Telemetry.health_check("subscriptions", duration, health_status)
+        # Emit telemetry
+        duration = System.monotonic_time(:millisecond) - start_time
+        Server.Telemetry.health_check("subscriptions", duration, health_status)
 
-      conn
-      |> put_status(status_code)
-      |> json(response)
-    rescue
-      error ->
+        conn
+        |> put_status(status_code)
+        |> json(response)
+
+      {:error, error_message} ->
         # Emit telemetry for error
         duration = System.monotonic_time(:millisecond) - start_time
         Server.Telemetry.health_check("subscriptions", duration, "error")
@@ -232,42 +222,102 @@ defmodule ServerWeb.HealthController do
         |> json(%{
           status: "error",
           timestamp: System.system_time(:second),
-          error: "Failed to retrieve subscription health data",
-          details: inspect(error)
+          error: error_message,
+          details: "Subscription monitor unavailable"
         })
     end
   end
 
-  defp get_database_status do
-    case Server.Repo.query("SELECT 1", []) do
-      {:ok, _} -> %{connected: true, status: "healthy"}
-      {:error, reason} -> %{connected: false, error: to_string(reason)}
+  # Safe service status helpers with comprehensive error handling
+  defp safe_get_service_status(:obs) do
+    try do
+      case Server.Services.OBS.get_status() do
+        {:ok, status} -> Map.merge(%{connected: true}, status)
+        {:error, reason} -> %{connected: false, error: to_string(reason)}
+      end
+    rescue
+      e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
+      e in GenServer.CallError -> %{connected: false, error: "Service call failed: #{e.message}"}
+      _other -> %{connected: false, error: "Service unavailable"}
+    catch
+      :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
     end
-  rescue
-    _ -> %{connected: false, error: "Database unavailable"}
+  end
+
+  defp safe_get_service_status(:twitch) do
+    try do
+      case Server.Services.Twitch.get_status() do
+        {:ok, status} -> Map.merge(%{connected: true}, status)
+        {:error, reason} -> %{connected: false, error: to_string(reason)}
+      end
+    rescue
+      e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
+      e in GenServer.CallError -> %{connected: false, error: "Service call failed: #{e.message}"}
+      _other -> %{connected: false, error: "Service unavailable"}
+    catch
+      :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
+    end
+  end
+
+  defp safe_get_database_status do
+    try do
+      case Server.Repo.query("SELECT 1", [], timeout: 5000) do
+        {:ok, _} -> %{connected: true, status: "healthy"}
+        {:error, reason} -> %{connected: false, error: to_string(reason)}
+      end
+    rescue
+      e in Postgrex.Error -> %{connected: false, error: "Database error: #{e.message}"}
+      e in DBConnection.ConnectionError -> %{connected: false, error: "Connection error: #{e.message}"}
+      e in DBConnection.OwnershipError -> %{connected: false, error: "Ownership error: #{e.message}"}
+      _other -> %{connected: false, error: "Database unavailable"}
+    catch
+      :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
+    end
+  end
+
+  defp get_database_status do
+    safe_get_database_status()
+  end
+
+  defp safe_get_subscription_status do
+    try do
+      report = Server.SubscriptionMonitor.get_health_report()
+
+      status =
+        cond do
+          report.total_subscriptions == 0 -> "no_subscriptions"
+          report.failed_subscriptions > report.enabled_subscriptions -> "degraded"
+          report.failed_subscriptions > 0 -> "warning"
+          true -> "healthy"
+        end
+
+      %{
+        status: status,
+        total: report.total_subscriptions,
+        enabled: report.enabled_subscriptions,
+        failed: report.failed_subscriptions,
+        orphaned: report.orphaned_subscriptions
+      }
+    rescue
+      _error -> %{status: "error", error: "Twitch subscription monitoring temporarily unavailable"}
+    catch
+      :exit, _reason -> %{status: "error", error: "Twitch subscription monitoring temporarily unavailable"}
+    end
+  end
+
+  defp safe_get_subscription_health do
+    try do
+      report = Server.SubscriptionMonitor.get_health_report()
+      {:ok, report}
+    rescue
+      _error -> {:error, "Subscription monitor unavailable"}
+    catch
+      :exit, _reason -> {:error, "Subscription monitor unavailable"}
+    end
   end
 
   defp get_subscription_status do
-    report = Server.SubscriptionMonitor.get_health_report()
-
-    status =
-      cond do
-        report.total_subscriptions == 0 -> "no_subscriptions"
-        report.failed_subscriptions > report.enabled_subscriptions -> "degraded"
-        report.failed_subscriptions > 0 -> "warning"
-        true -> "healthy"
-      end
-
-    %{
-      status: status,
-      total: report.total_subscriptions,
-      enabled: report.enabled_subscriptions,
-      failed: report.failed_subscriptions,
-      orphaned: report.orphaned_subscriptions
-    }
-  rescue
-    _ ->
-      %{status: "error", error: "Subscription monitor unavailable"}
+    safe_get_subscription_status()
   end
 
   defp determine_overall_status(service_statuses) do
