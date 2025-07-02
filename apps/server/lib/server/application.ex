@@ -37,7 +37,8 @@ defmodule Server.Application do
             Server.Events.BatchPublisher,
             Server.Cache,
             # Subscription monitoring
-            Server.SubscriptionMonitor,
+            {Server.SubscriptionStorage, [name: :subscriptions]},
+            {Server.SubscriptionMonitor, [storage: :subscriptions]},
             # Services
             Server.Services.OBS,
             Server.Services.Twitch,

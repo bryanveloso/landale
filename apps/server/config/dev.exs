@@ -12,7 +12,7 @@ config :server, Server.Repo,
   database: "landale",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
-  pool_size: 15,
+  pool_size: 10,
   queue_target: 50,
   queue_interval: 1_000,
   timeout: 15_000

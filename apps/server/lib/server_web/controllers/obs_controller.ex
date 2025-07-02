@@ -16,9 +16,19 @@ defmodule ServerWeb.OBSController do
   )
 
   def status(conn, _params) do
-    case Server.Services.OBS.get_state() do
-      state when is_map(state) ->
-        json(conn, %{success: true, data: state})
+    case Server.Services.OBS.get_status() do
+      {:ok, status} ->
+        json(conn, %{success: true, data: status})
+
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: message})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: to_string(reason)})
 
       _ ->
         conn
@@ -42,10 +52,15 @@ defmodule ServerWeb.OBSController do
       {:ok, _} ->
         json(conn, %{success: true, message: "Stream started"})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 
@@ -64,10 +79,15 @@ defmodule ServerWeb.OBSController do
       {:ok, _} ->
         json(conn, %{success: true, message: "Stream stopped"})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 
@@ -86,10 +106,15 @@ defmodule ServerWeb.OBSController do
       {:ok, _} ->
         json(conn, %{success: true, message: "Recording started"})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 
@@ -108,10 +133,15 @@ defmodule ServerWeb.OBSController do
       {:ok, _} ->
         json(conn, %{success: true, message: "Recording stopped"})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 
@@ -133,10 +163,41 @@ defmodule ServerWeb.OBSController do
       {:ok, _} ->
         json(conn, %{success: true, message: "Scene changed to #{scene_name}"})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
+    end
+  end
+
+  operation(:current_scene,
+    summary: "Get current OBS scene",
+    description: "Returns the currently active scene in OBS Studio",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      503 => {"Service Unavailable", "application/json", Schemas.ErrorResponse}
+    }
+  )
+
+  def current_scene(conn, _params) do
+    case Server.Services.OBS.get_current_scene() do
+      {:ok, scene_data} ->
+        json(conn, %{success: true, data: scene_data})
+
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: message})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 
@@ -156,10 +217,15 @@ defmodule ServerWeb.OBSController do
       {:ok, scenes_data} ->
         json(conn, %{success: true, data: scenes_data})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:service_unavailable)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 
@@ -177,10 +243,15 @@ defmodule ServerWeb.OBSController do
       {:ok, stream_data} ->
         json(conn, %{success: true, data: stream_data})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:service_unavailable)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 
@@ -198,10 +269,15 @@ defmodule ServerWeb.OBSController do
       {:ok, record_data} ->
         json(conn, %{success: true, data: record_data})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:service_unavailable)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 
@@ -226,10 +302,15 @@ defmodule ServerWeb.OBSController do
 
       json(conn, %{success: true, data: combined_stats})
     else
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:service_unavailable)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
 
       _ ->
         conn
@@ -252,10 +333,15 @@ defmodule ServerWeb.OBSController do
       {:ok, version_data} ->
         json(conn, %{success: true, data: version_data})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:service_unavailable)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 
@@ -273,10 +359,15 @@ defmodule ServerWeb.OBSController do
       {:ok, virtual_cam_data} ->
         json(conn, %{success: true, data: virtual_cam_data})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:service_unavailable)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 
@@ -294,10 +385,15 @@ defmodule ServerWeb.OBSController do
       {:ok, outputs_data} ->
         json(conn, %{success: true, data: outputs_data})
 
+      {:error, %Server.ServiceError{message: message}} ->
+        conn
+        |> put_status(:service_unavailable)
+        |> json(%{success: false, error: message})
+
       {:error, reason} ->
         conn
         |> put_status(:service_unavailable)
-        |> json(%{success: false, error: reason})
+        |> json(%{success: false, error: to_string(reason)})
     end
   end
 end
