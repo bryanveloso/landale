@@ -157,24 +157,31 @@ defmodule Server.Telemetry do
   Measures database connection pool metrics.
   """
   def measure_database_pool do
-    # Get pool status directly from DBConnection
-    case DBConnection.status(Server.Repo) do
-      :ok ->
-        # Repo is running, emit basic health metric
-        :telemetry.execute([:server, :database, :status], %{value: 1}, %{})
+    # Check if repo process exists before attempting operations
+    case Process.whereis(Server.Repo) do
+      nil ->
+        # Repo not started yet
+        :telemetry.execute([:server, :database, :status], %{value: 0}, %{reason: "not_started"})
 
-        # For more detailed pool metrics, we'd need to access internal pool state
-        # For single-user system, basic connectivity is sufficient
-        :ok
+      pid when is_pid(pid) ->
+        # Repo is started, check if it's accepting connections
+        try do
+          case DBConnection.status(Server.Repo) do
+            :ok ->
+              # Repo is running, emit basic health metric
+              :telemetry.execute([:server, :database, :status], %{value: 1}, %{})
 
-      _ ->
-        :telemetry.execute([:server, :database, :status], %{value: 0}, %{})
+            _ ->
+              :telemetry.execute([:server, :database, :status], %{value: 0}, %{reason: "unavailable"})
+          end
+        rescue
+          error ->
+            # Log the specific error for debugging but don't crash telemetry
+            Logger.debug("Database status check failed during telemetry measurement", 
+              error: inspect(error))
+            :telemetry.execute([:server, :database, :status], %{value: 0}, %{reason: "error"})
+        end
     end
-  rescue
-    _ ->
-      # Fallback measurement - check if repo process is alive
-      repo_alive = if Process.whereis(Server.Repo), do: 1, else: 0
-      :telemetry.execute([:server, :database, :status], %{value: repo_alive}, %{})
   end
 
   @doc """
