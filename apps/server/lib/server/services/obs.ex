@@ -72,7 +72,6 @@ defmodule Server.Services.OBS do
   # UI events (1 << 10)
   @event_subscription_ui 1024
 
-
   # EventSubscription::All helper (non-high-volume events only)
   @event_subscription_all @event_subscription_general |||
                             @event_subscription_config |||
@@ -712,7 +711,11 @@ defmodule Server.Services.OBS do
           {:noreply, new_state}
 
         {:error, reason} ->
-          error = ServiceError.new(:obs, "websocket_send", :network_error, "Failed to send WebSocket message", details: %{reason: reason})
+          error =
+            ServiceError.new(:obs, "websocket_send", :network_error, "Failed to send WebSocket message",
+              details: %{reason: reason}
+            )
+
           {:reply, {:error, error}, state}
       end
     else
@@ -2481,5 +2484,4 @@ defmodule Server.Services.OBS do
         }
     end
   end
-
 end

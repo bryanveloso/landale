@@ -177,8 +177,10 @@ defmodule Server.Telemetry do
         rescue
           error ->
             # Log the specific error for debugging but don't crash telemetry
-            Logger.debug("Database status check failed during telemetry measurement", 
-              error: inspect(error))
+            Logger.debug("Database status check failed during telemetry measurement",
+              error: inspect(error)
+            )
+
             :telemetry.execute([:server, :database, :status], %{value: 0}, %{reason: "error"})
         end
     end

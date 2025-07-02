@@ -316,7 +316,6 @@ defmodule ServerWeb.HealthController do
     end
   end
 
-
   defp determine_overall_status(service_statuses) do
     # Service is healthy if database is connected
     # OBS and Twitch are considered optional for basic functionality
