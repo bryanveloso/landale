@@ -7,7 +7,7 @@ defmodule Server.EventsTest do
     test "publishes and receives OBS events" do
       Events.subscribe_to_obs_events()
 
-      Events.publish_obs_event("test_event", %{test: "data"})
+      Events.publish_obs_event("test_event", %{test: "data"}, batch: false)
 
       assert_receive {:obs_event, event}
       assert event.type == "test_event"
@@ -19,7 +19,7 @@ defmodule Server.EventsTest do
     test "publishes and receives Twitch events" do
       Events.subscribe_to_twitch_events()
 
-      Events.publish_twitch_event("channel.update", %{broadcaster_user_name: "test"})
+      Events.publish_twitch_event("channel.update", %{broadcaster_user_name: "test"}, batch: false)
 
       assert_receive {:twitch_event, event}
       assert event.type == "channel.update"
@@ -66,7 +66,7 @@ defmodule Server.EventsTest do
       Events.subscribe_to_obs_events()
       Events.unsubscribe_from_obs_events()
 
-      Events.publish_obs_event("test_event", %{test: "data"})
+      Events.publish_obs_event("test_event", %{test: "data"}, batch: false)
 
       # Should not receive the event after unsubscribing
       refute_receive {:obs_event, _event}, 100

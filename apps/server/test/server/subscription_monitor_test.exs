@@ -6,10 +6,10 @@ defmodule Server.SubscriptionMonitorTest do
   # Following official Elixir testing patterns from the documentation
   setup context do
     # Create unique storage table for each test (pattern from official docs)
-    storage = start_supervised!({SubscriptionStorage, name: context.test})
+    _storage = start_supervised!({SubscriptionStorage, name: context.test})
 
     # Start monitor with injected storage dependency
-    monitor = start_supervised!({SubscriptionMonitor, storage: context.test, name: :"monitor_#{context.test}"})
+    _monitor = start_supervised!({SubscriptionMonitor, storage: context.test, name: :"monitor_#{context.test}"})
 
     %{storage: context.test, monitor: :"monitor_#{context.test}"}
   end

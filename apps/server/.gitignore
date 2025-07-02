@@ -51,3 +51,6 @@ Thumbs.db
 # DETS files (contain sensitive data)
 *.dets
 
+# Test data directory (contains generated test files and token data)
+/test_data/
+

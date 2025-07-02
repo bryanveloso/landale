@@ -1266,15 +1266,6 @@ defmodule Server.Services.Twitch do
     new_state
   end
 
-  defp update_subscription_state(state, updates) do
-    new_state = Map.merge(state.state, updates)
-    updated_state = %{state | state: new_state}
-
-    # Invalidate caches that include subscription data
-    invalidate_twitch_caches([:subscription_metrics, :full_state, :connection_status])
-
-    updated_state
-  end
 
   # Cache invalidation helper
   defp invalidate_twitch_caches(cache_keys) do

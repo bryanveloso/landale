@@ -268,20 +268,20 @@ defmodule Server.Cache do
 
   @impl true
   def handle_cast({:cache_hit, namespace}, state) do
-    new_stats =
-      update_in(state.stats.hits, fn hits ->
-        Map.update(hits, namespace, 1, &(&1 + 1))
-      end)
+    new_stats = %{
+      state.stats
+      | hits: Map.update(state.stats.hits, namespace, 1, &(&1 + 1))
+    }
 
     {:noreply, %{state | stats: new_stats}}
   end
 
   @impl true
   def handle_cast({:cache_miss, namespace}, state) do
-    new_stats =
-      update_in(state.stats.misses, fn misses ->
-        Map.update(misses, namespace, 1, &(&1 + 1))
-      end)
+    new_stats = %{
+      state.stats
+      | misses: Map.update(state.stats.misses, namespace, 1, &(&1 + 1))
+    }
 
     {:noreply, %{state | stats: new_stats}}
   end
