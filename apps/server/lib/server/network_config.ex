@@ -166,19 +166,24 @@ defmodule Server.NetworkConfig do
 
   defp environment_overrides(:development) do
     %{
-      connection_timeout: 5_000,
-      reconnect_interval: 2_000,
+      # More aggressive timeouts for local environment
+      connection_timeout: 3_000,
+      reconnect_interval: 1_000,
       websocket: %{
-        timeout: 15_000,
-        keepalive: 30_000
+        # Faster timeouts for local OBS/Twitch connections
+        timeout: 8_000,
+        keepalive: 15_000,
+        retry_limit: 3
       },
       http: %{
-        timeout: 10_000,
-        receive_timeout: 20_000,
-        pool_size: 5
+        # Local API calls should be very fast
+        timeout: 5_000,
+        receive_timeout: 10_000,
+        pool_size: 3
       },
       telemetry: %{
-        reporting_interval: 30_000
+        # More frequent telemetry for development monitoring
+        reporting_interval: 15_000
       }
     }
   end

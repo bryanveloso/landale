@@ -67,18 +67,30 @@ defmodule Server.Services.Twitch do
   end
 
   @doc """
-  Gets the current internal state of the Twitch service.
+  Gets the current internal state of the Twitch service with caching.
+
+  Uses ETS cache to reduce GenServer load. Cache TTL is 2 seconds for detailed state.
 
   ## Returns
   - Map containing connection, subscriptions, and EventSub state
   """
   @spec get_state() :: map()
   def get_state do
-    GenServer.call(__MODULE__, :get_state)
+    Server.Cache.get_or_compute(
+      :twitch_service,
+      :full_state,
+      fn ->
+        GenServer.call(__MODULE__, :get_state)
+      end,
+      ttl_seconds: 2
+    )
   end
 
   @doc """
-  Gets the current status of the Twitch service.
+  Gets the current status of the Twitch service with caching.
+
+  Uses caching (10 seconds TTL) for connection status since this is called frequently
+  by dashboard and health checks but changes infrequently.
 
   ## Returns
   - `{:ok, status}` where status contains connection and subscription information
@@ -86,7 +98,65 @@ defmodule Server.Services.Twitch do
   """
   @spec get_status() :: {:ok, map()} | {:error, binary()}
   def get_status do
-    GenServer.call(__MODULE__, :get_status)
+    Server.Cache.get_or_compute(
+      :twitch_service,
+      :connection_status,
+      fn ->
+        GenServer.call(__MODULE__, :get_status)
+      end,
+      ttl_seconds: 10
+    )
+  end
+
+  @doc """
+  Gets Twitch connection state with aggressive caching.
+
+  ## Returns
+  - Map with connection details
+  """
+  @spec get_connection_state() :: map()
+  def get_connection_state do
+    Server.Cache.get_or_compute(
+      :twitch_service,
+      :connection_state,
+      fn ->
+        state = GenServer.call(__MODULE__, :get_internal_state)
+
+        %{
+          connected: state.connection.connected,
+          connection_state: state.connection.connection_state,
+          session_id: state.connection.session_id,
+          last_connected: state.connection.last_connected,
+          websocket_url: state.connection.websocket_url
+        }
+      end,
+      ttl_seconds: 10
+    )
+  end
+
+  @doc """
+  Gets subscription metrics with caching.
+
+  ## Returns
+  - Map with subscription counts and costs
+  """
+  @spec get_subscription_metrics() :: map()
+  def get_subscription_metrics do
+    Server.Cache.get_or_compute(
+      :twitch_service,
+      :subscription_metrics,
+      fn ->
+        state = GenServer.call(__MODULE__, :get_internal_state)
+
+        %{
+          subscription_count: state.subscription_count,
+          subscription_total_cost: state.subscription_total_cost,
+          subscription_max_count: state.subscription_max_count,
+          subscription_max_cost: state.subscription_max_cost
+        }
+      end,
+      ttl_seconds: 30
+    )
   end
 
   @doc """
@@ -222,6 +292,11 @@ defmodule Server.Services.Twitch do
   end
 
   @impl GenServer
+  def handle_call(:get_internal_state, _from, state) do
+    {:reply, state.state, state}
+  end
+
+  @impl GenServer
   def handle_call({:create_subscription, event_type, condition, opts}, _from, state) do
     cond do
       not (state.state.connection.connected && state.session_id) ->
@@ -262,6 +337,9 @@ defmodule Server.Services.Twitch do
                 subscription_count: max(0, state.state.subscription_count - 1)
             }
         }
+
+        # Invalidate subscription-related caches
+        invalidate_twitch_caches([:subscription_metrics, :full_state, :connection_status])
 
         {:reply, :ok, new_state}
 
@@ -344,6 +422,9 @@ defmodule Server.Services.Twitch do
             subscription_count: state.state.subscription_count + 1
         }
     }
+
+    # Invalidate subscription-related caches
+    invalidate_twitch_caches([:subscription_metrics, :full_state, :connection_status])
 
     {:reply, {:ok, subscription}, new_state}
   end
@@ -1176,10 +1257,30 @@ defmodule Server.Services.Twitch do
     connection = Map.merge(state.state.connection, updates)
     new_state = put_in(state.state.connection, connection)
 
+    # Invalidate relevant caches
+    invalidate_twitch_caches([:connection_state, :connection_status, :full_state])
+
     # Publish connection state changes
     Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_connection_changed, connection})
 
     new_state
+  end
+
+  defp update_subscription_state(state, updates) do
+    new_state = Map.merge(state.state, updates)
+    updated_state = %{state | state: new_state}
+
+    # Invalidate caches that include subscription data
+    invalidate_twitch_caches([:subscription_metrics, :full_state, :connection_status])
+
+    updated_state
+  end
+
+  # Cache invalidation helper
+  defp invalidate_twitch_caches(cache_keys) do
+    Enum.each(cache_keys, fn key ->
+      Server.Cache.invalidate(:twitch_service, key)
+    end)
   end
 
   defp schedule_token_refresh(state) do

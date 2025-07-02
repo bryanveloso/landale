@@ -33,6 +33,7 @@ defmodule Server.Application do
             # Performance optimizations
             Server.CorrelationIdPool,
             Server.Events.BatchPublisher,
+            Server.Cache,
             # Subscription monitoring
             Server.SubscriptionMonitor,
             # Services

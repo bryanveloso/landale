@@ -157,26 +157,24 @@ defmodule Server.Telemetry do
   Measures database connection pool metrics.
   """
   def measure_database_pool do
-    try do
-      # Get pool status directly from DBConnection
-      case DBConnection.status(Server.Repo) do
-        :ok ->
-          # Repo is running, emit basic health metric
-          :telemetry.execute([:server, :database, :status], %{value: 1}, %{})
+    # Get pool status directly from DBConnection
+    case DBConnection.status(Server.Repo) do
+      :ok ->
+        # Repo is running, emit basic health metric
+        :telemetry.execute([:server, :database, :status], %{value: 1}, %{})
 
-          # For more detailed pool metrics, we'd need to access internal pool state
-          # For single-user system, basic connectivity is sufficient
-          :ok
+        # For more detailed pool metrics, we'd need to access internal pool state
+        # For single-user system, basic connectivity is sufficient
+        :ok
 
-        _ ->
-          :telemetry.execute([:server, :database, :status], %{value: 0}, %{})
-      end
-    rescue
       _ ->
-        # Fallback measurement - check if repo process is alive
-        repo_alive = if Process.whereis(Server.Repo), do: 1, else: 0
-        :telemetry.execute([:server, :database, :status], %{value: repo_alive}, %{})
+        :telemetry.execute([:server, :database, :status], %{value: 0}, %{})
     end
+  rescue
+    _ ->
+      # Fallback measurement - check if repo process is alive
+      repo_alive = if Process.whereis(Server.Repo), do: 1, else: 0
+      :telemetry.execute([:server, :database, :status], %{value: repo_alive}, %{})
   end
 
   @doc """

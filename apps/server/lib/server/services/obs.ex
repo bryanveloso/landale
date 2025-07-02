@@ -119,18 +119,31 @@ defmodule Server.Services.OBS do
   end
 
   @doc """
-  Gets the current internal state of the OBS service.
+  Gets the current internal state of the OBS service with caching.
+
+  Uses ETS cache to reduce GenServer load. Cache TTL is 1 second for basic status
+  and 2 seconds for detailed state to balance responsiveness with performance.
 
   ## Returns
   - Map containing connection, scenes, streaming, and recording state
   """
   @spec get_state() :: map()
   def get_state do
-    GenServer.call(__MODULE__, :get_state)
+    Server.Cache.get_or_compute(
+      :obs_service,
+      :full_state,
+      fn ->
+        GenServer.call(__MODULE__, :get_state)
+      end,
+      ttl_seconds: 2
+    )
   end
 
   @doc """
-  Gets the current status of the OBS service.
+  Gets the current status of the OBS service with caching.
+
+  Uses aggressive caching (1 second TTL) for connection status since this is
+  called frequently by dashboard and health checks but changes infrequently.
 
   ## Returns
   - `{:ok, status}` where status contains connection information
@@ -138,7 +151,42 @@ defmodule Server.Services.OBS do
   """
   @spec get_status() :: {:ok, map()} | {:error, ServiceError.service_error()}
   def get_status do
-    GenServer.call(__MODULE__, :get_status)
+    Server.Cache.get_or_compute(
+      :obs_service,
+      :connection_status,
+      fn ->
+        GenServer.call(__MODULE__, :get_status)
+      end,
+      ttl_seconds: 1
+    )
+  end
+
+  @doc """
+  Gets basic OBS status flags (connected, streaming, recording) with aggressive caching.
+
+  This is the most frequently accessed data for dashboard indicators.
+  Uses 500ms TTL for ultra-fast response to high-frequency polling.
+
+  ## Returns
+  - Map with basic status flags
+  """
+  @spec get_basic_status() :: map()
+  def get_basic_status do
+    Server.Cache.get_or_compute(
+      :obs_service,
+      :basic_status,
+      fn ->
+        state = GenServer.call(__MODULE__, :get_internal_state)
+
+        %{
+          connected: state.connection.connected,
+          streaming: state.streaming.active,
+          recording: state.recording.active,
+          current_scene: state.scenes.current
+        }
+      end,
+      ttl_seconds: 1
+    )
   end
 
   @doc """
@@ -466,6 +514,11 @@ defmodule Server.Services.OBS do
     }
 
     {:reply, {:ok, status}, state}
+  end
+
+  @impl GenServer
+  def handle_call(:get_internal_state, _from, state) do
+    {:reply, state.state, state}
   end
 
   @impl GenServer
@@ -1020,6 +1073,9 @@ defmodule Server.Services.OBS do
     connection = Map.merge(state.state.connection, updates)
     new_state = put_in(state.state.connection, connection)
 
+    # Invalidate relevant caches
+    invalidate_obs_caches([:connection_status, :basic_status, :full_state])
+
     # Publish connection state changes
     Server.Events.publish_obs_event("connection_changed", connection)
 
@@ -1030,6 +1086,9 @@ defmodule Server.Services.OBS do
     scenes = Map.merge(state.state.scenes, updates)
     new_state = put_in(state.state.scenes, scenes)
 
+    # Invalidate caches that include scene data
+    invalidate_obs_caches([:basic_status, :full_state])
+
     Server.Events.publish_obs_event("scenes_updated", scenes)
 
     new_state
@@ -1039,9 +1098,44 @@ defmodule Server.Services.OBS do
     streaming = Map.merge(state.state.streaming, updates)
     new_state = put_in(state.state.streaming, streaming)
 
+    # Invalidate caches that include streaming data
+    invalidate_obs_caches([:basic_status, :full_state])
+
     Server.Events.publish_obs_event("streaming_updated", streaming)
 
     new_state
+  end
+
+  defp update_recording_state(state, updates) do
+    recording = Map.merge(state.state.recording, updates)
+    new_state = put_in(state.state.recording, recording)
+
+    # Invalidate caches that include recording data
+    invalidate_obs_caches([:basic_status, :full_state])
+
+    Server.Events.publish_obs_event("recording_updated", recording)
+
+    new_state
+  end
+
+  defp update_other_state(state, field, updates) do
+    current_field_state = Map.get(state.state, field, %{})
+    new_field_state = Map.merge(current_field_state, updates)
+    new_state = put_in(state.state[field], new_field_state)
+
+    # For non-core state changes, only invalidate full state cache
+    invalidate_obs_caches([:full_state])
+
+    Server.Events.publish_obs_event("#{field}_updated", new_field_state)
+
+    new_state
+  end
+
+  # Cache invalidation helper
+  defp invalidate_obs_caches(cache_keys) do
+    Enum.each(cache_keys, fn key ->
+      Server.Cache.invalidate(:obs_service, key)
+    end)
   end
 
   # Stats polling

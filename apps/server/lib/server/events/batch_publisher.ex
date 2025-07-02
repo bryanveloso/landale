@@ -16,13 +16,24 @@ defmodule Server.Events.BatchPublisher do
   @batch_table_name :event_batch_buffer
   @critical_events [
     # Connection events
-    "connection_lost", "connection_failed", "websocket_disconnected", "authentication_failed",
-    # Streaming events  
-    "stream_stopped", "recording_stopped", "stream_started", "recording_started",
+    "connection_lost",
+    "connection_failed",
+    "websocket_disconnected",
+    "authentication_failed",
+    # Streaming events
+    "stream_stopped",
+    "recording_stopped",
+    "stream_started",
+    "recording_started",
     # Service events
-    "service_error", "service_unavailable", "startup", "shutdown",
+    "service_error",
+    "service_unavailable",
+    "startup",
+    "shutdown",
     # Health events
-    "unhealthy", "degraded", "service_down"
+    "unhealthy",
+    "degraded",
+    "service_down"
   ]
 
   defstruct [
