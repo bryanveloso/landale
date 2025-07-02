@@ -140,7 +140,7 @@ defmodule Server.Ironmon do
   end
 
   def get_active_challenge(seed_id) do
-    from(s in Seed,
+    case from(s in Seed,
       join: ch in Challenge,
       on: s.challenge_id == ch.id,
       left_join: r in Result,
@@ -152,10 +152,13 @@ defmodule Server.Ironmon do
         seed_id: s.id,
         challenge_name: ch.name,
         completed_checkpoints: count(r.id, :distinct),
-        last_result: max(r.result)
+        last_result: fragment("bool_or(?)", r.result)
       },
       group_by: [s.id, ch.name]
     )
-    |> Repo.one()
+    |> Repo.one() do
+      nil -> {:error, "No active challenge found"}
+      challenge -> {:ok, challenge}
+    end
   end
 end
