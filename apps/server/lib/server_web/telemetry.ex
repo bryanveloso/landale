@@ -11,10 +11,7 @@ defmodule ServerWeb.Telemetry do
     children = [
       # Telemetry poller will execute the given period measurements
       # every 10_000ms with initial startup delay to prevent early database access
-      {:telemetry_poller, 
-       measurements: periodic_measurements(), 
-       period: 10_000,
-       initial_delay: 15_000}
+      {:telemetry_poller, measurements: periodic_measurements(), period: 10_000, initial_delay: 15_000}
       # Add reporters as children of your supervision tree.
       # {Telemetry.Metrics.ConsoleReporter, metrics: metrics()}
     ]
