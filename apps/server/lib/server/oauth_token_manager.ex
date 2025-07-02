@@ -126,7 +126,7 @@ defmodule Server.OAuthTokenManager do
   end
 
   @doc """
-  Opens DETS storage and loads existing tokens.
+  Opens DETS storage and loads existing tokens with corruption detection and auto-recovery.
 
   ## Parameters
   - `manager` - Token manager state
@@ -140,27 +140,30 @@ defmodule Server.OAuthTokenManager do
     storage_dir = Path.dirname(manager.storage_path)
     File.mkdir_p!(storage_dir)
 
-    # Open DETS table
-    case :dets.open_file(manager.storage_key, file: String.to_charlist(manager.storage_path)) do
-      {:ok, table} ->
-        manager = %{manager | dets_table: table}
+    # Try to open DETS table with corruption detection
+    case open_dets_with_recovery(manager) do
+      {:ok, table, token_info} ->
+        Logger.info("Tokens loaded from storage",
+          storage_key: manager.storage_key,
+          source: if(token_info, do: "dets", else: "empty")
+        )
 
-        # Load existing token
-        case :dets.lookup(table, :token) do
-          [{:token, token_data}] ->
-            Logger.info("Tokens loaded from storage", storage_key: manager.storage_key)
-            %{manager | token_info: deserialize_token(token_data)}
+        %{manager | dets_table: table, token_info: token_info}
 
-          [] ->
-            Logger.info("Token storage empty", storage_key: manager.storage_key)
-            manager
-        end
+      {:recovered, table, token_info} ->
+        Logger.info("Tokens recovered from JSON backup after DETS corruption",
+          storage_key: manager.storage_key
+        )
+
+        manager = %{manager | dets_table: table, token_info: token_info}
+        # Save recovered tokens back to DETS
+        save_tokens(manager)
+        manager
 
       {:error, reason} ->
-        Logging.log_error("Token storage open failed", reason,
+        Logging.log_error("Token storage failed completely", reason,
           storage_key: manager.storage_key,
-          path: manager.storage_path,
-          file_exists: File.exists?(manager.storage_path)
+          path: manager.storage_path
         )
 
         manager
@@ -168,7 +171,7 @@ defmodule Server.OAuthTokenManager do
   end
 
   @doc """
-  Saves tokens to DETS storage.
+  Saves tokens to DETS storage using atomic operations to prevent corruption.
 
   ## Parameters
   - `manager` - Token manager state
@@ -180,26 +183,20 @@ defmodule Server.OAuthTokenManager do
   @spec save_tokens(manager_state()) :: :ok | {:error, term()}
   def save_tokens(manager) do
     if manager.dets_table && manager.token_info do
-      serialized = serialize_token(manager.token_info)
-
-      case :dets.insert(manager.dets_table, {:token, serialized}) do
+      # Always create JSON backup BEFORE attempting DETS write
+      # This ensures we have a reliable recovery point
+      case create_json_backup(manager) do
         :ok ->
-          # Force sync to disk immediately to prevent corruption
-          case :dets.sync(manager.dets_table) do
-            :ok ->
-              Logger.debug("Tokens saved and synced to storage", storage_key: manager.storage_key)
-              # Create automatic JSON backup to prevent DETS corruption loss
-              create_json_backup(manager)
-              :ok
+          # Now attempt atomic DETS write
+          save_to_dets_atomically(manager)
 
-            {:error, sync_reason} ->
-              Logging.log_error("Token sync failed", sync_reason, storage_key: manager.storage_key)
-              {:error, sync_reason}
-          end
+        {:error, backup_reason} ->
+          Logger.error("JSON backup failed, skipping DETS write to prevent data loss",
+            storage_key: manager.storage_key,
+            error: backup_reason
+          )
 
-        {:error, reason} ->
-          Logging.log_error("Token save failed", reason, storage_key: manager.storage_key)
-          {:error, reason}
+          {:error, backup_reason}
       end
     else
       {:error, :no_storage_or_token}
@@ -545,33 +542,195 @@ defmodule Server.OAuthTokenManager do
     end
   end
 
+  # Corruption-resistant DETS operations
+
+  # Opens DETS with corruption detection and automatic recovery
+  defp open_dets_with_recovery(manager) do
+    dets_path = String.to_charlist(manager.storage_path)
+
+    case :dets.open_file(manager.storage_key, file: dets_path) do
+      {:ok, table} ->
+        # Test if DETS is readable and has valid structure
+        case validate_dets_integrity(table) do
+          {:ok, token_info} ->
+            {:ok, table, token_info}
+
+          {:corrupted, _reason} ->
+            Logger.warning("DETS corruption detected, attempting recovery from JSON backup",
+              storage_key: manager.storage_key
+            )
+
+            :dets.close(table)
+            attempt_recovery_from_backup(manager)
+        end
+
+      {:error, {:corrupt_file, _}} ->
+        Logger.warning("DETS file corrupted, attempting recovery from JSON backup",
+          storage_key: manager.storage_key
+        )
+
+        attempt_recovery_from_backup(manager)
+
+      {:error, reason} ->
+        Logger.error("DETS open failed",
+          storage_key: manager.storage_key,
+          error: inspect(reason)
+        )
+
+        {:error, reason}
+    end
+  end
+
+  # Validates DETS table integrity by attempting to read the token
+  defp validate_dets_integrity(table) do
+    try do
+      case :dets.lookup(table, :token) do
+        [{:token, token_data}] when is_map(token_data) ->
+          {:ok, deserialize_token(token_data)}
+
+        [] ->
+          {:ok, nil}
+
+        invalid_data ->
+          Logger.warning("Invalid token data structure in DETS", data: inspect(invalid_data))
+          {:corrupted, :invalid_structure}
+      end
+    rescue
+      error ->
+        Logger.warning("DETS read failed during integrity check", error: inspect(error))
+        {:corrupted, error}
+    end
+  end
+
+  # Attempts to recover from JSON backup after DETS corruption
+  defp attempt_recovery_from_backup(manager) do
+    backup_file = Path.join(Path.dirname(manager.storage_path), "#{manager.storage_key}_backup.json")
+
+    if File.exists?(backup_file) do
+      try do
+        json_data = File.read!(backup_file)
+        backup_data = Jason.decode!(json_data)
+
+        # Convert backup data to token_info
+        token_info = %{
+          access_token: backup_data["access_token"],
+          refresh_token: backup_data["refresh_token"],
+          expires_at: backup_data["expires_at"] && parse_stored_datetime(backup_data["expires_at"]),
+          scopes: backup_data["scopes"] && MapSet.new(backup_data["scopes"]),
+          user_id: backup_data["user_id"]
+        }
+
+        # Create new DETS file
+        # Remove corrupted file
+        File.rm(manager.storage_path)
+
+        case :dets.open_file(manager.storage_key, file: String.to_charlist(manager.storage_path)) do
+          {:ok, table} ->
+            {:recovered, table, token_info}
+
+          {:error, reason} ->
+            Logger.error("Failed to create new DETS file after recovery attempt",
+              storage_key: manager.storage_key,
+              error: inspect(reason)
+            )
+
+            {:error, reason}
+        end
+      rescue
+        error ->
+          Logger.error("JSON backup recovery failed",
+            storage_key: manager.storage_key,
+            backup_file: backup_file,
+            error: inspect(error)
+          )
+
+          {:error, {:backup_recovery_failed, error}}
+      end
+    else
+      Logger.error("No JSON backup found for recovery",
+        storage_key: manager.storage_key,
+        backup_file: backup_file
+      )
+
+      {:error, :no_backup_available}
+    end
+  end
+
+  # Saves to DETS atomically to prevent corruption
+  defp save_to_dets_atomically(manager) do
+    serialized = serialize_token(manager.token_info)
+
+    try do
+      # Insert the data
+      case :dets.insert(manager.dets_table, {:token, serialized}) do
+        :ok ->
+          # Force sync to disk immediately
+          case :dets.sync(manager.dets_table) do
+            :ok ->
+              Logger.debug("Tokens saved and synced to DETS storage", storage_key: manager.storage_key)
+              :ok
+
+            {:error, sync_reason} ->
+              Logger.error("DETS sync failed, token may be lost",
+                storage_key: manager.storage_key,
+                error: sync_reason
+              )
+
+              {:error, sync_reason}
+          end
+
+        {:error, reason} ->
+          Logger.error("DETS insert failed",
+            storage_key: manager.storage_key,
+            error: reason
+          )
+
+          {:error, reason}
+      end
+    rescue
+      error ->
+        Logger.error("DETS write operation crashed",
+          storage_key: manager.storage_key,
+          error: inspect(error)
+        )
+
+        {:error, error}
+    end
+  end
+
   # Creates an automatic JSON backup to prevent DETS corruption data loss
   defp create_json_backup(manager) do
-    backup_data = %{
-      access_token: manager.token_info.access_token,
-      refresh_token: manager.token_info.refresh_token,
-      expires_at: manager.token_info.expires_at && DateTime.to_iso8601(manager.token_info.expires_at),
-      scopes: manager.token_info.scopes && MapSet.to_list(manager.token_info.scopes),
-      user_id: manager.token_info.user_id,
-      backup_timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
-    }
+    try do
+      backup_data = %{
+        access_token: manager.token_info.access_token,
+        refresh_token: manager.token_info.refresh_token,
+        expires_at: manager.token_info.expires_at && DateTime.to_iso8601(manager.token_info.expires_at),
+        scopes: manager.token_info.scopes && MapSet.to_list(manager.token_info.scopes),
+        user_id: manager.token_info.user_id,
+        backup_timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+      }
 
-    # Create backup file path
-    storage_dir = Path.dirname(manager.storage_path)
-    backup_file = Path.join(storage_dir, "#{manager.storage_key}_backup.json")
+      # Create backup file path
+      storage_dir = Path.dirname(manager.storage_path)
+      backup_file = Path.join(storage_dir, "#{manager.storage_key}_backup.json")
 
-    json_data = Jason.encode!(backup_data, pretty: true)
-    File.write!(backup_file, json_data)
+      json_data = Jason.encode!(backup_data, pretty: true)
+      File.write!(backup_file, json_data)
 
-    Logger.debug("Token backup created",
-      storage_key: manager.storage_key,
-      backup_file: backup_file
-    )
-  rescue
-    error ->
-      Logger.warning("Token backup failed",
-        error: inspect(error),
-        storage_key: manager.storage_key
+      Logger.debug("Token backup created",
+        storage_key: manager.storage_key,
+        backup_file: backup_file
       )
+
+      :ok
+    rescue
+      error ->
+        Logger.error("Token backup failed",
+          error: inspect(error),
+          storage_key: manager.storage_key
+        )
+
+        {:error, error}
+    end
   end
 end

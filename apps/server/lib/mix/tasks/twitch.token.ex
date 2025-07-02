@@ -62,12 +62,38 @@ defmodule Mix.Tasks.Twitch.Token do
 
   # Required scopes for Landale functionality
   @required_scopes [
-    # For subscription events
+    # Stream/channel management
     "channel:read:subscriptions",
-    # For follow events
+    "channel:read:redemptions",
+    "channel:read:polls",
+    "channel:read:predictions",
+    "channel:read:hype_train",
+    "channel:read:goals",
+    "channel:read:charity",
+    "channel:read:vips",
+    "channel:read:ads",
+    "channel:manage:redemptions",
+    "channel:manage:videos",
+    "channel:manage:ads",
+    "channel:edit:commercial",
+    "channel:bot",
+
+    # Moderation and chat
     "moderator:read:followers",
-    # For channel point redemptions
-    "channel:read:redemptions"
+    "moderator:read:shoutouts",
+    "moderator:read:chat_settings",
+    "moderator:manage:announcements",
+    "user:read:chat",
+    "user:write:chat",
+    "user:bot",
+    "chat:read",
+    "chat:edit",
+
+    # Monetization
+    "bits:read",
+
+    # Content
+    "clips:edit"
   ]
 
   # Twitch OAuth URLs

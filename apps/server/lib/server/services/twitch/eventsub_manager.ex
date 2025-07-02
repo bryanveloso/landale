@@ -35,8 +35,6 @@ defmodule Server.Services.Twitch.EventSubManager do
   - `channel.subscription.message` - Subscription messages
   - `channel.cheer` - Bits cheered
   - `channel.raid` - Incoming raids
-  - `channel.guest_star_session.begin` / `channel.guest_star_session.end` - Guest star sessions
-  - `channel.guest_star_guest.update` - Guest star updates
   - `channel.channel_points_custom_reward.add` - Custom reward creation
   - `channel.channel_points_custom_reward.update` - Custom reward updates
   - `channel.channel_points_custom_reward.remove` - Custom reward removal
@@ -126,11 +124,6 @@ defmodule Server.Services.Twitch.EventSubManager do
     # VIP events
     {"channel.vip.add", ["channel:read:vips"], []},
     {"channel.vip.remove", ["channel:read:vips"], []},
-
-    # Guest star events
-    {"channel.guest_star_session.begin", ["channel:read:guest_star"], []},
-    {"channel.guest_star_session.end", ["channel:read:guest_star"], []},
-    {"channel.guest_star_guest.update", ["channel:read:guest_star"], []},
 
     # Ad break events
     {"channel.ad_break.begin", ["channel:read:ads"], []},

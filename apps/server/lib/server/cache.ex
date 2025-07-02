@@ -320,8 +320,9 @@ defmodule Server.Cache do
         if current_time < expires_at do
           {:hit, value}
         else
-          # Entry expired, remove it
-          :ets.delete(@cache_table_name, cache_key)
+          # Entry expired, remove it atomically
+          # Use delete_object to ensure we only delete if it hasn't changed
+          :ets.delete_object(@cache_table_name, {cache_key, value, expires_at})
           :miss
         end
 
