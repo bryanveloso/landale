@@ -30,8 +30,10 @@ defmodule Server.Services.Twitch do
     :ws_client,
     :user_id,
     :scopes,
+    :retry_subscription_timer,
     subscriptions: %{},
     cloudfront_retry_count: 0,
+    default_subscriptions_created: false,
     state: %{
       connection: %{
         connected: false,
@@ -489,16 +491,26 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_info(:validate_token, state) do
-    # Cancel any existing validation task
-    if state.token_validation_task do
-      Task.shutdown(state.token_validation_task, :brutal_kill)
-    end
-
     Logger.info("Token validation started", storage_key: state.token_manager.storage_key)
 
-    # Start async token validation
+    # Cancel any existing validation task first
+    state =
+      if state.token_validation_task do
+        case Task.shutdown(state.token_validation_task, 5_000) do
+          :ok ->
+            state
+
+          nil ->
+            Logger.warning("Token validation task timeout during shutdown")
+            state
+        end
+      else
+        state
+      end
+
+    # Start async token validation with supervisor
     task =
-      Task.async(fn ->
+      Task.Supervisor.async_nolink(Server.TaskSupervisor, fn ->
         OAuthTokenManager.validate_token(state.token_manager, "https://id.twitch.tv/oauth2/validate")
       end)
 
@@ -507,14 +519,24 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_info(:refresh_token, state) do
-    # Cancel any existing refresh task
-    if state.token_refresh_task do
-      Task.shutdown(state.token_refresh_task, :brutal_kill)
-    end
+    # Cancel any existing refresh task gracefully
+    state =
+      if state.token_refresh_task do
+        case Task.shutdown(state.token_refresh_task, 5_000) do
+          :ok ->
+            state
 
-    # Start async token refresh
+          nil ->
+            Logger.warning("Token refresh task timeout during shutdown")
+            state
+        end
+      else
+        state
+      end
+
+    # Start async token refresh with supervisor
     task =
-      Task.async(fn ->
+      Task.Supervisor.async_nolink(Server.TaskSupervisor, fn ->
         OAuthTokenManager.refresh_token(state.token_manager)
       end)
 
@@ -535,7 +557,9 @@ defmodule Server.Services.Twitch do
 
         # Store user ID and scopes in state
         user_id = token_info["user_id"]
-        scopes = MapSet.new(token_info["scopes"] || [])
+        # Get scopes from token manager instead of validation response
+        # to ensure we have the complete scope set
+        scopes = updated_manager.token_info.scopes || MapSet.new()
 
         # Update logging context immediately with user_id
         Logging.set_service_context(:twitch, user_id: user_id)
@@ -931,21 +955,41 @@ defmodule Server.Services.Twitch do
         user_id: state.user_id
       }
 
-      {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
+      if state.default_subscriptions_created do
+        Logger.debug("Skipping subscription creation - already created")
+        {:noreply, state}
+      else
+        {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
 
-      Logger.info("Default subscriptions created after token validation",
-        success: success_count,
-        failed: failed_count
-      )
+        Logger.info("Default subscriptions created after token validation",
+          success: success_count,
+          failed: failed_count
+        )
+
+        # Only mark as created if we had some success
+        state =
+          if success_count > 0 do
+            # Clear retry timer since we succeeded
+            if state.retry_subscription_timer do
+              Process.cancel_timer(state.retry_subscription_timer)
+            end
+
+            %{state | default_subscriptions_created: true, retry_subscription_timer: nil}
+          else
+            state
+          end
+
+        {:noreply, state}
+      end
     else
       Logger.warning("Subscription creation skipped",
         reason: "invalid state",
         has_user_id: state.user_id != nil,
         session_matches: state.session_id == session_id
       )
-    end
 
-    {:noreply, state}
+      {:noreply, state}
+    end
   end
 
   # Retry default subscriptions when user_id becomes available
@@ -974,12 +1018,32 @@ defmodule Server.Services.Twitch do
         user_id: state.user_id
       }
 
-      {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
+      if state.default_subscriptions_created do
+        Logger.debug("Skipping subscription creation - already created")
+        {:noreply, state}
+      else
+        {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
 
-      Logger.info("Default subscriptions created",
-        success: success_count,
-        failed: failed_count
-      )
+        Logger.info("Default subscriptions created",
+          success: success_count,
+          failed: failed_count
+        )
+
+        # Only mark as created if we had some success
+        state =
+          if success_count > 0 do
+            # Clear retry timer since we succeeded
+            if state.retry_subscription_timer do
+              Process.cancel_timer(state.retry_subscription_timer)
+            end
+
+            %{state | default_subscriptions_created: true, retry_subscription_timer: nil}
+          else
+            state
+          end
+
+        {:noreply, state}
+      end
     else
       if state.session_id == session_id do
         # Still no user_id, retry again after a longer delay
@@ -987,7 +1051,13 @@ defmodule Server.Services.Twitch do
           reason: "user_id still not available, will retry again"
         )
 
-        Process.send_after(self(), {:retry_default_subscriptions, session_id}, 2000)
+        # Cancel any existing retry timer
+        if state.retry_subscription_timer do
+          Process.cancel_timer(state.retry_subscription_timer)
+        end
+
+        timer = Process.send_after(self(), {:retry_default_subscriptions, session_id}, 2000)
+        {:noreply, %{state | retry_subscription_timer: timer}}
       else
         # Session ID changed, abandon this retry
         Logger.info("Default subscriptions retry abandoned",
@@ -995,10 +1065,10 @@ defmodule Server.Services.Twitch do
           old_session: session_id,
           current_session: state.session_id
         )
+
+        {:noreply, state}
       end
     end
-
-    {:noreply, state}
   end
 
   # Catch-all for unhandled messages
@@ -1068,13 +1138,19 @@ defmodule Server.Services.Twitch do
       end
     end
 
-    # Cancel async tasks
+    # Cancel async tasks gracefully
     if state.token_validation_task do
-      Task.shutdown(state.token_validation_task, :brutal_kill)
+      case Task.shutdown(state.token_validation_task, 5_000) do
+        :ok -> :ok
+        nil -> Logger.warning("Token validation task timeout during termination")
+      end
     end
 
     if state.token_refresh_task do
-      Task.shutdown(state.token_refresh_task, :brutal_kill)
+      case Task.shutdown(state.token_refresh_task, 5_000) do
+        :ok -> :ok
+        nil -> Logger.warning("Token refresh task timeout during termination")
+      end
     end
 
     # Cancel timers with validation
@@ -1089,6 +1165,13 @@ defmodule Server.Services.Twitch do
       case Process.cancel_timer(state.token_refresh_timer) do
         false -> Logger.debug("Timer cleanup skipped", timer: "token_refresh", reason: "already expired")
         _time_left -> Logger.debug("Timer cleanup completed", timer: "token_refresh")
+      end
+    end
+
+    if state.retry_subscription_timer do
+      case Process.cancel_timer(state.retry_subscription_timer) do
+        false -> Logger.debug("Timer cleanup skipped", timer: "retry_subscription", reason: "already expired")
+        _time_left -> Logger.debug("Timer cleanup completed", timer: "retry_subscription")
       end
     end
 
@@ -1163,23 +1246,48 @@ defmodule Server.Services.Twitch do
         user_id: user_id
       }
 
-      {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
+      if state.default_subscriptions_created do
+        Logger.debug("Skipping subscription creation - already created")
+        state
+      else
+        {success_count, failed_count} = EventSubManager.create_default_subscriptions(manager_state)
 
-      Logger.info("Default subscriptions created",
-        success: success_count,
-        failed: failed_count
-      )
+        Logger.info("Default subscriptions created",
+          success: success_count,
+          failed: failed_count
+        )
+
+        # Only mark as created if we had some success
+        if success_count > 0 do
+          # Clear retry timer since we succeeded
+          if state.retry_subscription_timer do
+            Process.cancel_timer(state.retry_subscription_timer)
+          end
+
+          %{state | default_subscriptions_created: true, retry_subscription_timer: nil}
+        else
+          state
+        end
+      end
     else
       # user_id not available yet, schedule retry after token validation completes
       Logger.info("Default subscriptions deferred",
         reason: "user_id not available, will retry after token validation"
       )
 
-      # Reduced delay for faster subscription creation
-      Process.send_after(self(), {:retry_default_subscriptions, session_id}, 500)
-    end
+      # Cancel any existing retry timer
+      state =
+        if state.retry_subscription_timer do
+          Process.cancel_timer(state.retry_subscription_timer)
+          %{state | retry_subscription_timer: nil}
+        else
+          state
+        end
 
-    state
+      # Reduced delay for faster subscription creation
+      timer = Process.send_after(self(), {:retry_default_subscriptions, session_id}, 500)
+      %{state | retry_subscription_timer: timer}
+    end
   end
 
   defp handle_eventsub_protocol_message(state, %{

@@ -80,6 +80,73 @@ defmodule Server.Services.IronmonTCP do
     GenServer.stop(__MODULE__, :normal)
   end
 
+  @doc """
+  Lists all available IronMON challenges.
+  """
+  @spec list_challenges() :: {:ok, [map()]} | {:error, term()}
+  def list_challenges do
+    try do
+      challenges = Server.Ironmon.list_challenges()
+      {:ok, challenges}
+    rescue
+      error -> {:error, inspect(error)}
+    end
+  end
+
+  @doc """
+  Lists checkpoints for a specific challenge.
+  """
+  @spec list_checkpoints(integer()) :: {:ok, [map()]} | {:error, term()}
+  def list_checkpoints(challenge_id) do
+    try do
+      checkpoints = Server.Ironmon.list_checkpoints_for_challenge(challenge_id)
+      {:ok, checkpoints}
+    rescue
+      error -> {:error, inspect(error)}
+    end
+  end
+
+  @doc """
+  Gets statistics for a specific checkpoint.
+  """
+  @spec get_checkpoint_stats(integer()) :: {:ok, map()} | {:error, term()}
+  def get_checkpoint_stats(checkpoint_id) do
+    try do
+      stats = Server.Ironmon.get_checkpoint_stats(checkpoint_id)
+      {:ok, stats}
+    rescue
+      error -> {:error, inspect(error)}
+    end
+  end
+
+  @doc """
+  Gets recent IronMON run results.
+  """
+  @spec get_recent_results(integer()) :: {:ok, [map()]} | {:error, term()}
+  def get_recent_results(limit \\ 10) do
+    try do
+      results = Server.Ironmon.get_recent_results(limit, nil)
+      {:ok, results}
+    rescue
+      error -> {:error, inspect(error)}
+    end
+  end
+
+  @doc """
+  Gets the active challenge for a specific seed.
+  """
+  @spec get_active_challenge(integer()) :: {:ok, map()} | {:error, term()}
+  def get_active_challenge(seed_id) do
+    try do
+      case Server.Ironmon.get_active_challenge(seed_id) do
+        {:ok, challenge} -> {:ok, challenge}
+        {:error, reason} -> {:error, reason}
+      end
+    rescue
+      error -> {:error, inspect(error)}
+    end
+  end
+
   # GenServer Callbacks
 
   @impl GenServer

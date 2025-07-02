@@ -96,6 +96,20 @@ defmodule Server.Services.OBS do
       },
       replay_buffer: %{
         active: false
+      },
+      stats: %{
+        active_fps: 0,
+        average_frame_time: 0,
+        cpu_usage: 0,
+        memory_usage: 0,
+        available_disk_space: 0,
+        render_total_frames: 0,
+        render_skipped_frames: 0,
+        output_total_frames: 0,
+        output_skipped_frames: 0,
+        web_socket_session_incoming_messages: 0,
+        web_socket_session_outgoing_messages: 0,
+        last_updated: nil
       }
     }
   ]
@@ -463,6 +477,26 @@ defmodule Server.Services.OBS do
   end
 
   @doc """
+  Gets OBS performance statistics.
+
+  Returns current FPS, CPU usage, memory usage, and other performance metrics.
+  """
+  @spec get_stats() :: {:ok, map()} | {:error, term()}
+  def get_stats do
+    case GenServer.call(__MODULE__, :get_state) do
+      %{state: %{stats: stats}} when is_map(stats) ->
+        {:ok, stats}
+
+      %{state: %{connection: %{connected: true}}} ->
+        # If connected but no stats yet, make a direct request
+        GenServer.call(__MODULE__, {:obs_call, "GetStats", %{}})
+
+      _ ->
+        {:error, "OBS not connected"}
+    end
+  end
+
+  @doc """
   Gets status of a specific output.
 
   ## Parameters
@@ -580,7 +614,14 @@ defmodule Server.Services.OBS do
 
   @impl GenServer
   def handle_info(:poll_stats, state) do
-    if state.state.connection.connected do
+    # Safe access to connection state with fallback
+    connected =
+      case state.state do
+        %{connection: %{connected: conn}} when is_boolean(conn) -> conn
+        _ -> false
+      end
+
+    if connected do
       request_obs_stats(state)
     end
 
@@ -969,14 +1010,33 @@ defmodule Server.Services.OBS do
     request_type = response["requestType"]
 
     if request_type == "GetStats" do
-      # Stats requests are fire-and-forget, don't track responses
-      Logger.debug("Stats response received",
+      # Store stats in state
+      stats_data = response["responseData"] || %{}
+
+      updated_stats = %{
+        active_fps: stats_data["activeFps"] || 0,
+        average_frame_time: stats_data["averageFrameTime"] || 0,
+        cpu_usage: stats_data["cpuUsage"] || 0,
+        memory_usage: stats_data["memoryUsage"] || 0,
+        available_disk_space: stats_data["availableDiskSpace"] || 0,
+        render_total_frames: stats_data["renderTotalFrames"] || 0,
+        render_skipped_frames: stats_data["renderSkippedFrames"] || 0,
+        output_total_frames: stats_data["outputTotalFrames"] || 0,
+        output_skipped_frames: stats_data["outputSkippedFrames"] || 0,
+        web_socket_session_incoming_messages: stats_data["webSocketSessionIncomingMessages"] || 0,
+        web_socket_session_outgoing_messages: stats_data["webSocketSessionOutgoingMessages"] || 0,
+        last_updated: DateTime.utc_now()
+      }
+
+      updated_state = put_in(state.state.stats, updated_stats)
+
+      Logger.debug("Stats response received and stored",
         request_id: request_id,
-        fps: get_in(response, ["responseData", "activeFps"]),
-        cpu_usage: get_in(response, ["responseData", "cpuUsage"])
+        fps: updated_stats.active_fps,
+        cpu_usage: updated_stats.cpu_usage
       )
 
-      state
+      %{state | state: updated_state}
     else
       # Handle tracked requests
       case Map.pop(state.pending_requests, request_id) do

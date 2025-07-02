@@ -30,6 +30,8 @@ defmodule Server.Application do
       else
         base_children ++
           [
+            # Task supervision for async operations
+            {Task.Supervisor, name: Server.TaskSupervisor},
             # Performance optimizations
             Server.CorrelationIdPool,
             Server.Events.BatchPublisher,
