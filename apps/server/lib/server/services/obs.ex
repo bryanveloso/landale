@@ -49,8 +49,6 @@ defmodule Server.Services.OBS do
   # EventSubscription flags based on OBS WebSocket v5 specification
 
   # Standard event categories (non-high-volume)
-  # No events (0)
-  @event_subscription_none 0
   # General events (1 << 0)
   @event_subscription_general 1
   # Config events (1 << 1)
@@ -74,15 +72,6 @@ defmodule Server.Services.OBS do
   # UI events (1 << 10)
   @event_subscription_ui 1024
 
-  # High-volume event categories (require explicit subscription)
-  # Input volume meters (1 << 16)
-  @event_subscription_input_volume_meters 65_536
-  # Input active state (1 << 17)
-  @event_subscription_input_active_state 131_072
-  # Input show state (1 << 18)
-  @event_subscription_input_show_state 262_144
-  # Scene item transform (1 << 19)
-  @event_subscription_scene_item_transform 524_288
 
   # EventSubscription::All helper (non-high-volume events only)
   @event_subscription_all @event_subscription_general |||
@@ -671,12 +660,6 @@ defmodule Server.Services.OBS do
   end
 
   @impl GenServer
-  def handle_cast({:update_outgoing_counter, new_count}, state) do
-    updated_state = %{state | websocket_outgoing_messages: new_count}
-    {:noreply, updated_state}
-  end
-
-  @impl GenServer
   def handle_call(:get_status, _from, state) do
     # Direct struct field access - clean and simple
     connection_status = %{
@@ -699,11 +682,10 @@ defmodule Server.Services.OBS do
       request_id = CorrelationId.generate()
 
       message = %{
-        # Request opcode
         op: 6,
         d: %{
-          requestType: request_type,
           requestId: request_id,
+          requestType: request_type,
           requestData: request_data
         }
       }
@@ -729,17 +711,20 @@ defmodule Server.Services.OBS do
 
           {:noreply, new_state}
 
-        {:error, %ServiceError{} = error} ->
-          {:reply, {:error, error}, state}
-
         {:error, reason} ->
-          error = ServiceError.from_error_tuple(:obs, "websocket_message", {:error, reason})
+          error = ServiceError.new(:obs, "websocket_send", :network_error, "Failed to send WebSocket message", details: %{reason: reason})
           {:reply, {:error, error}, state}
       end
     else
       error = ServiceError.new(:obs, "websocket_call", :service_unavailable, "OBS not connected")
       {:reply, {:error, error}, state}
     end
+  end
+
+  @impl GenServer
+  def handle_cast({:update_outgoing_counter, new_count}, state) do
+    updated_state = %{state | websocket_outgoing_messages: new_count}
+    {:noreply, updated_state}
   end
 
   @impl GenServer
@@ -1380,19 +1365,6 @@ defmodule Server.Services.OBS do
     end
   end
 
-  defp send_identify_message(state, identify_message) do
-    # Send Identify directly without authentication checks
-    case send_message_now(state, identify_message) do
-      :ok ->
-        Logger.debug("Identify message sent, waiting for Identified response")
-        state
-
-      {:error, reason} ->
-        Logger.error("Failed to send Identify message", error: reason)
-        %{state | connection_state: "auth_failed", last_error: "Failed to send identify: #{inspect(reason)}"}
-    end
-  end
-
   defp handle_obs_protocol_message(state, 2, %{"d" => data}) do
     # Identified - authentication successful, now truly connected
     Logger.info("Authentication completed", rpc_version: data["negotiatedRpcVersion"])
@@ -1423,6 +1395,46 @@ defmodule Server.Services.OBS do
 
     # Start monitoring
     start_stats_polling(state)
+  end
+
+  defp handle_obs_protocol_message(state, 3, %{"d" => reidentify_data}) do
+    # Reidentify - update session parameters
+    Logger.info("Reidentify request received", data: reidentify_data)
+
+    # Update event subscriptions if provided
+    updated_state =
+      case reidentify_data["eventSubscriptions"] do
+        nil ->
+          state
+
+        new_subscriptions ->
+          Logger.debug("Updating event subscriptions",
+            old: @event_subscription_all,
+            new: new_subscriptions
+          )
+
+          # Note: In a full implementation, we would update our subscription mask
+          # For now, just log the change
+          state
+      end
+
+    # Send back Identified response (OpCode 2) to confirm reidentification
+    identified_response = %{
+      op: 2,
+      d: %{
+        negotiatedRpcVersion: state.negotiated_rpc_version || 1
+      }
+    }
+
+    case send_message_now(updated_state, identified_response) do
+      :ok ->
+        Logger.debug("Reidentify successful")
+        updated_state
+
+      {:error, reason} ->
+        Logger.error("Failed to send Identified response to Reidentify", error: reason)
+        updated_state
+    end
   end
 
   defp handle_obs_protocol_message(state, 5, %{
@@ -1567,46 +1579,6 @@ defmodule Server.Services.OBS do
     end
   end
 
-  defp handle_obs_protocol_message(state, 3, %{"d" => reidentify_data}) do
-    # Reidentify - update session parameters
-    Logger.info("Reidentify request received", data: reidentify_data)
-
-    # Update event subscriptions if provided
-    updated_state =
-      case reidentify_data["eventSubscriptions"] do
-        nil ->
-          state
-
-        new_subscriptions ->
-          Logger.debug("Updating event subscriptions",
-            old: @event_subscription_all,
-            new: new_subscriptions
-          )
-
-          # Note: In a full implementation, we would update our subscription mask
-          # For now, just log the change
-          state
-      end
-
-    # Send back Identified response (OpCode 2) to confirm reidentification
-    identified_response = %{
-      op: 2,
-      d: %{
-        negotiatedRpcVersion: state.negotiated_rpc_version || 1
-      }
-    }
-
-    case send_message_now(updated_state, identified_response) do
-      :ok ->
-        Logger.debug("Reidentify successful")
-        updated_state
-
-      {:error, reason} ->
-        Logger.error("Failed to send Identified response to Reidentify", error: reason)
-        updated_state
-    end
-  end
-
   defp handle_obs_protocol_message(state, 8, %{"d" => batch_data}) do
     # RequestBatch - handle batch of requests
     request_id = batch_data["requestId"]
@@ -1654,6 +1626,19 @@ defmodule Server.Services.OBS do
   defp handle_obs_protocol_message(state, op, message) do
     Logger.warning("Protocol message unhandled", op: op, message: message)
     state
+  end
+
+  defp send_identify_message(state, identify_message) do
+    # Send Identify directly without authentication checks
+    case send_message_now(state, identify_message) do
+      :ok ->
+        Logger.debug("Identify message sent, waiting for Identified response")
+        state
+
+      {:error, reason} ->
+        Logger.error("Failed to send Identify message", error: reason)
+        %{state | connection_state: "auth_failed", last_error: "Failed to send identify: #{inspect(reason)}"}
+    end
   end
 
   # Event subscription checking
@@ -2258,7 +2243,7 @@ defmodule Server.Services.OBS do
     }
   end
 
-  defp handle_set_current_scene_request(state, request) do
+  defp handle_set_current_scene_request(_state, request) do
     request_data = request["requestData"] || %{}
     scene_name = request_data["sceneName"]
 
@@ -2497,28 +2482,4 @@ defmodule Server.Services.OBS do
     end
   end
 
-  # Handle Sleep request for batch execution
-  defp handle_sleep_request(request_data) do
-    cond do
-      sleep_millis = request_data["sleepMillis"] ->
-        if sleep_millis > 0 and sleep_millis <= 50_000 do
-          Process.sleep(sleep_millis)
-        else
-          Logger.warning("Invalid sleepMillis value", value: sleep_millis)
-        end
-
-      sleep_frames = request_data["sleepFrames"] ->
-        if sleep_frames > 0 and sleep_frames <= 10_000 do
-          # Approximate frame time at 60fps (16.67ms per frame)
-          frame_duration = 16.67
-          sleep_duration = round(sleep_frames * frame_duration)
-          Process.sleep(sleep_duration)
-        else
-          Logger.warning("Invalid sleepFrames value", value: sleep_frames)
-        end
-
-      true ->
-        Logger.warning("Sleep request with no valid sleep parameters")
-    end
-  end
 end

@@ -316,9 +316,6 @@ defmodule ServerWeb.HealthController do
     end
   end
 
-  defp get_subscription_status do
-    safe_get_subscription_status()
-  end
 
   defp determine_overall_status(service_statuses) do
     # Service is healthy if database is connected
