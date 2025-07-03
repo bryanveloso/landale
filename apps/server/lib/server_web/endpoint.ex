@@ -42,6 +42,12 @@ defmodule ServerWeb.Endpoint do
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
+  # CORS support for OpenAPI/Swagger and dashboard
+  plug Corsica,
+    origins: "*",
+    allow_headers: :all,
+    allow_methods: :all
+
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],

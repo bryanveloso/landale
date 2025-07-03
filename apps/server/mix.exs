@@ -49,6 +49,7 @@ defmodule Server.MixProject do
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
       {:logger_json, "~> 6.1"},
+      {:corsica, "~> 2.1"},
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
       {:uuid, "~> 1.1"},
