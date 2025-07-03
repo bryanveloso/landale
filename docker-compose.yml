@@ -30,7 +30,7 @@ services:
       MIX_ENV: prod
       SECRET_KEY_BASE: ${SECRET_KEY_BASE:-insecure_default_key_for_development_only}
       PHX_HOST: ${PHX_HOST:-localhost}
-      PORT: ${PORT:-8080}
+      PORT: ${PORT:-7175}
     env_file:
       - .env
     ports:
