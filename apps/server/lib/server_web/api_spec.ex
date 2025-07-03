@@ -28,7 +28,14 @@ defmodule ServerWeb.ApiSpec do
         version: "1.0.0"
       },
       servers: [
-        Server.from_endpoint(ServerWeb.Endpoint)
+        %Server{
+          url: "http://localhost:7175",
+          description: "Development server"
+        },
+        %Server{
+          url: "http://saya:7175",
+          description: "Production server (Tailscale)"
+        }
       ],
       paths: paths(),
       components: %Components{
