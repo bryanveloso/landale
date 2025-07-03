@@ -75,6 +75,7 @@ defmodule Server.Services.Rainwave do
 
   @doc "Get current service status"
   @spec get_status() :: {:ok, map()} | {:error, term()}
+  @impl true
   def get_status do
     GenServer.call(__MODULE__, :get_status)
   end
