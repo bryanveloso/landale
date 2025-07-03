@@ -25,13 +25,13 @@ defmodule Server.Repo.Migrations.CreateTranscriptionTables do
     if Mix.env() == :prod do
       # Enable TimescaleDB extension
       execute "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
-      
+
       # Create hypertable (time-series optimization)
       execute "SELECT create_hypertable('transcriptions', 'timestamp');"
-      
+
       # Enable pg_trgm extension for text search
       execute "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
-      
+
       # Create GIN index for text search (only in production)
       create index(:transcriptions, [:text], using: :gin, prefix: :gin_trgm_ops)
     end
@@ -39,7 +39,7 @@ defmodule Server.Repo.Migrations.CreateTranscriptionTables do
 
   def down do
     drop table(:transcriptions)
-    
+
     if Mix.env() == :prod do
       execute "DROP EXTENSION IF EXISTS timescaledb CASCADE;"
       execute "DROP EXTENSION IF EXISTS pg_trgm;"

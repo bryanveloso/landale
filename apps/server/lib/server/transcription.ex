@@ -36,12 +36,22 @@ defmodule Server.Transcription do
   @spec list_transcriptions(transcription_opts()) :: [Transcription.t()]
   def list_transcriptions(opts \\ []) do
     limit = Keyword.get(opts, :limit, 50) |> min(1000)
+    stream_session_id = Keyword.get(opts, :stream_session_id)
 
-    from(t in Transcription,
-      order_by: [desc: t.timestamp],
-      limit: ^limit
-    )
-    |> Repo.all()
+    query =
+      from(t in Transcription,
+        order_by: [desc: t.timestamp],
+        limit: ^limit
+      )
+
+    query =
+      if stream_session_id do
+        from(q in query, where: q.stream_session_id == ^stream_session_id)
+      else
+        query
+      end
+
+    Repo.all(query)
   end
 
   @doc """
