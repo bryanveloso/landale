@@ -109,7 +109,7 @@ defmodule Server.CacheIntegrationTest do
     test "entries expire after TTL" do
       # Set entry with very short TTL
       Cache.set(:expiration, "short_ttl", "expires_soon", ttl_seconds: 1)
-      
+
       # Should be accessible immediately
       assert {:ok, "expires_soon"} = Cache.get(:expiration, "short_ttl")
 
@@ -280,7 +280,7 @@ defmodule Server.CacheIntegrationTest do
 
     test "bulk_set handles empty entries list" do
       assert :ok = Cache.bulk_set(:empty, [], ttl_seconds: 300)
-      
+
       # No entries should be set
       _stats = Cache.stats()
       # Cache should still be functional
@@ -297,7 +297,8 @@ defmodule Server.CacheIntegrationTest do
 
       # Verify overwrites and new entries
       assert {:ok, "new1"} = Cache.get(:overwrite_test, "key1")
-      assert {:ok, "old2"} = Cache.get(:overwrite_test, "key2")  # Should remain unchanged
+      # Should remain unchanged
+      assert {:ok, "old2"} = Cache.get(:overwrite_test, "key2")
       assert {:ok, "new3"} = Cache.get(:overwrite_test, "key3")
     end
   end
@@ -397,9 +398,12 @@ defmodule Server.CacheIntegrationTest do
       _initial_stats = Cache.stats()
 
       # Perform cache operations
-      Cache.get_or_compute(:stats_test, "key1", fn -> "value1" end, ttl_seconds: 300)  # Miss
-      Cache.get_or_compute(:stats_test, "key1", fn -> "value1" end, ttl_seconds: 300)  # Hit
-      Cache.get_or_compute(:stats_test, "key2", fn -> "value2" end, ttl_seconds: 300)  # Miss
+      # Miss
+      Cache.get_or_compute(:stats_test, "key1", fn -> "value1" end, ttl_seconds: 300)
+      # Hit
+      Cache.get_or_compute(:stats_test, "key1", fn -> "value1" end, ttl_seconds: 300)
+      # Miss
+      Cache.get_or_compute(:stats_test, "key2", fn -> "value2" end, ttl_seconds: 300)
 
       # Allow time for async stat updates
       :timer.sleep(50)
@@ -460,7 +464,8 @@ defmodule Server.CacheIntegrationTest do
       # Set entries with very short TTL
       Cache.set(:auto_cleanup, "key1", "value1", ttl_seconds: 1)
       Cache.set(:auto_cleanup, "key2", "value2", ttl_seconds: 1)
-      Cache.set(:auto_cleanup, "key3", "value3", ttl_seconds: 10)  # This should survive
+      # This should survive
+      Cache.set(:auto_cleanup, "key3", "value3", ttl_seconds: 10)
 
       # Wait for expiration
       :timer.sleep(1100)
@@ -516,7 +521,7 @@ defmodule Server.CacheIntegrationTest do
       assert cleanup_duration < 100
 
       final_stats = Cache.stats()
-      
+
       # Should have cleaned up entries
       assert final_stats.current_size < initial_size or final_stats.entries_cleaned > initial_stats.entries_cleaned
     end
@@ -534,11 +539,12 @@ defmodule Server.CacheIntegrationTest do
       end
 
       # Start multiple concurrent get_or_compute calls
-      tasks = for _i <- 1..5 do
-        Task.async(fn ->
-          Cache.get_or_compute(:concurrent_test, "key", compute_fn, ttl_seconds: 300)
-        end)
-      end
+      tasks =
+        for _i <- 1..5 do
+          Task.async(fn ->
+            Cache.get_or_compute(:concurrent_test, "key", compute_fn, ttl_seconds: 300)
+          end)
+        end
 
       # Wait for all tasks to complete
       results = Task.await_many(tasks, 1000)
@@ -548,18 +554,20 @@ defmodule Server.CacheIntegrationTest do
 
       # But computation should only happen once (or very few times due to race conditions)
       final_count = Agent.get(computation_count, & &1)
-      assert final_count <= 2  # Allow for some race conditions but not 5 computations
+      # Allow for some race conditions but not 5 computations
+      assert final_count <= 2
 
       Agent.stop(computation_count)
     end
 
     test "handles concurrent set operations correctly" do
       # Start multiple concurrent set operations
-      tasks = for i <- 1..10 do
-        Task.async(fn ->
-          Cache.set(:concurrent_set, "key", "value_#{i}", ttl_seconds: 300)
-        end)
-      end
+      tasks =
+        for i <- 1..10 do
+          Task.async(fn ->
+            Cache.set(:concurrent_set, "key", "value_#{i}", ttl_seconds: 300)
+          end)
+        end
 
       # Wait for all tasks to complete
       Task.await_many(tasks, 1000)
@@ -574,17 +582,19 @@ defmodule Server.CacheIntegrationTest do
       Cache.set(:concurrent_invalidate, "key", "value", ttl_seconds: 300)
 
       # Start concurrent access and invalidation
-      access_task = Task.async(fn ->
-        for _i <- 1..100 do
-          Cache.get(:concurrent_invalidate, "key")
-          :timer.sleep(1)
-        end
-      end)
+      access_task =
+        Task.async(fn ->
+          for _i <- 1..100 do
+            Cache.get(:concurrent_invalidate, "key")
+            :timer.sleep(1)
+          end
+        end)
 
-      invalidate_task = Task.async(fn ->
-        :timer.sleep(50)
-        Cache.invalidate(:concurrent_invalidate, "key")
-      end)
+      invalidate_task =
+        Task.async(fn ->
+          :timer.sleep(50)
+          Cache.invalidate(:concurrent_invalidate, "key")
+        end)
 
       # Wait for both to complete
       Task.await(access_task, 1000)
@@ -603,13 +613,13 @@ defmodule Server.CacheIntegrationTest do
 
       # Measure get performance with large cache
       start_time = System.monotonic_time(:microsecond)
-      
+
       for _i <- 1..100 do
         Cache.get(:performance_test, "key_500")
       end
-      
+
       end_time = System.monotonic_time(:microsecond)
-      
+
       total_duration = end_time - start_time
       avg_duration_per_get = total_duration / 100
 
@@ -627,11 +637,13 @@ defmodule Server.CacheIntegrationTest do
 
       # Clear and measure individual sets
       Cache.invalidate_namespace(:individual_perf)
-      
+
       start_time = System.monotonic_time(:millisecond)
+
       for {key, value} <- entries do
         Cache.set(:individual_perf, key, value, ttl_seconds: 300)
       end
+
       individual_duration = System.monotonic_time(:millisecond) - start_time
 
       # Bulk should be faster than individual operations
@@ -643,19 +655,20 @@ defmodule Server.CacheIntegrationTest do
       Cache.set(:perf_compute, "key", "cached_value", ttl_seconds: 300)
 
       expensive_compute = fn ->
-        :timer.sleep(100)  # Simulate expensive computation
+        # Simulate expensive computation
+        :timer.sleep(100)
         "expensive_value"
       end
 
       # Measure hit performance
       start_time = System.monotonic_time(:millisecond)
-      
+
       for _i <- 1..10 do
         Cache.get_or_compute(:perf_compute, "key", expensive_compute, ttl_seconds: 300)
       end
-      
+
       end_time = System.monotonic_time(:millisecond)
-      
+
       total_duration = end_time - start_time
 
       # Should be much faster than if computation actually ran (which would take 1000ms)
@@ -684,7 +697,7 @@ defmodule Server.CacheIntegrationTest do
     test "handles very large values correctly" do
       # Create a large value (1MB string)
       large_value = String.duplicate("x", 1_000_000)
-      
+
       Cache.set(:large_value, "big_key", large_value, ttl_seconds: 300)
       assert {:ok, ^large_value} = Cache.get(:large_value, "big_key")
     end
@@ -717,15 +730,16 @@ defmodule Server.CacheIntegrationTest do
       assert :error = Cache.get(:zero_ttl, "key")
 
       # Negative TTL should also expire immediately (treated as 0)
-      _log_output = capture_log(fn ->
-        # This might cause a warning but shouldn't crash
-        try do
-          Cache.set(:negative_ttl, "key", "value", ttl_seconds: -1)
-          :timer.sleep(50)
-        rescue
-          _ -> :ok
-        end
-      end)
+      _log_output =
+        capture_log(fn ->
+          # This might cause a warning but shouldn't crash
+          try do
+            Cache.set(:negative_ttl, "key", "value", ttl_seconds: -1)
+            :timer.sleep(50)
+          rescue
+            _ -> :ok
+          end
+        end)
 
       # Cache should remain functional
       Cache.set(:normal_ttl, "key", "value", ttl_seconds: 300)
