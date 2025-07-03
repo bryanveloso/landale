@@ -70,6 +70,7 @@ defmodule Server.Services.IronmonTCP do
   - `{:ok, status}` where status contains port, connection count, etc.
   """
   @spec get_status() :: {:ok, map()}
+  @impl true
   def get_status do
     GenServer.call(__MODULE__, :get_status)
   end
@@ -86,6 +87,7 @@ defmodule Server.Services.IronmonTCP do
   Lists all available IronMON challenges.
   """
   @spec list_challenges() :: {:ok, [map()]} | {:error, term()}
+  @impl true
   def list_challenges do
     challenges = Server.Ironmon.list_challenges()
     {:ok, challenges}
@@ -97,6 +99,7 @@ defmodule Server.Services.IronmonTCP do
   Lists checkpoints for a specific challenge.
   """
   @spec list_checkpoints(integer()) :: {:ok, [map()]} | {:error, term()}
+  @impl true
   def list_checkpoints(challenge_id) do
     checkpoints = Server.Ironmon.list_checkpoints_for_challenge(challenge_id)
     {:ok, checkpoints}
@@ -108,6 +111,7 @@ defmodule Server.Services.IronmonTCP do
   Gets statistics for a specific checkpoint.
   """
   @spec get_checkpoint_stats(integer()) :: {:ok, map()} | {:error, term()}
+  @impl true
   def get_checkpoint_stats(checkpoint_id) do
     stats = Server.Ironmon.get_checkpoint_stats(checkpoint_id)
     {:ok, stats}
@@ -119,6 +123,7 @@ defmodule Server.Services.IronmonTCP do
   Gets recent IronMON run results.
   """
   @spec get_recent_results(integer()) :: {:ok, [map()]} | {:error, term()}
+  @impl true
   def get_recent_results(limit \\ 10) do
     results = Server.Ironmon.get_recent_results(limit, nil)
     {:ok, results}
@@ -130,6 +135,7 @@ defmodule Server.Services.IronmonTCP do
   Gets the active challenge for a specific seed.
   """
   @spec get_active_challenge(integer()) :: {:ok, map()} | {:error, term()}
+  @impl true
   def get_active_challenge(seed_id) do
     case Server.Ironmon.get_active_challenge(seed_id) do
       {:ok, challenge} -> {:ok, challenge}

@@ -215,6 +215,7 @@ defmodule Server.Services.OBS do
   - `{:error, reason}` if service is unavailable
   """
   @spec get_status() :: {:ok, map()} | {:error, ServiceError.service_error()}
+  @impl true
   def get_status do
     Server.Cache.get_or_compute(
       :obs_service,
@@ -451,6 +452,7 @@ defmodule Server.Services.OBS do
   - `{:error, reason}` if not connected or command fails
   """
   @spec get_scene_list() :: {:ok, map()} | {:error, binary()}
+  @impl true
   def get_scene_list do
     GenServer.call(__MODULE__, {:obs_call, "GetSceneList", %{}})
   end
@@ -487,6 +489,7 @@ defmodule Server.Services.OBS do
   - `{:error, reason}` if not connected or command fails
   """
   @spec get_stream_status() :: {:ok, map()} | {:error, binary()}
+  @impl true
   def get_stream_status do
     GenServer.call(__MODULE__, {:obs_call, "GetStreamStatus", %{}})
   end
@@ -499,6 +502,7 @@ defmodule Server.Services.OBS do
   - `{:error, reason}` if not connected or command fails
   """
   @spec get_record_status() :: {:ok, map()} | {:error, binary()}
+  @impl true
   def get_record_status do
     GenServer.call(__MODULE__, {:obs_call, "GetRecordStatus", %{}})
   end
@@ -511,6 +515,7 @@ defmodule Server.Services.OBS do
   - `{:error, reason}` if not connected or command fails
   """
   @spec get_version() :: {:ok, map()} | {:error, binary()}
+  @impl true
   def get_version do
     GenServer.call(__MODULE__, {:obs_call, "GetVersion", %{}})
   end
@@ -523,6 +528,7 @@ defmodule Server.Services.OBS do
   - `{:error, reason}` if not connected or command fails
   """
   @spec get_virtual_cam_status() :: {:ok, map()} | {:error, binary()}
+  @impl true
   def get_virtual_cam_status do
     GenServer.call(__MODULE__, {:obs_call, "GetVirtualCamStatus", %{}})
   end
@@ -535,6 +541,7 @@ defmodule Server.Services.OBS do
   - `{:error, reason}` if not connected or command fails
   """
   @spec get_output_list() :: {:ok, map()} | {:error, binary()}
+  @impl true
   def get_output_list do
     GenServer.call(__MODULE__, {:obs_call, "GetOutputList", %{}})
   end
@@ -545,6 +552,7 @@ defmodule Server.Services.OBS do
   Returns current FPS, CPU usage, memory usage, and other performance metrics.
   """
   @spec get_stats() :: {:ok, map()} | {:error, term()}
+  @impl true
   def get_stats do
     case GenServer.call(__MODULE__, :get_state) do
       %{state: %{stats: stats}} when is_map(stats) ->

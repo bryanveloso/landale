@@ -122,7 +122,9 @@ defmodule Server.EndToEndIntegrationTest do
       assert obs_status.connected == true
 
       # Step 3: Simulate IronMON checkpoint completion
-      expect(IronmonTCPMock, :list_checkpoints, fn ^challenge.id ->
+      challenge_id = challenge.id
+
+      expect(IronmonTCPMock, :list_checkpoints, fn ^challenge_id ->
         {:ok,
          [
            %{id: checkpoint.id, name: checkpoint.name, trainer: checkpoint.trainer}
@@ -328,7 +330,10 @@ defmodule Server.EndToEndIntegrationTest do
         {:ok, [%{id: challenge.id, name: challenge.name}]}
       end)
 
-      stub(IronmonTCPMock, :list_checkpoints, fn ^challenge.id ->
+      challenge_id = challenge.id
+      seed_id = seed.id
+
+      stub(IronmonTCPMock, :list_checkpoints, fn ^challenge_id ->
         {:ok,
          [
            %{id: checkpoint1.id, name: checkpoint1.name, trainer: checkpoint1.trainer},
@@ -336,7 +341,7 @@ defmodule Server.EndToEndIntegrationTest do
          ]}
       end)
 
-      stub(IronmonTCPMock, :get_active_challenge, fn ^seed.id ->
+      stub(IronmonTCPMock, :get_active_challenge, fn ^seed_id ->
         {:ok,
          %{
            seed_id: seed.id,
@@ -365,7 +370,7 @@ defmodule Server.EndToEndIntegrationTest do
         })
 
       # Step 3: Update mock to reflect progress
-      expect(IronmonTCPMock, :get_active_challenge, fn ^seed.id ->
+      expect(IronmonTCPMock, :get_active_challenge, fn ^seed_id ->
         {:ok,
          %{
            seed_id: seed.id,
@@ -411,19 +416,19 @@ defmodule Server.EndToEndIntegrationTest do
       assert checkpoint2.id in checkpoint_ids
     end
 
-    test "event broadcasting consistency across channels", %{challenge: challenge, checkpoint1: checkpoint} do
+    test "event broadcasting consistency across channels", %{challenge: _challenge, checkpoint1: checkpoint} do
       # Setup multiple channel types
-      {:ok, _, obs_overlay} =
+      {:ok, _, _obs_overlay} =
         UserSocket
         |> socket("obs_user", %{user_id: "obs_user"})
         |> subscribe_and_join(OverlayChannel, "overlay:obs")
 
-      {:ok, _, twitch_overlay} =
+      {:ok, _, _twitch_overlay} =
         UserSocket
         |> socket("twitch_user", %{user_id: "twitch_user"})
         |> subscribe_and_join(OverlayChannel, "overlay:twitch")
 
-      {:ok, _, dashboard} =
+      {:ok, _, _dashboard} =
         UserSocket
         |> socket("admin", %{user_id: "admin"})
         |> subscribe_and_join(DashboardChannel, "dashboard:main")
@@ -472,13 +477,13 @@ defmodule Server.EndToEndIntegrationTest do
   end
 
   describe "performance and scalability workflows" do
-    test "high-frequency event processing", %{challenge: challenge} do
+    test "high-frequency event processing", %{challenge: _challenge} do
       # Mock rapid event generation
       stub(OBSMock, :get_status, fn ->
         {:ok, %{connected: true, streaming: true}}
       end)
 
-      {:ok, _, overlay_socket} =
+      {:ok, _, _overlay_socket} =
         UserSocket
         |> socket("perf_test", %{user_id: "perf_test"})
         |> subscribe_and_join(OverlayChannel, "overlay:obs")
@@ -512,7 +517,7 @@ defmodule Server.EndToEndIntegrationTest do
       assert duration < 2000
     end
 
-    test "memory usage stability under load", %{challenge: challenge} do
+    test "memory usage stability under load", %{challenge: _challenge} do
       # Mock service responses
       stub(OBSMock, :get_status, fn ->
         {:ok, %{connected: true, streaming: false}}

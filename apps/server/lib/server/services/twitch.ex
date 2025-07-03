@@ -101,6 +101,7 @@ defmodule Server.Services.Twitch do
   - `{:error, reason}` if service is unavailable
   """
   @spec get_status() :: {:ok, map()} | {:error, binary()}
+  @impl true
   def get_status do
     Server.Cache.get_or_compute(
       :twitch_service,
