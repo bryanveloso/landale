@@ -83,26 +83,8 @@ services:
   #     - server
   #   command: ['bunx', '--bun', 'vite']
 
-  seq:
-    image: datalust/seq:latest
-    restart: unless-stopped
-    environment:
-      ACCEPT_EULA: Y
-      SEQ_FIRSTRUN_NOAUTHENTICATION: True
-    ports:
-      - '5341:80'     # Seq Web UI and Ingestion API (internal port 80, external 5341)
-    volumes:
-      - seq_data:/data
-    healthcheck:
-      test: ['CMD', '/bin/sh', '-c', 'wget -q -O /dev/null http://localhost/api/diagnostics/health || exit 1']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
 volumes:
   postgres_data:
   emotes_cache:
   server_data:
-  seq_data:
   tailscale_state:
