@@ -1259,10 +1259,9 @@ defmodule Server.Services.OBS do
             _ -> "Op#{op}"
           end
 
-        Logger.info("OBS protocol message received",
+        Logger.debug("OBS protocol message received",
           opcode: op,
           message_type: message_type,
-          has_data: Map.has_key?(message, "d"),
           connection_state: state.connection_state,
           authenticated: state.authenticated
         )
@@ -1340,10 +1339,9 @@ defmodule Server.Services.OBS do
     rpc_version = hello_data["rpcVersion"]
     authentication_data = hello_data["authentication"]
 
-    Logger.info("!!! HELLO MESSAGE HANDLER CALLED !!!",
+    Logger.info("OBS WebSocket hello received",
       rpc_version: rpc_version,
-      authentication_required: authentication_data != nil,
-      hello_data: inspect(hello_data)
+      authentication_required: authentication_data != nil
     )
 
     # Build identify message based on OBS WebSocket v5 specification
