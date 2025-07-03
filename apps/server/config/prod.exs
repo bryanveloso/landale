@@ -3,12 +3,12 @@ import Config
 # Configure environment for runtime checks
 config :server, env: :prod
 
-# Production logging configuration with structured JSON
+# Production logging configuration  
 config :logger, level: :info
 
-# Configure JSON logging for production
+# Use simple JSON formatting that's more reliable
 config :logger, :console,
-  format: {LoggerJSON.Formatters.BasicLogger, :format},
+  format: "$time [$level] $message $metadata\n",
   metadata: [:request_id, :correlation_id, :service, :event_type]
 
 # Disable Phoenix request logging to avoid duplicate JSON logs
