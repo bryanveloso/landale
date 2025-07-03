@@ -7,7 +7,6 @@ on:
       - 'apps/overlays/**'
       - 'packages/**'
       - 'docker-compose.yml'
-      - 'Dockerfile'
       - '.github/workflows/deploy.yml'
 
 jobs:
@@ -20,7 +19,7 @@ jobs:
       - name: Create .env file
         run: |
           cat > .env << EOF
-          # Twitch
+          # Twitch API Configuration
           TWITCH_CLIENT_ID=${{ vars.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET=${{ secrets.TWITCH_CLIENT_SECRET }}
           TWITCH_EVENTSUB_SECRET=${{ secrets.TWITCH_EVENTSUB_SECRET }}
@@ -30,13 +29,13 @@ jobs:
           RAINWAVE_USER_ID=${{ vars.RAINWAVE_USER_ID }}
           RAINWAVE_API_KEY=${{ secrets.RAINWAVE_API_KEY }}
 
-          # Control API Security
-          CONTROL_API_KEY=${{ secrets.CONTROL_API_KEY }}
+          # Database
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
 
-          # Seq Logging
-          SEQ_HOST=${{ vars.SEQ_HOST }}
-          SEQ_PORT=${{ vars.SEQ_PORT }}
-          SEQ_API_KEY=${{ secrets.SEQ_API_KEY }}
+          # Phoenix Configuration
+          SECRET_KEY_BASE=${{ secrets.SECRET_KEY_BASE }}
+          PHX_HOST=${{ vars.PHX_HOST }}
+          PORT=${{ vars.PORT }}
           EOF
 
       - name: Deploy with OrbStack
