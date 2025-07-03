@@ -99,6 +99,23 @@ defmodule ServerWeb.ControlController do
     json(conn, %{success: true, data: services})
   end
 
+  operation(:tokens,
+    summary: "Get OAuth token status",
+    description: "Returns OAuth token validity and expiration information for external services",
+    responses: %{
+      200 => {"Success", "application/json", Schemas.TokenStatusResponse}
+    }
+  )
+
+  def tokens(conn, _params) do
+    # Get token status for all services that use OAuth
+    tokens = %{
+      twitch: get_token_status(:twitch)
+    }
+
+    json(conn, %{success: true, data: tokens})
+  end
+
   # Private helper functions
 
   defp get_service_status(:obs) do
@@ -266,4 +283,54 @@ defmodule ServerWeb.ControlController do
   end
 
   defp format_bytes(_), do: "0 B"
+
+  defp get_token_status(:twitch) do
+    try do
+      case Server.Services.Twitch.get_status() do
+        {:ok, _status} ->
+          # Extract token information from service status
+          token_info = get_twitch_token_details()
+
+          %{
+            service: "twitch",
+            connected: true,
+            token_valid: Map.get(token_info, :valid, false),
+            expires_at: Map.get(token_info, :expires_at),
+            scopes: Map.get(token_info, :scopes, []),
+            last_validated: Map.get(token_info, :last_validated)
+          }
+
+        {:error, reason} ->
+          %{
+            service: "twitch",
+            connected: false,
+            token_valid: false,
+            error: to_string(reason)
+          }
+      end
+    rescue
+      error ->
+        %{
+          service: "twitch",
+          connected: false,
+          token_valid: false,
+          error: "Token status check failed: #{inspect(error)}"
+        }
+    end
+  end
+
+  defp get_twitch_token_details do
+    # Try to get token details from the Twitch service's token manager
+    try do
+      # Access the token manager state if available
+      case GenServer.call(Server.Services.Twitch, :get_token_info, 5000) do
+        {:ok, token_info} -> token_info
+        {:error, _} -> %{valid: false}
+      end
+    rescue
+      _ -> %{valid: false}
+    catch
+      :exit, _ -> %{valid: false}
+    end
+  end
 end

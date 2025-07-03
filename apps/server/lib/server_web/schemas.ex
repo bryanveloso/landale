@@ -375,4 +375,62 @@ defmodule ServerWeb.Schemas do
       }
     })
   end
+
+  defmodule TokenStatus do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        service: %Schema{type: :string, example: "twitch", description: "OAuth service name"},
+        connected: %Schema{type: :boolean, example: true, description: "Service connection status"},
+        token_valid: %Schema{type: :boolean, example: true, description: "Token validity status"},
+        expires_at: %Schema{
+          type: :string,
+          format: :datetime,
+          example: "2024-08-15T10:30:00Z",
+          description: "Token expiration timestamp (ISO 8601)"
+        },
+        scopes: %Schema{
+          type: :array,
+          items: %Schema{type: :string},
+          example: ["channel:read:subscriptions", "moderator:read:followers"],
+          description: "OAuth scopes granted to the token"
+        },
+        last_validated: %Schema{
+          type: :string,
+          example: "2024-07-03T20:00:00Z",
+          description: "Last time token was validated"
+        },
+        error: %Schema{
+          type: :string,
+          example: "Token expired",
+          description: "Error message if token is invalid"
+        }
+      },
+      required: [:service, :connected, :token_valid]
+    })
+  end
+
+  defmodule TokenStatusResponse do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        success: %Schema{type: :boolean, example: true},
+        data: %Schema{
+          type: :object,
+          properties: %{
+            twitch: TokenStatus
+          },
+          additionalProperties: TokenStatus,
+          description: "OAuth token status for each service"
+        }
+      },
+      required: [:success, :data]
+    })
+  end
 end
