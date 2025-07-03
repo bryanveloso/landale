@@ -90,13 +90,13 @@ defmodule ServerWeb.WebSocketController do
         {:error, :not_a_channel_module} ->
           conn
           |> put_status(:not_found)
-          |> json(%{success: false, error: %{message: "Module is not a Phoenix channel"}})
+          |> json(%{success: false, error: "Module is not a Phoenix channel"})
       end
     rescue
       ArgumentError ->
         conn
         |> put_status(:not_found)
-        |> json(%{success: false, error: %{message: "Module not found"}})
+        |> json(%{success: false, error: "Module not found"})
     end
   end
 

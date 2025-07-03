@@ -86,7 +86,7 @@ defmodule ServerWeb.TwitchController do
 
   Creates a subscription for the specified event type with the given conditions.
   """
-  def create_subscription(conn, %{"event_type" => event_type, "condition" => condition} = params) do
+  def create_subscription(conn, %{"type" => event_type, "condition" => condition} = params) do
     opts = Map.get(params, "opts", [])
 
     case Server.Services.Twitch.create_subscription(event_type, condition, opts) do
