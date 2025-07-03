@@ -19,16 +19,18 @@ services:
 
   server:
     build:
-      context: .
+      context: ./apps/server
       dockerfile: Dockerfile
-      target: ${DOCKER_TARGET:-development}
+      target: runtime
     restart: unless-stopped
-    working_dir: /app/apps/server
     volumes:
-      - twitch_tokens:/app/apps/server/src/services/twitch
+      - server_data:/app/data
     environment:
       DATABASE_URL: postgres://landale:landale@db:5432/landale
-      NODE_ENV: ${NODE_ENV:-development}
+      MIX_ENV: prod
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-insecure_default_key_for_development_only}
+      PHX_HOST: ${PHX_HOST:-localhost}
+      PORT: ${PORT:-8080}
     env_file:
       - .env
     ports:
@@ -38,9 +40,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ['bun', 'run', 'src/index.ts']
     healthcheck:
-      test: ['CMD-SHELL', 'nc -z 0.0.0.0 7175 || exit 1']
+      test: ['CMD', '/app/bin/server', 'rpc', ':ok']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -51,22 +52,22 @@ services:
       - "demi:100.106.173.14"
       - "saya:100.122.53.119"
 
-  overlays:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: ${DOCKER_TARGET:-development}
-    restart: unless-stopped
-    working_dir: /app/apps/overlays
-    volumes:
-      - emotes_cache:/app/apps/overlays/public/emotes
-    environment:
-      NODE_ENV: ${NODE_ENV:-development}
-    ports:
-      - '8008:8008'
-    depends_on:
-      - server
-    command: ['bunx', '--bun', 'vite']
+  # overlays:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     target: ${DOCKER_TARGET:-development}
+  #   restart: unless-stopped
+  #   working_dir: /app/apps/overlays
+  #   volumes:
+  #     - emotes_cache:/app/apps/overlays/public/emotes
+  #   environment:
+  #     NODE_ENV: ${NODE_ENV:-development}
+  #   ports:
+  #     - '8008:8008'
+  #   depends_on:
+  #     - server
+  #   command: ['bunx', '--bun', 'vite']
 
   seq:
     image: datalust/seq:latest
@@ -88,5 +89,5 @@ services:
 volumes:
   postgres_data:
   emotes_cache:
-  twitch_tokens:
+  server_data:
   seq_data:
