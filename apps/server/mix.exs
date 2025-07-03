@@ -48,6 +48,7 @@ defmodule Server.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
+      {:logger_json, "~> 6.1"},
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
       {:uuid, "~> 1.1"},
