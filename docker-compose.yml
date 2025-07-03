@@ -32,6 +32,10 @@ services:
     cap_add:
       - net_admin
     restart: unless-stopped
+    ports:
+      - '7175:7175'
+      - '8080:8080'
+      - '8081:8081'
 
   server:
     build:
@@ -49,10 +53,6 @@ services:
       PORT: ${PORT:-7175}
     env_file:
       - .env
-    ports:
-      - '7175:7175'
-      - '8080:8080'
-      - '8081:8081'
     depends_on:
       db:
         condition: service_healthy
