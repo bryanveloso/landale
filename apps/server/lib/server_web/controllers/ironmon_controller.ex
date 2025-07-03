@@ -36,7 +36,7 @@ defmodule ServerWeb.IronmonController do
 
   def list_checkpoints(conn, %{"id" => challenge_id}) do
     case Integer.parse(challenge_id) do
-      {id, ""} ->
+      {id, ""} when id > 0 ->
         checkpoints = Ironmon.list_checkpoints_for_challenge(id)
         json(conn, %{success: true, data: checkpoints})
 
@@ -61,7 +61,7 @@ defmodule ServerWeb.IronmonController do
 
   def checkpoint_stats(conn, %{"id" => checkpoint_id}) do
     case Integer.parse(checkpoint_id) do
-      {id, ""} ->
+      {id, ""} when id > 0 ->
         stats = Ironmon.get_checkpoint_stats(id)
         json(conn, %{success: true, data: stats})
 
@@ -107,15 +107,15 @@ defmodule ServerWeb.IronmonController do
 
   def active_challenge(conn, %{"id" => seed_id}) do
     case Integer.parse(seed_id) do
-      {id, ""} ->
+      {id, ""} when id > 0 ->
         case Ironmon.get_active_challenge(id) do
-          nil ->
+          {:ok, challenge} ->
+            json(conn, %{success: true, data: challenge})
+
+          {:error, _reason} ->
             conn
             |> put_status(:not_found)
-            |> json(%{success: false, error: "Seed not found"})
-
-          challenge ->
-            json(conn, %{success: true, data: challenge})
+            |> json(%{success: false, error: "No active challenge found"})
         end
 
       _ ->
@@ -127,7 +127,7 @@ defmodule ServerWeb.IronmonController do
 
   defp parse_integer(value, default) when is_binary(value) do
     case Integer.parse(value) do
-      {num, ""} -> num
+      {num, ""} when num >= 0 -> num
       _ -> default
     end
   end

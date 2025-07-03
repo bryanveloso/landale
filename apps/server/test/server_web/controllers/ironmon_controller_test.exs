@@ -89,7 +89,7 @@ defmodule ServerWeb.IronmonControllerTest do
     end
 
     test "returns 400 for invalid challenge ID", %{conn: conn} do
-      invalid_ids = ["abc", "12.5", "", "-1"]
+      invalid_ids = ["abc", "12.5", "-1"]
 
       Enum.each(invalid_ids, fn invalid_id ->
         response =
@@ -100,6 +100,14 @@ defmodule ServerWeb.IronmonControllerTest do
         assert response["success"] == false
         assert response["error"] == "Invalid challenge ID"
       end)
+    end
+
+    test "returns 404 for empty challenge ID", %{conn: conn} do
+      response =
+        conn
+        |> get("/api/ironmon/challenges//checkpoints")
+
+      assert response.status == 404
     end
 
     test "handles numeric string IDs correctly", %{conn: conn} do
@@ -162,7 +170,7 @@ defmodule ServerWeb.IronmonControllerTest do
     end
 
     test "returns 400 for invalid checkpoint ID", %{conn: conn} do
-      invalid_ids = ["abc", "12.5", "", "-1", "not_a_number"]
+      invalid_ids = ["abc", "12.5", "-1", "not_a_number"]
 
       Enum.each(invalid_ids, fn invalid_id ->
         response =
@@ -205,11 +213,11 @@ defmodule ServerWeb.IronmonControllerTest do
     end
   end
 
-  describe "GET /api/ironmon/recent-results - recent results" do
+  describe "GET /api/ironmon/results/recent - recent results" do
     test "returns recent results with default pagination", %{conn: conn} do
       response =
         conn
-        |> get("/api/ironmon/recent-results")
+        |> get("/api/ironmon/results/recent")
         |> json_response(200)
 
       assert response["success"] == true
@@ -224,7 +232,7 @@ defmodule ServerWeb.IronmonControllerTest do
       Enum.each(limits, fn limit ->
         response =
           conn
-          |> get("/api/ironmon/recent-results?limit=#{limit}")
+          |> get("/api/ironmon/results/recent?limit=#{limit}")
           |> json_response(200)
 
         assert response["success"] == true
@@ -235,7 +243,7 @@ defmodule ServerWeb.IronmonControllerTest do
     test "accepts cursor parameter for pagination", %{conn: conn} do
       response =
         conn
-        |> get("/api/ironmon/recent-results?cursor=123")
+        |> get("/api/ironmon/results/recent?cursor=123")
         |> json_response(200)
 
       assert response["success"] == true
@@ -245,7 +253,7 @@ defmodule ServerWeb.IronmonControllerTest do
     test "accepts both limit and cursor parameters", %{conn: conn} do
       response =
         conn
-        |> get("/api/ironmon/recent-results?limit=15&cursor=456")
+        |> get("/api/ironmon/results/recent?limit=15&cursor=456")
         |> json_response(200)
 
       assert response["success"] == true
@@ -258,7 +266,7 @@ defmodule ServerWeb.IronmonControllerTest do
       Enum.each(invalid_limits, fn invalid_limit ->
         response =
           conn
-          |> get("/api/ironmon/recent-results?limit=#{invalid_limit}")
+          |> get("/api/ironmon/results/recent?limit=#{invalid_limit}")
           |> json_response(200)
 
         # Should still succeed with default limit
@@ -273,7 +281,7 @@ defmodule ServerWeb.IronmonControllerTest do
       Enum.each(invalid_cursors, fn invalid_cursor ->
         response =
           conn
-          |> get("/api/ironmon/recent-results?cursor=#{invalid_cursor}")
+          |> get("/api/ironmon/results/recent?cursor=#{invalid_cursor}")
           |> json_response(200)
 
         # Should still succeed with nil cursor
@@ -285,7 +293,7 @@ defmodule ServerWeb.IronmonControllerTest do
     test "returns results with expected structure", %{conn: conn} do
       response =
         conn
-        |> get("/api/ironmon/recent-results")
+        |> get("/api/ironmon/results/recent")
         |> json_response(200)
 
       results_data = response["data"]
@@ -298,13 +306,13 @@ defmodule ServerWeb.IronmonControllerTest do
     end
   end
 
-  describe "GET /api/ironmon/seeds/:id/active-challenge - active challenge" do
+  describe "GET /api/ironmon/seeds/:id/challenge - active challenge" do
     test "returns active challenge for valid seed ID", %{conn: conn} do
       seed_id = 1
 
       response =
         conn
-        |> get("/api/ironmon/seeds/#{seed_id}/active-challenge")
+        |> get("/api/ironmon/seeds/#{seed_id}/challenge")
 
       assert response.status in [200, 404]
       response_data = json_response(response, response.status)
@@ -315,17 +323,17 @@ defmodule ServerWeb.IronmonControllerTest do
         assert is_map(response_data["data"])
       else
         assert response_data["success"] == false
-        assert response_data["error"] == "Seed not found"
+        assert response_data["error"] == "No active challenge found"
       end
     end
 
     test "returns 400 for invalid seed ID", %{conn: conn} do
-      invalid_ids = ["abc", "12.5", "", "-1", "not_a_number"]
+      invalid_ids = ["abc", "12.5", "-1", "not_a_number"]
 
       Enum.each(invalid_ids, fn invalid_id ->
         response =
           conn
-          |> get("/api/ironmon/seeds/#{invalid_id}/active-challenge")
+          |> get("/api/ironmon/seeds/#{invalid_id}/challenge")
           |> json_response(400)
 
         assert response["success"] == false
@@ -339,7 +347,7 @@ defmodule ServerWeb.IronmonControllerTest do
       Enum.each(valid_numeric_ids, fn id ->
         response =
           conn
-          |> get("/api/ironmon/seeds/#{id}/active-challenge")
+          |> get("/api/ironmon/seeds/#{id}/challenge")
 
         # Should not return 400 for valid numeric strings
         assert response.status in [200, 404]
@@ -352,7 +360,7 @@ defmodule ServerWeb.IronmonControllerTest do
 
       response =
         conn
-        |> get("/api/ironmon/seeds/#{nonexistent_seed_id}/active-challenge")
+        |> get("/api/ironmon/seeds/#{nonexistent_seed_id}/challenge")
 
       # Could be 404 (seed not found) or 200 (seed exists)
       assert response.status in [200, 404]
@@ -360,7 +368,7 @@ defmodule ServerWeb.IronmonControllerTest do
       if response.status == 404 do
         response_data = json_response(response, 404)
         assert response_data["success"] == false
-        assert response_data["error"] == "Seed not found"
+        assert response_data["error"] == "No active challenge found"
       end
     end
 
@@ -369,7 +377,7 @@ defmodule ServerWeb.IronmonControllerTest do
 
       response =
         conn
-        |> get("/api/ironmon/seeds/#{seed_id}/active-challenge")
+        |> get("/api/ironmon/seeds/#{seed_id}/challenge")
 
       if response.status == 200 do
         response_data = json_response(response, 200)
@@ -389,8 +397,8 @@ defmodule ServerWeb.IronmonControllerTest do
         "/api/ironmon/challenges",
         "/api/ironmon/challenges/1/checkpoints",
         "/api/ironmon/checkpoints/1/stats",
-        "/api/ironmon/recent-results",
-        "/api/ironmon/seeds/1/active-challenge"
+        "/api/ironmon/results/recent",
+        "/api/ironmon/seeds/1/challenge"
       ]
 
       Enum.each(endpoints, fn endpoint ->
@@ -412,8 +420,8 @@ defmodule ServerWeb.IronmonControllerTest do
         "/api/ironmon/challenges",
         "/api/ironmon/challenges/1/checkpoints",
         "/api/ironmon/checkpoints/1/stats",
-        "/api/ironmon/recent-results",
-        "/api/ironmon/seeds/1/active-challenge"
+        "/api/ironmon/results/recent",
+        "/api/ironmon/seeds/1/challenge"
       ]
 
       tasks =
@@ -439,7 +447,7 @@ defmodule ServerWeb.IronmonControllerTest do
       error_inducing_requests = [
         get(conn, "/api/ironmon/challenges/invalid/checkpoints"),
         get(conn, "/api/ironmon/checkpoints/invalid/stats"),
-        get(conn, "/api/ironmon/seeds/invalid/active-challenge")
+        get(conn, "/api/ironmon/seeds/invalid/challenge")
       ]
 
       Enum.each(error_inducing_requests, fn response ->
@@ -459,7 +467,7 @@ defmodule ServerWeb.IronmonControllerTest do
       Enum.each(large_limits, fn limit ->
         response =
           conn
-          |> get("/api/ironmon/recent-results?limit=#{limit}")
+          |> get("/api/ironmon/results/recent?limit=#{limit}")
 
         # Should handle large limits gracefully
         assert response.status in [200, 400]
@@ -486,7 +494,7 @@ defmodule ServerWeb.IronmonControllerTest do
 
   describe "parameter parsing and validation" do
     test "parse_integer function handles various inputs", %{conn: conn} do
-      # Test endpoint that uses parse_integer internally (recent-results)
+      # Test endpoint that uses parse_integer internally (results/recent)
       test_cases = [
         # Valid integer string
         {"10", 200},
@@ -503,7 +511,7 @@ defmodule ServerWeb.IronmonControllerTest do
       Enum.each(test_cases, fn {limit_value, expected_status} ->
         response =
           conn
-          |> get("/api/ironmon/recent-results?limit=#{limit_value}")
+          |> get("/api/ironmon/results/recent?limit=#{limit_value}")
 
         assert response.status == expected_status
         response_data = json_response(response, expected_status)
@@ -512,7 +520,7 @@ defmodule ServerWeb.IronmonControllerTest do
     end
 
     test "parse_optional_integer function handles various inputs", %{conn: conn} do
-      # Test endpoint that uses parse_optional_integer internally (recent-results cursor)
+      # Test endpoint that uses parse_optional_integer internally (results/recent cursor)
       test_cases = [
         # Valid integer string
         {"123", 200},
@@ -529,7 +537,7 @@ defmodule ServerWeb.IronmonControllerTest do
       Enum.each(test_cases, fn {cursor_value, expected_status} ->
         response =
           conn
-          |> get("/api/ironmon/recent-results?cursor=#{cursor_value}")
+          |> get("/api/ironmon/results/recent?cursor=#{cursor_value}")
 
         assert response.status == expected_status
         response_data = json_response(response, expected_status)
@@ -542,10 +550,10 @@ defmodule ServerWeb.IronmonControllerTest do
       id_endpoints = [
         "/api/ironmon/challenges/{id}/checkpoints",
         "/api/ironmon/checkpoints/{id}/stats",
-        "/api/ironmon/seeds/{id}/active-challenge"
+        "/api/ironmon/seeds/{id}/challenge"
       ]
 
-      invalid_ids = ["abc", "12.5", "", "not_a_number"]
+      invalid_ids = ["abc", "12.5", "not_a_number"]
 
       Enum.each(id_endpoints, fn endpoint_template ->
         Enum.each(invalid_ids, fn invalid_id ->
@@ -581,8 +589,8 @@ defmodule ServerWeb.IronmonControllerTest do
         "/api/ironmon/challenges",
         "/api/ironmon/challenges/1/checkpoints",
         "/api/ironmon/checkpoints/1/stats",
-        "/api/ironmon/recent-results",
-        "/api/ironmon/seeds/1/active-challenge"
+        "/api/ironmon/results/recent",
+        "/api/ironmon/seeds/1/challenge"
       ]
 
       Enum.each(endpoints, fn endpoint ->
@@ -603,7 +611,7 @@ defmodule ServerWeb.IronmonControllerTest do
       start_time = System.monotonic_time(:millisecond)
 
       conn
-      |> get("/api/ironmon/recent-results?limit=50&cursor=100")
+      |> get("/api/ironmon/results/recent?limit=50&cursor=100")
       |> json_response(200)
 
       duration = System.monotonic_time(:millisecond) - start_time
