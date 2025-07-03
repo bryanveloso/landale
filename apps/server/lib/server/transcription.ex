@@ -145,6 +145,7 @@ defmodule Server.Transcription do
   Searches transcriptions using PostgreSQL full-text search with similarity ranking.
 
   Uses pg_trgm extension for fuzzy matching and similarity scoring.
+  Falls back to basic search in test/dev environments.
 
   ## Options
 
@@ -158,6 +159,15 @@ defmodule Server.Transcription do
   """
   @spec search_transcriptions_full_text(String.t(), transcription_opts()) :: [Transcription.t()]
   def search_transcriptions_full_text(search_term, opts \\ []) when is_binary(search_term) do
+    if Mix.env() == :prod do
+      search_with_similarity(search_term, opts)
+    else
+      # Fall back to basic search in test/dev environments
+      search_transcriptions(search_term, opts)
+    end
+  end
+
+  defp search_with_similarity(search_term, opts) do
     limit = Keyword.get(opts, :limit, 25) |> min(100)
     stream_session_id = Keyword.get(opts, :stream_session_id)
 
