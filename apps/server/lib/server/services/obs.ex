@@ -779,7 +779,7 @@ defmodule Server.Services.OBS do
 
   @impl GenServer
   def handle_info(:poll_stats, state) do
-    # Direct access to connection state 
+    # Direct access to connection state
     if state.connected do
       request_obs_stats(state)
     end
@@ -1141,7 +1141,7 @@ defmodule Server.Services.OBS do
     gun_opts = %{
       # Disable automatic retry for WebSocket connections
       retry: 0,
-      # HTTP/1.1 protocol for WebSocket compatibility  
+      # HTTP/1.1 protocol for WebSocket compatibility
       protocols: [:http],
       # Connection timeout
       connect_timeout: Server.NetworkConfig.connection_timeout()
@@ -1986,7 +1986,7 @@ defmodule Server.Services.OBS do
       4002 -> {"Message decode error", true}
       # Protocol error
       4003 -> {"Missing data field", false}
-      # Protocol error  
+      # Protocol error
       4004 -> {"Invalid data field type", false}
       # Protocol error
       4005 -> {"Invalid data field value", false}
@@ -2445,7 +2445,7 @@ defmodule Server.Services.OBS do
     process_serial_realtime_batch(state, requests, halt_on_failure)
   end
 
-  # Process requests in parallel (experimental) 
+  # Process requests in parallel (experimental)
   defp process_parallel_batch(state, requests, halt_on_failure) do
     # For safety, process serially for now since parallel execution could cause race conditions
     Logger.debug("Using parallel execution (treating as serial for safety)")

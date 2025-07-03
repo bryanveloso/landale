@@ -10,8 +10,8 @@ defmodule Server.Services.OBSIntegrationTest do
   use ExUnit.Case, async: false
   import ExUnit.CaptureLog
 
-  alias Server.Services.OBS
   alias Server.ServiceError
+  alias Server.Services.OBS
 
   # Setup test GenServer for isolated testing
   setup do
@@ -611,12 +611,10 @@ defmodule Server.Services.OBSIntegrationTest do
 
   # Private helper to access module constants (if exported as functions)
   defp get_module_constant(module, constant) do
-    try do
-      apply(module, constant, [])
-    rescue
-      UndefinedFunctionError ->
-        nil
-    end
+    apply(module, constant, [])
+  rescue
+    UndefinedFunctionError ->
+      nil
   end
 end
 

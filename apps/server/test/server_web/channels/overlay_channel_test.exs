@@ -3,7 +3,7 @@ defmodule ServerWeb.OverlayChannelTest do
   import Hammox
 
   alias ServerWeb.{OverlayChannel, UserSocket}
-  alias Server.Mocks.{OBSMock, TwitchMock, IronmonTCPMock, RainwaveMock}
+  alias Server.Mocks.{IronmonTCPMock, OBSMock, RainwaveMock, TwitchMock}
 
   setup do
     # Stub the initial state call that happens on join
