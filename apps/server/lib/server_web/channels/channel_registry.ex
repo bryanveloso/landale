@@ -57,17 +57,35 @@ defmodule ServerWeb.ChannelRegistry do
           description: binary()
         }
 
+  # Cache the computed channels in a module attribute at compile time
+  @cached_channels :code.all_loaded()
+                   |> Enum.map(&elem(&1, 0))
+                   |> Enum.filter(fn module ->
+                     try do
+                       case module.__info__(:attributes) do
+                         attributes when is_list(attributes) ->
+                           # Check if module uses Phoenix.Channel behavior
+                           behaviours = Keyword.get_values(attributes, :behaviour)
+                           Phoenix.Channel in behaviours
+
+                         _ ->
+                           false
+                       end
+                     rescue
+                       _ -> false
+                     end
+                   end)
+                   |> Enum.sort()
+
   @doc """
   Lists all available Phoenix channels in the application.
 
   Uses runtime introspection to find all modules that implement Phoenix.Channel.
+  Cached at application startup to avoid runtime overhead.
   """
   @spec list_channels() :: [module()]
   def list_channels do
-    :code.all_loaded()
-    |> Enum.map(&elem(&1, 0))
-    |> Enum.filter(&channel_module?/1)
-    |> Enum.sort()
+    @cached_channels
   end
 
   @doc """
