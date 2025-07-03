@@ -90,7 +90,8 @@ defmodule Server.Services.RainwaveIntegrationTest do
       # Verify initial configuration
       assert state.api_key == "test_api_key"
       assert state.user_id == "12345"
-      assert state.station_id == 3  # Covers station
+      # Covers station
+      assert state.station_id == 3
       assert state.station_name == "Covers"
       assert state.current_song == nil
       assert state.is_enabled == false
@@ -104,11 +105,12 @@ defmodule Server.Services.RainwaveIntegrationTest do
       System.delete_env("RAINWAVE_API_KEY")
       System.delete_env("RAINWAVE_USER_ID")
 
-      log_output = capture_log(fn ->
-        {:ok, pid} = Rainwave.start_link()
-        :timer.sleep(50)
-        GenServer.stop(pid, :normal, 1000)
-      end)
+      log_output =
+        capture_log(fn ->
+          {:ok, pid} = Rainwave.start_link()
+          :timer.sleep(50)
+          GenServer.stop(pid, :normal, 1000)
+        end)
 
       assert log_output =~ "Rainwave credentials not found in environment"
     end
@@ -172,10 +174,11 @@ defmodule Server.Services.RainwaveIntegrationTest do
     test "enabling logs correct message" do
       {:ok, pid} = Rainwave.start_link()
 
-      log_output = capture_log([level: :info], fn ->
-        Rainwave.set_enabled(true)
-        :timer.sleep(50)
-      end)
+      log_output =
+        capture_log([level: :info], fn ->
+          Rainwave.set_enabled(true)
+          :timer.sleep(50)
+        end)
 
       assert log_output =~ "Service enabled"
 
@@ -185,10 +188,11 @@ defmodule Server.Services.RainwaveIntegrationTest do
     test "disabling logs correct message" do
       {:ok, pid} = Rainwave.start_link()
 
-      log_output = capture_log([level: :info], fn ->
-        Rainwave.set_enabled(false)
-        :timer.sleep(50)
-      end)
+      log_output =
+        capture_log([level: :info], fn ->
+          Rainwave.set_enabled(false)
+          :timer.sleep(50)
+        end)
 
       assert log_output =~ "Service disabled"
 
@@ -240,10 +244,11 @@ defmodule Server.Services.RainwaveIntegrationTest do
     test "set_station logs station change" do
       {:ok, pid} = Rainwave.start_link()
 
-      log_output = capture_log([level: :info], fn ->
-        Rainwave.set_station(:ocremix)
-        :timer.sleep(50)
-      end)
+      log_output =
+        capture_log([level: :info], fn ->
+          Rainwave.set_station(:ocremix)
+          :timer.sleep(50)
+        end)
 
       assert log_output =~ "Station changed"
       assert log_output =~ "OCR Radio"
@@ -259,10 +264,11 @@ defmodule Server.Services.RainwaveIntegrationTest do
       :timer.sleep(50)
 
       # Change station should trigger poll
-      log_output = capture_log(fn ->
-        Rainwave.set_station(:chiptunes)
-        :timer.sleep(100)
-      end)
+      log_output =
+        capture_log(fn ->
+          Rainwave.set_station(:chiptunes)
+          :timer.sleep(100)
+        end)
 
       # Should see polling activity (will likely fail API call in test)
       assert log_output =~ "Station changed"
@@ -304,6 +310,7 @@ defmodule Server.Services.RainwaveIntegrationTest do
         "enabled" => true,
         "station_id" => :all
       })
+
       :timer.sleep(50)
 
       state = :sys.get_state(pid)
@@ -323,6 +330,7 @@ defmodule Server.Services.RainwaveIntegrationTest do
         "enabled" => "invalid",
         "station_id" => "not_a_station"
       })
+
       :timer.sleep(50)
 
       final_state = :sys.get_state(pid)
@@ -342,6 +350,7 @@ defmodule Server.Services.RainwaveIntegrationTest do
         "enabled" => nil,
         "station_id" => nil
       })
+
       :timer.sleep(50)
 
       final_state = :sys.get_state(pid)
@@ -359,12 +368,12 @@ defmodule Server.Services.RainwaveIntegrationTest do
       assert @valid_api_response["user"]["id"] == "12345"
       assert @valid_api_response["station_name"] == "Covers"
       assert is_map(@valid_api_response["sched_current"])
-      
+
       # Verify song structure
       songs = @valid_api_response["sched_current"]["songs"]
       assert is_list(songs)
       assert length(songs) > 0
-      
+
       song = hd(songs)
       assert song["title"] == "Test Song"
       assert is_list(song["artists"])
@@ -498,15 +507,16 @@ defmodule Server.Services.RainwaveIntegrationTest do
     test "polling doesn't occur without credentials" do
       System.delete_env("RAINWAVE_API_KEY")
 
-      log_output = capture_log(fn ->
-        {:ok, pid} = Rainwave.start_link()
+      log_output =
+        capture_log(fn ->
+          {:ok, pid} = Rainwave.start_link()
 
-        # Enable service
-        Rainwave.set_enabled(true)
-        :timer.sleep(50)
+          # Enable service
+          Rainwave.set_enabled(true)
+          :timer.sleep(50)
 
-        GenServer.stop(pid, :normal, 1000)
-      end)
+          GenServer.stop(pid, :normal, 1000)
+        end)
 
       # Should log warning about missing credentials
       assert log_output =~ "Rainwave credentials not found in environment"
@@ -542,7 +552,8 @@ defmodule Server.Services.RainwaveIntegrationTest do
 
     test "validates API configuration constants" do
       # Verify API configuration is reasonable
-      assert true  # Basic API config validation
+      # Basic API config validation
+      assert true
     end
 
     test "handles missing environment variables" do
@@ -577,7 +588,8 @@ defmodule Server.Services.RainwaveIntegrationTest do
       final_state = :sys.get_state(pid)
 
       # Key state should persist appropriately
-      assert final_state.station_id == 4  # Chiptunes
+      # Chiptunes
+      assert final_state.station_id == 4
       assert final_state.is_enabled == initial_state.is_enabled
       assert final_state.api_key == initial_state.api_key
 
@@ -647,10 +659,11 @@ defmodule Server.Services.RainwaveIntegrationTest do
     test "handles process exit messages gracefully" do
       {:ok, pid} = Rainwave.start_link()
 
-      log_output = capture_log([level: :warning], fn ->
-        send(pid, {:EXIT, self(), :normal})
-        :timer.sleep(50)
-      end)
+      log_output =
+        capture_log([level: :warning], fn ->
+          send(pid, {:EXIT, self(), :normal})
+          :timer.sleep(50)
+        end)
 
       assert log_output =~ "HTTP request process exited"
       assert Process.alive?(pid)
@@ -662,11 +675,12 @@ defmodule Server.Services.RainwaveIntegrationTest do
       System.delete_env("RAINWAVE_API_KEY")
       System.delete_env("RAINWAVE_USER_ID")
 
-      log_output = capture_log([level: :warning], fn ->
-        {:ok, pid} = Rainwave.start_link()
-        :timer.sleep(50)
-        GenServer.stop(pid, :normal, 1000)
-      end)
+      log_output =
+        capture_log([level: :warning], fn ->
+          {:ok, pid} = Rainwave.start_link()
+          :timer.sleep(50)
+          GenServer.stop(pid, :normal, 1000)
+        end)
 
       assert log_output =~ "Rainwave credentials not found in environment"
     end
@@ -679,10 +693,11 @@ defmodule Server.Services.RainwaveIntegrationTest do
       :timer.sleep(50)
 
       # Stop should clean up properly
-      log_output = capture_log(fn ->
-        GenServer.stop(pid, :normal, 1000)
-        :timer.sleep(50)
-      end)
+      log_output =
+        capture_log(fn ->
+          GenServer.stop(pid, :normal, 1000)
+          :timer.sleep(50)
+        end)
 
       refute Process.alive?(pid)
     end
@@ -733,11 +748,16 @@ defmodule Server.Services.RainwaveIntegrationTest do
 
       # Test invalid station types
       test_cases = [
-        {nil, 3},           # nil -> default (covers)
-        {"invalid", 3},     # string -> default
-        {0, 3},            # out of range -> default
-        {6, 3},            # out of range -> default
-        {:invalid, 3}      # invalid atom -> default
+        # nil -> default (covers)
+        {nil, 3},
+        # string -> default
+        {"invalid", 3},
+        # out of range -> default
+        {0, 3},
+        # out of range -> default
+        {6, 3},
+        # invalid atom -> default
+        {:invalid, 3}
       ]
 
       Enum.each(test_cases, fn {input, expected} ->
@@ -755,17 +775,20 @@ defmodule Server.Services.RainwaveIntegrationTest do
   describe "API configuration and constants" do
     test "API configuration is correct" do
       # Verify API constants are properly set
-      assert true  # Basic configuration verification
+      # Basic configuration verification
+      assert true
     end
 
     test "poll interval is reasonable" do
       # Verify polling interval makes sense (10 seconds)
-      assert true  # Timing verification
+      # Timing verification
+      assert true
     end
 
     test "HTTP timeout configuration" do
       # Verify HTTP timeouts are configured
-      assert true  # Network configuration verification
+      # Network configuration verification
+      assert true
     end
   end
 

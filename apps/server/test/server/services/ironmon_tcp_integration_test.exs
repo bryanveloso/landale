@@ -184,13 +184,13 @@ defmodule Server.Services.IronmonTCPIntegrationTest do
       # For now, just verify the service is stable and the connection can be made
       # The TCP connection tracking may have timing issues but the core functionality works
       assert Process.alive?(pid)
-      
+
       # Verify we can communicate over the socket
       :gen_tcp.send(socket, "test")
       :timer.sleep(50)
-      
+
       TestTCPClient.close(socket)
-      
+
       # Service should remain stable
       assert Process.alive?(pid)
     end
