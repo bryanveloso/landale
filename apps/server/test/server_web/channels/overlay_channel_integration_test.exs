@@ -12,7 +12,7 @@ defmodule ServerWeb.OverlayChannelIntegrationTest do
   import Hammox
 
   alias ServerWeb.{OverlayChannel, UserSocket}
-  alias Server.Mocks.{OBSMock, TwitchMock, IronmonTCPMock, RainwaveMock}
+  alias Server.Mocks.{IronmonTCPMock, OBSMock, RainwaveMock, TwitchMock}
 
   describe "channel lifecycle and connection management" do
     test "successfully joins overlay:obs channel and receives initial state" do

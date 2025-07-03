@@ -11,8 +11,8 @@ defmodule Server.Services.IronmonTCPIntegrationTest do
   import ExUnit.CaptureLog
 
   alias Server.Services.IronmonTCP
-  alias Server.{Repo, Ironmon}
-  alias Server.Ironmon.{Challenge, Checkpoint, Seed, Result}
+  alias Server.{Ironmon, Repo}
+  alias Server.Ironmon.{Challenge, Checkpoint, Result, Seed}
 
   # Test TCP client helper
   defmodule TestTCPClient do
@@ -594,11 +594,11 @@ defmodule Server.Services.IronmonTCPIntegrationTest do
 
     test "handles database errors gracefully" do
       # Test with non-existent challenge ID - this actually returns empty list, not error
-      {:ok, checkpoints} = IronmonTCP.list_checkpoints(99999)
+      {:ok, checkpoints} = IronmonTCP.list_checkpoints(99_999)
       assert checkpoints == []
 
       # Test with non-existent checkpoint ID - this returns empty stats
-      {:ok, stats} = IronmonTCP.get_checkpoint_stats(99999)
+      {:ok, stats} = IronmonTCP.get_checkpoint_stats(99_999)
       assert stats.wins == 0
       assert stats.losses == 0
       assert stats.total == 0

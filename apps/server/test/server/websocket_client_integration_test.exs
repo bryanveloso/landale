@@ -130,7 +130,7 @@ defmodule Server.WebSocketClientIntegrationTest do
       client =
         WebSocketClient.new(test_url, receiver_pid,
           reconnect_interval: 5000,
-          connection_timeout: 10000,
+          connection_timeout: 10_000,
           telemetry_prefix: [:custom, :telemetry]
         )
 
@@ -146,7 +146,7 @@ defmodule Server.WebSocketClientIntegrationTest do
       assert client.connection_start_time == nil
       assert client.reconnect_timer == nil
       assert client.reconnect_interval == 5000
-      assert client.connection_timeout == 10000
+      assert client.connection_timeout == 10_000
       assert client.telemetry_prefix == [:custom, :telemetry]
       assert is_map(client.connection_manager)
     end
@@ -658,7 +658,7 @@ defmodule Server.WebSocketClientIntegrationTest do
         {:ping, "ping data"}
       )
 
-      # Test pong frame (should be ignored gracefully) 
+      # Test pong frame (should be ignored gracefully)
       WebSocketClient.handle_message(
         mock_client,
         mock_stream_ref,

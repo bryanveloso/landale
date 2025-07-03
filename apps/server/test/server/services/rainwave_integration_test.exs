@@ -402,7 +402,7 @@ defmodule Server.Services.RainwaveIntegrationTest do
       # Test with integer user ID
       integer_id_response = %{
         "station_name" => "Covers",
-        "user" => %{"id" => 12345},
+        "user" => %{"id" => 12_345},
         "sched_current" => @valid_api_response["sched_current"]
       }
 
