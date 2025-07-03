@@ -99,10 +99,11 @@ if config_env() == :prod do
   config :server, ServerWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
-      ip: parse_bind_ip.(System.get_env("BIND_IP", "127.0.0.1")),
+      ip: parse_bind_ip.(System.get_env("BIND_IP", "0.0.0.0")),
       port: port
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    server: true
 
   # ## SSL Support
   #
