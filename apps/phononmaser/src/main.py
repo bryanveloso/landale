@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from .audio_processor import AudioProcessor
 from .websocket_server import PhononmaserServer
+from .server_client import ServerTranscriptionClient
 from .health import create_health_app
 from .service_config import get_server_url, get_phononmaser_port, get_phononmaser_health_port
 
@@ -33,6 +34,7 @@ class Phononmaser:
         self.whisper_model_path = os.getenv("WHISPER_MODEL_PATH", "")
         self.whisper_threads = int(os.getenv("WHISPER_THREADS", "8"))
         self.whisper_language = os.getenv("WHISPER_LANGUAGE", "en")
+        self.server_url = os.getenv("SERVER_HTTP_URL", "http://localhost:7175")
         
         # Validate configuration
         if not self.whisper_model_path:
@@ -41,6 +43,7 @@ class Phononmaser:
         # Components
         self.audio_processor: Optional[AudioProcessor] = None
         self.websocket_server: Optional[PhononmaserServer] = None
+        self.transcription_client: Optional[ServerTranscriptionClient] = None
         self.health_runner = None
         
         # State
@@ -49,6 +52,10 @@ class Phononmaser:
     async def start(self):
         """Start the phononmaser service."""
         logger.info("Starting phononmaser...")
+        
+        # Initialize transcription client
+        self.transcription_client = ServerTranscriptionClient(self.server_url)
+        await self.transcription_client.__aenter__()
         
         # Initialize audio processor
         self.audio_processor = AudioProcessor(
@@ -87,6 +94,9 @@ class Phononmaser:
         if self.websocket_server:
             await self.websocket_server.stop()
         
+        if self.transcription_client:
+            await self.transcription_client.__aexit__(None, None, None)
+        
         if self.health_runner:
             await self.health_runner.cleanup()
         
@@ -95,6 +105,19 @@ class Phononmaser:
     async def _handle_transcription(self, event):
         """Handle transcription events from audio processor."""
         logger.info(f"Transcription received: {event.text[:50] if event.text else 'empty'}...")
+        
+        # Send to Phoenix server for storage and WebSocket broadcasting
+        if self.transcription_client:
+            try:
+                success = await self.transcription_client.send_transcription(event)
+                if success:
+                    logger.debug("Transcription sent to server successfully")
+                else:
+                    logger.warning("Failed to send transcription to server")
+            except Exception as e:
+                logger.error(f"Error sending transcription to server: {e}")
+        
+        # Also emit to local WebSocket clients (for backward compatibility)
         if self.websocket_server:
             self.websocket_server.emit_transcription(event)
 

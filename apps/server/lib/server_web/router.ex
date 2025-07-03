@@ -81,5 +81,14 @@ defmodule ServerWeb.Router do
     get "/websocket/channels", WebSocketController, :channels
     get "/websocket/channels/:module", WebSocketController, :channel_details
     get "/websocket/examples", WebSocketController, :examples
+
+    # Transcription data and real-time events
+    post "/transcriptions", TranscriptionController, :create
+    get "/transcriptions", TranscriptionController, :index
+    get "/transcriptions/search", TranscriptionController, :search
+    get "/transcriptions/time-range", TranscriptionController, :by_time_range
+    get "/transcriptions/recent", TranscriptionController, :recent
+    get "/transcriptions/session/:session_id", TranscriptionController, :session
+    get "/transcriptions/stats", TranscriptionController, :stats
   end
 end

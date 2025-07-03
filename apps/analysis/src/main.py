@@ -3,11 +3,13 @@ import asyncio
 import logging
 import os
 import signal
+from datetime import datetime
 from typing import Optional
 
 from dotenv import load_dotenv
 
 from .websocket_client import PhononmaserClient, ServerClient
+from .transcription_client import TranscriptionWebSocketClient
 from .lms_client import LMSClient
 from .correlator import StreamCorrelator
 from .events import TranscriptionEvent, ChatMessage, EmoteEvent, AnalysisResult
@@ -30,14 +32,14 @@ class AnalysisService:
     
     def __init__(self):
         # Configuration from environment with service-config defaults
-        self.phononmaser_url = os.getenv("PHONONMASER_URL", get_phononmaser_url())
-        self.server_url = os.getenv("SERVER_URL", get_server_events_url())
+        self.server_events_url = os.getenv("SERVER_URL", get_server_events_url())
+        self.server_ws_url = os.getenv("SERVER_WS_URL", "ws://localhost:7175")
         self.lms_url = os.getenv("LMS_API_URL", get_lms_api_url())
         self.lms_model = os.getenv("LMS_MODEL", "dolphin-2.9.3-llama-3-8b")
         
         # Components
-        self.phononmaser_client = PhononmaserClient(self.phononmaser_url)
-        self.server_client = ServerClient(self.server_url)
+        self.transcription_client = TranscriptionWebSocketClient(self.server_ws_url)
+        self.server_client = ServerClient(self.server_events_url)
         self.lms_client = LMSClient(self.lms_url, self.lms_model)
         self.correlator: Optional[StreamCorrelator] = None
         
@@ -57,17 +59,17 @@ class AnalysisService:
         self.correlator = StreamCorrelator(self.lms_client)
         
         # Register event handlers
-        self.phononmaser_client.on_transcription(self._handle_transcription)
+        self.transcription_client.on_transcription(self._handle_transcription)
         self.server_client.on_chat_message(self._handle_chat_message)
         self.server_client.on_emote(self._handle_emote)
         self.correlator.on_analysis(self._handle_analysis_result)
         
         # Connect to services
         try:
-            await self.phononmaser_client.connect()
-            logger.info("Connected to phononmaser")
+            await self.transcription_client.connect()
+            logger.info("Connected to transcription service")
         except Exception as e:
-            logger.error(f"Failed to connect to phononmaser: {e}")
+            logger.error(f"Failed to connect to transcription service: {e}")
             raise
             
         # Try to connect to server, but don't fail if it's not available
@@ -86,7 +88,7 @@ class AnalysisService:
         
         # Start listening tasks
         self.tasks = [
-            asyncio.create_task(self.phononmaser_client.listen()),
+            asyncio.create_task(self.transcription_client.listen()),
             asyncio.create_task(self.server_client.listen()),
             asyncio.create_task(self.correlator.periodic_analysis_loop()),
             asyncio.create_task(self._health_check_loop())
@@ -107,7 +109,7 @@ class AnalysisService:
         await asyncio.gather(*self.tasks, return_exceptions=True)
         
         # Disconnect clients
-        await self.phononmaser_client.disconnect()
+        await self.transcription_client.disconnect()
         await self.server_client.disconnect()
         await self.lms_client.__aexit__(None, None, None)
         
@@ -118,9 +120,10 @@ class AnalysisService:
         logger.info("Analysis service stopped")
         
     async def _handle_transcription(self, event: TranscriptionEvent):
-        """Handle transcription events from phononmaser."""
+        """Handle transcription events from Phoenix server."""
         logger.debug(f"Transcription: {event.text}")
         
+        # Add to correlator for analysis
         if self.correlator:
             await self.correlator.add_transcription(event)
             
