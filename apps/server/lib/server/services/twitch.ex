@@ -297,6 +297,25 @@ defmodule Server.Services.Twitch do
   end
 
   @impl GenServer
+  def handle_call(:get_token_info, _from, state) do
+    token_info =
+      case Server.OAuthTokenManager.get_valid_token(state.token_manager) do
+        {:ok, token} ->
+          %{
+            valid: true,
+            expires_at: token.expires_at,
+            scopes: token.scopes,
+            last_validated: token.last_validated || "unknown"
+          }
+
+        {:error, _} ->
+          %{valid: false}
+      end
+
+    {:reply, {:ok, token_info}, state}
+  end
+
+  @impl GenServer
   def handle_call(:get_internal_state, _from, state) do
     {:reply, state.state, state}
   end

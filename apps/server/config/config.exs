@@ -22,9 +22,9 @@ config :server, ServerWeb.Endpoint,
   pubsub_server: Server.PubSub,
   live_view: [signing_salt: "er5AtYWV"]
 
-# Configures Elixir's Logger with structured JSON output for production
+# Configures Elixir's Logger - will be overridden to JSON in production
 config :logger, :console,
-  format: {LoggerJSON.Formatters.BasicLogger, :format},
+  format: "$time $metadata[$level] $message\n",
   metadata: [:request_id, :correlation_id, :service, :event_type]
 
 # Use Jason for JSON parsing in Phoenix

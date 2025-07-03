@@ -73,6 +73,7 @@ defmodule ServerWeb.Router do
     # Control system
     get "/control/status", ControlController, :status
     get "/control/services", ControlController, :services
+    get "/control/tokens", ControlController, :tokens
     post "/control/ping", ControlController, :ping
 
     # WebSocket API introspection
