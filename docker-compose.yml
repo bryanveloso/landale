@@ -17,6 +17,22 @@ services:
       retries: 5
     command: ['postgres', '-c', 'log_min_messages=error']
 
+  tailscale-server:
+    image: tailscale/tailscale:latest
+    hostname: landale-server
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_CLIENT_SECRET}
+      - TS_EXTRA_ARGS=--advertise-tags=tag:container
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - net_admin
+    restart: unless-stopped
+
   server:
     build:
       context: ./apps/server
@@ -40,6 +56,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      tailscale-server:
+        condition: service_started
+    network_mode: service:tailscale-server
     healthcheck:
       test: ['CMD', '/app/bin/server', 'rpc', ':ok']
       interval: 30s
@@ -91,3 +110,4 @@ volumes:
   emotes_cache:
   server_data:
   seq_data:
+  tailscale_state:
