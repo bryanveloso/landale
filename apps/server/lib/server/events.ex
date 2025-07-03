@@ -143,7 +143,8 @@ defmodule Server.Events do
   def emit(event_name, data, correlation_id \\ nil)
 
   def emit("rainwave:update", data, correlation_id) do
-    publish_rainwave_event("update", data, correlation_id)
+    opts = if correlation_id, do: [correlation_id: correlation_id], else: []
+    publish_rainwave_event("update", data, opts)
   end
 
   def emit(event_name, data, correlation_id) do
