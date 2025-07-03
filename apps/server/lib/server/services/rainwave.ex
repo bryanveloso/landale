@@ -186,7 +186,7 @@ defmodule Server.Services.Rainwave do
   @impl true
   def handle_info(:poll, state) do
     new_state =
-      if state.is_enabled and state.api_key and state.user_id do
+      if state.is_enabled and not is_nil(state.api_key) and not is_nil(state.user_id) do
         fetch_now_playing(state)
       else
         state
@@ -199,6 +199,12 @@ defmodule Server.Services.Rainwave do
   def handle_info({:EXIT, _pid, reason}, state) do
     Logger.warning("HTTP request process exited", reason: reason)
 
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(message, state) do
+    Logger.debug("Unhandled message received", message: inspect(message))
     {:noreply, state}
   end
 
