@@ -8,8 +8,12 @@ defmodule Nurvus.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Starts a worker by calling: Nurvus.Worker.start_link(arg)
-      # {Nurvus.Worker, arg}
+      # Process supervision tree
+      Nurvus.ProcessSupervisor,
+      Nurvus.ProcessManager,
+      Nurvus.ProcessMonitor,
+      # HTTP API server
+      Nurvus.HttpServer
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
