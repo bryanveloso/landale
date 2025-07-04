@@ -204,10 +204,6 @@ defmodule Server.Services.IronmonTCP do
       case handle_tcp_data(socket, data, state) do
         {:ok, new_state} ->
           {:noreply, new_state}
-
-        {:error, reason} ->
-          Logger.warning("TCP data handling failed", error: inspect(reason), socket: inspect(socket))
-          {:noreply, state}
       end
     end)
   end
@@ -363,20 +359,17 @@ defmodule Server.Services.IronmonTCP do
   end
 
   defp process_message(message_str) do
-    with {:ok, json} <- Jason.decode(message_str),
+    with {:ok, json} <- JSON.decode(message_str),
          {:ok, message} <- validate_message(json) do
       handle_ironmon_message(message)
     else
-      {:error, %Jason.DecodeError{}} ->
-        {:error, "Invalid JSON"}
-
-      {:error, reason} ->
-        {:error, reason}
+      {:error, _reason} ->
+        {:error, "Invalid JSON or message format"}
     end
   end
 
   defp validate_message(%{"type" => type, "metadata" => metadata} = json)
-       when is_map(metadata) do
+       when is_non_struct_map(metadata) do
     case type do
       "init" ->
         validate_init_message(json)

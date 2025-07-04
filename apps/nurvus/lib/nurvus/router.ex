@@ -15,7 +15,7 @@ defmodule Nurvus.Router do
   plug(Plug.Parsers,
     parsers: [:json],
     pass: ["application/json"],
-    json_decoder: Jason
+    json_decoder: JSON
   )
 
   plug(:dispatch)
@@ -47,7 +47,7 @@ defmodule Nurvus.Router do
 
   # List all processes
   get "/api/processes" do
-    processes = Nurvus.list_processes()
+    {:ok, processes} = Nurvus.list_processes()
     send_json_response(conn, 200, %{processes: processes})
   end
 
@@ -259,7 +259,7 @@ defmodule Nurvus.Router do
   # Cross-machine health check
   get "/api/health/detailed" do
     {:ok, system_status} = Nurvus.system_status()
-    processes = Nurvus.list_processes()
+    {:ok, processes} = Nurvus.list_processes()
 
     platform_info = %{
       platform: Nurvus.Platform.current_platform(),
@@ -312,6 +312,6 @@ defmodule Nurvus.Router do
 
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(status, Jason.encode!(data))
+    |> send_resp(status, JSON.encode!(data))
   end
 end

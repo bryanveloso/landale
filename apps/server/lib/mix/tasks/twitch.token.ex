@@ -763,8 +763,8 @@ defmodule Mix.Tasks.Twitch.Token do
       load_dot_env_file()
     end
 
-    # Start only Jason for JSON parsing and Gun for HTTP requests
-    Application.ensure_all_started(:jason)
+    # Start Gun for HTTP requests (JSON is now built-in)
+    # Application.ensure_all_started(:jason) # No longer needed - JSON is built-in to Elixir 1.18
     Application.ensure_all_started(:gun)
     Application.ensure_all_started(:crypto)
   end
@@ -776,7 +776,7 @@ defmodule Mix.Tasks.Twitch.Token do
     |> Enum.each(fn line ->
       line = String.trim(line)
 
-      unless String.starts_with?(line, "#") or line == "" do
+      if !(String.starts_with?(line, "#") or line == "") do
         case String.split(line, "=", parts: 2) do
           [key, value] ->
             # Remove quotes if present
@@ -877,7 +877,7 @@ defmodule Mix.Tasks.Twitch.Token do
   defp warning_icon, do: yellow("⚠")
   defp info_icon, do: cyan("ℹ")
 
-  defp format_oauth_error({:http_error, status, body}) when is_map(body) do
+  defp format_oauth_error({:http_error, status, body}) when is_non_struct_map(body) do
     error_msg = Map.get(body, "error", "Unknown error")
     error_desc = Map.get(body, "error_description", "")
     "HTTP #{status}: #{error_msg}#{if error_desc != "", do: " - #{error_desc}", else: ""}"
@@ -969,17 +969,13 @@ defmodule Mix.Tasks.Twitch.Token do
     backup_data = Map.put(token_info, :backup_timestamp, DateTime.utc_now() |> DateTime.to_iso8601())
     backup_file = Path.join(storage_dir, "twitch_tokens_backup.json")
 
-    case Jason.encode(backup_data, pretty: true) do
-      {:ok, json_data} ->
-        File.write!(backup_file, json_data)
-
-      {:error, _reason} ->
+    try do
+      json_data = JSON.encode!(backup_data)
+      File.write!(backup_file, json_data)
+    rescue
+      _error ->
         # Backup failure is not critical, just continue
         :ok
     end
-  rescue
-    _ ->
-      # Backup failure is not critical, just continue
-      :ok
   end
 end

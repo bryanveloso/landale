@@ -332,7 +332,7 @@ defmodule Server.OAuth2Client do
   end
 
   defp parse_token_response({200, _headers, body}) do
-    case Jason.decode(body) do
+    case JSON.decode(body) do
       {:ok, data} ->
         tokens = %{
           access_token: data["access_token"],
@@ -350,7 +350,7 @@ defmodule Server.OAuth2Client do
   end
 
   defp parse_token_response({status, _headers, body}) when status >= 400 do
-    case Jason.decode(body) do
+    case JSON.decode(body) do
       {:ok, %{"error" => error}} ->
         {:error, String.to_atom(error)}
 
@@ -363,7 +363,7 @@ defmodule Server.OAuth2Client do
   end
 
   defp parse_validation_response({200, _headers, body}) do
-    case Jason.decode(body) do
+    case JSON.decode(body) do
       {:ok, data} ->
         user_info = %{
           user_id: data["user_id"],
@@ -380,7 +380,7 @@ defmodule Server.OAuth2Client do
   end
 
   defp parse_validation_response({status, _headers, body}) when status >= 400 do
-    case Jason.decode(body) do
+    case JSON.decode(body) do
       {:ok, %{"error" => error}} ->
         {:error, String.to_atom(error)}
 

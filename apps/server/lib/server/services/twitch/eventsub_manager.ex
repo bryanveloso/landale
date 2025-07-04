@@ -184,7 +184,7 @@ defmodule Server.Services.Twitch.EventSubManager do
       "transport" => transport
     }
 
-    json_body = Jason.encode!(body)
+    json_body = JSON.encode!(body)
 
     Logger.debug("Subscription creation started",
       event_type: event_type,
@@ -198,7 +198,7 @@ defmodule Server.Services.Twitch.EventSubManager do
            make_subscription_request(url, headers, json_body)
          end) do
       {:ok, response_body} ->
-        case Jason.decode(response_body) do
+        case JSON.decode(response_body) do
           {:ok, %{"data" => [subscription]}} ->
             Logger.info("Subscription created",
               event_type: event_type,
@@ -536,14 +536,14 @@ defmodule Server.Services.Twitch.EventSubManager do
   - Unique string key for the subscription
   """
   @spec generate_subscription_key(binary(), map()) :: binary()
-  def generate_subscription_key(event_type, condition) when is_map(condition) do
+  def generate_subscription_key(event_type, condition) when is_non_struct_map(condition) do
     # Sort condition keys for consistent key generation
     sorted_condition =
       condition
       |> Enum.sort()
       |> Enum.into(%{})
 
-    "#{event_type}:#{Jason.encode!(sorted_condition)}"
+    "#{event_type}:#{JSON.encode!(sorted_condition)}"
   end
 
   # Builds the appropriate condition map for different EventSub event types.
@@ -634,7 +634,7 @@ defmodule Server.Services.Twitch.EventSubManager do
   end
 
   defp parse_subscription_response({status, _headers, response_body}) do
-    case Jason.decode(response_body) do
+    case JSON.decode(response_body) do
       {:ok, %{"message" => message}} -> {:error, message}
       {:ok, %{"error" => error}} -> {:error, error}
       _ -> {:error, {:http_error, status, response_body}}

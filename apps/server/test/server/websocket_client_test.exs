@@ -1,6 +1,8 @@
 defmodule Server.WebSocketClientTest do
   use ExUnit.Case, async: true
 
+  @moduletag :unit
+
   alias Server.WebSocketClient
 
   describe "new/3" do
@@ -17,8 +19,8 @@ defmodule Server.WebSocketClientTest do
       assert client.uri.scheme == "ws"
       assert client.conn_pid == nil
       assert client.stream_ref == nil
-      assert client.reconnect_interval == 1_000
-      assert client.connection_timeout == 3_000
+      assert client.reconnect_interval == Duration.new!(second: 1)
+      assert client.connection_timeout == Duration.new!(second: 3)
       assert client.telemetry_prefix == [:server, :websocket]
     end
 
@@ -27,8 +29,8 @@ defmodule Server.WebSocketClientTest do
       owner_pid = self()
 
       opts = [
-        reconnect_interval: 10_000,
-        connection_timeout: 30_000,
+        reconnect_interval: Duration.new!(second: 10),
+        connection_timeout: Duration.new!(second: 30),
         telemetry_prefix: [:custom, :prefix]
       ]
 
@@ -38,8 +40,8 @@ defmodule Server.WebSocketClientTest do
       assert client.uri.host == "example.com"
       assert client.uri.port == 443
       assert client.uri.scheme == "wss"
-      assert client.reconnect_interval == 10_000
-      assert client.connection_timeout == 30_000
+      assert client.reconnect_interval == Duration.new!(second: 10)
+      assert client.connection_timeout == Duration.new!(second: 30)
       assert client.telemetry_prefix == [:custom, :prefix]
     end
 

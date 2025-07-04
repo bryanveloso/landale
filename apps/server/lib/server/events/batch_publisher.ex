@@ -171,11 +171,11 @@ defmodule Server.Events.BatchPublisher do
   defp prepare_event_for_batch({_topic, event, timestamp}) do
     # Extract the actual event data from the tuple if needed
     case event do
-      {event_type, event_map} when is_map(event_map) ->
+      {event_type, event_map} when is_non_struct_map(event_map) ->
         Map.put(event_map, :event_type, event_type)
         |> Map.put(:batch_timestamp, timestamp)
 
-      event_map when is_map(event_map) ->
+      event_map when is_non_struct_map(event_map) ->
         Map.put(event_map, :batch_timestamp, timestamp)
 
       _ ->

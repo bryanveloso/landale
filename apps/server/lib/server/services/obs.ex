@@ -771,7 +771,7 @@ defmodule Server.Services.OBS do
 
       {:error, new_state} ->
         # Schedule reconnect with ConnectionManager tracking
-        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
         updated_connection_manager =
           Server.ConnectionManager.add_timer(
@@ -854,7 +854,7 @@ defmodule Server.Services.OBS do
         |> cleanup_connection()
 
       # Schedule reconnect
-      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
       updated_connection_manager =
         Server.ConnectionManager.add_timer(
@@ -923,7 +923,7 @@ defmodule Server.Services.OBS do
 
           # Only schedule reconnect for recoverable errors
           if should_reconnect do
-            timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+            timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
             updated_connection_manager =
               Server.ConnectionManager.add_timer(
@@ -970,7 +970,7 @@ defmodule Server.Services.OBS do
       Server.Events.publish_obs_event("connection_lost", %{})
 
       # Schedule reconnect with ConnectionManager tracking
-      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
       updated_connection_manager =
         Server.ConnectionManager.add_timer(
@@ -1006,7 +1006,7 @@ defmodule Server.Services.OBS do
         |> cleanup_connection()
 
       # Schedule reconnect with ConnectionManager tracking
-      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
       updated_connection_manager =
         Server.ConnectionManager.add_timer(
@@ -1041,7 +1041,7 @@ defmodule Server.Services.OBS do
         |> cleanup_connection()
 
       # Schedule reconnect with ConnectionManager tracking
-      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
       updated_connection_manager =
         Server.ConnectionManager.add_timer(
@@ -1098,7 +1098,7 @@ defmodule Server.Services.OBS do
       Server.Events.publish_obs_event("connection_lost", %{})
 
       # Schedule reconnect
-      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
       # Track reconnect timer with ConnectionManager
       final_connection_manager =
@@ -1152,7 +1152,7 @@ defmodule Server.Services.OBS do
       # HTTP/1.1 protocol for WebSocket compatibility
       protocols: [:http],
       # Connection timeout
-      connect_timeout: Server.NetworkConfig.connection_timeout()
+      connect_timeout: Server.NetworkConfig.connection_timeout_ms()
     }
 
     case :gun.open(host, port, gun_opts) do
@@ -1243,7 +1243,7 @@ defmodule Server.Services.OBS do
   defp handle_obs_message(state, message_json) do
     Logger.debug("Raw OBS message received", message: String.slice(message_json, 0, 200))
 
-    case Jason.decode(message_json) do
+    case JSON.decode(message_json) do
       {:ok, %{"op" => op} = message} ->
         message_type =
           case op do
@@ -1457,7 +1457,7 @@ defmodule Server.Services.OBS do
     Logger.debug("OBS Event received",
       event_type: event_type,
       event_intent: event_intent,
-      has_data: event_data != %{}
+      has_data: map_size(event_data) > 0
     )
 
     # Verify client is subscribed to this event intent
@@ -1482,7 +1482,7 @@ defmodule Server.Services.OBS do
     Logger.info("OBS Request received",
       request_type: request_type,
       request_id: request_id,
-      has_data: request_data_payload != %{}
+      has_data: map_size(request_data_payload) > 0
     )
 
     # Validate request format according to OBS WebSocket v5 spec
@@ -1722,7 +1722,7 @@ defmodule Server.Services.OBS do
   defp send_websocket_message(state, message) do
     cond do
       # Always allow protocol handshake messages (Hello=0, Identify=1, Identified=2)
-      message["op"] in [0, 1, 2] and state.conn_pid && state.stream_ref ->
+      (message["op"] in [0, 1, 2] and state.conn_pid) && state.stream_ref ->
         Logger.debug("Sending protocol handshake message", message_type: get_message_type(message))
         send_message_now(state, message)
 
@@ -1748,7 +1748,7 @@ defmodule Server.Services.OBS do
   end
 
   defp send_message_now(state, message) do
-    json_message = Jason.encode!(message)
+    json_message = JSON.encode!(message)
 
     # Count outgoing message and log details
     current_outgoing = state.websocket_outgoing_messages || 0
@@ -2049,7 +2049,7 @@ defmodule Server.Services.OBS do
   # Direct message sending without authentication checks (for internal use)
   defp send_websocket_message_direct(state, message) do
     if state.conn_pid && state.stream_ref do
-      json_message = Jason.encode!(message)
+      json_message = JSON.encode!(message)
 
       case :gun.ws_send(state.conn_pid, state.stream_ref, {:text, json_message}) do
         :ok -> :ok

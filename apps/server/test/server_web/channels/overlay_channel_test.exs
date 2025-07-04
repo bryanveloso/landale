@@ -2,6 +2,8 @@ defmodule ServerWeb.OverlayChannelTest do
   use ServerWeb.ChannelCase
   import Hammox
 
+  @moduletag :web
+
   alias ServerWeb.{OverlayChannel, UserSocket}
   alias Server.Mocks.{IronmonTCPMock, OBSMock, RainwaveMock, TwitchMock}
 

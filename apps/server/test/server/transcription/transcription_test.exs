@@ -1,6 +1,8 @@
 defmodule Server.Transcription.TranscriptionTest do
   use Server.DataCase, async: true
 
+  @moduletag :database
+
   alias Server.Transcription.Transcription
 
   describe "changeset/2" do

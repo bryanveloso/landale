@@ -13,7 +13,7 @@ defmodule Nurvus.ProcessMonitor do
   require Logger
 
   # 30 seconds
-  @default_check_interval 30_000
+  @default_check_interval Duration.new!(second: 30)
   @default_history_limit 100
 
   defstruct [
@@ -130,7 +130,12 @@ defmodule Nurvus.ProcessMonitor do
 
   ## Private Functions
 
-  defp schedule_health_check(interval) do
+  defp schedule_health_check(%Duration{} = interval) do
+    interval_ms = System.convert_time_unit(interval.second, :second, :millisecond)
+    Process.send_after(self(), :health_check, interval_ms)
+  end
+
+  defp schedule_health_check(interval) when is_integer(interval) do
     Process.send_after(self(), :health_check, interval)
   end
 

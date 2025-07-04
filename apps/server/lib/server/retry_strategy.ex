@@ -258,10 +258,10 @@ defmodule Server.RetryStrategy do
 
   defp calculate_delay(attempt, config) do
     # Calculate exponential backoff: base_delay * (backoff_factor ^ (attempt - 1))
-    delay = round(config.base_delay * :math.pow(config.backoff_factor, attempt - 1))
+    delay_ms = round(config.base_delay * :math.pow(config.backoff_factor, attempt - 1))
 
     # Apply maximum delay limit
-    capped_delay = min(delay, config.max_delay)
+    capped_delay = min(delay_ms, config.max_delay)
 
     # Add jitter if enabled
     if config.jitter do

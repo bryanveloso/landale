@@ -51,8 +51,8 @@ defmodule Server.WebSocketClient do
           monitor_ref: reference() | nil,
           connection_start_time: integer() | nil,
           reconnect_timer: reference() | nil,
-          reconnect_interval: integer(),
-          connection_timeout: integer(),
+          reconnect_interval: Duration.t(),
+          connection_timeout: Duration.t(),
           telemetry_prefix: [atom()],
           connection_manager: Server.ConnectionManager.connection_state()
         }
@@ -66,8 +66,8 @@ defmodule Server.WebSocketClient do
   - `url` - WebSocket URL to connect to
   - `owner_pid` - Process that will receive WebSocket events
   - `opts` - Optional configuration
-    - `:reconnect_interval` - Time between reconnection attempts (default: 5000ms)
-    - `:connection_timeout` - Connection timeout (default: 10000ms)
+    - `:reconnect_interval` - Time between reconnection attempts (default: 5 seconds)
+    - `:connection_timeout` - Connection timeout (default: 10 seconds)
     - `:telemetry_prefix` - Telemetry event prefix (default: [:server, :websocket])
 
   ## Returns
@@ -151,8 +151,9 @@ defmodule Server.WebSocketClient do
       )
 
     websocket_config = Server.NetworkConfig.websocket_config()
+    timeout_ms = System.convert_time_unit(websocket_config.timeout.second, :second, :millisecond)
 
-    case :gun.await_up(conn_pid, websocket_config.timeout) do
+    case :gun.await_up(conn_pid, timeout_ms) do
       {:ok, _protocol} ->
         complete_websocket_setup(client, conn_pid, monitor_ref, updated_connection_manager, path, opts)
 
@@ -227,7 +228,7 @@ defmodule Server.WebSocketClient do
       frame =
         case message do
           binary when is_binary(binary) -> {:text, binary}
-          data -> {:text, Jason.encode!(data)}
+          data -> {:text, JSON.encode!(data)}
         end
 
       :gun.ws_send(client.conn_pid, client.stream_ref, frame)
@@ -269,12 +270,14 @@ defmodule Server.WebSocketClient do
   def schedule_reconnect(client) do
     client = cancel_reconnect_timer(client)
 
+    interval_ms = System.convert_time_unit(client.reconnect_interval.second, :second, :millisecond)
+
     Logger.info("Reconnection scheduled",
       url: client.url,
-      interval: client.reconnect_interval
+      interval: interval_ms
     )
 
-    timer = Process.send_after(client.owner_pid, {:websocket_reconnect, client}, client.reconnect_interval)
+    timer = Process.send_after(client.owner_pid, {:websocket_reconnect, client}, interval_ms)
 
     # Track timer with ConnectionManager
     updated_connection_manager =

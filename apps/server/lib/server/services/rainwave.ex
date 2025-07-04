@@ -236,7 +236,7 @@ defmodule Server.Services.Rainwave do
   end
 
   defp normalize_station_id(station) when is_integer(station) do
-    if station in 1..5, do: station, else: @stations.covers
+    if station in 1..5//1, do: station, else: @stations.covers
   end
 
   defp normalize_station_id(_), do: @stations.covers
@@ -327,14 +327,14 @@ defmodule Server.Services.Rainwave do
   end
 
   defp parse_api_response({200, _headers, body}) do
-    case Jason.decode(body) do
+    case JSON.decode(body) do
       {:ok, data} -> {:ok, data}
       {:error, reason} -> {:error, {:json_decode_error, reason}}
     end
   end
 
   defp parse_api_response({status, _headers, body}) when status >= 400 do
-    case Jason.decode(body) do
+    case JSON.decode(body) do
       {:ok, %{"error" => error}} ->
         {:error, String.to_atom(error)}
 
@@ -387,7 +387,7 @@ defmodule Server.Services.Rainwave do
 
   defp extract_current_song(data) do
     case Map.get(data, "sched_current") do
-      %{"songs" => [song | _]} = sched when is_map(song) ->
+      %{"songs" => [song | _]} = sched when is_non_struct_map(song) ->
         %{
           title: Map.get(song, "title", "Unknown"),
           artist: extract_artists(song),
@@ -418,14 +418,14 @@ defmodule Server.Services.Rainwave do
 
   defp extract_album(song) do
     case Map.get(song, "albums") do
-      [album | _] when is_map(album) -> Map.get(album, "name", "Unknown")
+      [album | _] when is_non_struct_map(album) -> Map.get(album, "name", "Unknown")
       _ -> "Unknown"
     end
   end
 
   defp extract_album_art(song) do
     case Map.get(song, "albums") do
-      [album | _] when is_map(album) ->
+      [album | _] when is_non_struct_map(album) ->
         case Map.get(album, "art") do
           art when is_binary(art) -> "https://rainwave.cc#{art}_320.jpg"
           _ -> nil

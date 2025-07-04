@@ -237,8 +237,7 @@ defmodule ServerWeb.HealthController do
       end
     rescue
       e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
-      e in GenServer.CallError -> %{connected: false, error: "Service call failed: #{e.message}"}
-      _other -> %{connected: false, error: "Service unavailable"}
+      e -> %{connected: false, error: "Service call failed: #{inspect(e)}"}
     catch
       :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
     end
@@ -252,8 +251,7 @@ defmodule ServerWeb.HealthController do
       end
     rescue
       e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
-      e in GenServer.CallError -> %{connected: false, error: "Service call failed: #{e.message}"}
-      _other -> %{connected: false, error: "Service unavailable"}
+      e -> %{connected: false, error: "Service call failed: #{inspect(e)}"}
     catch
       :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
     end

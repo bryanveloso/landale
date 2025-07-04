@@ -1,6 +1,8 @@
 defmodule ServerWeb.DashboardChannelTest do
   use ServerWeb.ChannelCase
 
+  @moduletag :web
+
   setup do
     {:ok, _, socket} =
       ServerWeb.UserSocket
