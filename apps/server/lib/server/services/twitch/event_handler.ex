@@ -234,6 +234,9 @@ defmodule Server.Services.Twitch.EventHandler do
       "channel.chat.message_delete" ->
         Phoenix.PubSub.broadcast(Server.PubSub, "chat", {:message_delete, normalized_event})
 
+      "channel.update" ->
+        Phoenix.PubSub.broadcast(Server.PubSub, "channel:updates", {:channel_update, normalized_event})
+
       _ ->
         # For other events, just use the general topic
         :ok
