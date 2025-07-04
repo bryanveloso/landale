@@ -163,6 +163,39 @@ defmodule Server.NetworkConfig do
     reconnect_interval() |> duration_to_millisecond()
   end
 
+  @doc """
+  Gets websocket timeout in milliseconds for :gun functions.
+
+  ## Returns
+  - WebSocket timeout in milliseconds as integer
+  """
+  @spec websocket_timeout_ms() :: integer()
+  def websocket_timeout_ms do
+    websocket_config().timeout |> duration_to_millisecond()
+  end
+
+  @doc """
+  Gets HTTP timeout in milliseconds for :gun functions.
+
+  ## Returns
+  - HTTP timeout in milliseconds as integer
+  """
+  @spec http_timeout_ms() :: integer()
+  def http_timeout_ms do
+    http_config().timeout |> duration_to_millisecond()
+  end
+
+  @doc """
+  Gets HTTP receive timeout in milliseconds for :gun functions.
+
+  ## Returns
+  - HTTP receive timeout in milliseconds as integer
+  """
+  @spec http_receive_timeout_ms() :: integer()
+  def http_receive_timeout_ms do
+    http_config().receive_timeout |> duration_to_millisecond()
+  end
+
   # Helper function to convert Duration to milliseconds
   defp duration_to_millisecond(%Duration{} = duration) do
     System.convert_time_unit(duration.second, :second, :millisecond)

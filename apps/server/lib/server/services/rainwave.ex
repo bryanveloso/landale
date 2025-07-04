@@ -287,12 +287,13 @@ defmodule Server.Services.Rainwave do
       {"accept", "application/json"}
     ]
 
-    http_config = Server.NetworkConfig.http_config()
+    timeout_ms = Server.NetworkConfig.http_timeout_ms()
+    receive_timeout_ms = Server.NetworkConfig.http_receive_timeout_ms()
 
     with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
-         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, http_config.timeout),
+         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, timeout_ms),
          stream_ref <- :gun.post(conn_pid, String.to_charlist(uri.path), headers, body),
-         {:ok, response} <- await_response(conn_pid, stream_ref, http_config.receive_timeout) do
+         {:ok, response} <- await_response(conn_pid, stream_ref, receive_timeout_ms) do
       :gun.close(conn_pid)
       parse_api_response(response)
     else

@@ -244,7 +244,7 @@ defmodule Server.Services.Twitch.EventSubManager do
   @spec make_subscription_request(binary(), list(), binary()) :: {:ok, binary()} | {:error, term()}
   defp make_subscription_request(url, headers, json_body) do
     uri = URI.parse(url)
-    http_config = Server.NetworkConfig.http_config()
+    timeout_ms = Server.NetworkConfig.http_timeout_ms()
 
     gun_headers = Enum.map(headers, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end)
 
@@ -254,9 +254,9 @@ defmodule Server.Services.Twitch.EventSubManager do
     path = String.to_charlist(uri.path || "/")
 
     with {:ok, conn_pid} <- :gun.open(host, port, gun_opts(uri)),
-         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, http_config.timeout),
+         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, timeout_ms),
          stream_ref <- :gun.post(conn_pid, path, gun_headers, json_body),
-         {:ok, response} <- await_response(conn_pid, stream_ref, http_config.timeout) do
+         {:ok, response} <- await_response(conn_pid, stream_ref, timeout_ms) do
       :gun.close(conn_pid)
       parse_subscription_response(response)
     else
@@ -322,7 +322,7 @@ defmodule Server.Services.Twitch.EventSubManager do
   @spec make_delete_request(binary(), list()) :: {:ok, atom()} | {:error, term()}
   defp make_delete_request(url, headers) do
     uri = URI.parse(url)
-    http_config = Server.NetworkConfig.http_config()
+    timeout_ms = Server.NetworkConfig.http_timeout_ms()
 
     gun_headers = Enum.map(headers, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end)
 
@@ -332,9 +332,9 @@ defmodule Server.Services.Twitch.EventSubManager do
     path_with_query = String.to_charlist("#{uri.path || "/"}#{if uri.query, do: "?#{uri.query}", else: ""}")
 
     with {:ok, conn_pid} <- :gun.open(host, port, gun_opts(uri)),
-         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, http_config.timeout),
+         {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, timeout_ms),
          stream_ref <- :gun.delete(conn_pid, path_with_query, gun_headers),
-         {:ok, response} <- await_response(conn_pid, stream_ref, http_config.timeout) do
+         {:ok, response} <- await_response(conn_pid, stream_ref, timeout_ms) do
       :gun.close(conn_pid)
       parse_delete_response(response)
     else

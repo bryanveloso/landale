@@ -1165,9 +1165,9 @@ defmodule Server.Services.OBS do
             :obs_connection
           )
 
-        websocket_config = Server.NetworkConfig.websocket_config()
+        timeout_ms = Server.NetworkConfig.websocket_timeout_ms()
 
-        case :gun.await_up(conn_pid, websocket_config.timeout) do
+        case :gun.await_up(conn_pid, timeout_ms) do
           {:ok, protocol} ->
             Logger.debug("Gun connection established",
               conn_pid: inspect(conn_pid),
