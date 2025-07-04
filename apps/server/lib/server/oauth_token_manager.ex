@@ -26,23 +26,23 @@ defmodule Server.OAuthTokenManager do
         validate_url: "https://id.twitch.tv/oauth2/validate",
         telemetry_prefix: [:server, :twitch, :oauth]
       )
-      
+
       # Load existing tokens
       manager = OAuthTokenManager.load_tokens(manager)
-      
+
       # Get current valid token (auto-refreshes if needed)
       case OAuthTokenManager.get_valid_token(manager) do
-        {:ok, token, updated_manager} -> 
+        {:ok, token, updated_manager} ->
           # Use token for API calls
-        {:error, reason} -> 
+        {:error, reason} ->
           # Handle token unavailable
       end
-      
+
       # Manually refresh token
       case OAuthTokenManager.refresh_token(manager) do
-        {:ok, updated_manager} -> 
+        {:ok, updated_manager} ->
           # Token refreshed successfully
-        {:error, reason} -> 
+        {:error, reason} ->
           # Refresh failed
       end
   """

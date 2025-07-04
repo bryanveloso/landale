@@ -39,7 +39,7 @@ COPY priv ./priv
 RUN mix compile && \
     mix release
 
-# Production runtime stage  
+# Production runtime stage
 FROM elixir:1.18.4-otp-26-slim AS runtime
 
 # Install runtime dependencies (minimal since base image includes Erlang/Elixir)

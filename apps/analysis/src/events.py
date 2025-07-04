@@ -1,10 +1,13 @@
 """Event models for stream analysis."""
-from typing import List, Optional, Literal
+
+from typing import List, Literal, Optional
+
 from pydantic import BaseModel, Field
 
 
 class TranscriptionEvent(BaseModel):
     """Audio transcription event from phononmaser."""
+
     timestamp: int
     text: str
     duration: float
@@ -13,24 +16,27 @@ class TranscriptionEvent(BaseModel):
 
 class ChatMessage(BaseModel):
     """Chat message event from server."""
+
     timestamp: int
     username: str
     message: str
     emotes: List[str] = Field(default_factory=list)
     is_subscriber: bool = False
     is_moderator: bool = False
-    
-    
+
+
 class EmoteEvent(BaseModel):
     """Emote usage event from server."""
+
     timestamp: int
     username: str
     emote_name: str
     emote_id: Optional[str] = None
-    
+
 
 class StreamPatterns(BaseModel):
     """Detected patterns in stream content."""
+
     technical_discussion: float = Field(ge=0, le=1)
     excitement: float = Field(ge=0, le=1)
     frustration: float = Field(ge=0, le=1)
@@ -41,6 +47,7 @@ class StreamPatterns(BaseModel):
 
 class StreamDynamics(BaseModel):
     """How patterns are changing over time."""
+
     technical_discussion: Literal["increasing", "decreasing", "stable", "fluctuating"]
     excitement: Literal["increasing", "decreasing", "stable", "fluctuating"]
     frustration: Literal["increasing", "decreasing", "stable", "fluctuating"]
@@ -51,16 +58,19 @@ class StreamDynamics(BaseModel):
 
 class AnalysisResult(BaseModel):
     """Complete analysis of stream segment."""
+
     timestamp: int
     patterns: StreamPatterns
     dynamics: Optional[StreamDynamics] = None
     sentiment: Literal["positive", "negative", "neutral", "mixed"]
-    sentiment_trajectory: Optional[Literal["improving", "declining", "stable", "swinging"]] = None
+    sentiment_trajectory: Optional[
+        Literal["improving", "declining", "stable", "swinging"]
+    ] = None
     topics: List[str] = Field(default_factory=list)
     context: str
     suggested_actions: List[str] = Field(default_factory=list)
     stream_momentum: Optional[dict] = None
-    
+
     # Correlation data
     transcription_context: str
     chat_context: Optional[str] = None

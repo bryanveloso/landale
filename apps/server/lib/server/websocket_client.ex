@@ -11,7 +11,7 @@ defmodule Server.WebSocketClient do
       defmodule MyService do
         use GenServer
         alias Server.WebSocketClient
-        
+
         # In your GenServer
         def init(_opts) do
           state = %{
@@ -20,17 +20,17 @@ defmodule Server.WebSocketClient do
           }
           {:ok, state}
         end
-        
+
         def handle_info({:websocket_connected, client}, state) do
           # Handle successful connection
           {:noreply, %{state | ws_client: client}}
         end
-        
+
         def handle_info({:websocket_disconnected, client, reason}, state) do
           # Handle disconnection
           {:noreply, %{state | ws_client: client}}
         end
-        
+
         def handle_info({:websocket_message, client, message}, state) do
           # Handle incoming messages
           {:noreply, %{state | ws_client: client}}

@@ -19,19 +19,19 @@ defmodule Nurvus do
       # Add a process
       Nurvus.add_process(%{
         id: "my_app",
-        name: "My Application", 
+        name: "My Application",
         command: "bun",
         args: ["run", "start"],
         cwd: "/path/to/app",
         auto_restart: true
       })
-      
+
       # Start the process
       Nurvus.start_process("my_app")
-      
+
       # Check status
       Nurvus.get_status("my_app")
-      
+
       # List all processes
       Nurvus.list_processes()
   """

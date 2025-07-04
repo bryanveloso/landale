@@ -48,3 +48,63 @@ To run:
 ```bash
 bun run index.ts
 ```
+
+## Code Quality & Pre-commit Hooks
+
+This project uses [pre-commit](https://pre-commit.com/) to ensure code quality and consistency across all languages (Elixir, TypeScript/JavaScript, Python). Pre-commit hooks automatically run before each commit to:
+
+- Format code consistently
+- Check for syntax errors
+- Run linters and static analysis
+- Validate configuration files
+- Fix common issues (trailing whitespace, missing newlines, etc.)
+
+### Quick Setup
+
+```bash
+# Install pre-commit and setup hooks
+./scripts/setup-pre-commit.sh
+```
+
+### Manual Setup
+
+```bash
+# Install pre-commit framework
+pip install pre-commit
+
+# Install Python development dependencies
+pip install -r requirements-dev.txt
+
+# Install hooks
+bun run pre-commit:install
+
+# Test the setup
+bun run pre-commit:run
+```
+
+### Supported Tools
+
+- **Elixir**: `mix format`, `credo`, `mix compile`
+- **TypeScript/JavaScript**: `eslint`, `prettier`, `tsc`
+- **Python**: `black`, `isort`, `flake8`, `mypy`
+- **General**: File validation, whitespace cleanup, merge conflict detection
+
+### Usage
+
+Pre-commit hooks run automatically on `git commit`. For manual execution:
+
+```bash
+# Run all hooks on all files
+bun run pre-commit:run
+
+# Run hooks on staged files only
+bun run pre-commit:run-staged
+
+# Update hooks to latest versions
+bun run pre-commit:update
+
+# Skip hooks temporarily (not recommended)
+git commit --no-verify
+```
+
+For detailed setup instructions and troubleshooting, see [Pre-commit Setup Guide](docs/PRE_COMMIT_SETUP.md).

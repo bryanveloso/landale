@@ -24,7 +24,7 @@ sql_content = File.read!("ironmon_export.sql")
 # Transform column names from camelCase to snake_case
 transformed_sql = sql_content
 |> String.replace(~r/"challengeId"/, "challenge_id")
-|> String.replace(~r/"checkpointId"/, "checkpoint_id") 
+|> String.replace(~r/"checkpointId"/, "checkpoint_id")
 |> String.replace(~r/"seedId"/, "seed_id")
 
 IO.puts "Importing IronMON data..."
@@ -33,22 +33,22 @@ IO.puts "Importing IronMON data..."
 case Repo.query(transformed_sql) do
   {:ok, _} ->
     IO.puts "✅ IronMON data imported successfully!"
-    
+
     # Show import summary
     challenges_count = Repo.aggregate(Challenge, :count, :id)
     checkpoints_count = Repo.aggregate(Checkpoint, :count, :id)
     seeds_count = Repo.aggregate(Seed, :count, :id)
     results_count = Repo.aggregate(Result, :count, :id)
-    
+
     IO.puts """
-    
+
     Import Summary:
     - Challenges: #{challenges_count}
     - Checkpoints: #{checkpoints_count}
     - Seeds: #{seeds_count}
     - Results: #{results_count}
     """
-    
+
   {:error, error} ->
     IO.puts "❌ Error importing data:"
     IO.puts inspect(error)

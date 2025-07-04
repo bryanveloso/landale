@@ -1,9 +1,9 @@
 /**
  * Avalonstar Channel Emote Repository
- * 
+ *
  * Contains the actual 102 channel-specific emotes from avalonstar's Twitch channel
  * with their real meanings and contexts for AI-driven emote selection.
- * 
+ *
  * Shared across dashboard, overlays, and phononmaser for consistent emote handling.
  */
 
@@ -153,7 +153,7 @@ export class AvalonstarEmoteRepository {
     const matches: EmoteMapping[] = []
 
     for (const emote of Object.values(AVALONSTAR_EMOTES)) {
-      const hasMatch = emote.keywords.some(keyword => 
+      const hasMatch = emote.keywords.some(keyword =>
         lowerText.includes(keyword.toLowerCase())
       )
       if (hasMatch) {
@@ -176,7 +176,7 @@ export class AvalonstarEmoteRepository {
    */
   selectEmotesForEmotion(emotion: EmoteAnalysis['emotion'], intensity: number): string[] {
     let category: EmoteMapping['category']
-    
+
     switch (emotion) {
       case 'excited':
       case 'hype':
@@ -199,16 +199,16 @@ export class AvalonstarEmoteRepository {
     }
 
     const categoryEmotes = Object.values(AVALONSTAR_EMOTES).filter(emote => emote.category === category)
-    
+
     // Filter by intensity (higher AI intensity = higher emote intensity)
     const targetIntensity = intensity >= 7 ? 3 : intensity >= 4 ? 2 : 1
     const filteredEmotes = categoryEmotes.filter(emote => emote.intensity <= targetIntensity)
-    
+
     // Return emote names, or fallback to some channel emotes if no matches
     if (filteredEmotes.length > 0) {
       return filteredEmotes.map(emote => emote.name)
     }
-    
+
     // Fallback: return a few channel emotes based on basic emotion
     return this.getFallbackEmotes(emotion).slice(0, 3)
   }

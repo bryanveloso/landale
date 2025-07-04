@@ -12,7 +12,7 @@ def load_services_config():
     # Find the services.json file relative to this module
     # From apps/phononmaser/src to packages/service-config
     config_path = Path(__file__).parent.parent.parent.parent / "packages" / "service-config" / "services.json"
-    
+
     try:
         with open(config_path, 'r') as f:
             config = json.load(f)
@@ -35,11 +35,11 @@ def get_service_host(service: str) -> str:
 def get_service_port(service: str, port_type: str = 'http') -> int:
     """Get the port for a service"""
     default_port = SERVICES.get(service, {}).get('ports', {}).get(port_type, 0)
-    
+
     # Special handling for SEQ_PORT environment variable
     if service == 'seq' and port_type == 'http':
         return int(os.getenv('SEQ_PORT', str(default_port)))
-    
+
     return default_port
 
 

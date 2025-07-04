@@ -19,7 +19,7 @@ defmodule Server.OAuth2Client do
 
       # Exchange authorization code for tokens
       case OAuth2Client.exchange_code(client, code, redirect_uri) do
-        {:ok, tokens} -> 
+        {:ok, tokens} ->
           # tokens contains access_token, refresh_token, expires_in, scope
         {:error, reason} ->
           # Handle error
@@ -30,7 +30,7 @@ defmodule Server.OAuth2Client do
         {:ok, new_tokens} ->
           # Use new tokens
         {:error, reason} ->
-          # Handle refresh failure  
+          # Handle refresh failure
       end
 
       # Validate token
@@ -46,7 +46,7 @@ defmodule Server.OAuth2Client do
   The client requires these configuration parameters:
 
   - `:auth_url` - OAuth2 authorization endpoint URL
-  - `:token_url` - OAuth2 token endpoint URL  
+  - `:token_url` - OAuth2 token endpoint URL
   - `:validate_url` - Token validation endpoint URL (optional)
   - `:client_id` - OAuth2 client ID
   - `:client_secret` - OAuth2 client secret

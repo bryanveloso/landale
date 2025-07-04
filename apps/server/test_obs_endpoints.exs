@@ -458,7 +458,7 @@ defmodule OBSEndpointTester do
         cond do
           # Success codes
           code >= 100 and code <= 199 -> errors
-          # Some Error codes  
+          # Some Error codes
           code >= 200 and code <= 299 -> errors
           # Request Error codes
           code >= 300 and code <= 399 -> errors

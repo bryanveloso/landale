@@ -29,7 +29,7 @@ defmodule Server.Transcription do
 
       iex> list_transcriptions(limit: 10)
       [%Transcription{}, ...]
-      
+
       iex> list_transcriptions(stream_session_id: "stream_2024_01_15")
       [%Transcription{}, ...]
   """
@@ -67,7 +67,7 @@ defmodule Server.Transcription do
 
       iex> create_transcription(%{text: "Hello world", duration: 1.5, timestamp: DateTime.utc_now()})
       {:ok, %Transcription{}}
-      
+
       iex> create_transcription(%{text: ""})
       {:error, %Ecto.Changeset{}}
   """

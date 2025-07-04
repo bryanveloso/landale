@@ -11,29 +11,29 @@ logger = logging.getLogger(__name__)
 
 class LMSClient:
     """Client for LM Studio API."""
-    
+
     def __init__(self, api_url: str = "http://zelan:1234/v1", model: str = "dolphin-2.9.3-llama-3-8b"):
         self.api_url = api_url
         self.model = model
         self.session: Optional[aiohttp.ClientSession] = None
-        
+
     async def __aenter__(self):
         """Async context manager entry."""
         self.session = aiohttp.ClientSession()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         if self.session:
             await self.session.close()
-            
+
     async def analyze(self, transcription_context: str, chat_context: Optional[str] = None) -> Optional[AnalysisResult]:
         """Analyze stream context and return insights."""
         if not self.session:
             raise RuntimeError("LMSClient must be used as async context manager")
-            
+
         prompt = self._build_prompt(transcription_context, chat_context)
-        
+
         try:
             async with self.session.post(
                 f"{self.api_url}/chat/completions",
@@ -56,13 +56,13 @@ class LMSClient:
                 if response.status != 200:
                     logger.error(f"LMS API error: {response.status}")
                     return None
-                    
+
                 data = await response.json()
                 content = data["choices"][0]["message"]["content"]
-                
+
                 # Parse JSON response
                 result_data = json.loads(content)
-                
+
                 # Convert to AnalysisResult
                 return AnalysisResult(
                     timestamp=int(result_data.get("timestamp", 0)),
@@ -77,18 +77,18 @@ class LMSClient:
                     transcription_context=transcription_context,
                     chat_context=chat_context
                 )
-                
+
         except Exception as e:
             logger.error(f"Failed to analyze with LMS: {e}")
             return None
-            
+
     def _build_prompt(self, transcription_context: str, chat_context: Optional[str] = None) -> str:
         """Build analysis prompt with available context."""
         base_prompt = f"""You are analyzing a streamer's content. This represents the last 2 minutes.
 
 Streamer's speech: "{transcription_context}"
 """
-        
+
         if chat_context:
             base_prompt += f"""
 Chat reactions: "{chat_context}"
@@ -98,7 +98,7 @@ Analyze BOTH the streamer's words AND how chat is reacting. Consider:
 - What emotions or reactions is chat showing?
 - Are there any disconnects between streamer mood and chat mood?
 """
-        
+
         base_prompt += """
 Provide analysis of:
 1. Current patterns and their intensity (0.0-1.0)
@@ -136,5 +136,5 @@ Respond with JSON in this exact format:
     "direction": "ramping_up|winding_down|steady_state|chaotic"
   }
 }"""
-        
+
         return base_prompt

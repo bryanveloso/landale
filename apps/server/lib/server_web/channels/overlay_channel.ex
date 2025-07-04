@@ -8,7 +8,7 @@ defmodule ServerWeb.OverlayChannel do
   ## Supported Topics
 
   - `overlay:obs` - OBS status, scenes, stream/recording state, stats
-  - `overlay:twitch` - Twitch events and connection status  
+  - `overlay:twitch` - Twitch events and connection status
   - `overlay:ironmon` - IronMON challenges, stats, results, runs
   - `overlay:music` - Rainwave music service status and configuration
   - `overlay:system` - System health, service status, control information
@@ -27,7 +27,7 @@ defmodule ServerWeb.OverlayChannel do
   - `obs:virtual_cam` - Get virtual camera status
   - `obs:outputs` - Get output configurations
 
-  ### Twitch Commands  
+  ### Twitch Commands
   - `twitch:status` - Get Twitch EventSub connection status
 
   ### IronMON Commands
@@ -53,21 +53,21 @@ defmodule ServerWeb.OverlayChannel do
       // Connect to WebSocket
       const socket = new Phoenix.Socket("/socket")
       socket.connect()
-      
+
       // Join OBS overlay channel
       const channel = socket.channel("overlay:obs")
       channel.join()
-      
+
       // Get current OBS status
       channel.push("obs:status", {})
         .receive("ok", (response) => console.log("OBS Status:", response))
         .receive("error", (error) => console.log("Error:", error))
-      
+
       // Get checkpoints for a challenge (requires challenge_id)
       channel.push("ironmon:checkpoints", {challenge_id: 1})
         .receive("ok", (response) => console.log("Checkpoints:", response))
         .receive("error", (error) => console.log("Error:", error))
-      
+
       // Listen for OBS events
       channel.on("obs_event", (event) => {
         console.log("OBS Event:", event)

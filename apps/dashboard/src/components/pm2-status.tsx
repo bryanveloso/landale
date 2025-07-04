@@ -62,17 +62,17 @@ export function PM2Status({ machine }: PM2StatusProps) {
   })
 
   const startMutation = useMutation({
-    mutationFn: ({ machine, process }: { machine: string; process: string }) => 
+    mutationFn: ({ machine, process }: { machine: string; process: string }) =>
       trpcClient.processes.start.mutate({ machine, process })
   })
 
   const stopMutation = useMutation({
-    mutationFn: ({ machine, process }: { machine: string; process: string }) => 
+    mutationFn: ({ machine, process }: { machine: string; process: string }) =>
       trpcClient.processes.stop.mutate({ machine, process })
   })
 
   const restartMutation = useMutation({
-    mutationFn: ({ machine, process }: { machine: string; process: string }) => 
+    mutationFn: ({ machine, process }: { machine: string; process: string }) =>
       trpcClient.processes.restart.mutate({ machine, process })
   })
 
@@ -86,22 +86,22 @@ export function PM2Status({ machine }: PM2StatusProps) {
 
   const handleAction = async () => {
     if (!confirmDialog.action || !confirmDialog.processName || !confirmDialog.machine) return
-    
+
     setError(null)
     setActionInProgress(`${confirmDialog.action}-${confirmDialog.processName}`)
     closeConfirmDialog()
-    
+
     try {
       const mutations = {
         start: startMutation,
         stop: stopMutation,
         restart: restartMutation
       }
-      
+
       const mutation = mutations[confirmDialog.action]
-      await mutation.mutateAsync({ 
-        machine: confirmDialog.machine, 
-        process: confirmDialog.processName 
+      await mutation.mutateAsync({
+        machine: confirmDialog.machine,
+        process: confirmDialog.processName
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed')
@@ -178,7 +178,7 @@ export function PM2Status({ machine }: PM2StatusProps) {
           </h2>
           {getConnectionIcon()}
         </div>
-        
+
         {/* Machine selector tabs */}
         <div className="flex gap-1 bg-gray-900/50 rounded-lg p-1">
           {MACHINES.map(machine => (
@@ -285,7 +285,7 @@ export function PM2Status({ machine }: PM2StatusProps) {
                       )}
                     </button>
                   )}
-                  
+
                   {process.status === 'online' && (
                     <>
                       <button
@@ -345,14 +345,14 @@ export function PM2Status({ machine }: PM2StatusProps) {
               <button
                 onClick={handleAction}
                 className={`px-4 py-2 rounded transition-colors ${
-                  confirmDialog.action === 'stop' 
-                    ? 'bg-red-600 hover:bg-red-700' 
-                    : confirmDialog.action === 'start' 
+                  confirmDialog.action === 'stop'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : confirmDialog.action === 'start'
                     ? 'bg-green-600 hover:bg-green-700'
                     : 'bg-yellow-600 hover:bg-yellow-700'
                 }`}
               >
-                {confirmDialog.action === 'stop' ? 'Stop' : 
+                {confirmDialog.action === 'stop' ? 'Stop' :
                  confirmDialog.action === 'start' ? 'Start' : 'Restart'}
               </button>
             </div>

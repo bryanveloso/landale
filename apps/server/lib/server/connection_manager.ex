@@ -31,12 +31,12 @@ defmodule Server.ConnectionManager do
 
         def handle_info({:DOWN, ref, :process, pid, reason}, state) do
           updated_connection_state = ConnectionManager.handle_monitor_down(
-            state.connection_state, 
-            ref, 
-            pid, 
+            state.connection_state,
+            ref,
+            pid,
             reason
           )
-          
+
           state = %{state | connection_state: updated_connection_state}
           {:noreply, state}
         end

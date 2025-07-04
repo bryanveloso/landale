@@ -45,7 +45,7 @@ describe('useSubscription', () => {
     })
 
     const onData = mock()
-    const { result } = renderHook(() => 
+    const { result } = renderHook(() =>
       useSubscription('twitch.onMessage', undefined, { onData })
     )
 
@@ -70,7 +70,7 @@ describe('useSubscription', () => {
     })
 
     const onError = mock()
-    const { result } = renderHook(() => 
+    const { result } = renderHook(() =>
       useSubscription('health.check', undefined, { onError })
     )
 
@@ -88,7 +88,7 @@ describe('useSubscription', () => {
   it('should cleanup subscription on unmount', () => {
     mockSubscribe.mockReturnValue({ unsubscribe: mockUnsubscribe })
 
-    const { unmount } = renderHook(() => 
+    const { unmount } = renderHook(() =>
       useSubscription('twitch.onMessage')
     )
 
@@ -102,7 +102,7 @@ describe('useSubscription', () => {
   it('should handle reconnection', () => {
     mockSubscribe.mockReturnValue({ unsubscribe: mockUnsubscribe })
 
-    const { result, rerender } = renderHook(() => 
+    const { result, rerender } = renderHook(() =>
       useSubscription('twitch.onMessage')
     )
 
