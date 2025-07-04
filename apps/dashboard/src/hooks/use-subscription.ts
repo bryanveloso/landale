@@ -126,7 +126,7 @@ export function useSubscription<T>(path: string, input: unknown = undefined, opt
       subscriptionRef.current = null
     }
 
-
+    
     updateConnectionState({ state: 'connecting' })
 
     // Get the procedure from the tRPC client using the path

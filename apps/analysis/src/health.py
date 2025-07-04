@@ -21,12 +21,12 @@ async def create_health_app(port: int = 8891):
     app = web.Application()
     app["start_time"] = int(time.time())
     app.router.add_get("/health", health_check)
-
+    
     runner = web.AppRunner(app)
     await runner.setup()
     host = os.getenv("ANALYSIS_HOST", "0.0.0.0")
     site = web.TCPSite(runner, host, port)
     await site.start()
-
+    
     logger.info(f"Health check endpoint available at http://{host}:{port}/health")
     return runner

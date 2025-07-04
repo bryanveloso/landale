@@ -18,7 +18,7 @@ defmodule ServerWeb.ApiSpec do
 
         This API provides endpoints for:
         - OBS WebSocket integration and controls
-        - Twitch EventSub subscription management
+        - Twitch EventSub subscription management  
         - IronMON Pokemon challenge data
         - System health and monitoring
         - Real-time dashboard communication

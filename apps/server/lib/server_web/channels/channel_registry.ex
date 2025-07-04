@@ -17,10 +17,10 @@ defmodule ServerWeb.ChannelRegistry do
 
       # Get all available channels
       channels = ChannelRegistry.list_channels()
-
+      
       # Get specific channel info
       {:ok, info} = ChannelRegistry.get_channel_info(ServerWeb.OverlayChannel)
-
+      
       # Get WebSocket API schema
       schema = ChannelRegistry.generate_websocket_schema()
   """

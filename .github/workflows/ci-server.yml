@@ -15,10 +15,10 @@ jobs:
   test:
     name: Test and Lint Elixir Server
     runs-on: ubuntu-latest
-
+    
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/server_test
-
+    
     services:
       postgres:
         image: postgres:16

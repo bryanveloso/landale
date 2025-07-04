@@ -34,25 +34,25 @@ interface PinoLogObject {
 
 export default function (options: SeqTransportOptions) {
   const { serverUrl, apiKey, batchSize = 100, flushInterval = 1000 } = options
-
+  
   let batch: SeqEvent[] = []
   let timer: NodeJS.Timeout | null = null
-
+  
   const flush = async () => {
     if (batch.length === 0) return
-
+    
     const events = batch.map(e => JSON.stringify(e)).join('\n')
     batch = []
-
+    
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/vnd.serilog.clef'
       }
-
+      
       if (apiKey) {
         headers['X-Seq-ApiKey'] = apiKey
       }
-
+      
       await fetch(`${serverUrl}/api/events/raw`, {
         method: 'POST',
         headers,
@@ -62,7 +62,7 @@ export default function (options: SeqTransportOptions) {
       console.error('Failed to send logs to Seq:', error)
     }
   }
-
+  
   return build(async function (source: AsyncIterable<PinoLogObject>) {
     for await (const obj of source) {
       const seqEvent: SeqEvent = {
@@ -71,12 +71,12 @@ export default function (options: SeqTransportOptions) {
         '@mt': obj.msg,
         ...obj
       }
-
+      
       // Handle error objects
       if (obj.err?.stack) {
         seqEvent['@x'] = obj.err.stack
       }
-
+      
       // Remove pino internals
       delete seqEvent.time
       delete seqEvent.level
@@ -84,9 +84,9 @@ export default function (options: SeqTransportOptions) {
       delete seqEvent.err
       delete seqEvent.pid
       delete seqEvent.hostname
-
+      
       batch.push(seqEvent)
-
+      
       if (batch.length >= batchSize) {
         await flush()
       } else if (!timer) {

@@ -53,7 +53,7 @@ defmodule Server.ServiceError do
       iex> ServiceError.new(:obs, "connect", :network_error, "Connection refused")
       %ServiceError{
         service: :obs,
-        operation: "connect",
+        operation: "connect", 
         reason: :network_error,
         message: "Connection refused",
         timestamp: ~U[2024-01-01 00:00:00Z]
@@ -81,7 +81,7 @@ defmodule Server.ServiceError do
 
   ## Parameters
   - `service` - The service that generated the error
-  - `operation` - The operation that failed
+  - `operation` - The operation that failed  
   - `exception` - The exception that was raised
   - `opts` - Additional options (see new/5)
   """

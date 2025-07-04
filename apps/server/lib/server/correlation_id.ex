@@ -44,10 +44,10 @@ defmodule Server.CorrelationId do
 
       iex> CorrelationId.from_context(assigns: %{correlation_id: "abc123"})
       "abc123"
-
+      
       iex> CorrelationId.from_context(headers: %{"x-correlation-id" => "def456"})
       "def456"
-
+      
       iex> CorrelationId.from_context([])
       "a1b2c3d4"  # Generated
   """

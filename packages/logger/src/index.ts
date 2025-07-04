@@ -198,11 +198,11 @@ export function createLoggerWithSeq(
   seqApiKey?: string
 ): Logger {
   const fullConfig = getLoggerConfig(config)
-
+  
   // Create Pino options without formatters (not allowed with transport targets)
   const pinoOptions = createPinoOptions(fullConfig)
   const { formatters, ...optionsWithoutFormatters } = pinoOptions
-
+  
   // Create Pino logger with Seq transport
   const pinoLogger = pino({
     ...optionsWithoutFormatters,
@@ -224,14 +224,14 @@ export function createLoggerWithSeq(
       ]
     }
   })
-
+  
   return wrapLogger(pinoLogger, fullConfig)
 }
 
 // Helper to extract pino options from createPinoLogger
 function createPinoOptions(config: LoggerConfig): pino.LoggerOptions {
   const redactPaths = config.redact.map((field) => `*.${field}`)
-
+  
   return {
     level: config.level,
     base: {

@@ -18,7 +18,7 @@ defmodule Mix.Tasks.Twitch.Token do
   ### Ongoing Maintenance
       # Check token status
       docker exec landale-server mix twitch.token status
-
+      
       # Refresh expired tokens
       docker exec landale-server mix twitch.token refresh
 
@@ -42,7 +42,7 @@ defmodule Mix.Tasks.Twitch.Token do
   ## Scopes Included
 
   - channel:read:subscriptions (subscription events)
-  - moderator:read:followers (follow events)
+  - moderator:read:followers (follow events)  
   - channel:read:redemptions (channel point redemptions)
 
   ## Security & Storage

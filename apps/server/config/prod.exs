@@ -3,7 +3,7 @@ import Config
 # Configure environment for runtime checks
 config :server, env: :prod
 
-# Production logging configuration
+# Production logging configuration  
 config :logger, level: :info
 
 # Use simple JSON formatting that's more reliable

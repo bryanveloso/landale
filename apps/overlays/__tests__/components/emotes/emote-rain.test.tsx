@@ -92,7 +92,7 @@ describe('EmoteRain', () => {
 
   it('should initialize Matter.js physics engine', () => {
     render(<EmoteRain />)
-
+    
     expect(Matter.Engine.create).toHaveBeenCalled()
     expect(Matter.Render.create).toHaveBeenCalled()
     expect(Matter.Runner.create).toHaveBeenCalled()
@@ -100,15 +100,15 @@ describe('EmoteRain', () => {
 
   it('should register emote queue listener', () => {
     render(<EmoteRain />)
-
+    
     expect(emoteQueue.addListener).toHaveBeenCalled()
   })
 
   it('should clean up on unmount', () => {
     const { unmount } = render(<EmoteRain />)
-
+    
     unmount()
-
+    
     expect(Matter.Render.stop).toHaveBeenCalled()
     expect(Matter.Runner.stop).toHaveBeenCalled()
     expect(Matter.Engine.clear).toHaveBeenCalled()
@@ -118,19 +118,19 @@ describe('EmoteRain', () => {
 
   it('should handle emote spawn from queue', () => {
     render(<EmoteRain />)
-
+    
     // Get the listener that was registered
     const listener = mockQueueListener.mock.calls[0][0]
-
+    
     // Simulate an emote being added to queue
     const mockEmote = {
       id: 'test-emote',
       url: 'https://example.com/emote.png',
       name: 'TestEmote'
     }
-
+    
     listener(mockEmote)
-
+    
     // Verify that a body was created for the emote
     expect(Matter.Bodies.rectangle).toHaveBeenCalled()
     expect(Matter.World.add).toHaveBeenCalled()
@@ -138,18 +138,18 @@ describe('EmoteRain', () => {
 
   it('should handle multiple emotes', () => {
     render(<EmoteRain />)
-
+    
     const listener = mockQueueListener.mock.calls[0][0]
-
+    
     // Add multiple emotes
     const emotes = [
       { id: 'emote1', url: 'https://example.com/1.png', name: 'Emote1' },
       { id: 'emote2', url: 'https://example.com/2.png', name: 'Emote2' },
       { id: 'emote3', url: 'https://example.com/3.png', name: 'Emote3' }
     ]
-
+    
     emotes.forEach(emote => listener(emote))
-
+    
     // Should create a body for each emote
     expect(Matter.Bodies.rectangle).toHaveBeenCalledTimes(emotes.length)
     expect(Matter.World.add).toHaveBeenCalledTimes(emotes.length)

@@ -2,7 +2,7 @@ defmodule ServerWeb.TranscriptionChannel do
   @moduledoc """
   Phoenix channel for real-time transcription broadcasting to obs-entei plugin.
 
-  This channel provides live transcription data for OBS caption overlays and
+  This channel provides live transcription data for OBS caption overlays and 
   real-time streaming applications. The channel is optimized for low-latency
   delivery of transcription events from the AI analysis pipeline.
 
@@ -22,17 +22,17 @@ defmodule ServerWeb.TranscriptionChannel do
       // Connect to WebSocket
       const socket = new Phoenix.Socket("/socket")
       socket.connect()
-
+      
       // Join live transcription channel
       const channel = socket.channel("transcription:live")
       channel.join()
-
+      
       // Listen for new transcriptions
       channel.on("new_transcription", (data) => {
         console.log("New transcription:", data.text)
         updateCaptions(data.text, data.confidence)
       })
-
+      
       // Join session-specific channel
       const sessionChannel = socket.channel("transcription:session:stream_2024_01_15")
       sessionChannel.join()

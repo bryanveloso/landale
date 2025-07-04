@@ -71,7 +71,7 @@ defmodule Server.NetworkConfig do
 
   ## Returns
   - `:development` - Local development environment
-  - `:docker` - Running in Docker container
+  - `:docker` - Running in Docker container 
   - `:production` - Production environment
   """
   @spec detect_environment() :: env_type()
@@ -111,7 +111,7 @@ defmodule Server.NetworkConfig do
   @doc """
   Gets HTTP client configuration.
 
-  ## Returns
+  ## Returns  
   - HTTP client configuration map
   """
   @spec http_config() :: map()
