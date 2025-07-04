@@ -227,7 +227,7 @@ defmodule Server.WebSocketClient do
       frame =
         case message do
           binary when is_binary(binary) -> {:text, binary}
-          data -> {:text, Jason.encode!(data)}
+          data -> {:text, JSON.encode!(data)}
         end
 
       :gun.ws_send(client.conn_pid, client.stream_ref, frame)

@@ -1243,7 +1243,7 @@ defmodule Server.Services.OBS do
   defp handle_obs_message(state, message_json) do
     Logger.debug("Raw OBS message received", message: String.slice(message_json, 0, 200))
 
-    case Jason.decode(message_json) do
+    case JSON.decode(message_json) do
       {:ok, %{"op" => op} = message} ->
         message_type =
           case op do
@@ -1722,7 +1722,7 @@ defmodule Server.Services.OBS do
   defp send_websocket_message(state, message) do
     cond do
       # Always allow protocol handshake messages (Hello=0, Identify=1, Identified=2)
-      message["op"] in [0, 1, 2] and state.conn_pid && state.stream_ref ->
+      (message["op"] in [0, 1, 2] and state.conn_pid) && state.stream_ref ->
         Logger.debug("Sending protocol handshake message", message_type: get_message_type(message))
         send_message_now(state, message)
 
@@ -1748,7 +1748,7 @@ defmodule Server.Services.OBS do
   end
 
   defp send_message_now(state, message) do
-    json_message = Jason.encode!(message)
+    json_message = JSON.encode!(message)
 
     # Count outgoing message and log details
     current_outgoing = state.websocket_outgoing_messages || 0
@@ -2049,7 +2049,7 @@ defmodule Server.Services.OBS do
   # Direct message sending without authentication checks (for internal use)
   defp send_websocket_message_direct(state, message) do
     if state.conn_pid && state.stream_ref do
-      json_message = Jason.encode!(message)
+      json_message = JSON.encode!(message)
 
       case :gun.ws_send(state.conn_pid, state.stream_ref, {:text, json_message}) do
         :ok -> :ok

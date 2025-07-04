@@ -165,7 +165,7 @@ defmodule Server.Performance do
 
     # This would normally go through Phoenix Channel handling
     # For benchmark, we simulate the processing
-    _processed = Jason.encode!(message)
+    _processed = JSON.encode!(message)
     :ok
   end
 

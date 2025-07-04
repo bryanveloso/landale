@@ -763,8 +763,8 @@ defmodule Mix.Tasks.Twitch.Token do
       load_dot_env_file()
     end
 
-    # Start only Jason for JSON parsing and Gun for HTTP requests
-    Application.ensure_all_started(:jason)
+    # Start Gun for HTTP requests (JSON is now built-in)
+    # Application.ensure_all_started(:jason) # No longer needed - JSON is built-in to Elixir 1.18
     Application.ensure_all_started(:gun)
     Application.ensure_all_started(:crypto)
   end
@@ -969,17 +969,13 @@ defmodule Mix.Tasks.Twitch.Token do
     backup_data = Map.put(token_info, :backup_timestamp, DateTime.utc_now() |> DateTime.to_iso8601())
     backup_file = Path.join(storage_dir, "twitch_tokens_backup.json")
 
-    case Jason.encode(backup_data, pretty: true) do
-      {:ok, json_data} ->
-        File.write!(backup_file, json_data)
-
-      {:error, _reason} ->
+    try do
+      json_data = JSON.encode!(backup_data)
+      File.write!(backup_file, json_data)
+    rescue
+      _error ->
         # Backup failure is not critical, just continue
         :ok
     end
-  rescue
-    _ ->
-      # Backup failure is not critical, just continue
-      :ok
   end
 end

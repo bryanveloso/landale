@@ -609,7 +609,7 @@ defmodule Server.OAuthTokenManager do
     if File.exists?(backup_file) do
       try do
         json_data = File.read!(backup_file)
-        backup_data = Jason.decode!(json_data)
+        backup_data = JSON.decode!(json_data)
 
         # Convert backup data to token_info
         token_info = %{
@@ -714,7 +714,7 @@ defmodule Server.OAuthTokenManager do
       storage_dir = Path.dirname(manager.storage_path)
       backup_file = Path.join(storage_dir, "#{manager.storage_key}_backup.json")
 
-      json_data = Jason.encode!(backup_data, pretty: true)
+      json_data = JSON.encode!(backup_data)
       File.write!(backup_file, json_data)
 
       Logger.debug("Token backup created",

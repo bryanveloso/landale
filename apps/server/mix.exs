@@ -47,7 +47,6 @@ defmodule Server.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.26"},
-      {:jason, "~> 1.2"},
       {:logger_json, "~> 6.1"},
       {:corsica, "~> 2.1"},
       {:dns_cluster, "~> 0.1.1"},

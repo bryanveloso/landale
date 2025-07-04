@@ -577,8 +577,7 @@ defmodule ServerWeb.OverlayChannel do
     end
   rescue
     e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
-    e in GenServer.CallError -> %{connected: false, error: "Service call failed: #{e.message}"}
-    _other -> %{connected: false, error: "Service unavailable"}
+    e -> %{connected: false, error: "Service call failed: #{inspect(e)}"}
   end
 
   defp get_service_status(:twitch) do
@@ -588,8 +587,7 @@ defmodule ServerWeb.OverlayChannel do
     end
   rescue
     e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
-    e in GenServer.CallError -> %{connected: false, error: "Service call failed: #{e.message}"}
-    _other -> %{connected: false, error: "Service unavailable"}
+    e -> %{connected: false, error: "Service call failed: #{inspect(e)}"}
   end
 
   defp get_service_status(:ironmon_tcp) do

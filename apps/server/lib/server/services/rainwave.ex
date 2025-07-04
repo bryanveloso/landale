@@ -327,14 +327,14 @@ defmodule Server.Services.Rainwave do
   end
 
   defp parse_api_response({200, _headers, body}) do
-    case Jason.decode(body) do
+    case JSON.decode(body) do
       {:ok, data} -> {:ok, data}
       {:error, reason} -> {:error, {:json_decode_error, reason}}
     end
   end
 
   defp parse_api_response({status, _headers, body}) when status >= 400 do
-    case Jason.decode(body) do
+    case JSON.decode(body) do
       {:ok, %{"error" => error}} ->
         {:error, String.to_atom(error)}
 
