@@ -10,16 +10,16 @@ echo "🔧 Setting up pre-commit hooks for Landale project..."
 # Check if pre-commit is installed
 if ! command -v pre-commit &> /dev/null; then
     echo "❌ pre-commit is not installed. Please install it first:"
-    echo "   pip install pre-commit"
+    echo "   uv tool install pre-commit"
     echo "   or"
-    echo "   pip install -r requirements-dev.txt"
+    echo "   uv pip install -r requirements-dev.txt"
     exit 1
 fi
 
 # Install Python dev dependencies if requirements-dev.txt exists
 if [ -f "requirements-dev.txt" ]; then
     echo "📦 Installing Python development dependencies..."
-    pip install -r requirements-dev.txt
+    uv pip install -r requirements-dev.txt
 fi
 
 # Install pre-commit hooks

@@ -39,10 +39,10 @@ This project uses [pre-commit](https://pre-commit.com/) to ensure code quality a
 ### Manual Setup
 ```bash
 # Install pre-commit framework
-pip install pre-commit
+uv tool install pre-commit
 
 # Install Python development dependencies
-pip install -r requirements-dev.txt
+uv pip install -r requirements-dev.txt
 
 # Install hooks
 bun run pre-commit:install
@@ -81,13 +81,14 @@ asdf install elixir 1.18.0
 ```
 
 ### Python
-Python 3.12+ is required. Virtual environments are recommended:
+Python 3.12+ is required. uv is recommended for package management:
 ```bash
-# Create virtual environment for Python apps
-cd apps/analysis
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+# Install Python dependencies with uv
+cd apps/seed
+uv pip install -r requirements.txt
+
+# For development dependencies
+uv pip install -r requirements-dev.txt
 ```
 
 ### TypeScript/JavaScript
@@ -119,7 +120,7 @@ SKIP=eslint,mix-format git commit
 
 3. **TypeScript hooks failing**: Ensure Bun is installed and `bun install` has been run.
 
-4. **Python hooks failing**: Ensure Python dev dependencies are installed with `pip install -r requirements-dev.txt`.
+4. **Python hooks failing**: Ensure Python dev dependencies are installed with `uv pip install -r requirements-dev.txt`.
 
 ## Configuration
 
