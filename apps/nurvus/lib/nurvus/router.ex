@@ -258,7 +258,7 @@ defmodule Nurvus.Router do
 
   # Cross-machine health check
   get "/api/health/detailed" do
-    system_status = Nurvus.system_status()
+    {:ok, system_status} = Nurvus.system_status()
     processes = Nurvus.list_processes()
 
     platform_info = %{
