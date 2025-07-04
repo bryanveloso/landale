@@ -191,9 +191,9 @@ jobs:
           mkdir -p artifacts
           
           # Copy standalone executables with clean names
-          cp ../burrito_out/nurvus_windows.exe artifacts/nurvus.exe
-          cp ../burrito_out/nurvus_linux artifacts/nurvus
-          cp ../burrito_out/nurvus_macos artifacts/nurvus_macos
+          cp ../../burrito_out/nurvus_windows.exe artifacts/nurvus.exe
+          cp ../../burrito_out/nurvus_linux artifacts/nurvus
+          cp ../../burrito_out/nurvus_macos artifacts/nurvus_macos
           
           # Create machine-specific packages
           declare -A machines=(
@@ -211,9 +211,9 @@ jobs:
             
             # Copy appropriate executable
             if [ "$platform" = "windows" ]; then
-              cp "../burrito_out/nurvus_windows.exe" "artifacts/$machine/nurvus.exe"
+              cp "../../burrito_out/nurvus_windows.exe" "artifacts/$machine/nurvus.exe"
             else
-              cp "../burrito_out/nurvus_macos" "artifacts/$machine/nurvus"
+              cp "../../burrito_out/nurvus_macos" "artifacts/$machine/nurvus"
             fi
             
             # Copy machine-specific config and deployment files
