@@ -198,7 +198,7 @@ defmodule Nurvus.Platform do
           [_node, _page_file, _cpu_time, working_set] ->
             with {memory_kb, ""} <- Integer.parse(String.trim(working_set)) do
               %{
-                memory_mb: memory_kb / 1024 / 1024,
+                memory_mb: memory_kb / 1024,
                 cpu_percent: 0.0
               }
             else

@@ -34,14 +34,14 @@ defmodule Nurvus.Router do
 
   # System status endpoint
   get "/api/system/status" do
-    status = Nurvus.system_status()
+    {:ok, status_map} = Nurvus.system_status()
 
     platform_info = %{
       platform: Nurvus.Platform.current_platform(),
       hostname: System.get_env("HOSTNAME") || :inet.gethostname() |> elem(1) |> to_string()
     }
 
-    enhanced_status = Map.merge(status, platform_info)
+    enhanced_status = Map.merge(status_map, platform_info)
     send_json_response(conn, 200, enhanced_status)
   end
 
