@@ -1,0 +1,15 @@
+[project]
+name = "landale-workspace"
+version = "0.1.0"
+description = "Development tools for Landale workspace"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.0.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "flake8>=7.0.0",
+    "mypy>=1.11.0",
+]

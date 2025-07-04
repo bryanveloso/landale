@@ -12,14 +12,14 @@ if ! command -v pre-commit &> /dev/null; then
     echo "❌ pre-commit is not installed. Please install it first:"
     echo "   uv tool install pre-commit"
     echo "   or"
-    echo "   uv pip install -r requirements-dev.txt"
+    echo "   uv sync --group dev"
     exit 1
 fi
 
-# Install Python dev dependencies if requirements-dev.txt exists
-if [ -f "requirements-dev.txt" ]; then
+# Install Python dev dependencies if pyproject.toml exists
+if [ -f "pyproject.toml" ]; then
     echo "📦 Installing Python development dependencies..."
-    uv pip install -r requirements-dev.txt
+    uv sync --group dev
 fi
 
 # Install pre-commit hooks
