@@ -331,34 +331,29 @@ class StreamCorrelator:
             last_transcription = self.transcription_buffer[-1]
             actual_duration = last_transcription.timestamp - first_transcription.timestamp
             
-            # Build rich context data
-            chat_summary = self._build_chat_summary()
-            interactions_summary = self._build_interactions_summary()
-            emotes_summary = self._build_emotes_summary()
+            # Build maximum data capture
+            rich_context_data = await self._build_rich_context_data(
+                transcript, actual_duration, first_transcription, last_transcription
+            )
             
-            # Get AI analysis if available
-            analysis_result = await self.analyze(immediate=True)
-            
-            # Build context data
+            # Build legacy context data for TimescaleDB storage
             context_data = {
                 'started': self.context_start_time,
                 'ended': context_end_time,
                 'session': self.current_session_id,
                 'transcript': transcript,
                 'duration': actual_duration,
-                'chat': chat_summary,
-                'interactions': interactions_summary,
-                'emotes': emotes_summary
+                'chat': rich_context_data.get('community_data', {}).get('chat_summary'),
+                'interactions': rich_context_data.get('community_data', {}).get('interactions_summary'),
+                'emotes': rich_context_data.get('community_data', {}).get('emotes_summary')
             }
             
-            # Add AI analysis results if available
-            if analysis_result:
-                context_data['patterns'] = {
-                    'stream_momentum': analysis_result.stream_momentum,
-                    'patterns': analysis_result.patterns
-                }
-                context_data['sentiment'] = analysis_result.sentiment
-                context_data['topics'] = analysis_result.topics
+            # Add AI analysis if available
+            ai_analysis = rich_context_data.get('ai_analysis')
+            if ai_analysis:
+                context_data['patterns'] = ai_analysis.get('patterns')
+                context_data['sentiment'] = ai_analysis.get('sentiment')
+                context_data['topics'] = ai_analysis.get('topics')
                 
             # Store context in TimescaleDB
             if self.context_client:
@@ -428,3 +423,224 @@ class StreamCorrelator:
             'top_emotes': emote_frequency or {},
             'native_emotes': native_emote_frequency or {}
         }
+        
+    async def _build_rich_context_data(self, transcript: str, duration: float, 
+                                      first_transcription, last_transcription) -> Dict:
+        """Build comprehensive context data for training and analysis."""
+        # Temporal data
+        temporal_data = {
+            'started': self.context_start_time.isoformat() if self.context_start_time else None,
+            'ended': (self.context_start_time + timedelta(seconds=self.context_window)).isoformat() if self.context_start_time else None,
+            'duration': duration,
+            'session_id': self.current_session_id,
+            'fragment_count': len(self.transcription_buffer)
+        }
+        
+        # Content data with maximum detail
+        content_data = {
+            'transcript': transcript,
+            'transcript_fragments': [{
+                'timestamp': t.timestamp,
+                'text': t.text,
+                'duration': t.duration,
+                'confidence': t.confidence
+            } for t in self.transcription_buffer],
+            'confidence_scores': [t.confidence for t in self.transcription_buffer if t.confidence],
+            'speaking_patterns': self._analyze_speaking_patterns(),
+            'content_metrics': {
+                'word_count': len(transcript.split()),
+                'sentence_count': transcript.count('.') + transcript.count('!') + transcript.count('?'),
+                'avg_words_per_fragment': len(transcript.split()) / len(self.transcription_buffer) if self.transcription_buffer else 0
+            }
+        }
+        
+        # Community data with full detail
+        community_data = {
+            'chat_messages': [{
+                'timestamp': msg.timestamp,
+                'username': msg.username,
+                'message': msg.message,
+                'emotes': msg.emotes,
+                'native_emotes': msg.native_emotes,
+                'is_subscriber': msg.is_subscriber,
+                'is_moderator': msg.is_moderator
+            } for msg in self.chat_buffer],
+            'emote_events': [{
+                'timestamp': emote.timestamp,
+                'username': emote.username,
+                'emote_name': emote.emote_name,
+                'emote_id': emote.emote_id
+            } for emote in self.emote_buffer],
+            'viewer_interactions': [{
+                'timestamp': interaction.timestamp,
+                'interaction_type': interaction.interaction_type,
+                'username': interaction.username,
+                'user_id': interaction.user_id,
+                'details': interaction.details
+            } for interaction in self.interaction_buffer],
+            'chat_summary': self._build_chat_summary(),
+            'interactions_summary': self._build_interactions_summary(),
+            'emotes_summary': self._build_emotes_summary(),
+            'community_metrics': {
+                'total_messages': len(self.chat_buffer),
+                'unique_participants': len(set(msg.username for msg in self.chat_buffer)),
+                'chat_velocity': self._calculate_chat_velocity(),
+                'emote_frequency': self._calculate_emote_frequency(),
+                'native_emote_frequency': self._calculate_native_emote_frequency()
+            }
+        }
+        
+        # Correlation analysis
+        correlation_data = {
+            'speech_to_chat_correlation': self._analyze_speech_chat_correlation(),
+            'temporal_patterns': self._analyze_temporal_patterns(),
+            'engagement_patterns': self._analyze_engagement_patterns()
+        }
+        
+        # Get AI analysis
+        analysis_result = await self.analyze(immediate=True)
+        ai_analysis = None
+        if analysis_result:
+            ai_analysis = {
+                'patterns': analysis_result.patterns.dict() if analysis_result.patterns else None,
+                'dynamics': analysis_result.dynamics.dict() if analysis_result.dynamics else None,
+                'sentiment': analysis_result.sentiment,
+                'sentiment_trajectory': analysis_result.sentiment_trajectory,
+                'topics': analysis_result.topics,
+                'context': analysis_result.context,
+                'suggested_actions': analysis_result.suggested_actions,
+                'stream_momentum': analysis_result.stream_momentum,
+                'model_metadata': {
+                    'model_used': 'current_lms_model',  # TODO: get from config
+                    'analysis_version': '1.0',
+                    'timestamp': datetime.now().isoformat()
+                }
+            }
+        
+        return {
+            'temporal_data': temporal_data,
+            'content_data': content_data,
+            'community_data': community_data,
+            'correlation_data': correlation_data,
+            'ai_analysis': ai_analysis
+        }
+        
+    def _analyze_speaking_patterns(self) -> Dict:
+        """Analyze speaking patterns from transcription data."""
+        if not self.transcription_buffer:
+            return {}
+            
+        fragments = list(self.transcription_buffer)
+        if len(fragments) < 2:
+            return {}
+            
+        # Calculate speaking pace
+        total_words = sum(len(t.text.split()) for t in fragments)
+        total_duration = fragments[-1].timestamp - fragments[0].timestamp
+        words_per_minute = (total_words / total_duration) * 60 if total_duration > 0 else 0
+        
+        # Calculate pauses between fragments
+        pauses = []
+        for i in range(1, len(fragments)):
+            pause = fragments[i].timestamp - (fragments[i-1].timestamp + fragments[i-1].duration)
+            pauses.append(max(0, pause))  # Ensure non-negative
+            
+        return {
+            'words_per_minute': words_per_minute,
+            'avg_pause_duration': sum(pauses) / len(pauses) if pauses else 0,
+            'max_pause_duration': max(pauses) if pauses else 0,
+            'fragment_durations': [t.duration for t in fragments],
+            'avg_fragment_duration': sum(t.duration for t in fragments) / len(fragments)
+        }
+        
+    def _analyze_speech_chat_correlation(self) -> Dict:
+        """Analyze correlation between speech and chat activity."""
+        correlations = []
+        
+        for transcription in self.transcription_buffer:
+            # Find chat messages within correlation window
+            correlated_messages = [
+                msg for msg in self.chat_buffer
+                if transcription.timestamp <= msg.timestamp <= transcription.timestamp + self.correlation_window
+            ]
+            
+            correlations.append({
+                'speech_timestamp': transcription.timestamp,
+                'speech_text': transcription.text,
+                'related_chat_count': len(correlated_messages),
+                'chat_delay_avg': sum(
+                    msg.timestamp - transcription.timestamp 
+                    for msg in correlated_messages
+                ) / len(correlated_messages) if correlated_messages else 0
+            })
+            
+        return {
+            'correlations': correlations,
+            'avg_chat_response_delay': sum(
+                c['chat_delay_avg'] for c in correlations
+            ) / len(correlations) if correlations else 0
+        }
+        
+    def _analyze_temporal_patterns(self) -> Dict:
+        """Analyze how patterns change over time within the context window."""
+        if len(self.transcription_buffer) < 3:
+            return {}
+            
+        # Divide window into segments for trend analysis
+        segments = 3
+        fragment_count = len(self.transcription_buffer)
+        segment_size = fragment_count // segments
+        
+        if segment_size == 0:
+            return {}
+            
+        segment_data = []
+        for i in range(segments):
+            start_idx = i * segment_size
+            end_idx = start_idx + segment_size if i < segments - 1 else fragment_count
+            
+            segment_fragments = list(self.transcription_buffer)[start_idx:end_idx]
+            segment_chat = [
+                msg for msg in self.chat_buffer
+                if segment_fragments[0].timestamp <= msg.timestamp <= segment_fragments[-1].timestamp
+            ]
+            
+            segment_data.append({
+                'segment': i + 1,
+                'word_count': sum(len(f.text.split()) for f in segment_fragments),
+                'chat_count': len(segment_chat),
+                'energy_indicator': len(segment_chat) / len(segment_fragments) if segment_fragments else 0
+            })
+            
+        return {
+            'segments': segment_data,
+            'trend_direction': self._calculate_trend_direction(segment_data)
+        }
+        
+    def _analyze_engagement_patterns(self) -> Dict:
+        """Analyze viewer engagement patterns."""
+        return {
+            'interaction_types': dict(Counter(
+                interaction.interaction_type for interaction in self.interaction_buffer
+            )),
+            'engagement_timeline': [{
+                'timestamp': interaction.timestamp,
+                'type': interaction.interaction_type,
+                'username': interaction.username
+            } for interaction in self.interaction_buffer],
+            'engagement_density': len(self.interaction_buffer) / (self.context_window / 60)  # per minute
+        }
+        
+    def _calculate_trend_direction(self, segment_data: List[Dict]) -> str:
+        """Calculate overall trend direction from segment data."""
+        if len(segment_data) < 2:
+            return 'stable'
+            
+        energy_trend = [s['energy_indicator'] for s in segment_data]
+        
+        if energy_trend[-1] > energy_trend[0] * 1.2:
+            return 'increasing'
+        elif energy_trend[-1] < energy_trend[0] * 0.8:
+            return 'decreasing'
+        else:
+            return 'stable'

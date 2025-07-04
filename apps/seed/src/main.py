@@ -157,21 +157,25 @@ class SeedService:
             
     async def _handle_analysis_result(self, result: AnalysisResult):
         """Handle analysis results from correlator."""
-        logger.info(f"Analysis result: {result.sentiment} sentiment, momentum: {result.stream_momentum}")
+        logger.info(f"Analysis result: {result.sentiment} sentiment")
         
-        # Log detailed results
+        # Log detailed results with new flexible patterns
         logger.info(f"Topics: {result.topics}")
-        logger.info(f"Patterns: {result.patterns}")
+        if result.patterns:
+            logger.info(f"Energy level: {result.patterns.energy_level:.2f}")
+            logger.info(f"Engagement depth: {result.patterns.engagement_depth:.2f}")
+            logger.info(f"Community sync: {result.patterns.community_sync:.2f}")
+            logger.info(f"Content focus: {result.patterns.content_focus}")
+            logger.info(f"Temporal flow: {result.patterns.temporal_flow}")
         if result.chat_velocity:
             logger.info(f"Chat velocity: {result.chat_velocity:.1f} msg/min")
         if result.emote_frequency:
             logger.info(f"Top emotes: {list(result.emote_frequency.keys())[:5]}")
             
-        # TODO: Future enhancements
-        # - Send to server via WebSocket for overlay display
-        # - Store in database for historical analysis
-        # - Trigger overlay effects based on patterns
-        # - Send notifications for significant events
+        # Future enhancements for training data pipeline
+        # - Export rich context data for training datasets
+        # - Build personalized pattern detection from accumulated data
+        # - Train specialized models on your streaming patterns
             
     async def _health_check_loop(self):
         """Periodic health check."""
