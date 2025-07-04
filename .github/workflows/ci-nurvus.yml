@@ -42,7 +42,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd apps/nurvus
-          mix deps.get --only prod
+          mix deps.get
 
       - name: Compile project
         run: |
@@ -52,12 +52,17 @@ jobs:
       - name: Run tests
         run: |
           cd apps/nurvus
-          MIX_ENV=test mix test
+          mix test
 
       - name: Run Credo
         run: |
           cd apps/nurvus
           mix credo
+
+      - name: Install production dependencies
+        run: |
+          cd apps/nurvus
+          mix deps.get --only prod
 
       - name: Build release
         run: |
