@@ -240,7 +240,7 @@ defmodule Nurvus.ProcessManager do
     processes =
       state.processes
       |> Enum.map(fn {id, config} ->
-        {status, _} = handle_call({:get_process_status, id}, nil, state)
+        {_reply, status, _state} = handle_call({:get_process_status, id}, nil, state)
 
         status =
           case status do
