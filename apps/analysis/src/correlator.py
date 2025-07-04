@@ -5,7 +5,7 @@ from collections import deque, Counter
 from datetime import datetime
 from typing import List, Optional, Dict
 
-from .events import TranscriptionEvent, ChatMessage, EmoteEvent, AnalysisResult
+from .events import TranscriptionEvent, ChatMessage, EmoteEvent, ViewerInteractionEvent, AnalysisResult
 from .lms_client import LMSClient
 
 logger = logging.getLogger(__name__)
@@ -30,29 +30,21 @@ class StreamCorrelator:
         self.transcription_buffer: deque[TranscriptionEvent] = deque()
         self.chat_buffer: deque[ChatMessage] = deque()
         self.emote_buffer: deque[EmoteEvent] = deque()
+        self.interaction_buffer: deque[ViewerInteractionEvent] = deque()
         
         # Analysis state
         self.last_analysis_time = 0
         self.is_analyzing = False
         
-        # Trigger keywords that warrant immediate analysis
-        self.trigger_keywords = [
-            "let's go", "gg", "nice", "thank you", "game over",
-            "what's that", "oh no", "yes", "finally", "got it"
-        ]
+        # No trigger keywords - patterns emerge naturally through periodic analysis
         
         # Analysis result callbacks
         self._analysis_callbacks = []
         
     async def add_transcription(self, event: TranscriptionEvent):
-        """Add a transcription event and potentially trigger analysis."""
+        """Add a transcription event for periodic analysis."""
         self.transcription_buffer.append(event)
         self._cleanup_old_events()
-        
-        # Check for trigger keywords
-        if any(keyword in event.text.lower() for keyword in self.trigger_keywords):
-            logger.info(f"Trigger keyword detected: {event.text}")
-            await self.analyze(immediate=True)
             
     async def add_chat_message(self, event: ChatMessage):
         """Add a chat message event."""
@@ -63,6 +55,12 @@ class StreamCorrelator:
         """Add an emote usage event."""
         self.emote_buffer.append(event)
         self._cleanup_old_events()
+        
+    async def add_viewer_interaction(self, event: ViewerInteractionEvent):
+        """Add a viewer interaction event as context for periodic analysis."""
+        self.interaction_buffer.append(event)
+        self._cleanup_old_events()
+        logger.debug(f"Community interaction: {event.interaction_type} from {event.username}")
         
     def on_analysis(self, callback):
         """Register a callback for analysis results."""
@@ -92,17 +90,25 @@ class StreamCorrelator:
             # Build chat context with correlation
             chat_context = self._build_correlated_chat_context()
             
+            # Build viewer interaction context
+            interaction_context = self._build_interaction_context()
+            
             # Calculate chat metrics
             chat_velocity = self._calculate_chat_velocity()
             emote_frequency = self._calculate_emote_frequency()
+            native_emote_frequency = self._calculate_native_emote_frequency()
+            
+            # Combine contexts
+            full_context = f"{chat_context} | Interactions: {interaction_context}" if interaction_context else chat_context
             
             # Send to LMS for analysis
-            result = await self.lms_client.analyze(transcription_context, chat_context)
+            result = await self.lms_client.analyze(transcription_context, full_context)
             
             if result:
                 # Add correlation metrics
                 result.chat_velocity = chat_velocity
                 result.emote_frequency = emote_frequency
+                result.native_emote_frequency = native_emote_frequency
                 
                 logger.info(f"Analysis complete: {result.sentiment} sentiment, {len(result.topics)} topics")
                 
@@ -140,6 +146,10 @@ class StreamCorrelator:
         # Clean emotes
         while self.emote_buffer and self.emote_buffer[0].timestamp < cutoff_time:
             self.emote_buffer.popleft()
+            
+        # Clean interactions
+        while self.interaction_buffer and self.interaction_buffer[0].timestamp < cutoff_time:
+            self.interaction_buffer.popleft()
             
     def _build_transcription_context(self) -> str:
         """Build context string from recent transcriptions."""
@@ -231,3 +241,40 @@ class StreamCorrelator:
             emote_counts[event.emote_name] += 1
             
         return dict(emote_counts.most_common(10))  # Top 10 emotes
+        
+    def _build_interaction_context(self) -> str:
+        """Build context string from recent viewer interactions."""
+        if not self.interaction_buffer:
+            return ""
+            
+        # Group interactions by type
+        interaction_counts = Counter()
+        recent_interactions = []
+        
+        for interaction in self.interaction_buffer:
+            interaction_counts[interaction.interaction_type] += 1
+            recent_interactions.append(f"{interaction.interaction_type} from {interaction.username}")
+            
+        # Build summary
+        summary_parts = []
+        
+        if interaction_counts:
+            counts_str = ", ".join([f"{count} {itype}" for itype, count in interaction_counts.most_common()])
+            summary_parts.append(f"Totals: {counts_str}")
+            
+        if recent_interactions:
+            recent_str = " | ".join(recent_interactions[-5:])  # Last 5 interactions
+            summary_parts.append(f"Recent: {recent_str}")
+            
+        return " | ".join(summary_parts) if summary_parts else ""
+        
+    def _calculate_native_emote_frequency(self) -> Dict[str, int]:
+        """Calculate native avalon-prefixed emote usage frequency."""
+        native_emote_counts = Counter()
+        
+        # Count native emotes from chat messages
+        for msg in self.chat_buffer:
+            for emote in msg.native_emotes:
+                native_emote_counts[emote] += 1
+                
+        return dict(native_emote_counts.most_common(10))  # Top 10 native emotes

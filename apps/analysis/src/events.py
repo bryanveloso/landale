@@ -17,6 +17,7 @@ class ChatMessage(BaseModel):
     username: str
     message: str
     emotes: List[str] = Field(default_factory=list)
+    native_emotes: List[str] = Field(default_factory=list)  # avalon-prefixed emotes
     is_subscriber: bool = False
     is_moderator: bool = False
     
@@ -27,6 +28,15 @@ class EmoteEvent(BaseModel):
     username: str
     emote_name: str
     emote_id: Optional[str] = None
+    
+
+class ViewerInteractionEvent(BaseModel):
+    """Viewer interaction event (follows, subscriptions, cheers, etc.)."""
+    timestamp: int
+    interaction_type: Literal["follow", "subscription", "gift_subscription", "cheer"]
+    username: str
+    user_id: str
+    details: dict = Field(default_factory=dict)  # Type-specific data like bits, tier, etc.
     
 
 class StreamPatterns(BaseModel):
@@ -66,3 +76,4 @@ class AnalysisResult(BaseModel):
     chat_context: Optional[str] = None
     chat_velocity: Optional[float] = None  # messages per minute
     emote_frequency: Optional[dict] = None  # emote usage counts
+    native_emote_frequency: Optional[dict] = None  # avalon-prefixed emote counts

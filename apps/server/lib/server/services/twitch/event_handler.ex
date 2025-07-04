@@ -22,6 +22,9 @@ defmodule Server.Services.Twitch.EventHandler do
   - `channel.subscription.gift` - Gift subscriptions
   - `channel.cheer` - Bits cheered
   - `channel.update` - Channel information updates
+  - `channel.chat.message` - Chat messages for correlation analysis
+  - `channel.chat.clear` - Chat clearing events
+  - `channel.chat.message_delete` - Message deletion events
   """
 
   require Logger
@@ -148,6 +151,34 @@ defmodule Server.Services.Twitch.EventHandler do
           category_name: event_data["category_name"]
         })
 
+      "channel.chat.message" ->
+        Map.merge(base_event, %{
+          message_id: event_data["message_id"],
+          user_id: event_data["chatter_user_id"],
+          user_login: event_data["chatter_user_login"],
+          user_name: event_data["chatter_user_name"],
+          message: event_data["message"]["text"],
+          fragments: event_data["message"]["fragments"] || [],
+          color: event_data["color"],
+          badges: extract_badges(event_data["badges"]),
+          message_type: event_data["message_type"],
+          cheer: event_data["cheer"],
+          reply: event_data["reply"],
+          channel_points_custom_reward_id: event_data["channel_points_custom_reward_id"]
+        })
+
+      "channel.chat.clear" ->
+        base_event
+
+      "channel.chat.message_delete" ->
+        Map.merge(base_event, %{
+          target_user_id: event_data["target_user_id"],
+          target_user_login: event_data["target_user_login"],
+          target_user_name: event_data["target_user_name"],
+          target_message_id: event_data["target_message_id"],
+          target_message_body: event_data["target_message_body"]
+        })
+
       _ ->
         # For unknown event types, include all original data
         Map.merge(base_event, %{
@@ -193,6 +224,15 @@ defmodule Server.Services.Twitch.EventHandler do
 
       "channel.cheer" ->
         Phoenix.PubSub.broadcast(Server.PubSub, "cheers", {:new_cheer, normalized_event})
+
+      "channel.chat.message" ->
+        Phoenix.PubSub.broadcast(Server.PubSub, "chat", {:chat_message, normalized_event})
+
+      "channel.chat.clear" ->
+        Phoenix.PubSub.broadcast(Server.PubSub, "chat", {:chat_clear, normalized_event})
+
+      "channel.chat.message_delete" ->
+        Phoenix.PubSub.broadcast(Server.PubSub, "chat", {:message_delete, normalized_event})
 
       _ ->
         # For other events, just use the general topic
@@ -255,6 +295,26 @@ defmodule Server.Services.Twitch.EventHandler do
           is_anonymous: normalized_event.is_anonymous
         })
 
+      "channel.chat.message" ->
+        :telemetry.execute([:server, :twitch, :chat, :message], %{count: 1}, %{
+          broadcaster_id: normalized_event.broadcaster_user_id,
+          user_id: normalized_event.user_id,
+          message_type: normalized_event.message_type,
+          has_cheer: not is_nil(normalized_event.cheer),
+          has_reply: not is_nil(normalized_event.reply)
+        })
+
+      "channel.chat.clear" ->
+        :telemetry.execute([:server, :twitch, :chat, :clear], %{count: 1}, %{
+          broadcaster_id: normalized_event.broadcaster_user_id
+        })
+
+      "channel.chat.message_delete" ->
+        :telemetry.execute([:server, :twitch, :chat, :delete], %{count: 1}, %{
+          broadcaster_id: normalized_event.broadcaster_user_id,
+          target_user_id: normalized_event.target_user_id
+        })
+
       _ ->
         :telemetry.execute([:server, :twitch, :event, :other], %{count: 1}, %{
           event_type: event_type,
@@ -277,4 +337,18 @@ defmodule Server.Services.Twitch.EventHandler do
   end
 
   defp parse_datetime(_), do: nil
+
+  defp extract_badges(nil), do: []
+
+  defp extract_badges(badges) when is_list(badges) do
+    Enum.map(badges, fn badge ->
+      %{
+        set_id: badge["set_id"],
+        id: badge["id"],
+        info: badge["info"]
+      }
+    end)
+  end
+
+  defp extract_badges(_), do: []
 end

@@ -6,7 +6,7 @@ from typing import Callable, Optional
 import websockets
 from websockets.client import WebSocketClientProtocol
 
-from .events import TranscriptionEvent, ChatMessage, EmoteEvent
+from .events import TranscriptionEvent, ChatMessage, EmoteEvent, ViewerInteractionEvent
 
 logger = logging.getLogger(__name__)
 
@@ -73,21 +73,26 @@ class PhononmaserClient:
 class ServerClient:
     """WebSocket client for server chat/emote events."""
     
-    def __init__(self, url: str = "ws://saya:7175/events"):
+    def __init__(self, url: str = "ws://saya:7175/socket/websocket"):
         self.url = url
         self.ws: Optional[WebSocketClientProtocol] = None
         self._handlers = {
-            "chat:message": [],
-            "chat:emote": []
+            "chat_message": [],
+            "chat_emote": [],
+            "viewer_interaction": []
         }
         
     def on_chat_message(self, handler: Callable[[ChatMessage], None]):
         """Register a handler for chat messages."""
-        self._handlers["chat:message"].append(handler)
+        self._handlers["chat_message"].append(handler)
         
     def on_emote(self, handler: Callable[[EmoteEvent], None]):
         """Register a handler for emote events."""
-        self._handlers["chat:emote"].append(handler)
+        self._handlers["chat_emote"].append(handler)
+        
+    def on_viewer_interaction(self, handler: Callable[[ViewerInteractionEvent], None]):
+        """Register a handler for viewer interaction events."""
+        self._handlers["viewer_interaction"].append(handler)
         
     async def connect(self):
         """Connect to server WebSocket."""
@@ -95,11 +100,14 @@ class ServerClient:
             self.ws = await websockets.connect(self.url)
             logger.info(f"Connected to server at {self.url}")
             
-            # Subscribe to chat events
-            await self.ws.send(json.dumps({
-                "type": "subscribe",
-                "channels": ["chat:message", "chat:emote"]
-            }))
+            # Join events channel for all events including viewer interactions
+            await self.ws.send(json.dumps([
+                "1",  # Reference
+                "1",  # Join reference  
+                "events:all",  # Topic
+                "phx_join",  # Event
+                {}  # Payload
+            ]))
         except Exception as e:
             logger.error(f"Failed to connect to server: {e}")
             raise
@@ -113,46 +121,63 @@ class ServerClient:
             async for message in self.ws:
                 try:
                     data = json.loads(message)
-                    msg_type = data.get("type")
                     
-                    # Handle connection confirmation
-                    if msg_type == "connected":
-                        logger.info(f"Server confirmed connection: {data.get('id')}")
-                        continue
+                    # Phoenix WebSocket messages format: [join_ref, ref, topic, event, payload]
+                    if isinstance(data, list) and len(data) >= 5:
+                        join_ref, ref, topic, event, payload = data[:5]
                         
-                    # Handle subscription confirmation
-                    if msg_type == "subscribed":
-                        logger.info(f"Subscribed to channels: {data.get('channels')}")
-                        continue
-                    
-                    # Handle events
-                    if msg_type == "event":
-                        channel = data.get("channel")
-                        event_data = data.get("event")
-                        
-                        if channel == "chat:message":
-                            event = ChatMessage(
-                                timestamp=event_data["timestamp"],
-                                username=event_data["username"],
-                                message=event_data["message"],
-                                emotes=event_data.get("emotes", []),
-                                is_subscriber=event_data.get("is_subscriber", False),
-                                is_moderator=event_data.get("is_moderator", False)
+                        # Handle join confirmation
+                        if event == "phx_reply" and payload.get("status") == "ok":
+                            logger.info(f"Joined channel: {topic}")
+                            continue
+                            
+                        # Handle chat message events
+                        if topic == "events:all" and event == "chat_message":
+                            event_data = payload.get("data", {})
+                            
+                            # Extract emotes from structured fragment data
+                            emotes = []
+                            native_emotes = []
+                            for fragment in event_data.get("fragments", []):
+                                if fragment.get("type") == "emote":
+                                    emote_name = fragment.get("text", "")
+                                    emotes.append(emote_name)
+                                    # Track native avalon-prefixed emotes specifically
+                                    if emote_name.startswith("avalon"):
+                                        native_emotes.append(emote_name)
+                            
+                            # Check if user is subscriber/moderator from badges
+                            badges = event_data.get("badges", [])
+                            is_subscriber = any(badge.get("set_id") == "subscriber" for badge in badges)
+                            is_moderator = any(badge.get("set_id") == "moderator" for badge in badges)
+                            
+                            chat_event = ChatMessage(
+                                timestamp=int(event_data["timestamp"].timestamp() * 1000) if isinstance(event_data.get("timestamp"), dict) else int(data.get("timestamp", 0)),
+                                username=event_data.get("user_name", ""),
+                                message=event_data.get("message", ""),
+                                emotes=emotes,
+                                native_emotes=native_emotes,
+                                is_subscriber=is_subscriber,
+                                is_moderator=is_moderator
                             )
+                            
+                            for handler in self._handlers["chat_message"]:
+                                await asyncio.create_task(handler(chat_event))
                         
-                            for handler in self._handlers["chat:message"]:
-                                await asyncio.create_task(handler(event))
-                                
-                        elif channel == "chat:emote":
-                            event = EmoteEvent(
-                                timestamp=event_data["timestamp"],
-                                username=event_data["username"],
-                                emote_name=event_data["emote_name"],
-                                emote_id=event_data.get("emote_id")
+                        # Handle viewer interaction events
+                        if topic == "events:all" and event in ["follower", "subscription", "gift_subscription", "cheer"]:
+                            event_data = payload.get("data", {})
+                            
+                            interaction_event = ViewerInteractionEvent(
+                                timestamp=int(event_data.get("timestamp", 0)),
+                                interaction_type=event,
+                                username=event_data.get("user_name", ""),
+                                user_id=event_data.get("user_id", ""),
+                                details=event_data
                             )
-                        
-                            for handler in self._handlers["chat:emote"]:
-                                await asyncio.create_task(handler(event))
+                            
+                            for handler in self._handlers["viewer_interaction"]:
+                                await asyncio.create_task(handler(interaction_event))
                             
                 except json.JSONDecodeError:
                     logger.error(f"Invalid JSON received: {message}")
