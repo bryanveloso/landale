@@ -11,7 +11,7 @@ from typing import Dict, Any, Tuple
 def load_services_config() -> Dict[str, Any]:
     """Load the shared services configuration"""
     # Find the services.json file relative to this module
-    # From apps/analysis/src to packages/service-config
+    # From apps/seed/src to packages/service-config
     config_path = Path(__file__).parent.parent.parent.parent / "packages" / "service-config" / "services.json"
     
     try:

@@ -1,4 +1,4 @@
-"""Main entry point for the analysis service."""
+"""Main entry point for the SEED intelligence service."""
 import asyncio
 import logging
 import os
@@ -27,8 +27,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class AnalysisService:
-    """Main analysis service that coordinates all components."""
+class SeedService:
+    """Main SEED intelligence service that coordinates all components."""
     
     def __init__(self):
         # Configuration from environment with service-config defaults
@@ -49,8 +49,8 @@ class AnalysisService:
         self.health_runner = None
         
     async def start(self):
-        """Start the analysis service."""
-        logger.info("Starting analysis service...")
+        """Start the SEED intelligence service."""
+        logger.info("Starting SEED intelligence service...")
         
         # Initialize LMS client
         await self.lms_client.__aenter__()
@@ -83,7 +83,7 @@ class AnalysisService:
         
         # Start health check endpoint
         from .service_config import ServiceConfig, SERVICES
-        health_port = SERVICES['analysis']['ports']['health']
+        health_port = SERVICES.get('seed', {}).get('ports', {}).get('health', 8891)
         self.health_runner = await create_health_app(port=health_port)
         
         # Start listening tasks
@@ -94,11 +94,11 @@ class AnalysisService:
             asyncio.create_task(self._health_check_loop())
         ]
         
-        logger.info("Analysis service started successfully")
+        logger.info("SEED intelligence service started successfully")
         
     async def stop(self):
-        """Stop the analysis service."""
-        logger.info("Stopping analysis service...")
+        """Stop the SEED intelligence service."""
+        logger.info("Stopping SEED intelligence service...")
         self.running = False
         
         # Cancel tasks
@@ -117,7 +117,7 @@ class AnalysisService:
         if self.health_runner:
             await self.health_runner.cleanup()
         
-        logger.info("Analysis service stopped")
+        logger.info("SEED intelligence service stopped")
         
     async def _handle_transcription(self, event: TranscriptionEvent):
         """Handle transcription events from Phoenix server."""
@@ -168,7 +168,7 @@ class AnalysisService:
 
 async def main():
     """Main entry point."""
-    service = AnalysisService()
+    service = SeedService()
     
     # Handle shutdown signals
     loop = asyncio.get_event_loop()

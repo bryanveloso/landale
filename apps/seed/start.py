@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Startup script for the analysis service."""
+"""Startup script for the SEED intelligence service."""
 import sys
 import asyncio
 from src.main import main

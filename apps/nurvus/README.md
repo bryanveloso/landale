@@ -71,7 +71,7 @@ Nurvus manages processes across multiple machines in the Landale streaming infra
 
 ### Machine Roles
 
-- **Zelan (Mac Studio)** - AI services (Phononmaser, Analysis, LM Studio)
+- **Zelan (Mac Studio)** - AI services (Phononmaser, SEED, LM Studio)
 - **Demi (Windows PC)** - Streaming apps (OBS Studio, VTube Studio, TITS)
 - **Saya (Mac Mini)** - Docker services (Landale stack)
 - **Alys (Windows VM)** - Automation (Streamer.Bot)
