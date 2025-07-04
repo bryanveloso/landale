@@ -82,6 +82,7 @@ jobs:
           # Zelan (Mac Studio) - AI Services
           mkdir -p artifacts/zelan
           tar -xzf artifacts/nurvus-release-base.tar.gz -C artifacts/zelan
+          mkdir -p artifacts/zelan/config
           cp config/zelan.json artifacts/zelan/config/processes.json
           # Add deployment scripts
           cp -r deployment artifacts/zelan/
@@ -91,6 +92,7 @@ jobs:
           # Saya (Mac Mini) - Docker Services  
           mkdir -p artifacts/saya
           tar -xzf artifacts/nurvus-release-base.tar.gz -C artifacts/saya
+          mkdir -p artifacts/saya/config
           cp config/saya.json artifacts/saya/config/processes.json
           # Add deployment scripts
           cp -r deployment artifacts/saya/
@@ -100,6 +102,7 @@ jobs:
           # Demi (Windows PC) - Streaming Apps
           mkdir -p artifacts/demi
           tar -xzf artifacts/nurvus-release-base.tar.gz -C artifacts/demi
+          mkdir -p artifacts/demi/config
           cp config/demi.json artifacts/demi/config/processes.json
           # Add deployment scripts (Windows)
           cp -r deployment artifacts/demi/
@@ -108,6 +111,7 @@ jobs:
           # Alys (Windows VM) - Automation
           mkdir -p artifacts/alys
           tar -xzf artifacts/nurvus-release-base.tar.gz -C artifacts/alys
+          mkdir -p artifacts/alys/config
           cp config/alys.json artifacts/alys/config/processes.json
           # Add deployment scripts (Windows)
           cp -r deployment artifacts/alys/
