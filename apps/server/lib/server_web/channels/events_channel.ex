@@ -106,17 +106,6 @@ defmodule ServerWeb.EventsChannel do
   end
 
   @impl true
-  def handle_info({:twitch_event, event}, socket) do
-    push(socket, "twitch_event", %{
-      type: event.type,
-      data: event,
-      timestamp: event.timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_info({:chat_message, event}, socket) do
     push(socket, "chat_message", %{
       type: "chat_message",
