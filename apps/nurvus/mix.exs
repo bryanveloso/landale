@@ -5,7 +5,7 @@ defmodule Nurvus.MixProject do
     [
       app: :nurvus,
       version: "0.1.0",
-      elixir: "~> 1.16",
+      elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       releases: releases()
@@ -28,6 +28,7 @@ defmodule Nurvus.MixProject do
       {:bandit, "~> 1.5"},
       {:req, "~> 0.4"},
       {:telemetry, "~> 1.0"},
+      {:burrito, "~> 1.3"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
@@ -38,7 +39,22 @@ defmodule Nurvus.MixProject do
         version: "0.1.0",
         applications: [nurvus: :permanent],
         include_executables_for: [:unix, :windows],
-        steps: [:assemble, :tar]
+        steps: [:assemble, &Burrito.wrap/1],
+        burrito: [
+          targets: [
+            windows: [os: :windows, cpu: :x86_64],
+            linux: [os: :linux, cpu: :x86_64],
+            macos: [os: :darwin, cpu: :aarch64]
+          ]
+        ]
+      ]
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
+        release: :prod
       ]
     ]
   end

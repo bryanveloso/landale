@@ -139,15 +139,16 @@ defmodule Nurvus do
   def system_status do
     {:ok, processes} = list_processes()
 
-    {:ok, %{
-      total_processes: length(processes),
-      running: Enum.count(processes, &(&1.status == :running)),
-      stopped: Enum.count(processes, &(&1.status == :stopped)),
-      failed: Enum.count(processes, &(&1.status == :failed)),
-      alerts: length(get_alerts()),
-      uptime: get_uptime(),
-      platform: Nurvus.Platform.current_platform()
-    }}
+    {:ok,
+     %{
+       total_processes: length(processes),
+       running: Enum.count(processes, &(&1.status == :running)),
+       stopped: Enum.count(processes, &(&1.status == :stopped)),
+       failed: Enum.count(processes, &(&1.status == :failed)),
+       alerts: length(get_alerts()),
+       uptime: get_uptime(),
+       platform: Nurvus.Platform.current_platform()
+     }}
   end
 
   defp get_uptime do

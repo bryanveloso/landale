@@ -54,3 +54,6 @@ config/*.json.backup
 
 # Temporary deployment files
 deployment/tmp/
+
+# Burrito build artifacts
+/burrito_out/
