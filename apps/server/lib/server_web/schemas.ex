@@ -33,6 +33,30 @@ defmodule ServerWeb.Schemas do
     })
   end
 
+  defmodule ValidationErrorResponse do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        status: %Schema{type: :string, example: "error"},
+        errors: %Schema{
+          type: :object,
+          additionalProperties: %Schema{
+            type: :array,
+            items: %Schema{type: :string}
+          },
+          example: %{
+            "transcript" => ["can't be blank"],
+            "duration" => ["must be greater than 0"]
+          }
+        }
+      },
+      required: [:status, :errors]
+    })
+  end
+
   defmodule HealthStatus do
     @moduledoc false
     require OpenApiSpex
