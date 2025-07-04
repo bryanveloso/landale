@@ -82,7 +82,8 @@ defmodule Nurvus.TelemetryExample do
 
   ## Event Handlers
 
-  defp handle_process_event([:nurvus, :process, event], _measurements, metadata, _config) do
+  defp handle_process_event([:nurvus, :process, event], _measurements, metadata, _config)
+       when is_non_struct_map(metadata) do
     case event do
       :started ->
         Logger.info("🚀 Process #{metadata.process_id} (#{metadata.process_name}) started")
@@ -101,7 +102,8 @@ defmodule Nurvus.TelemetryExample do
     end
   end
 
-  defp handle_http_event([:nurvus, :http, :request], measurements, metadata, _config) do
+  defp handle_http_event([:nurvus, :http, :request], measurements, metadata, _config)
+       when is_non_struct_map(measurements) and is_non_struct_map(metadata) do
     duration_ms = System.convert_time_unit(measurements.duration, :native, :millisecond)
 
     Logger.debug("🌐 #{metadata.method} #{metadata.path} → #{metadata.status} (#{duration_ms}ms)")
@@ -110,7 +112,8 @@ defmodule Nurvus.TelemetryExample do
     # Example: send_to_metrics_system("http.request.duration", duration_ms, metadata)
   end
 
-  defp handle_metrics_event([:nurvus, :metrics, :collected], measurements, metadata, _config) do
+  defp handle_metrics_event([:nurvus, :metrics, :collected], measurements, metadata, _config)
+       when is_non_struct_map(measurements) and is_non_struct_map(metadata) do
     # Log if metrics are concerning
     if measurements.cpu_percent > 50 or measurements.memory_mb > 200 do
       Logger.info(
@@ -124,7 +127,8 @@ defmodule Nurvus.TelemetryExample do
     # Example: store_metrics(metadata.process_id, measurements)
   end
 
-  defp handle_alert_event([:nurvus, :alert, :generated], _measurements, metadata, _config) do
+  defp handle_alert_event([:nurvus, :alert, :generated], _measurements, metadata, _config)
+       when is_non_struct_map(metadata) do
     case metadata.alert_type do
       :high_cpu ->
         Logger.warning(

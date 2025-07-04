@@ -1,6 +1,8 @@
 defmodule Server.RetryStrategyTest do
   use ExUnit.Case, async: false
 
+  @moduletag :unit
+
   alias Server.RetryStrategy
 
   describe "basic retry functionality" do

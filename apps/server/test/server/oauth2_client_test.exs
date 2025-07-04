@@ -1,6 +1,8 @@
 defmodule Server.OAuth2ClientTest do
   use ExUnit.Case, async: true
 
+  @moduletag :unit
+
   alias Server.OAuth2Client
 
   describe "new/1" do

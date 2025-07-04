@@ -1,6 +1,8 @@
 defmodule Server.OAuthTokenManagerTest do
   use ExUnit.Case, async: true
 
+  @moduletag :unit
+
   alias Server.OAuthTokenManager
 
   @test_storage_path "./test_data/test_tokens.dets"

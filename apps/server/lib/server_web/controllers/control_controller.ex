@@ -126,8 +126,7 @@ defmodule ServerWeb.ControlController do
       end
     rescue
       e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
-      e in GenServer.CallError -> %{connected: false, error: "Service call failed: #{e.message}"}
-      _other -> %{connected: false, error: "Service unavailable"}
+      e -> %{connected: false, error: "Service call failed: #{inspect(e)}"}
     catch
       :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
     end
@@ -141,8 +140,7 @@ defmodule ServerWeb.ControlController do
       end
     rescue
       e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
-      e in GenServer.CallError -> %{connected: false, error: "Service call failed: #{e.message}"}
-      _other -> %{connected: false, error: "Service unavailable"}
+      e -> %{connected: false, error: "Service call failed: #{inspect(e)}"}
     catch
       :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
     end
@@ -239,9 +237,17 @@ defmodule ServerWeb.ControlController do
       if base_status.connected do
         try do
           case Server.Repo.query("SELECT COUNT(*) FROM seeds", [], timeout: 5000) do
-            {:ok, %{rows: [[count]]}} when is_integer(count) -> %{seed_count: count}
-            {:ok, _} -> %{seed_count: "unexpected_result"}
-            {:error, _} -> %{seed_count: "query_error"}
+            {:ok, result} when is_non_struct_map(result) and is_map_key(result, :rows) ->
+              case result.rows do
+                [[count]] when is_integer(count) -> %{seed_count: count}
+                _ -> %{seed_count: "unexpected_result"}
+              end
+
+            {:ok, _} ->
+              %{seed_count: "unexpected_result"}
+
+            {:error, _} ->
+              %{seed_count: "query_error"}
           end
         rescue
           e in Postgrex.Error -> %{seed_count: "database_error", error: e.message}

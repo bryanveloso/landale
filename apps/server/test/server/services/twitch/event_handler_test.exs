@@ -1,6 +1,8 @@
 defmodule Server.Services.Twitch.EventHandlerTest do
   use ExUnit.Case, async: true
 
+  @moduletag :services
+
   alias Server.Services.Twitch.EventHandler
 
   describe "normalize_event/2" do

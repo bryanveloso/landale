@@ -2,6 +2,8 @@ defmodule NurvusTest do
   use ExUnit.Case
   doctest Nurvus
 
+  @moduletag :unit
+
   test "add_process adds a process configuration" do
     config = %{
       "id" => "test_process",

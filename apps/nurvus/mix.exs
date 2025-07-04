@@ -23,7 +23,6 @@ defmodule Nurvus.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:jason, "~> 1.4"},
       {:plug, "~> 1.14"},
       {:bandit, "~> 1.5"},
       {:req, "~> 0.4"},

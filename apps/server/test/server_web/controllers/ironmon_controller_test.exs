@@ -8,6 +8,8 @@ defmodule ServerWeb.IronmonControllerTest do
   """
 
   use ServerWeb.ConnCase, async: false
+
+  @moduletag :web
   import ExUnit.CaptureLog
 
   describe "GET /api/ironmon/challenges - list challenges" do
@@ -88,18 +90,16 @@ defmodule ServerWeb.IronmonControllerTest do
       end
     end
 
-    test "returns 400 for invalid challenge ID", %{conn: conn} do
-      invalid_ids = ["abc", "12.5", "-1"]
-
-      Enum.each(invalid_ids, fn invalid_id ->
+    for invalid_id <- ["abc", "12.5", "-1"] do
+      test "returns 400 for invalid challenge ID: #{invalid_id}", %{conn: conn} do
         response =
           conn
-          |> get("/api/ironmon/challenges/#{invalid_id}/checkpoints")
+          |> get("/api/ironmon/challenges/#{unquote(invalid_id)}/checkpoints")
           |> json_response(400)
 
         assert response["success"] == false
         assert response["error"] == "Invalid challenge ID"
-      end)
+      end
     end
 
     test "returns 404 for empty challenge ID", %{conn: conn} do
@@ -110,13 +110,11 @@ defmodule ServerWeb.IronmonControllerTest do
       assert response.status == 404
     end
 
-    test "handles numeric string IDs correctly", %{conn: conn} do
-      valid_numeric_ids = ["1", "123", "9999"]
-
-      Enum.each(valid_numeric_ids, fn id ->
+    for id <- ["1", "123", "9999"] do
+      test "handles numeric string IDs correctly: #{id}", %{conn: conn} do
         response =
           conn
-          |> get("/api/ironmon/challenges/#{id}/checkpoints")
+          |> get("/api/ironmon/challenges/#{unquote(id)}/checkpoints")
 
         # Should not return 400 for valid numeric strings
         assert response.status in [200, 404]
@@ -126,7 +124,7 @@ defmodule ServerWeb.IronmonControllerTest do
           assert response_data["success"] == true
           assert Map.has_key?(response_data, "data")
         end
-      end)
+      end
     end
 
     test "returns checkpoints with expected structure", %{conn: conn} do
@@ -169,31 +167,27 @@ defmodule ServerWeb.IronmonControllerTest do
       end
     end
 
-    test "returns 400 for invalid checkpoint ID", %{conn: conn} do
-      invalid_ids = ["abc", "12.5", "-1", "not_a_number"]
-
-      Enum.each(invalid_ids, fn invalid_id ->
+    for invalid_id <- ["abc", "12.5", "-1", "not_a_number"] do
+      test "returns 400 for invalid checkpoint ID: #{invalid_id}", %{conn: conn} do
         response =
           conn
-          |> get("/api/ironmon/checkpoints/#{invalid_id}/stats")
+          |> get("/api/ironmon/checkpoints/#{unquote(invalid_id)}/stats")
           |> json_response(400)
 
         assert response["success"] == false
         assert response["error"] == "Invalid checkpoint ID"
-      end)
+      end
     end
 
-    test "handles numeric string IDs correctly", %{conn: conn} do
-      valid_numeric_ids = ["1", "123", "9999"]
-
-      Enum.each(valid_numeric_ids, fn id ->
+    for id <- ["1", "123", "9999"] do
+      test "handles numeric string IDs correctly: #{id}", %{conn: conn} do
         response =
           conn
-          |> get("/api/ironmon/checkpoints/#{id}/stats")
+          |> get("/api/ironmon/checkpoints/#{unquote(id)}/stats")
 
         # Should not return 400 for valid numeric strings
         assert response.status in [200, 404]
-      end)
+      end
     end
 
     test "returns statistics with expected structure", %{conn: conn} do
@@ -226,18 +220,16 @@ defmodule ServerWeb.IronmonControllerTest do
       assert is_list(response["data"]) or is_map(response["data"])
     end
 
-    test "accepts limit parameter", %{conn: conn} do
-      limits = [5, 20, 50]
-
-      Enum.each(limits, fn limit ->
+    for limit <- [5, 20, 50] do
+      test "accepts limit parameter: #{limit}", %{conn: conn} do
         response =
           conn
-          |> get("/api/ironmon/results/recent?limit=#{limit}")
+          |> get("/api/ironmon/results/recent?limit=#{unquote(limit)}")
           |> json_response(200)
 
         assert response["success"] == true
         assert Map.has_key?(response, "data")
-      end)
+      end
     end
 
     test "accepts cursor parameter for pagination", %{conn: conn} do
@@ -260,34 +252,30 @@ defmodule ServerWeb.IronmonControllerTest do
       assert Map.has_key?(response, "data")
     end
 
-    test "handles invalid limit parameter gracefully", %{conn: conn} do
-      invalid_limits = ["abc", "12.5", "-5", "not_a_number"]
-
-      Enum.each(invalid_limits, fn invalid_limit ->
+    for invalid_limit <- ["abc", "12.5", "-5", "not_a_number"] do
+      test "handles invalid limit parameter gracefully: #{invalid_limit}", %{conn: conn} do
         response =
           conn
-          |> get("/api/ironmon/results/recent?limit=#{invalid_limit}")
+          |> get("/api/ironmon/results/recent?limit=#{unquote(invalid_limit)}")
           |> json_response(200)
 
         # Should still succeed with default limit
         assert response["success"] == true
         assert Map.has_key?(response, "data")
-      end)
+      end
     end
 
-    test "handles invalid cursor parameter gracefully", %{conn: conn} do
-      invalid_cursors = ["abc", "12.5", "not_a_number"]
-
-      Enum.each(invalid_cursors, fn invalid_cursor ->
+    for invalid_cursor <- ["abc", "12.5", "not_a_number"] do
+      test "handles invalid cursor parameter gracefully: #{invalid_cursor}", %{conn: conn} do
         response =
           conn
-          |> get("/api/ironmon/results/recent?cursor=#{invalid_cursor}")
+          |> get("/api/ironmon/results/recent?cursor=#{unquote(invalid_cursor)}")
           |> json_response(200)
 
         # Should still succeed with nil cursor
         assert response["success"] == true
         assert Map.has_key?(response, "data")
-      end)
+      end
     end
 
     test "returns results with expected structure", %{conn: conn} do
@@ -327,31 +315,27 @@ defmodule ServerWeb.IronmonControllerTest do
       end
     end
 
-    test "returns 400 for invalid seed ID", %{conn: conn} do
-      invalid_ids = ["abc", "12.5", "-1", "not_a_number"]
-
-      Enum.each(invalid_ids, fn invalid_id ->
+    for invalid_id <- ["abc", "12.5", "-1", "not_a_number"] do
+      test "returns 400 for invalid seed ID: #{invalid_id}", %{conn: conn} do
         response =
           conn
-          |> get("/api/ironmon/seeds/#{invalid_id}/challenge")
+          |> get("/api/ironmon/seeds/#{unquote(invalid_id)}/challenge")
           |> json_response(400)
 
         assert response["success"] == false
         assert response["error"] == "Invalid seed ID"
-      end)
+      end
     end
 
-    test "handles numeric string IDs correctly", %{conn: conn} do
-      valid_numeric_ids = ["1", "123", "9999"]
-
-      Enum.each(valid_numeric_ids, fn id ->
+    for id <- ["1", "123", "9999"] do
+      test "handles numeric string IDs correctly: #{id}", %{conn: conn} do
         response =
           conn
-          |> get("/api/ironmon/seeds/#{id}/challenge")
+          |> get("/api/ironmon/seeds/#{unquote(id)}/challenge")
 
         # Should not return 400 for valid numeric strings
         assert response.status in [200, 404]
-      end)
+      end
     end
 
     test "returns 404 for nonexistent seed", %{conn: conn} do
@@ -584,26 +568,24 @@ defmodule ServerWeb.IronmonControllerTest do
       assert duration < 3000
     end
 
-    test "all endpoints respond within reasonable time", %{conn: conn} do
-      endpoints = [
-        "/api/ironmon/challenges",
-        "/api/ironmon/challenges/1/checkpoints",
-        "/api/ironmon/checkpoints/1/stats",
-        "/api/ironmon/results/recent",
-        "/api/ironmon/seeds/1/challenge"
-      ]
-
-      Enum.each(endpoints, fn endpoint ->
+    for endpoint <- [
+          "/api/ironmon/challenges",
+          "/api/ironmon/challenges/1/checkpoints",
+          "/api/ironmon/checkpoints/1/stats",
+          "/api/ironmon/results/recent",
+          "/api/ironmon/seeds/1/challenge"
+        ] do
+      test "endpoint #{endpoint} responds within reasonable time", %{conn: conn} do
         start_time = System.monotonic_time(:millisecond)
 
-        response = get(conn, endpoint)
+        response = get(conn, unquote(endpoint))
 
         duration = System.monotonic_time(:millisecond) - start_time
 
         # All endpoints should complete within 5 seconds
         assert duration < 5000
         assert response.status in [200, 400, 404, 500]
-      end)
+      end
     end
 
     test "pagination doesn't significantly slow down response", %{conn: conn} do

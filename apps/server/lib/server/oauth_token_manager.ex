@@ -270,7 +270,11 @@ defmodule Server.OAuthTokenManager do
       nil ->
         {:error, :no_token_for_refresh}
 
-      %{refresh_token: nil} ->
+      token_info when is_non_struct_map(token_info) and not is_map_key(token_info, :refresh_token) ->
+        {:error, :no_refresh_token}
+
+      token_info
+      when is_non_struct_map(token_info) and is_map_key(token_info, :refresh_token) and token_info.refresh_token == nil ->
         {:error, :no_refresh_token}
 
       %{refresh_token: refresh_token} ->
@@ -585,7 +589,7 @@ defmodule Server.OAuthTokenManager do
   defp validate_dets_integrity(table) do
     try do
       case :dets.lookup(table, :token) do
-        [{:token, token_data}] when is_map(token_data) ->
+        [{:token, token_data}] when is_non_struct_map(token_data) ->
           {:ok, deserialize_token(token_data)}
 
         [] ->
@@ -609,7 +613,7 @@ defmodule Server.OAuthTokenManager do
     if File.exists?(backup_file) do
       try do
         json_data = File.read!(backup_file)
-        backup_data = Jason.decode!(json_data)
+        backup_data = JSON.decode!(json_data)
 
         # Convert backup data to token_info
         token_info = %{
@@ -714,7 +718,7 @@ defmodule Server.OAuthTokenManager do
       storage_dir = Path.dirname(manager.storage_path)
       backup_file = Path.join(storage_dir, "#{manager.storage_key}_backup.json")
 
-      json_data = Jason.encode!(backup_data, pretty: true)
+      json_data = JSON.encode!(backup_data)
       File.write!(backup_file, json_data)
 
       Logger.debug("Token backup created",

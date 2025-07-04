@@ -9,7 +9,7 @@ defmodule Server.Transcription.Transcription do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @derive {Jason.Encoder,
+  @derive {JSON.Encoder,
            only: [:id, :timestamp, :duration, :text, :source_id, :stream_session_id, :confidence, :metadata]}
 
   @type t :: %__MODULE__{

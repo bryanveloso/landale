@@ -1,6 +1,8 @@
 defmodule Server.TranscriptionTest do
   use Server.DataCase, async: true
 
+  @moduletag :database
+
   alias Server.Transcription
 
   describe "list_transcriptions/1" do
@@ -97,18 +99,19 @@ defmodule Server.TranscriptionTest do
       assert {:error, %Ecto.Changeset{}} = Transcription.create_transcription(attrs)
     end
 
-    test "validates duration is positive" do
-      attrs = valid_transcription_attrs(%{duration: -1.0})
+    for {field, value, expected_error} <- [
+          {:duration, -1.0, "must be greater than 0.0"},
+          {:duration, 0.0, "must be greater than 0.0"},
+          {:confidence, -0.1, "must be greater than or equal to 0.0"},
+          {:confidence, 1.5, "must be less than or equal to 1.0"},
+          {:confidence, 2.0, "must be less than or equal to 1.0"}
+        ] do
+      test "validates #{field} with value #{value}", _context do
+        attrs = valid_transcription_attrs(%{unquote(field) => unquote(value)})
 
-      assert {:error, changeset} = Transcription.create_transcription(attrs)
-      assert "must be greater than 0.0" in errors_on(changeset).duration
-    end
-
-    test "validates confidence is between 0 and 1" do
-      attrs = valid_transcription_attrs(%{confidence: 1.5})
-
-      assert {:error, changeset} = Transcription.create_transcription(attrs)
-      assert "must be less than or equal to 1.0" in errors_on(changeset).confidence
+        assert {:error, changeset} = Transcription.create_transcription(attrs)
+        assert unquote(expected_error) in errors_on(changeset)[unquote(field)]
+      end
     end
 
     test "validates text length" do
@@ -176,15 +179,20 @@ defmodule Server.TranscriptionTest do
       assert hd(result).id == session1_match.id
     end
 
-    test "sanitizes SQL injection attempts" do
-      insert_transcription(%{text: "safe content"})
+    for injection_attempt <- [
+          "'; DROP TABLE transcriptions; --",
+          "%'; OR '1'='1",
+          "'; DELETE FROM transcriptions WHERE '1'='1",
+          "UNION SELECT * FROM users --"
+        ] do
+      test "sanitizes SQL injection attempts: #{String.slice(injection_attempt, 0, 20)}...", _context do
+        insert_transcription(%{text: "safe content"})
 
-      # These should not cause SQL errors
-      result1 = Transcription.search_transcriptions("'; DROP TABLE transcriptions; --")
-      result2 = Transcription.search_transcriptions("%'; OR '1'='1")
+        # This should not cause SQL errors
+        result = Transcription.search_transcriptions(unquote(injection_attempt))
 
-      assert result1 == []
-      assert result2 == []
+        assert result == []
+      end
     end
   end
 
