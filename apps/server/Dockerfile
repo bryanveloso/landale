@@ -2,7 +2,7 @@
 # Multi-stage build for optimal production deployment
 
 # Build stage
-FROM elixir:1.16.3-otp-26 AS builder
+FROM elixir:1.18.4-otp-26 AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -40,7 +40,7 @@ RUN mix compile && \
     mix release
 
 # Production runtime stage  
-FROM elixir:1.16.3-otp-26-slim AS runtime
+FROM elixir:1.18.4-otp-26-slim AS runtime
 
 # Install runtime dependencies (minimal since base image includes Erlang/Elixir)
 RUN apt-get update && apt-get install -y \
