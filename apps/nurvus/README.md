@@ -1,52 +1,34 @@
 # Nurvus
 
-A lightweight, distributed process manager built with Elixir OTP that provides PM2-like functionality with proper supervision, health monitoring, and real-time metrics across multiple machines.
+A lightweight, distributed process manager built with Elixir OTP that provides PM2-like functionality as single executables across multiple machines.
 
 ## Features
 
-- **Distributed Process Management** - Manage processes across multiple machines (Zelan, Demi, Saya, Alys)
+- **Single Executable** - No dependencies, just download and run
+- **Distributed Process Management** - Manage processes across multiple machines
 - **Platform Detection** - Cross-platform support for Windows, macOS, and Linux
 - **Process Lifecycle Management** - Start, stop, restart external processes
 - **Health Monitoring** - Real-time CPU, memory, and performance metrics
 - **Auto-restart** - Configurable automatic restart on process failure
-- **Configuration-based** - Machine-specific JSON configurations with validation
-- **HTTP API** - RESTful endpoints for dashboard integration and cross-machine monitoring
+- **Configuration-based** - Machine-specific JSON configurations
+- **HTTP API** - RESTful endpoints for dashboard integration
 - **OTP Supervision** - Proper fault tolerance with Elixir supervision trees
 
 ## Quick Start
 
 ### Installation
 
-Start the Nurvus application:
-
-```bash
-mix deps.get
-iex -S mix
-```
+1. Download the appropriate package for your machine from GitHub Actions artifacts
+2. Extract: `tar -xzf nurvus-[machine].tar.gz`
+3. Run: `./nurvus` (or `nurvus.exe` on Windows)
 
 The HTTP API will be available at `http://localhost:4001`
 
 ### Configuration
 
-Nurvus supports machine-specific configurations. Create configuration files for each machine:
+Each package includes machine-specific configuration that's automatically copied to `~/.nurvus/processes.json` on first run.
 
-**Zelan (Mac Studio - AI Services):**
-```bash
-# Load Zelan configuration
-curl -X POST http://localhost:4001/api/config/load \
-  -H "Content-Type: application/json" \
-  -d '{"machine": "zelan"}'
-```
-
-**Demi (Windows - Streaming):**
-```bash
-# Load Demi configuration  
-curl -X POST http://localhost:4001/api/config/load \
-  -H "Content-Type: application/json" \
-  -d '{"machine": "demi"}'
-```
-
-**Example configuration (`config/zelan.json`):**
+**Example configuration:**
 ```json
 [
   {
@@ -80,6 +62,7 @@ curl http://localhost:4001/api/system/status
 ## Documentation
 
 - [API Documentation](API.md) - Complete HTTP API reference
+- [Deployment Guide](DEPLOYMENT.md) - Installation and setup instructions
 - [Configuration Guide](config/processes.sample.json) - Sample process configuration
 
 ## Distributed Architecture
@@ -122,13 +105,4 @@ curl http://saya.local:4001/api/health/detailed
 
 ## Development
 
-```bash
-# Format code
-mix format
-
-# Run code analysis
-mix credo --strict
-
-# Start in development
-iex -S mix
-```
+For development, see the main repository for build instructions using Mix and Elixir.

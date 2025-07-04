@@ -1,10 +1,10 @@
 # Nurvus Deployment Guide
 
-Complete deployment guide for Nurvus process manager across your streaming infrastructure.
+Complete deployment guide for Nurvus single-executable process manager.
 
 ## Overview
 
-Nurvus is designed to run on each machine in your streaming setup:
+Nurvus is deployed as single executables to each machine in your streaming setup:
 
 - **Zelan (Mac Studio)** - AI services (Phononmaser, Analysis, LM Studio)  
 - **Demi (Windows PC)** - Streaming apps (OBS, VTube Studio, TITS)
@@ -13,229 +13,86 @@ Nurvus is designed to run on each machine in your streaming setup:
 
 ## Quick Start
 
-### 1. Prerequisites
+### 1. Download Machine Package
 
-**Build Machine Only (typically Zelan):**
-- Elixir 1.16+ and Erlang/OTP 26+
-- Git access to the repository
+Download the appropriate package for your machine from GitHub Actions artifacts:
 
-**Target Machines (all others):**
-- **NO Elixir/Erlang installation required!**
-- Mix releases are self-contained with the runtime included
+- `nurvus-zelan.tar.gz` - Mac Studio
+- `nurvus-saya.tar.gz` - Mac Mini  
+- `nurvus-demi.tar.gz` - Windows PC
+- `nurvus-alys.tar.gz` - Windows VM
 
-**Build Machine Setup (macOS):**
-```bash
-brew install elixir
-```
-
-**OR for Windows build machine:**
-```powershell
-choco install elixir
-```
-
-### 2. Build Release (Build Machine Only)
+### 2. Extract and Run
 
 ```bash
-# Clone repository (on build machine)
-git clone <repository-url>
-cd landale/apps/nurvus
+# Extract package
+tar -xzf nurvus-[machine].tar.gz
 
-# Build production release
-MIX_ENV=prod mix deps.get --only prod
-MIX_ENV=prod mix release
-
-# Package for distribution
-tar -czf nurvus-release.tar.gz -C _build/prod/rel/nurvus .
+# Run directly (config will be copied to ~/.nurvus/ on first run)
+./nurvus  # or nurvus.exe on Windows
 ```
 
-### 3. Deploy to Target Machines
+That's it! No dependencies, no build process, no configuration copying.
 
-**No Elixir installation needed on target machines!**
+## Auto-Start Setup
 
-Copy the release package and extract:
-```bash
-# Copy nurvus-release.tar.gz to target machine
-# Then extract:
-sudo mkdir -p /opt/nurvus
-sudo tar -xzf nurvus-release.tar.gz -C /opt/nurvus/
-```
+### macOS/Linux: Systemd Service
 
-### 3. Machine-Specific Configuration
-
-Each machine has its own configuration file:
+Each package includes a `nurvus.service` file for auto-startup:
 
 ```bash
-# Copy appropriate config for your machine
-cp config/zelan.json config/processes.json     # Mac Studio
-cp config/demi.json config/processes.json      # Windows PC  
-cp config/saya.json config/processes.json      # Mac Mini
-cp config/alys.json config/processes.json      # Windows VM
-```
+# Install the service
+sudo cp nurvus.service /etc/systemd/system/nurvus-[machine].service
 
-### 4. Test Run
+# Enable auto-start on boot
+sudo systemctl daemon-reload
+sudo systemctl enable nurvus-[machine]
 
-```bash
-# Test locally first
-iex -S mix
-
-# Or run in background
-mix run --no-halt
-```
-
-### 5. Deploy to Production
-
-Choose your deployment method:
-
-## Deployment Methods
-
-### Option A: Mix Releases (Recommended)
-
-Mix releases create self-contained deployments with the Erlang runtime.
-
-#### Build Release
-
-```bash
-# Configure for production
-export MIX_ENV=prod
-
-# Build release
-mix release
-
-# Release will be in _build/prod/rel/nurvus/
-```
-
-#### Deploy Release
-
-```bash
-# Copy to target location
-sudo mkdir -p /opt/nurvus
-sudo cp -r _build/prod/rel/nurvus/* /opt/nurvus/
-
-# Set ownership (Unix only)
-sudo chown -R $USER:$USER /opt/nurvus
-```
-
-#### Run Release
-
-```bash
-# Start
-/opt/nurvus/bin/nurvus start
-
-# Stop  
-/opt/nurvus/bin/nurvus stop
+# Start now
+sudo systemctl start nurvus-[machine]
 
 # Check status
-/opt/nurvus/bin/nurvus pid
+sudo systemctl status nurvus-[machine]
 ```
 
-### Option B: Direct Execution
+### Windows: Manual Service Setup
 
-Run directly from source code (development/testing).
-
-```bash
-# Development
-iex -S mix
-
-# Production mode
-MIX_ENV=prod mix run --no-halt
-
-# Background daemon
-nohup mix run --no-halt > nurvus.log 2>&1 &
-```
-
-### Option C: Systemd Services (Linux/macOS)
-
-#### Create Service File
-
-**macOS (Zelan, Saya)** - `/usr/local/etc/systemd/system/nurvus.service`:
-```ini
-[Unit]
-Description=Nurvus Process Manager
-After=network.target
-
-[Service]
-Type=exec
-User=bryan
-WorkingDirectory=/opt/landale/apps/nurvus
-ExecStart=/opt/nurvus/bin/nurvus start
-ExecStop=/opt/nurvus/bin/nurvus stop
-Restart=always
-RestartSec=5
-Environment=MIX_ENV=prod
-Environment=NURVUS_PORT=4001
-
-[Install]
-WantedBy=multi-user.target
-```
-
-#### Enable Service
-
-```bash
-# Enable and start
-sudo systemctl enable nurvus
-sudo systemctl start nurvus
-
-# Check status
-sudo systemctl status nurvus
-
-# View logs
-sudo journalctl -u nurvus -f
-```
-
-### Option D: Windows Services (Demi, Alys)
-
-#### Using NSSM (Non-Sucking Service Manager)
+For Windows machines (Demi/Alys), use NSSM:
 
 ```powershell
 # Install NSSM
 choco install nssm
 
-# Create service
-nssm install Nurvus "C:\elixir\bin\mix.bat"
-nssm set Nurvus Parameters "run --no-halt"
-nssm set Nurvus AppDirectory "C:\landale\apps\nurvus"
+# Create service (from nurvus directory)
+nssm install Nurvus "C:\path\to\nurvus.exe"
 nssm set Nurvus DisplayName "Nurvus Process Manager"
 nssm set Nurvus Description "PM2-like process manager for streaming setup"
 
-# Set environment
-nssm set Nurvus AppEnvironmentExtra MIX_ENV=prod NURVUS_PORT=4001
-
 # Start service
 nssm start Nurvus
-```
 
-#### Check Windows Service
-
-```powershell
-# Service status
+# Check status
 sc query Nurvus
-
-# Start/stop
-net start Nurvus
-net stop Nurvus
-
-# View logs (check Windows Event Viewer)
 ```
 
-## Machine-Specific Deployment
+## Machine-Specific Details
 
 ### Zelan (Mac Studio) - AI Services
 
 ```bash
-# Dependencies for AI services
-brew install python@3.11 ffmpeg
+# Download and extract
+tar -xzf nurvus-zelan.tar.gz
 
-# Nurvus configuration
-cp config/zelan.json config/processes.json
+# Run (config auto-copied to ~/.nurvus/)
+./nurvus
 
-# Deploy using systemd
-sudo cp deployment/zelan/nurvus.service /usr/local/etc/systemd/system/
-sudo systemctl enable nurvus
-sudo systemctl start nurvus
+# Install systemd service
+sudo cp nurvus.service /etc/systemd/system/nurvus-zelan.service
+sudo systemctl enable nurvus-zelan
+sudo systemctl start nurvus-zelan
 
-# Verify services
-curl http://zelan.local:4001/api/platform
-curl http://zelan.local:4001/api/processes
+# Verify
+curl http://zelan.local:4001/health
 ```
 
 **Managed Processes:**
@@ -243,21 +100,42 @@ curl http://zelan.local:4001/api/processes
 - Analysis (Python ML service) 
 - LM Studio (Local language model server)
 
+### Saya (Mac Mini) - Docker Services
+
+```bash
+# Download and extract
+tar -xzf nurvus-saya.tar.gz
+
+# Run
+./nurvus
+
+# Install systemd service
+sudo cp nurvus.service /etc/systemd/system/nurvus-saya.service
+sudo systemctl enable nurvus-saya
+sudo systemctl start nurvus-saya
+
+# Verify
+curl http://saya.local:4001/health
+```
+
+**Managed Processes:**
+- Landale Docker Stack (Main application)
+
 ### Demi (Windows PC) - Streaming
 
 ```powershell
-# Nurvus configuration  
-Copy-Item config\demi.json config\processes.json
+# Extract package
+tar -xzf nurvus-demi.tar.gz
 
-# Deploy as Windows service
-nssm install Nurvus "C:\elixir\bin\mix.bat"
-nssm set Nurvus Parameters "run --no-halt"
-nssm set Nurvus AppDirectory "C:\landale\apps\nurvus"
+# Run
+.\nurvus.exe
+
+# Install as service
+nssm install Nurvus "C:\path\to\nurvus.exe"
 nssm start Nurvus
 
-# Verify streaming apps
-curl http://demi.local:4001/api/platform/processes/obs64.exe
-curl http://demi.local:4001/api/processes
+# Verify
+curl http://demi.local:4001/health
 ```
 
 **Managed Processes:**
@@ -265,39 +143,21 @@ curl http://demi.local:4001/api/processes
 - VTube Studio (Avatar software)
 - TITS Launcher (Text-to-speech)
 
-### Saya (Mac Mini) - Docker
-
-```bash
-# Docker must be running
-docker --version
-
-# Nurvus configuration
-cp config/saya.json config/processes.json
-
-# Deploy
-sudo systemctl enable nurvus
-sudo systemctl start nurvus
-
-# Verify Docker services
-curl http://saya.local:4001/api/processes/landale-stack
-curl http://saya.local:4001/api/health/detailed
-```
-
-**Managed Processes:**
-- Landale Docker Stack (Main application)
-
 ### Alys (Windows VM) - Automation
 
 ```powershell
-# Nurvus configuration
-Copy-Item config\alys.json config\processes.json
+# Extract package
+tar -xzf nurvus-alys.tar.gz
 
-# Deploy as service
-nssm install Nurvus "C:\elixir\bin\mix.bat"
+# Run
+.\nurvus.exe
+
+# Install as service
+nssm install Nurvus "C:\path\to\nurvus.exe"
 nssm start Nurvus
 
-# Verify automation
-curl http://alys.local:4001/api/platform/processes/Streamer.Bot.exe
+# Verify
+curl http://alys.local:4001/health
 ```
 
 **Managed Processes:**
@@ -323,7 +183,10 @@ export MIX_ENV=prod
 **Default locations by priority:**
 1. `NURVUS_CONFIG_FILE` environment variable
 2. Application config `:nurvus, :config_file`
-3. `config/processes.json` (default)
+3. `~/.nurvus/processes.json` (default)
+
+**Auto-initialization:**
+- On first run, if `~/.nurvus/` doesn't exist, Nurvus will copy `./processes.json` to `~/.nurvus/processes.json`
 
 ### Network Configuration
 
