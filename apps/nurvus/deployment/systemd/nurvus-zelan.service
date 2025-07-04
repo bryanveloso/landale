@@ -1,0 +1,45 @@
+[Unit]
+Description=Nurvus Process Manager (Zelan - AI Services)
+Documentation=https://github.com/bryanveloso/landale/apps/nurvus
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=bryan
+Group=bryan
+WorkingDirectory=/opt/nurvus
+ExecStart=/opt/nurvus/bin/nurvus start
+ExecStop=/opt/nurvus/bin/nurvus stop
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=always
+RestartSec=5
+RestartKillSignal=SIGKILL
+
+# Zelan-specific environment
+Environment=MIX_ENV=prod
+Environment=NURVUS_PORT=4001
+Environment=NURVUS_CONFIG_FILE=/opt/nurvus/config/zelan.json
+Environment=NURVUS_LOG_LEVEL=info
+Environment=HOSTNAME=zelan
+
+# AI services may need more resources
+Environment=ERL_MAX_PORTS=32768
+Environment=ERL_MAX_ETS_TABLES=32768
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/nurvus /var/log/nurvus /opt/landale
+
+# Higher resource limits for AI workloads
+LimitNOFILE=65536
+LimitNPROC=8192
+
+[Install]
+WantedBy=multi-user.target
