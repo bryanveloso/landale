@@ -58,25 +58,46 @@ class LMSClient:
                     return None
                     
                 data = await response.json()
+                
+                # Validate response structure
+                if "choices" not in data or not data["choices"]:
+                    logger.error("Invalid LMS response: missing choices")
+                    return None
+                    
                 content = data["choices"][0]["message"]["content"]
                 
-                # Parse JSON response
-                result_data = json.loads(content)
+                # Parse JSON response with proper error handling
+                try:
+                    result_data = json.loads(content)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse LMS JSON response: {e}")
+                    return None
                 
-                # Convert to AnalysisResult
-                return AnalysisResult(
-                    timestamp=int(result_data.get("timestamp", 0)),
-                    patterns=FlexiblePatterns(**result_data["patterns"]),
-                    dynamics=StreamDynamics(**result_data["dynamics"]) if "dynamics" in result_data else None,
-                    sentiment=result_data["sentiment"],
-                    sentiment_trajectory=result_data.get("sentimentTrajectory"),
-                    topics=result_data.get("topics", []),
-                    context=result_data["context"],
-                    suggested_actions=result_data.get("suggestedActions", []),
-                    stream_momentum=result_data.get("streamMomentum"),
-                    transcription_context=transcription_context,
-                    chat_context=chat_context
-                )
+                # Validate required fields
+                required_fields = ["patterns", "sentiment", "context"]
+                for field in required_fields:
+                    if field not in result_data:
+                        logger.error(f"Missing required field in LMS response: {field}")
+                        return None
+                
+                # Convert to AnalysisResult with error handling
+                try:
+                    return AnalysisResult(
+                        timestamp=int(result_data.get("timestamp", 0)),
+                        patterns=FlexiblePatterns(**result_data["patterns"]),
+                        dynamics=StreamDynamics(**result_data["dynamics"]) if "dynamics" in result_data else None,
+                        sentiment=result_data["sentiment"],
+                        sentiment_trajectory=result_data.get("sentimentTrajectory"),
+                        topics=result_data.get("topics", []),
+                        context=result_data["context"],
+                        suggested_actions=result_data.get("suggestedActions", []),
+                        stream_momentum=result_data.get("streamMomentum"),
+                        transcription_context=transcription_context,
+                        chat_context=chat_context
+                    )
+                except (KeyError, TypeError, ValueError) as e:
+                    logger.error(f"Failed to create AnalysisResult: {e}")
+                    return None
                 
         except Exception as e:
             logger.error(f"Failed to analyze with LMS: {e}")

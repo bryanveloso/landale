@@ -3,7 +3,7 @@ import asyncio
 import logging
 from collections import Counter, deque
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .context_client import ContextClient
 from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
@@ -427,8 +427,23 @@ class StreamCorrelator:
     async def _build_rich_context_data(self, transcript: str, duration: float, 
                                       first_transcription, last_transcription) -> Dict:
         """Build comprehensive context data for training and analysis."""
-        # Temporal data
-        temporal_data = {
+        temporal_data = self._build_temporal_data(duration)
+        content_data = self._build_content_data(transcript)
+        community_data = self._build_community_data()
+        correlation_data = self._build_correlation_data()
+        ai_analysis = await self._build_ai_analysis()
+        
+        return {
+            'temporal_data': temporal_data,
+            'content_data': content_data,
+            'community_data': community_data,
+            'correlation_data': correlation_data,
+            'ai_analysis': ai_analysis
+        }
+        
+    def _build_temporal_data(self, duration: float) -> Dict[str, Any]:
+        """Build temporal information for context."""
+        return {
             'started': self.context_start_time.isoformat() if self.context_start_time else None,
             'ended': (self.context_start_time + timedelta(seconds=self.context_window)).isoformat() if self.context_start_time else None,
             'duration': duration,
@@ -436,8 +451,9 @@ class StreamCorrelator:
             'fragment_count': len(self.transcription_buffer)
         }
         
-        # Content data with maximum detail
-        content_data = {
+    def _build_content_data(self, transcript: str) -> Dict[str, Any]:
+        """Build content analysis data."""
+        return {
             'transcript': transcript,
             'transcript_fragments': [{
                 'timestamp': t.timestamp,
@@ -447,82 +463,99 @@ class StreamCorrelator:
             } for t in self.transcription_buffer],
             'confidence_scores': [t.confidence for t in self.transcription_buffer if t.confidence],
             'speaking_patterns': self._analyze_speaking_patterns(),
-            'content_metrics': {
-                'word_count': len(transcript.split()),
-                'sentence_count': transcript.count('.') + transcript.count('!') + transcript.count('?'),
-                'avg_words_per_fragment': len(transcript.split()) / len(self.transcription_buffer) if self.transcription_buffer else 0
-            }
+            'content_metrics': self._calculate_content_metrics(transcript)
         }
         
-        # Community data with full detail
-        community_data = {
-            'chat_messages': [{
-                'timestamp': msg.timestamp,
-                'username': msg.username,
-                'message': msg.message,
-                'emotes': msg.emotes,
-                'native_emotes': msg.native_emotes,
-                'is_subscriber': msg.is_subscriber,
-                'is_moderator': msg.is_moderator
-            } for msg in self.chat_buffer],
-            'emote_events': [{
-                'timestamp': emote.timestamp,
-                'username': emote.username,
-                'emote_name': emote.emote_name,
-                'emote_id': emote.emote_id
-            } for emote in self.emote_buffer],
-            'viewer_interactions': [{
-                'timestamp': interaction.timestamp,
-                'interaction_type': interaction.interaction_type,
-                'username': interaction.username,
-                'user_id': interaction.user_id,
-                'details': interaction.details
-            } for interaction in self.interaction_buffer],
+    def _calculate_content_metrics(self, transcript: str) -> Dict[str, float]:
+        """Calculate content-related metrics."""
+        words = transcript.split()
+        return {
+            'word_count': len(words),
+            'sentence_count': transcript.count('.') + transcript.count('!') + transcript.count('?'),
+            'avg_words_per_fragment': len(words) / len(self.transcription_buffer) if self.transcription_buffer else 0.0
+        }
+        
+    def _build_community_data(self) -> Dict[str, Any]:
+        """Build community interaction data."""
+        return {
+            'chat_messages': [self._serialize_chat_message(msg) for msg in self.chat_buffer],
+            'emote_events': [self._serialize_emote_event(emote) for emote in self.emote_buffer],
+            'viewer_interactions': [self._serialize_interaction(interaction) for interaction in self.interaction_buffer],
             'chat_summary': self._build_chat_summary(),
             'interactions_summary': self._build_interactions_summary(),
             'emotes_summary': self._build_emotes_summary(),
-            'community_metrics': {
-                'total_messages': len(self.chat_buffer),
-                'unique_participants': len(set(msg.username for msg in self.chat_buffer)),
-                'chat_velocity': self._calculate_chat_velocity(),
-                'emote_frequency': self._calculate_emote_frequency(),
-                'native_emote_frequency': self._calculate_native_emote_frequency()
-            }
+            'community_metrics': self._calculate_community_metrics()
         }
         
-        # Correlation analysis
-        correlation_data = {
+    def _serialize_chat_message(self, msg) -> Dict[str, Any]:
+        """Serialize a chat message for storage."""
+        return {
+            'timestamp': msg.timestamp,
+            'username': msg.username,
+            'message': msg.message,
+            'emotes': msg.emotes,
+            'native_emotes': msg.native_emotes,
+            'is_subscriber': msg.is_subscriber,
+            'is_moderator': msg.is_moderator
+        }
+        
+    def _serialize_emote_event(self, emote) -> Dict[str, Any]:
+        """Serialize an emote event for storage."""
+        return {
+            'timestamp': emote.timestamp,
+            'username': emote.username,
+            'emote_name': emote.emote_name,
+            'emote_id': emote.emote_id
+        }
+        
+    def _serialize_interaction(self, interaction) -> Dict[str, Any]:
+        """Serialize a viewer interaction for storage."""
+        return {
+            'timestamp': interaction.timestamp,
+            'interaction_type': interaction.interaction_type,
+            'username': interaction.username,
+            'user_id': interaction.user_id,
+            'details': interaction.details
+        }
+        
+    def _calculate_community_metrics(self) -> Dict[str, Any]:
+        """Calculate community engagement metrics."""
+        return {
+            'total_messages': len(self.chat_buffer),
+            'unique_participants': len(set(msg.username for msg in self.chat_buffer)),
+            'chat_velocity': self._calculate_chat_velocity(),
+            'emote_frequency': self._calculate_emote_frequency(),
+            'native_emote_frequency': self._calculate_native_emote_frequency()
+        }
+        
+    def _build_correlation_data(self) -> Dict[str, Any]:
+        """Build correlation analysis data."""
+        return {
             'speech_to_chat_correlation': self._analyze_speech_chat_correlation(),
             'temporal_patterns': self._analyze_temporal_patterns(),
             'engagement_patterns': self._analyze_engagement_patterns()
         }
         
-        # Get AI analysis
+    async def _build_ai_analysis(self) -> Optional[Dict[str, Any]]:
+        """Build AI analysis data."""
         analysis_result = await self.analyze(immediate=True)
-        ai_analysis = None
-        if analysis_result:
-            ai_analysis = {
-                'patterns': analysis_result.patterns.dict() if analysis_result.patterns else None,
-                'dynamics': analysis_result.dynamics.dict() if analysis_result.dynamics else None,
-                'sentiment': analysis_result.sentiment,
-                'sentiment_trajectory': analysis_result.sentiment_trajectory,
-                'topics': analysis_result.topics,
-                'context': analysis_result.context,
-                'suggested_actions': analysis_result.suggested_actions,
-                'stream_momentum': analysis_result.stream_momentum,
-                'model_metadata': {
-                    'model_used': 'current_lms_model',  # TODO: get from config
-                    'analysis_version': '1.0',
-                    'timestamp': datetime.now().isoformat()
-                }
-            }
-        
+        if not analysis_result:
+            return None
+            
         return {
-            'temporal_data': temporal_data,
-            'content_data': content_data,
-            'community_data': community_data,
-            'correlation_data': correlation_data,
-            'ai_analysis': ai_analysis
+            'patterns': analysis_result.patterns.dict() if analysis_result.patterns else None,
+            'dynamics': analysis_result.dynamics.dict() if analysis_result.dynamics else None,
+            'sentiment': analysis_result.sentiment,
+            'sentiment_trajectory': analysis_result.sentiment_trajectory,
+            'topics': analysis_result.topics,
+            'context': analysis_result.context,
+            'suggested_actions': analysis_result.suggested_actions,
+            'stream_momentum': analysis_result.stream_momentum,
+            'model_metadata': {
+                'model_used': 'current_lms_model',  # TODO: get from config
+                'analysis_version': '1.0',
+                'timestamp': datetime.now().isoformat()
+            }
         }
         
     def _analyze_speaking_patterns(self) -> Dict:
@@ -537,7 +570,7 @@ class StreamCorrelator:
         # Calculate speaking pace
         total_words = sum(len(t.text.split()) for t in fragments)
         total_duration = fragments[-1].timestamp - fragments[0].timestamp
-        words_per_minute = (total_words / total_duration) * 60 if total_duration > 0 else 0
+        words_per_minute = (total_words / total_duration) * 60 if total_duration > 0 else 0.0
         
         # Calculate pauses between fragments
         pauses = []
@@ -547,10 +580,10 @@ class StreamCorrelator:
             
         return {
             'words_per_minute': words_per_minute,
-            'avg_pause_duration': sum(pauses) / len(pauses) if pauses else 0,
-            'max_pause_duration': max(pauses) if pauses else 0,
+            'avg_pause_duration': sum(pauses) / len(pauses) if pauses else 0.0,
+            'max_pause_duration': max(pauses) if pauses else 0.0,
             'fragment_durations': [t.duration for t in fragments],
-            'avg_fragment_duration': sum(t.duration for t in fragments) / len(fragments)
+            'avg_fragment_duration': sum(t.duration for t in fragments) / len(fragments) if fragments else 0.0
         }
         
     def _analyze_speech_chat_correlation(self) -> Dict:
@@ -571,14 +604,14 @@ class StreamCorrelator:
                 'chat_delay_avg': sum(
                     msg.timestamp - transcription.timestamp 
                     for msg in correlated_messages
-                ) / len(correlated_messages) if correlated_messages else 0
+                ) / len(correlated_messages) if correlated_messages else 0.0
             })
             
         return {
             'correlations': correlations,
             'avg_chat_response_delay': sum(
                 c['chat_delay_avg'] for c in correlations
-            ) / len(correlations) if correlations else 0
+            ) / len(correlations) if correlations else 0.0
         }
         
     def _analyze_temporal_patterns(self) -> Dict:
@@ -609,7 +642,7 @@ class StreamCorrelator:
                 'segment': i + 1,
                 'word_count': sum(len(f.text.split()) for f in segment_fragments),
                 'chat_count': len(segment_chat),
-                'energy_indicator': len(segment_chat) / len(segment_fragments) if segment_fragments else 0
+                'energy_indicator': len(segment_chat) / len(segment_fragments) if segment_fragments else 0.0
             })
             
         return {

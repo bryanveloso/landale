@@ -36,7 +36,7 @@ class ViewerInteractionEvent(BaseModel):
     interaction_type: Literal["follow", "subscription", "gift_subscription", "cheer"]
     username: str
     user_id: str
-    details: dict = Field(default_factory=dict)  # Type-specific data like bits, tier, etc.
+    details: Dict[str, Any] = Field(default_factory=dict)  # Type-specific data like bits, tier, etc.
     
 
 class FlexiblePatterns(BaseModel):
@@ -67,14 +67,14 @@ class RichContextData(BaseModel):
     
     # Content data
     transcript: str
-    transcript_fragments: List[dict] = Field(default_factory=list)  # Raw Whisper outputs
+    transcript_fragments: List[Dict[str, Any]] = Field(default_factory=list)  # Raw Whisper outputs
     confidence_scores: List[float] = Field(default_factory=list)
     speaking_patterns: Dict[str, Any] = Field(default_factory=dict)  # Pace, pauses, etc.
     
     # Community data
-    chat_messages: List[dict] = Field(default_factory=list)
+    chat_messages: List[Dict[str, Any]] = Field(default_factory=list)
     emote_usage: Dict[str, Any] = Field(default_factory=dict)
-    viewer_interactions: List[dict] = Field(default_factory=list)
+    viewer_interactions: List[Dict[str, Any]] = Field(default_factory=list)
     community_metrics: Dict[str, Any] = Field(default_factory=dict)
     
     # Correlation analysis
@@ -96,7 +96,7 @@ class AnalysisResult(BaseModel):
     topics: List[str] = Field(default_factory=list)
     context: str
     suggested_actions: List[str] = Field(default_factory=list)
-    stream_momentum: Optional[dict] = None
+    stream_momentum: Optional[Dict[str, Any]] = None
     
     # Rich context data
     rich_context: Optional[RichContextData] = None
@@ -105,5 +105,5 @@ class AnalysisResult(BaseModel):
     transcription_context: str
     chat_context: Optional[str] = None
     chat_velocity: Optional[float] = None  # messages per minute
-    emote_frequency: Optional[dict] = None  # emote usage counts
-    native_emote_frequency: Optional[dict] = None  # avalon-prefixed emote counts
+    emote_frequency: Optional[Dict[str, int]] = None  # emote usage counts
+    native_emote_frequency: Optional[Dict[str, int]] = None  # avalon-prefixed emote counts
