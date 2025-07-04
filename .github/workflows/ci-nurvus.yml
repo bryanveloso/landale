@@ -102,8 +102,8 @@ jobs:
           ls -la burrito_out/
           
           # Copy executables with proper names and extensions
-          if [ -f burrito_out/nurvus_windows ]; then
-            cp burrito_out/nurvus_windows artifacts/nurvus.exe
+          if [ -f burrito_out/nurvus_windows.exe ]; then
+            cp burrito_out/nurvus_windows.exe artifacts/nurvus.exe
           fi
           if [ -f burrito_out/nurvus_linux ]; then
             cp burrito_out/nurvus_linux artifacts/nurvus
@@ -133,18 +133,18 @@ jobs:
           fi
           
           # Create Demi (Windows PC) package - Streaming Apps
-          if [ -f burrito_out/nurvus_windows ]; then
+          if [ -f burrito_out/nurvus_windows.exe ]; then
             mkdir -p artifacts/demi
-            cp burrito_out/nurvus_windows artifacts/demi/nurvus.exe
+            cp burrito_out/nurvus_windows.exe artifacts/demi/nurvus.exe
             cp config/demi.json artifacts/demi/processes.json
             cp -r deployment artifacts/demi/
             tar -czf artifacts/nurvus-demi.tar.gz -C artifacts/demi .
           fi
           
           # Create Alys (Windows VM) package - Automation
-          if [ -f burrito_out/nurvus_windows ]; then
+          if [ -f burrito_out/nurvus_windows.exe ]; then
             mkdir -p artifacts/alys
-            cp burrito_out/nurvus_windows artifacts/alys/nurvus.exe
+            cp burrito_out/nurvus_windows.exe artifacts/alys/nurvus.exe
             cp config/alys.json artifacts/alys/processes.json
             cp -r deployment artifacts/alys/
             tar -czf artifacts/nurvus-alys.tar.gz -C artifacts/alys .
@@ -152,8 +152,8 @@ jobs:
           
           # Create standalone executables archive
           mkdir -p artifacts/standalone
-          if [ -f burrito_out/nurvus_windows ]; then
-            cp burrito_out/nurvus_windows artifacts/standalone/nurvus.exe
+          if [ -f burrito_out/nurvus_windows.exe ]; then
+            cp burrito_out/nurvus_windows.exe artifacts/standalone/nurvus.exe
           fi
           if [ -f burrito_out/nurvus_linux ]; then
             cp burrito_out/nurvus_linux artifacts/standalone/nurvus_linux
@@ -171,7 +171,11 @@ jobs:
           # List created artifacts with sizes
           ls -la artifacts/
           echo "Executable sizes:"
-          du -h artifacts/nurvus*
+          if ls artifacts/nurvus* 1> /dev/null 2>&1; then
+            du -h artifacts/nurvus*
+          else
+            echo "No standalone executables found"
+          fi
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
