@@ -16,9 +16,67 @@ env:
   ZIG_VERSION: "0.14.0"
 
 jobs:
-  build-executables:
-    name: Build Single Executables
+  test:
+    name: Test & Lint
     runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Elixir/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/nurvus/deps
+            apps/nurvus/_build
+          key: test-${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-${{ hashFiles('apps/nurvus/mix.lock') }}
+          restore-keys: |
+            test-${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-
+
+      - name: Install dependencies
+        run: |
+          cd apps/nurvus
+          mix deps.get
+
+      - name: Compile project
+        run: |
+          cd apps/nurvus
+          MIX_ENV=dev mix compile
+
+      - name: Run tests
+        run: |
+          cd apps/nurvus
+          MIX_ENV=test mix test
+
+      - name: Run Credo
+        run: |
+          cd apps/nurvus
+          MIX_ENV=dev mix credo
+
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      matrix:
+        target: [windows, linux, macos]
+        include:
+          - target: windows
+            executable: nurvus_windows.exe
+            artifact_name: nurvus.exe
+          - target: linux
+            executable: nurvus_linux
+            artifact_name: nurvus
+          - target: macos
+            executable: nurvus_macos
+            artifact_name: nurvus_macos
     
     steps:
       - name: Checkout code
@@ -46,141 +104,145 @@ jobs:
           path: |
             apps/nurvus/deps
             apps/nurvus/_build
-          key: ${{ runner.os }}-mix-elixir-${{ env.ELIXIR_VERSION }}-${{ hashFiles('apps/nurvus/mix.lock') }}
+          key: build-${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-zig-${{ env.ZIG_VERSION }}-${{ hashFiles('apps/nurvus/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-elixir-${{ env.ELIXIR_VERSION }}-
+            build-${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-zig-${{ env.ZIG_VERSION }}-
 
       - name: Install dependencies
         run: |
           cd apps/nurvus
-          mix deps.get
-
-      - name: Compile project
-        run: |
-          cd apps/nurvus
-          MIX_ENV=dev mix compile
-
-      - name: Run tests
-        run: |
-          cd apps/nurvus
-          MIX_ENV=test mix test
-
-      - name: Run Credo
-        run: |
-          cd apps/nurvus
-          MIX_ENV=dev mix credo
-
-      - name: Install production dependencies
-        run: |
-          cd apps/nurvus
           mix deps.get --only prod
 
-      - name: Build Windows executable
+      - name: Build ${{ matrix.target }} executable
         run: |
           cd apps/nurvus
-          BURRITO_TARGET=windows MIX_ENV=prod mix release
+          BURRITO_TARGET=${{ matrix.target }} MIX_ENV=prod mix release --overwrite
 
-      - name: Build Linux executable  
+      - name: Verify executable exists
         run: |
           cd apps/nurvus
-          BURRITO_TARGET=linux MIX_ENV=prod mix release
+          if [ ! -f "burrito_out/${{ matrix.executable }}" ]; then
+            echo "❌ Expected executable not found: burrito_out/${{ matrix.executable }}"
+            echo "Available files:"
+            ls -la burrito_out/
+            exit 1
+          fi
+          echo "✅ Successfully built: ${{ matrix.executable }}"
+          echo "📏 Size: $(du -h burrito_out/${{ matrix.executable }} | cut -f1)"
 
-      - name: Build macOS executable
-        run: |
-          cd apps/nurvus
-          BURRITO_TARGET=macos MIX_ENV=prod mix release
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}-executable
+          path: apps/nurvus/burrito_out/${{ matrix.executable }}
+          retention-days: 7
 
-      - name: Create machine-specific packages
+  package:
+    name: Create Release Packages
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all executables
+        uses: actions/download-artifact@v4
+        with:
+          path: executables
+
+      - name: Organize executables
         run: |
-          cd apps/nurvus
+          mkdir -p burrito_out
           
-          # Create artifacts directory
-          mkdir -p artifacts
+          # Move executables to expected locations
+          cp executables/windows-executable/* burrito_out/
+          cp executables/linux-executable/* burrito_out/  
+          cp executables/macos-executable/* burrito_out/
           
-          # List available executables
-          echo "Available executables:"
+          echo "📦 Available executables:"
           ls -la burrito_out/
           
-          # Copy executables with proper names and extensions
-          if [ -f burrito_out/nurvus_windows.exe ]; then
-            cp burrito_out/nurvus_windows.exe artifacts/nurvus.exe
-          fi
-          if [ -f burrito_out/nurvus_linux ]; then
-            cp burrito_out/nurvus_linux artifacts/nurvus
-          fi
-          if [ -f burrito_out/nurvus_macos ]; then
-            cp burrito_out/nurvus_macos artifacts/nurvus_macos
+          # Verify all targets built successfully
+          missing=""
+          for target in windows linux macos; do
+            if [ "$target" = "windows" ]; then
+              file="nurvus_windows.exe"
+            else
+              file="nurvus_${target}"
+            fi
+            
+            if [ ! -f "burrito_out/$file" ]; then
+              missing="$missing $target"
+            fi
+          done
+          
+          if [ -n "$missing" ]; then
+            echo "❌ Missing executables for:$missing"
+            echo "🚫 Cannot create complete release packages"
+            exit 1
           fi
           
-          # Create Zelan (Mac Studio) package - AI Services
-          if [ -f burrito_out/nurvus_macos ]; then
-            mkdir -p artifacts/zelan
-            cp burrito_out/nurvus_macos artifacts/zelan/nurvus
-            cp config/zelan.json artifacts/zelan/processes.json
-            cp -r deployment artifacts/zelan/
-            cp deployment/systemd/nurvus-zelan.service artifacts/zelan/nurvus.service
-            tar -czf artifacts/nurvus-zelan.tar.gz -C artifacts/zelan .
-          fi
+          echo "✅ All executables present, proceeding with packaging"
+
+      - name: Create release packages
+        run: |
+          cd apps/nurvus
+          mkdir -p artifacts
           
-          # Create Saya (Mac Mini) package - Docker Services  
-          if [ -f burrito_out/nurvus_macos ]; then
-            mkdir -p artifacts/saya
-            cp burrito_out/nurvus_macos artifacts/saya/nurvus
-            cp config/saya.json artifacts/saya/processes.json
-            cp -r deployment artifacts/saya/
-            cp deployment/systemd/nurvus-saya.service artifacts/saya/nurvus.service
-            tar -czf artifacts/nurvus-saya.tar.gz -C artifacts/saya .
-          fi
+          # Copy standalone executables with clean names
+          cp ../burrito_out/nurvus_windows.exe artifacts/nurvus.exe
+          cp ../burrito_out/nurvus_linux artifacts/nurvus
+          cp ../burrito_out/nurvus_macos artifacts/nurvus_macos
           
-          # Create Demi (Windows PC) package - Streaming Apps
-          if [ -f burrito_out/nurvus_windows.exe ]; then
-            mkdir -p artifacts/demi
-            cp burrito_out/nurvus_windows.exe artifacts/demi/nurvus.exe
-            cp config/demi.json artifacts/demi/processes.json
-            cp -r deployment artifacts/demi/
-            tar -czf artifacts/nurvus-demi.tar.gz -C artifacts/demi .
-          fi
+          # Create machine-specific packages
+          declare -A machines=(
+            ["zelan"]="macos"
+            ["saya"]="macos"  
+            ["demi"]="windows"
+            ["alys"]="windows"
+          )
           
-          # Create Alys (Windows VM) package - Automation
-          if [ -f burrito_out/nurvus_windows.exe ]; then
-            mkdir -p artifacts/alys
-            cp burrito_out/nurvus_windows.exe artifacts/alys/nurvus.exe
-            cp config/alys.json artifacts/alys/processes.json
-            cp -r deployment artifacts/alys/
-            tar -czf artifacts/nurvus-alys.tar.gz -C artifacts/alys .
-          fi
+          for machine in "${!machines[@]}"; do
+            platform="${machines[$machine]}"
+            echo "📦 Creating package for $machine ($platform)..."
+            
+            mkdir -p "artifacts/$machine"
+            
+            # Copy appropriate executable
+            if [ "$platform" = "windows" ]; then
+              cp "../burrito_out/nurvus_windows.exe" "artifacts/$machine/nurvus.exe"
+            else
+              cp "../burrito_out/nurvus_macos" "artifacts/$machine/nurvus"
+            fi
+            
+            # Copy machine-specific config and deployment files
+            cp "config/$machine.json" "artifacts/$machine/processes.json"
+            cp -r deployment "artifacts/$machine/"
+            
+            # Copy systemd service for Unix machines
+            if [ "$platform" != "windows" ]; then
+              cp "deployment/systemd/nurvus-$machine.service" "artifacts/$machine/nurvus.service"
+            fi
+            
+            # Create package
+            tar -czf "artifacts/nurvus-$machine.tar.gz" -C "artifacts/$machine" .
+            echo "✅ Created: nurvus-$machine.tar.gz"
+          done
           
-          # Create standalone executables archive
-          mkdir -p artifacts/standalone
-          if [ -f burrito_out/nurvus_windows.exe ]; then
-            cp burrito_out/nurvus_windows.exe artifacts/standalone/nurvus.exe
-          fi
-          if [ -f burrito_out/nurvus_linux ]; then
-            cp burrito_out/nurvus_linux artifacts/standalone/nurvus_linux
-          fi
-          if [ -f burrito_out/nurvus_macos ]; then
-            cp burrito_out/nurvus_macos artifacts/standalone/nurvus_macos
-          fi
-          if [ -d artifacts/standalone ] && [ "$(ls -A artifacts/standalone)" ]; then
-            tar -czf artifacts/nurvus-standalone.tar.gz -C artifacts/standalone .
-          fi
+          # Cleanup temp directories
+          rm -rf artifacts/{zelan,saya,demi,alys}
           
-          # Cleanup temporary directories
-          rm -rf artifacts/{zelan,saya,demi,alys,standalone}
-          
-          # List created artifacts with sizes
+          echo "📋 Final artifacts:"
           ls -la artifacts/
-          echo "Executable sizes:"
-          if ls artifacts/nurvus* 1> /dev/null 2>&1; then
-            du -h artifacts/nurvus*
-          else
-            echo "No standalone executables found"
-          fi
+          
+          echo "📏 Executable sizes:"
+          du -h artifacts/nurvus* | sort -h
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: nurvus-executables-${{ github.sha }}
+          name: nurvus-release-packages
           path: |
             apps/nurvus/artifacts/*.tar.gz
             apps/nurvus/artifacts/nurvus*
@@ -189,56 +251,50 @@ jobs:
       - name: Create release summary
         run: |
           cd apps/nurvus
-          echo "## Nurvus Single Executable Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🌯 Nurvus Single Executable Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Single Executables Created:" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Single Executables Created:" >> $GITHUB_STEP_SUMMARY
           echo "- **nurvus.exe** - Windows x86_64 single executable" >> $GITHUB_STEP_SUMMARY
           echo "- **nurvus** - Linux x86_64 single executable" >> $GITHUB_STEP_SUMMARY
           echo "- **nurvus_macos** - macOS ARM64 single executable" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Machine-Specific Packages:" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Machine-Specific Packages:" >> $GITHUB_STEP_SUMMARY
           echo "- **nurvus-zelan.tar.gz** - Mac Studio (AI services + config + deployment)" >> $GITHUB_STEP_SUMMARY
           echo "- **nurvus-saya.tar.gz** - Mac Mini (Docker services + config + deployment)" >> $GITHUB_STEP_SUMMARY
           echo "- **nurvus-demi.tar.gz** - Windows PC (streaming apps + config + deployment)" >> $GITHUB_STEP_SUMMARY
           echo "- **nurvus-alys.tar.gz** - Windows VM (automation + config + deployment)" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus-standalone.tar.gz** - All platforms standalone executables" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Deployment:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the appropriate package or standalone executable" >> $GITHUB_STEP_SUMMARY
-          echo "2. Extract (for packages) or place executable directly" >> $GITHUB_STEP_SUMMARY
-          echo "3. Run: \`./nurvus\` (Unix) or \`nurvus.exe\` (Windows)" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Quick Deploy:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Download and run directly:" >> $GITHUB_STEP_SUMMARY
+          echo "curl -L -o nurvus.exe [release-url]/nurvus.exe && ./nurvus.exe  # Windows" >> $GITHUB_STEP_SUMMARY
+          echo "curl -L -o nurvus [release-url]/nurvus && chmod +x nurvus && ./nurvus  # Linux" >> $GITHUB_STEP_SUMMARY
+          echo "curl -L -o nurvus [release-url]/nurvus_macos && chmod +x nurvus && ./nurvus  # macOS" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### File Sizes:" >> $GITHUB_STEP_SUMMARY
-          if [ -f artifacts/nurvus.exe ]; then
-            echo "- nurvus.exe: $(du -h artifacts/nurvus.exe | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ -f artifacts/nurvus ]; then
-            echo "- nurvus (Linux): $(du -h artifacts/nurvus | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ -f artifacts/nurvus_macos ]; then
-            echo "- nurvus_macos: $(du -h artifacts/nurvus_macos | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          fi
-          for archive in artifacts/*.tar.gz; do
-            if [ -f "$archive" ]; then
-              filename=$(basename "$archive")
-              echo "- $filename: $(du -h "$archive" | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          echo "### 📏 File Sizes:" >> $GITHUB_STEP_SUMMARY
+          for file in artifacts/nurvus*; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              size=$(du -h "$file" | cut -f1)
+              echo "- $filename: $size" >> $GITHUB_STEP_SUMMARY
             fi
           done
 
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: build-executables
+    needs: package
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download artifacts
+      - name: Download release packages
         uses: actions/download-artifact@v4
         with:
-          name: nurvus-executables-${{ github.sha }}
+          name: nurvus-release-packages
           path: artifacts
 
       - name: Get version
@@ -263,7 +319,6 @@ jobs:
             - `nurvus.exe` - **Windows** x86_64 single executable  
             - `nurvus` - **Linux** x86_64 single executable
             - `nurvus_macos` - **macOS** ARM64 single executable
-            - `nurvus-standalone.tar.gz` - All platform executables in one archive
 
             ### Machine-Specific Packages (Executable + Config + Deployment):
             - `nurvus-zelan.tar.gz` - **Mac Studio** (AI services: Phononmaser, Analysis, LM Studio)
