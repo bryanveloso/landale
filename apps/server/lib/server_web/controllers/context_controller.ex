@@ -1,7 +1,7 @@
 defmodule ServerWeb.ContextController do
   @moduledoc """
   REST API controller for SEED context management.
-  
+
   Handles creation and retrieval of AI memory contexts from the SEED service.
   """
 
@@ -103,7 +103,7 @@ defmodule ServerWeb.ContextController do
           status: "error",
           errors: format_changeset_errors(changeset)
         })
-        
+
       _ ->
         conn
         |> put_status(:internal_server_error)
@@ -236,7 +236,7 @@ defmodule ServerWeb.ContextController do
   def stats(conn, params) do
     try do
       hours = if params["hours"], do: String.to_integer(params["hours"]), else: 24
-      
+
       stats = Context.get_context_stats(hours)
       sentiment_dist = Context.get_sentiment_distribution(hours)
       popular_topics = Context.get_popular_topics(hours)

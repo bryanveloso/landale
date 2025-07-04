@@ -504,7 +504,7 @@ defmodule ServerWeb.Schemas do
               type: :object,
               properties: %{
                 total_count: %Schema{type: :integer, example: 150},
-                total_duration: %Schema{type: :number, example: 18000.0},
+                total_duration: %Schema{type: :number, example: 18_000.0},
                 unique_sessions: %Schema{type: :integer, example: 3},
                 avg_duration: %Schema{type: :number, example: 120.0}
               }

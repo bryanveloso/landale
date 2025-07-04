@@ -274,7 +274,8 @@ defmodule Server.OAuthTokenManager do
         {:error, :no_refresh_token}
 
       token_info
-      when is_non_struct_map(token_info) and is_map_key(token_info, :refresh_token) and token_info.refresh_token == nil ->
+      when is_non_struct_map(token_info) and is_map_key(token_info, :refresh_token) and
+             token_info.refresh_token == nil ->
         {:error, :no_refresh_token}
 
       %{refresh_token: refresh_token} ->

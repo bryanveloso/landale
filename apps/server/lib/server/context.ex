@@ -8,8 +8,8 @@ defmodule Server.Context do
   """
 
   import Ecto.Query, warn: false
-  alias Server.Repo
   alias Server.Context.Context
+  alias Server.Repo
 
   @type context_opts :: [
           limit: pos_integer(),
@@ -236,14 +236,15 @@ defmodule Server.Context do
 
       {start_time, end_time, context_count, total_duration} ->
         session_duration = DateTime.diff(end_time, start_time, :second)
-        
-        {:ok, %{
-          start_time: start_time,
-          end_time: end_time,
-          session_duration_seconds: session_duration,
-          context_count: context_count,
-          total_content_duration: total_duration || 0.0
-        }}
+
+        {:ok,
+         %{
+           start_time: start_time,
+           end_time: end_time,
+           session_duration_seconds: session_duration,
+           context_count: context_count,
+           total_content_duration: total_duration || 0.0
+         }}
     end
   end
 
