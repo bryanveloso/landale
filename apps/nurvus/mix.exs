@@ -7,7 +7,8 @@ defmodule Nurvus.MixProject do
       version: "0.1.0",
       elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      releases: releases()
     ]
   end
 
@@ -26,7 +27,19 @@ defmodule Nurvus.MixProject do
       {:plug, "~> 1.14"},
       {:bandit, "~> 1.5"},
       {:req, "~> 0.4"},
+      {:telemetry, "~> 1.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp releases do
+    [
+      nurvus: [
+        version: "0.1.0",
+        applications: [nurvus: :permanent],
+        include_executables_for: [:unix, :windows],
+        steps: [:assemble, :tar]
+      ]
     ]
   end
 end

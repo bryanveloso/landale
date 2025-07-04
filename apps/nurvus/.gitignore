@@ -24,3 +24,33 @@ nurvus-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Release artifacts
+nurvus-release.tar.gz
+
+# Runtime configuration files with secrets
+config/runtime.exs.local
+
+# Log files
+*.log
+/logs/
+
+# Process configuration backups
+config/*.json.backup
+
+# Environment-specific files
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary deployment files
+deployment/tmp/

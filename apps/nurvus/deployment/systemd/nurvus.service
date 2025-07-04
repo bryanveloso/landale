@@ -1,0 +1,39 @@
+[Unit]
+Description=Nurvus Process Manager
+Documentation=https://github.com/bryanveloso/landale/apps/nurvus
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=bryan
+Group=bryan
+WorkingDirectory=/opt/nurvus
+ExecStart=/opt/nurvus/bin/nurvus start
+ExecStop=/opt/nurvus/bin/nurvus stop
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=always
+RestartSec=5
+RestartKillSignal=SIGKILL
+
+# Environment variables
+Environment=MIX_ENV=prod
+Environment=NURVUS_PORT=4001
+Environment=NURVUS_LOG_LEVEL=info
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/nurvus /var/log/nurvus
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

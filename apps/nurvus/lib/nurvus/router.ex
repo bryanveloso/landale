@@ -9,6 +9,7 @@ defmodule Nurvus.Router do
   require Logger
 
   plug(Plug.Logger, log: :debug)
+  plug(:telemetry_start)
   plug(:match)
 
   plug(Plug.Parsers,
@@ -34,7 +35,14 @@ defmodule Nurvus.Router do
   # System status endpoint
   get "/api/system/status" do
     status = Nurvus.system_status()
-    send_json_response(conn, 200, status)
+
+    platform_info = %{
+      platform: Nurvus.Platform.current_platform(),
+      hostname: System.get_env("HOSTNAME") || :inet.gethostname() |> elem(1) |> to_string()
+    }
+
+    enhanced_status = Map.merge(status, platform_info)
+    send_json_response(conn, 200, enhanced_status)
   end
 
   # List all processes
@@ -172,6 +180,108 @@ defmodule Nurvus.Router do
     send_json_response(conn, 200, %{status: "cleared"})
   end
 
+  # Platform detection endpoints
+  get "/api/platform" do
+    {os_family, os_name} = :os.type()
+    os_version = :os.version() |> Tuple.to_list()
+
+    platform_info = %{
+      platform: Nurvus.Platform.current_platform(),
+      hostname: System.get_env("HOSTNAME") || :inet.gethostname() |> elem(1) |> to_string(),
+      os_info: %{
+        family: os_family,
+        name: os_name,
+        version: os_version
+      }
+    }
+
+    send_json_response(conn, 200, platform_info)
+  end
+
+  # Get system process list (for debugging/monitoring)
+  get "/api/platform/processes" do
+    case Nurvus.Platform.get_process_list() do
+      {:ok, processes} ->
+        send_json_response(conn, 200, %{processes: processes})
+
+      {:error, reason} ->
+        send_json_response(conn, 500, %{error: "Failed to get process list: #{inspect(reason)}"})
+    end
+  end
+
+  # Check if a specific process is running on the system
+  get "/api/platform/processes/:name" do
+    process_name = URI.decode(name)
+
+    case Nurvus.Platform.get_process_info(process_name) do
+      {:ok, process_info} ->
+        send_json_response(conn, 200, process_info)
+
+      {:error, :not_found} ->
+        send_json_response(conn, 404, %{error: "Process not found", process_name: process_name})
+
+      {:error, reason} ->
+        send_json_response(conn, 500, %{error: "Failed to get process info: #{inspect(reason)}"})
+    end
+  end
+
+  # Load configuration for specific machine
+  post "/api/config/load" do
+    machine_name = Map.get(conn.body_params, "machine", "default")
+    config_file = "config/#{machine_name}.json"
+
+    case Nurvus.Config.load_config(config_file) do
+      {:ok, processes} ->
+        # Add each process to the manager
+        results = Enum.map(processes, &Nurvus.add_process/1)
+
+        case Enum.find(results, fn result -> result != :ok end) do
+          nil ->
+            send_json_response(conn, 200, %{
+              status: "loaded",
+              machine: machine_name,
+              processes_count: length(processes)
+            })
+
+          {:error, reason} ->
+            send_json_response(conn, 400, %{
+              error: "Failed to load some processes: #{inspect(reason)}"
+            })
+        end
+
+      {:error, reason} ->
+        send_json_response(conn, 400, %{
+          error: "Failed to load configuration: #{inspect(reason)}"
+        })
+    end
+  end
+
+  # Cross-machine health check
+  get "/api/health/detailed" do
+    system_status = Nurvus.system_status()
+    processes = Nurvus.list_processes()
+
+    platform_info = %{
+      platform: Nurvus.Platform.current_platform(),
+      hostname: System.get_env("HOSTNAME") || :inet.gethostname() |> elem(1) |> to_string()
+    }
+
+    detailed_health = %{
+      service: "nurvus",
+      version: "0.1.0",
+      timestamp: DateTime.utc_now(),
+      platform: platform_info,
+      system: system_status,
+      processes: %{
+        total: length(processes),
+        running: Enum.count(processes, fn {_id, status} -> status == :running end),
+        stopped: Enum.count(processes, fn {_id, status} -> status == :stopped end)
+      }
+    }
+
+    send_json_response(conn, 200, detailed_health)
+  end
+
   # Catch-all for undefined routes
   match _ do
     send_json_response(conn, 404, %{error: "Not found"})
@@ -179,7 +289,27 @@ defmodule Nurvus.Router do
 
   ## Private Functions
 
+  defp telemetry_start(conn, _opts) do
+    start_time = System.monotonic_time()
+    assign(conn, :telemetry_start_time, start_time)
+  end
+
   defp send_json_response(conn, status, data) do
+    # Emit telemetry for response timing
+    if start_time = conn.assigns[:telemetry_start_time] do
+      duration = System.monotonic_time() - start_time
+
+      :telemetry.execute(
+        [:nurvus, :http, :request],
+        %{duration: duration},
+        %{
+          method: conn.method,
+          path: conn.request_path,
+          status: status
+        }
+      )
+    end
+
     conn
     |> put_resp_content_type("application/json")
     |> send_resp(status, Jason.encode!(data))

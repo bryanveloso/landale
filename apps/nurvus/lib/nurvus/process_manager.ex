@@ -12,7 +12,7 @@ defmodule Nurvus.ProcessManager do
   use GenServer
   require Logger
 
-  alias Nurvus.{ProcessMonitor, ProcessSupervisor}
+  alias Nurvus.ProcessSupervisor
 
   @type process_config :: %{
           id: String.t(),
@@ -145,6 +145,13 @@ defmodule Nurvus.ProcessManager do
       config ->
         case ProcessSupervisor.start_process(config) do
           {:ok, pid} ->
+            # Emit telemetry event for process start
+            :telemetry.execute(
+              [:nurvus, :process, :started],
+              %{count: 1},
+              %{process_id: process_id, process_name: config.name}
+            )
+
             monitor_ref = Process.monitor(pid)
             updated_monitors = Map.put(state.monitors, process_id, {pid, monitor_ref})
             new_state = %{state | monitors: updated_monitors}
@@ -165,6 +172,13 @@ defmodule Nurvus.ProcessManager do
 
     case result do
       :ok ->
+        # Emit telemetry event for process stop
+        :telemetry.execute(
+          [:nurvus, :process, :stopped],
+          %{count: 1},
+          %{process_id: process_id}
+        )
+
         updated_monitors = Map.delete(state.monitors, process_id)
         new_state = %{state | monitors: updated_monitors}
         {:reply, :ok, new_state}
@@ -186,6 +200,13 @@ defmodule Nurvus.ProcessManager do
         # Start again
         case handle_call({:start_process, process_id}, nil, temp_state) do
           {:reply, :ok, new_state} ->
+            # Emit telemetry event for process restart
+            :telemetry.execute(
+              [:nurvus, :process, :restarted],
+              %{count: 1},
+              %{process_id: process_id}
+            )
+
             {:reply, :ok, new_state}
 
           {:reply, error, _} ->
@@ -238,7 +259,14 @@ defmodule Nurvus.ProcessManager do
     # Find which process died
     case find_process_by_monitor(state.monitors, monitor_ref) do
       {process_id, _pid} ->
-        Logger.warn("Process #{process_id} exited: #{inspect(reason)}")
+        # Emit telemetry event for process crash
+        :telemetry.execute(
+          [:nurvus, :process, :crashed],
+          %{count: 1},
+          %{process_id: process_id, reason: inspect(reason)}
+        )
+
+        Logger.warning("Process #{process_id} exited: #{inspect(reason)}")
 
         # Remove from monitors
         updated_monitors = Map.delete(state.monitors, process_id)
@@ -246,7 +274,14 @@ defmodule Nurvus.ProcessManager do
 
         # Check if auto-restart is enabled
         case Map.get(state.processes, process_id) do
-          %{auto_restart: true} = config ->
+          %{auto_restart: true} = _config ->
+            # Emit telemetry event for auto-restart
+            :telemetry.execute(
+              [:nurvus, :process, :auto_restart_scheduled],
+              %{count: 1},
+              %{process_id: process_id}
+            )
+
             Logger.info("Auto-restarting process: #{process_id}")
             # Schedule restart after a delay
             Process.send_after(self(), {:restart_process, process_id}, 1000)
@@ -257,7 +292,7 @@ defmodule Nurvus.ProcessManager do
         end
 
       nil ->
-        Logger.warn("Received DOWN message for unknown process: #{inspect(monitor_ref)}")
+        Logger.warning("Received DOWN message for unknown process: #{inspect(monitor_ref)}")
         {:noreply, state}
     end
   end

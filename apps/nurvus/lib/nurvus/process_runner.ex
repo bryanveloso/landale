@@ -116,7 +116,7 @@ defmodule Nurvus.ProcessRunner do
   end
 
   @impl true
-  def handle_call({:get_logs, lines}, _from, state) do
+  def handle_call({:get_logs, _lines}, _from, state) do
     # For now, return empty logs - in a full implementation,
     # we'd capture and store process output
     logs = []
@@ -161,7 +161,7 @@ defmodule Nurvus.ProcessRunner do
 
   @impl true
   def handle_info({port, {:exit_status, status}}, %{port: port} = state) do
-    Logger.warn("Process #{state.config.name} exited with status: #{status}")
+    Logger.warning("Process #{state.config.name} exited with status: #{status}")
 
     # Close the port
     if state.port do
@@ -176,7 +176,7 @@ defmodule Nurvus.ProcessRunner do
 
   @impl true
   def handle_info({:EXIT, port, reason}, %{port: port} = state) do
-    Logger.warn("Port for #{state.config.name} exited: #{inspect(reason)}")
+    Logger.warning("Port for #{state.config.name} exited: #{inspect(reason)}")
 
     new_state = %{state | port: nil, os_pid: nil}
     {:stop, {:shutdown, reason}, new_state}
@@ -203,9 +203,17 @@ defmodule Nurvus.ProcessRunner do
         # Send TERM signal first
         System.cmd("kill", ["-TERM", to_string(state.os_pid)])
 
-        # Wait a bit then force kill if still running
-        Process.sleep(2000)
-        System.cmd("kill", ["-KILL", to_string(state.os_pid)])
+        # Use non-blocking approach: check if process is still running
+        # If it's still alive after TERM, send KILL immediately
+        case System.cmd("kill", ["-0", to_string(state.os_pid)], stderr_to_stdout: true) do
+          {_, 0} ->
+            # Process still exists, force kill
+            System.cmd("kill", ["-KILL", to_string(state.os_pid)])
+
+          _ ->
+            # Process already terminated
+            :ok
+        end
       rescue
         # Process might already be dead
         _ -> :ok

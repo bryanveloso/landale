@@ -17,7 +17,12 @@ defmodule Nurvus.Config do
           env: %{String.t() => String.t()},
           auto_restart: boolean(),
           max_restarts: non_neg_integer(),
-          restart_window: non_neg_integer()
+          restart_window: non_neg_integer(),
+          platform: String.t() | nil,
+          process_detection: map() | nil,
+          health_check: map() | nil,
+          stop_command: String.t() | nil,
+          stop_args: [String.t()] | nil
         }
 
   @default_config_file "config/processes.json"
@@ -147,18 +152,47 @@ defmodule Nurvus.Config do
   end
 
   defp validate_optional_fields(config) do
+    with {:ok, basic_fields} <- validate_basic_fields(config),
+         {:ok, advanced_fields} <- validate_advanced_fields(config) do
+      {:ok, Map.merge(basic_fields, advanced_fields)}
+    else
+      error -> error
+    end
+  end
+
+  defp validate_basic_fields(config) do
     with {:ok, cwd} <- validate_optional_string(config, "cwd"),
          {:ok, env} <- validate_env(config),
          {:ok, auto_restart} <- validate_boolean(config, "auto_restart", false),
          {:ok, max_restarts} <- validate_integer(config, "max_restarts", 3),
          {:ok, restart_window} <- validate_integer(config, "restart_window", 60) do
-      {:ok, %{
-        cwd: cwd,
-        env: env,
-        auto_restart: auto_restart,
-        max_restarts: max_restarts,
-        restart_window: restart_window
-      }}
+      {:ok,
+       %{
+         cwd: cwd,
+         env: env,
+         auto_restart: auto_restart,
+         max_restarts: max_restarts,
+         restart_window: restart_window
+       }}
+    else
+      error -> error
+    end
+  end
+
+  defp validate_advanced_fields(config) do
+    with {:ok, platform} <- validate_platform_field(config),
+         {:ok, process_detection} <- validate_process_detection_field(config),
+         {:ok, health_check} <- validate_health_check_field(config),
+         {:ok, stop_command} <- validate_optional_string(config, "stop_command"),
+         {:ok, stop_args} <- validate_optional_args(config, "stop_args") do
+      {:ok,
+       %{
+         platform: platform,
+         process_detection: process_detection,
+         health_check: health_check,
+         stop_command: stop_command,
+         stop_args: stop_args
+       }}
     else
       error -> error
     end
@@ -257,6 +291,87 @@ defmodule Nurvus.Config do
     case Map.get(config, key, default) do
       value when is_integer(value) and value >= 0 -> {:ok, value}
       _ -> {:error, "#{key} must be a non-negative integer"}
+    end
+  end
+
+  defp validate_optional_args(config, key) do
+    case Map.get(config, key) do
+      nil ->
+        {:ok, []}
+
+      args when is_list(args) ->
+        if Enum.all?(args, &is_binary/1) do
+          {:ok, args}
+        else
+          {:error, "#{key} must be a list of strings"}
+        end
+
+      _ ->
+        {:error, "#{key} must be a list"}
+    end
+  end
+
+  defp validate_platform_field(config) do
+    case Map.get(config, "platform") do
+      nil -> {:ok, nil}
+      platform when platform in ["win32", "darwin", "linux"] -> {:ok, platform}
+      _ -> {:error, "platform must be one of: win32, darwin, linux"}
+    end
+  end
+
+  defp validate_process_detection_field(config) do
+    case Map.get(config, "process_detection") do
+      nil ->
+        {:ok, nil}
+
+      detection when is_map(detection) ->
+        with {:ok, _} <- validate_required_string(detection, "name"),
+             {:ok, _} <- validate_optional_string(detection, "check_command"),
+             {:ok, _} <- validate_optional_list(detection, "check_args"),
+             {:ok, _} <- validate_optional_string(detection, "type") do
+          {:ok, detection}
+        else
+          error -> error
+        end
+
+      _ ->
+        {:error, "process_detection must be a map"}
+    end
+  end
+
+  defp validate_health_check_field(config) do
+    case Map.get(config, "health_check") do
+      nil ->
+        {:ok, nil}
+
+      health_check when is_map(health_check) ->
+        with {:ok, _} <- validate_optional_string(health_check, "type"),
+             {:ok, _} <- validate_optional_string(health_check, "url"),
+             {:ok, _} <- validate_optional_integer(health_check, "interval"),
+             {:ok, _} <- validate_optional_integer(health_check, "timeout") do
+          {:ok, health_check}
+        else
+          error -> error
+        end
+
+      _ ->
+        {:error, "health_check must be a map"}
+    end
+  end
+
+  defp validate_optional_list(config, key) do
+    case Map.get(config, key) do
+      nil -> {:ok, nil}
+      list when is_list(list) -> {:ok, list}
+      _ -> {:error, "#{key} must be a list"}
+    end
+  end
+
+  defp validate_optional_integer(config, key) do
+    case Map.get(config, key) do
+      nil -> {:ok, nil}
+      value when is_integer(value) and value > 0 -> {:ok, value}
+      _ -> {:error, "#{key} must be a positive integer"}
     end
   end
 

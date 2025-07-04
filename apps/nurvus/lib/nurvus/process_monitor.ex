@@ -150,12 +150,23 @@ defmodule Nurvus.ProcessMonitor do
   defp handle_running_process(process, acc_metrics, acc_alerts) do
     case collect_process_metrics(process.id) do
       {:ok, metrics} ->
+        # Emit telemetry for metrics collection
+        :telemetry.execute(
+          [:nurvus, :metrics, :collected],
+          %{
+            cpu_percent: metrics.cpu_percent,
+            memory_mb: metrics.memory_mb,
+            uptime_seconds: metrics.uptime_seconds
+          },
+          %{process_id: process.id}
+        )
+
         updated_metrics = update_process_metrics(acc_metrics, process.id, metrics)
         new_alerts = check_for_alerts(process.id, metrics, acc_alerts)
         {updated_metrics, new_alerts}
 
       {:error, reason} ->
-        Logger.warn("Failed to collect metrics for #{process.id}: #{inspect(reason)}")
+        Logger.warning("Failed to collect metrics for #{process.id}: #{inspect(reason)}")
         {acc_metrics, acc_alerts}
     end
   end
@@ -233,6 +244,18 @@ defmodule Nurvus.ProcessMonitor do
           severity: :warning
         }
 
+        # Emit telemetry for alert generation
+        :telemetry.execute(
+          [:nurvus, :alert, :generated],
+          %{count: 1},
+          %{
+            process_id: process_id,
+            alert_type: :high_cpu,
+            severity: :warning,
+            cpu_percent: metrics.cpu_percent
+          }
+        )
+
         [alert | alerts]
       else
         alerts
@@ -248,6 +271,18 @@ defmodule Nurvus.ProcessMonitor do
           timestamp: DateTime.utc_now(),
           severity: :warning
         }
+
+        # Emit telemetry for memory alert
+        :telemetry.execute(
+          [:nurvus, :alert, :generated],
+          %{count: 1},
+          %{
+            process_id: process_id,
+            alert_type: :high_memory,
+            severity: :warning,
+            memory_mb: metrics.memory_mb
+          }
+        )
 
         [alert | alerts]
       else
