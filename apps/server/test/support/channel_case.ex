@@ -32,7 +32,7 @@ defmodule ServerWeb.ChannelCase do
     Server.DataCase.setup_sandbox(tags)
 
     # Start cache for tests that need it
-    unless Process.whereis(Server.Cache) do
+    if !Process.whereis(Server.Cache) do
       {:ok, _} = Server.Cache.start_link([])
     end
 

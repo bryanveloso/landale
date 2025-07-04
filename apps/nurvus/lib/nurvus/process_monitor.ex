@@ -134,7 +134,7 @@ defmodule Nurvus.ProcessMonitor do
     interval_ms = System.convert_time_unit(interval.second, :second, :millisecond)
     Process.send_after(self(), :health_check, interval_ms)
   end
-  
+
   defp schedule_health_check(interval) when is_integer(interval) do
     Process.send_after(self(), :health_check, interval)
   end

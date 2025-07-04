@@ -373,11 +373,11 @@ defmodule OBSEndpointTester do
     errors = []
 
     # Validate basic batch structure
-    unless response["requestId"] == request_id do
+    if response["requestId"] != request_id do
       errors = ["Invalid request ID in batch response" | errors]
     end
 
-    unless is_list(response["results"]) do
+    if not is_list(response["results"]) do
       errors = ["Missing or invalid results array in batch response" | errors]
     end
 
@@ -413,20 +413,20 @@ defmodule OBSEndpointTester do
 
   defp validate_response_structure(response, expected_type, expected_id, errors) do
     errors =
-      unless response["requestType"] == expected_type do
+      if response["requestType"] != expected_type do
         ["Request type mismatch: expected #{expected_type}, got #{response["requestType"]}" | errors]
       else
         errors
       end
 
     errors =
-      unless response["requestId"] == expected_id do
+      if response["requestId"] != expected_id do
         ["Request ID mismatch: expected #{expected_id}, got #{response["requestId"]}" | errors]
       else
         errors
       end
 
-    unless is_map(response["requestStatus"]) do
+    if not is_map(response["requestStatus"]) do
       ["Missing or invalid requestStatus object" | errors]
     else
       errors
@@ -437,14 +437,14 @@ defmodule OBSEndpointTester do
     status = response["requestStatus"]
 
     errors =
-      unless is_boolean(status["result"]) do
+      if not is_boolean(status["result"]) do
         ["Missing or invalid result boolean in requestStatus" | errors]
       else
         errors
       end
 
     errors =
-      unless is_integer(status["code"]) do
+      if not is_integer(status["code"]) do
         ["Missing or invalid code integer in requestStatus" | errors]
       else
         errors

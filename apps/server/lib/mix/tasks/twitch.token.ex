@@ -776,7 +776,7 @@ defmodule Mix.Tasks.Twitch.Token do
     |> Enum.each(fn line ->
       line = String.trim(line)
 
-      unless String.starts_with?(line, "#") or line == "" do
+      if !(String.starts_with?(line, "#") or line == "") do
         case String.split(line, "=", parts: 2) do
           [key, value] ->
             # Remove quotes if present
