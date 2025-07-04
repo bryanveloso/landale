@@ -97,47 +97,73 @@ jobs:
           # Create artifacts directory
           mkdir -p artifacts
           
+          # List available executables
+          echo "Available executables:"
+          ls -la burrito_out/
+          
           # Copy executables with proper names and extensions
-          cp burrito_out/nurvus_windows artifacts/nurvus.exe
-          cp burrito_out/nurvus_linux artifacts/nurvus
-          cp burrito_out/nurvus_macos artifacts/nurvus_macos
+          if [ -f burrito_out/nurvus_windows ]; then
+            cp burrito_out/nurvus_windows artifacts/nurvus.exe
+          fi
+          if [ -f burrito_out/nurvus_linux ]; then
+            cp burrito_out/nurvus_linux artifacts/nurvus
+          fi
+          if [ -f burrito_out/nurvus_macos ]; then
+            cp burrito_out/nurvus_macos artifacts/nurvus_macos
+          fi
           
           # Create Zelan (Mac Studio) package - AI Services
-          mkdir -p artifacts/zelan
-          cp burrito_out/nurvus_macos artifacts/zelan/nurvus
-          cp config/zelan.json artifacts/zelan/processes.json
-          cp -r deployment artifacts/zelan/
-          cp deployment/systemd/nurvus-zelan.service artifacts/zelan/nurvus.service
-          tar -czf artifacts/nurvus-zelan.tar.gz -C artifacts/zelan .
+          if [ -f burrito_out/nurvus_macos ]; then
+            mkdir -p artifacts/zelan
+            cp burrito_out/nurvus_macos artifacts/zelan/nurvus
+            cp config/zelan.json artifacts/zelan/processes.json
+            cp -r deployment artifacts/zelan/
+            cp deployment/systemd/nurvus-zelan.service artifacts/zelan/nurvus.service
+            tar -czf artifacts/nurvus-zelan.tar.gz -C artifacts/zelan .
+          fi
           
           # Create Saya (Mac Mini) package - Docker Services  
-          mkdir -p artifacts/saya
-          cp burrito_out/nurvus_macos artifacts/saya/nurvus
-          cp config/saya.json artifacts/saya/processes.json
-          cp -r deployment artifacts/saya/
-          cp deployment/systemd/nurvus-saya.service artifacts/saya/nurvus.service
-          tar -czf artifacts/nurvus-saya.tar.gz -C artifacts/saya .
+          if [ -f burrito_out/nurvus_macos ]; then
+            mkdir -p artifacts/saya
+            cp burrito_out/nurvus_macos artifacts/saya/nurvus
+            cp config/saya.json artifacts/saya/processes.json
+            cp -r deployment artifacts/saya/
+            cp deployment/systemd/nurvus-saya.service artifacts/saya/nurvus.service
+            tar -czf artifacts/nurvus-saya.tar.gz -C artifacts/saya .
+          fi
           
           # Create Demi (Windows PC) package - Streaming Apps
-          mkdir -p artifacts/demi
-          cp burrito_out/nurvus_windows artifacts/demi/nurvus.exe
-          cp config/demi.json artifacts/demi/processes.json
-          cp -r deployment artifacts/demi/
-          tar -czf artifacts/nurvus-demi.tar.gz -C artifacts/demi .
+          if [ -f burrito_out/nurvus_windows ]; then
+            mkdir -p artifacts/demi
+            cp burrito_out/nurvus_windows artifacts/demi/nurvus.exe
+            cp config/demi.json artifacts/demi/processes.json
+            cp -r deployment artifacts/demi/
+            tar -czf artifacts/nurvus-demi.tar.gz -C artifacts/demi .
+          fi
           
           # Create Alys (Windows VM) package - Automation
-          mkdir -p artifacts/alys
-          cp burrito_out/nurvus_windows artifacts/alys/nurvus.exe
-          cp config/alys.json artifacts/alys/processes.json
-          cp -r deployment artifacts/alys/
-          tar -czf artifacts/nurvus-alys.tar.gz -C artifacts/alys .
+          if [ -f burrito_out/nurvus_windows ]; then
+            mkdir -p artifacts/alys
+            cp burrito_out/nurvus_windows artifacts/alys/nurvus.exe
+            cp config/alys.json artifacts/alys/processes.json
+            cp -r deployment artifacts/alys/
+            tar -czf artifacts/nurvus-alys.tar.gz -C artifacts/alys .
+          fi
           
           # Create standalone executables archive
           mkdir -p artifacts/standalone
-          cp burrito_out/nurvus_windows artifacts/standalone/nurvus.exe
-          cp burrito_out/nurvus_linux artifacts/standalone/nurvus_linux
-          cp burrito_out/nurvus_macos artifacts/standalone/nurvus_macos
-          tar -czf artifacts/nurvus-standalone.tar.gz -C artifacts/standalone .
+          if [ -f burrito_out/nurvus_windows ]; then
+            cp burrito_out/nurvus_windows artifacts/standalone/nurvus.exe
+          fi
+          if [ -f burrito_out/nurvus_linux ]; then
+            cp burrito_out/nurvus_linux artifacts/standalone/nurvus_linux
+          fi
+          if [ -f burrito_out/nurvus_macos ]; then
+            cp burrito_out/nurvus_macos artifacts/standalone/nurvus_macos
+          fi
+          if [ -d artifacts/standalone ] && [ "$(ls -A artifacts/standalone)" ]; then
+            tar -czf artifacts/nurvus-standalone.tar.gz -C artifacts/standalone .
+          fi
           
           # Cleanup temporary directories
           rm -rf artifacts/{zelan,saya,demi,alys,standalone}
