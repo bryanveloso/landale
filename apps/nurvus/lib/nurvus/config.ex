@@ -25,7 +25,6 @@ defmodule Nurvus.Config do
           stop_args: [String.t()] | nil
         }
 
-  @default_config_file "config/processes.json"
 
   ## Public API
 
@@ -41,8 +40,19 @@ defmodule Nurvus.Config do
         load_from_file(file_path)
 
       false ->
-        Logger.info("No configuration file found at #{file_path}, starting with empty config")
-        {:ok, []}
+        # Try to initialize config from local processes.json on first run
+        case initialize_config_from_local(file_path) do
+          :ok ->
+            load_from_file(file_path)
+          
+          :no_local_config ->
+            Logger.info("No configuration file found at #{file_path}, starting with empty config")
+            {:ok, []}
+            
+          {:error, reason} ->
+            Logger.warning("Failed to copy local config: #{reason}, starting with empty config")
+            {:ok, []}
+        end
     end
   end
 
@@ -93,7 +103,7 @@ defmodule Nurvus.Config do
   """
   @spec create_sample_config(String.t() | nil) :: :ok | {:error, term()}
   def create_sample_config(config_file \\ nil) do
-    file_path = config_file || "config/processes.sample.json"
+    file_path = config_file || Path.rootname(get_default_config_path()) <> ".sample.json"
 
     sample_processes = [
       %{
@@ -134,11 +144,50 @@ defmodule Nurvus.Config do
     cond do
       path = Application.get_env(:nurvus, :config_file) -> path
       path = System.get_env("NURVUS_CONFIG_FILE") -> path
-      true -> @default_config_file
+      true -> get_default_config_path()
     end
   end
 
+  @doc """
+  Gets the default configuration file path in ~/.nurvus directory.
+  """
+  @spec get_default_config_path() :: String.t()
+  def get_default_config_path do
+    home = System.get_env("HOME") || System.get_env("USERPROFILE") || "."
+    Path.join([home, ".nurvus", "processes.json"])
+  end
+
   ## Private Functions
+
+  @doc """
+  Attempts to initialize config from a local processes.json file on first run.
+  """
+  @spec initialize_config_from_local(String.t()) :: :ok | :no_local_config | {:error, term()}
+  defp initialize_config_from_local(target_path) do
+    local_config = "./processes.json"
+    
+    case File.exists?(local_config) do
+      true ->
+        try do
+          # Ensure target directory exists
+          case ensure_config_directory(target_path) do
+            :ok ->
+              File.cp!(local_config, target_path)
+              Logger.info("Copied local config from #{local_config} to #{target_path}")
+              :ok
+              
+            error ->
+              error
+          end
+        rescue
+          error ->
+            {:error, "Failed to copy config: #{inspect(error)}"}
+        end
+        
+      false ->
+        :no_local_config
+    end
+  end
 
   defp validate_required_fields(config) do
     with {:ok, id} <- validate_required_string(config, "id"),

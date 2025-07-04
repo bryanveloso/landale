@@ -190,11 +190,6 @@ jobs:
           cd apps/nurvus
           mkdir -p artifacts
           
-          # Copy standalone executables with clean names
-          cp ../../burrito_out/nurvus_windows.exe artifacts/nurvus.exe
-          cp ../../burrito_out/nurvus_linux artifacts/nurvus
-          cp ../../burrito_out/nurvus_macos artifacts/nurvus_macos
-          
           # Create machine-specific packages
           declare -A machines=(
             ["zelan"]="macos"
@@ -216,13 +211,18 @@ jobs:
               cp "../../burrito_out/nurvus_macos" "artifacts/$machine/nurvus"
             fi
             
-            # Copy machine-specific config and deployment files
+            # Copy machine-specific config file
             cp "config/$machine.json" "artifacts/$machine/processes.json"
-            cp -r deployment "artifacts/$machine/"
             
-            # Copy systemd service for Unix machines
-            if [ "$platform" != "windows" ]; then
-              cp "deployment/systemd/nurvus-$machine.service" "artifacts/$machine/nurvus.service"
+            # Copy platform-specific service files
+            if [ "$platform" = "windows" ]; then
+              # No service files for Windows (manual setup)
+              echo "# Windows service setup is manual" > "artifacts/$machine/README.txt"
+            else
+              # Copy systemd service for Unix machines
+              if [ -f "deployment/systemd/nurvus-$machine.service" ]; then
+                cp "deployment/systemd/nurvus-$machine.service" "artifacts/$machine/nurvus.service"
+              fi
             fi
             
             # Create package
@@ -253,27 +253,15 @@ jobs:
           cd apps/nurvus
           echo "## 🌯 Nurvus Single Executable Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ✅ Single Executables Created:" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus.exe** - Windows x86_64 single executable" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus** - Linux x86_64 single executable" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus_macos** - macOS ARM64 single executable" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Machine-Specific Packages:" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus-zelan.tar.gz** - Mac Studio (AI services + config + deployment)" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus-saya.tar.gz** - Mac Mini (Docker services + config + deployment)" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus-demi.tar.gz** - Windows PC (streaming apps + config + deployment)" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus-alys.tar.gz** - Windows VM (automation + config + deployment)" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus-zelan.tar.gz** - Mac Studio (executable + config)" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus-saya.tar.gz** - Mac Mini (executable + config)" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus-demi.tar.gz** - Windows PC (executable + config)" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus-alys.tar.gz** - Windows VM (executable + config)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🚀 Quick Deploy:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "# Download and run directly:" >> $GITHUB_STEP_SUMMARY
-          echo "curl -L -o nurvus.exe [release-url]/nurvus.exe && ./nurvus.exe  # Windows" >> $GITHUB_STEP_SUMMARY
-          echo "curl -L -o nurvus [release-url]/nurvus && chmod +x nurvus && ./nurvus  # Linux" >> $GITHUB_STEP_SUMMARY
-          echo "curl -L -o nurvus [release-url]/nurvus_macos && chmod +x nurvus && ./nurvus  # macOS" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📏 File Sizes:" >> $GITHUB_STEP_SUMMARY
-          for file in artifacts/nurvus*; do
+          echo "### 📏 Package Sizes:" >> $GITHUB_STEP_SUMMARY
+          for file in artifacts/*.tar.gz; do
             if [ -f "$file" ]; then
               filename=$(basename "$file")
               size=$(du -h "$file" | cut -f1)
@@ -315,12 +303,7 @@ jobs:
 
             Automated build from commit ${{ github.sha }}.
 
-            ### Single Executables (Download & Go):
-            - `nurvus.exe` - **Windows** x86_64 single executable  
-            - `nurvus` - **Linux** x86_64 single executable
-            - `nurvus_macos` - **macOS** ARM64 single executable
-
-            ### Machine-Specific Packages (Executable + Config + Deployment):
+            ### Machine-Specific Packages:
             - `nurvus-zelan.tar.gz` - **Mac Studio** (AI services: Phononmaser, Analysis, LM Studio)
             - `nurvus-saya.tar.gz` - **Mac Mini** (Docker services: Landale stack)
             - `nurvus-demi.tar.gz` - **Windows PC** (Streaming: OBS, VTube Studio, TITS)
@@ -328,35 +311,11 @@ jobs:
 
             ### Quick Start:
             ```bash
-            # Windows
-            curl -L -o nurvus.exe https://github.com/bryanveloso/landale/releases/download/nurvus-${{ steps.version.outputs.version }}-${{ github.sha }}/nurvus.exe
-            ./nurvus.exe
-            
-            # Linux  
-            curl -L -o nurvus https://github.com/bryanveloso/landale/releases/download/nurvus-${{ steps.version.outputs.version }}-${{ github.sha }}/nurvus
-            chmod +x nurvus
-            ./nurvus
-            
-            # macOS
-            curl -L -o nurvus https://github.com/bryanveloso/landale/releases/download/nurvus-${{ steps.version.outputs.version }}-${{ github.sha }}/nurvus_macos
-            chmod +x nurvus
-            ./nurvus
-            ```
-
-            ### Machine-Specific Deployment:
-            ```bash
             # Download your machine's package
             curl -L -o nurvus-[machine].tar.gz https://github.com/bryanveloso/landale/releases/download/nurvus-${{ steps.version.outputs.version }}-${{ github.sha }}/nurvus-[machine].tar.gz
             tar -xzf nurvus-[machine].tar.gz
-            cd nurvus-[machine]
             
-            # Unix: Run deployment script
-            sudo ./deployment/scripts/deploy.sh
-            
-            # Windows: Run deployment script  
-            .\deployment\scripts\deploy-windows.ps1
-            
-            # Or start manually
+            # Run directly (config will be copied to ~/.nurvus/ on first run)
             ./nurvus  # or nurvus.exe on Windows
             ```
 
