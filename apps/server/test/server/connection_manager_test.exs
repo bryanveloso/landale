@@ -1,6 +1,8 @@
 defmodule Server.ConnectionManagerTest do
   use ExUnit.Case, async: true
 
+  @moduletag :unit
+
   alias Server.ConnectionManager
 
   describe "connection state initialization" do

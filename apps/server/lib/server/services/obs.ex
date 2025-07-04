@@ -771,7 +771,7 @@ defmodule Server.Services.OBS do
 
       {:error, new_state} ->
         # Schedule reconnect with ConnectionManager tracking
-        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
         updated_connection_manager =
           Server.ConnectionManager.add_timer(
@@ -854,7 +854,7 @@ defmodule Server.Services.OBS do
         |> cleanup_connection()
 
       # Schedule reconnect
-      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
       updated_connection_manager =
         Server.ConnectionManager.add_timer(
@@ -923,7 +923,7 @@ defmodule Server.Services.OBS do
 
           # Only schedule reconnect for recoverable errors
           if should_reconnect do
-            timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+            timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
             updated_connection_manager =
               Server.ConnectionManager.add_timer(
@@ -970,7 +970,7 @@ defmodule Server.Services.OBS do
       Server.Events.publish_obs_event("connection_lost", %{})
 
       # Schedule reconnect with ConnectionManager tracking
-      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
       updated_connection_manager =
         Server.ConnectionManager.add_timer(
@@ -1006,7 +1006,7 @@ defmodule Server.Services.OBS do
         |> cleanup_connection()
 
       # Schedule reconnect with ConnectionManager tracking
-      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
       updated_connection_manager =
         Server.ConnectionManager.add_timer(
@@ -1041,7 +1041,7 @@ defmodule Server.Services.OBS do
         |> cleanup_connection()
 
       # Schedule reconnect with ConnectionManager tracking
-      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
       updated_connection_manager =
         Server.ConnectionManager.add_timer(
@@ -1098,7 +1098,7 @@ defmodule Server.Services.OBS do
       Server.Events.publish_obs_event("connection_lost", %{})
 
       # Schedule reconnect
-      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+      timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
 
       # Track reconnect timer with ConnectionManager
       final_connection_manager =
@@ -1152,7 +1152,7 @@ defmodule Server.Services.OBS do
       # HTTP/1.1 protocol for WebSocket compatibility
       protocols: [:http],
       # Connection timeout
-      connect_timeout: Server.NetworkConfig.connection_timeout()
+      connect_timeout: Server.NetworkConfig.connection_timeout_ms()
     }
 
     case :gun.open(host, port, gun_opts) do

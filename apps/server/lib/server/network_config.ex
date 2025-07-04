@@ -19,21 +19,21 @@ defmodule Server.NetworkConfig do
 
   @type env_type :: :development | :docker | :production
   @type network_config :: %{
-          connection_timeout: integer(),
-          reconnect_interval: integer(),
+          connection_timeout: Duration.t(),
+          reconnect_interval: Duration.t(),
           websocket: %{
-            timeout: integer(),
-            keepalive: integer(),
+            timeout: Duration.t(),
+            keepalive: Duration.t(),
             retry_limit: integer()
           },
           http: %{
-            timeout: integer(),
-            receive_timeout: integer(),
+            timeout: Duration.t(),
+            receive_timeout: Duration.t(),
             pool_size: integer()
           },
           telemetry: %{
             enabled: boolean(),
-            reporting_interval: integer()
+            reporting_interval: Duration.t()
           }
         }
 
@@ -123,9 +123,9 @@ defmodule Server.NetworkConfig do
   Gets connection timeout for the current environment.
 
   ## Returns
-  - Connection timeout in milliseconds
+  - Connection timeout as Duration struct
   """
-  @spec connection_timeout() :: integer()
+  @spec connection_timeout() :: Duration.t()
   def connection_timeout do
     get_config().connection_timeout
   end
@@ -134,32 +134,59 @@ defmodule Server.NetworkConfig do
   Gets reconnect interval for the current environment.
 
   ## Returns
-  - Reconnect interval in milliseconds
+  - Reconnect interval as Duration struct
   """
-  @spec reconnect_interval() :: integer()
+  @spec reconnect_interval() :: Duration.t()
   def reconnect_interval do
     get_config().reconnect_interval
+  end
+
+  @doc """
+  Gets connection timeout in milliseconds for Process functions.
+
+  ## Returns
+  - Connection timeout in milliseconds as integer
+  """
+  @spec connection_timeout_ms() :: integer()
+  def connection_timeout_ms do
+    connection_timeout() |> duration_to_millisecond()
+  end
+
+  @doc """
+  Gets reconnect interval in milliseconds for Process functions.
+
+  ## Returns
+  - Reconnect interval in milliseconds as integer
+  """
+  @spec reconnect_interval_ms() :: integer()
+  def reconnect_interval_ms do
+    reconnect_interval() |> duration_to_millisecond()
+  end
+
+  # Helper function to convert Duration to milliseconds
+  defp duration_to_millisecond(%Duration{} = duration) do
+    System.convert_time_unit(duration.second, :second, :millisecond)
   end
 
   # Private functions
 
   defp base_config do
     %{
-      connection_timeout: 10_000,
-      reconnect_interval: 5_000,
+      connection_timeout: Duration.new!(second: 10),
+      reconnect_interval: Duration.new!(second: 5),
       websocket: %{
-        timeout: 30_000,
-        keepalive: 60_000,
+        timeout: Duration.new!(second: 30),
+        keepalive: Duration.new!(minute: 1),
         retry_limit: 5
       },
       http: %{
-        timeout: 15_000,
-        receive_timeout: 30_000,
+        timeout: Duration.new!(second: 15),
+        receive_timeout: Duration.new!(second: 30),
         pool_size: 10
       },
       telemetry: %{
         enabled: true,
-        reporting_interval: 60_000
+        reporting_interval: Duration.new!(minute: 1)
       }
     }
   end
@@ -167,63 +194,63 @@ defmodule Server.NetworkConfig do
   defp environment_overrides(:development) do
     %{
       # More aggressive timeouts for local environment
-      connection_timeout: 3_000,
-      reconnect_interval: 1_000,
+      connection_timeout: Duration.new!(second: 3),
+      reconnect_interval: Duration.new!(second: 1),
       websocket: %{
         # Faster timeouts for local OBS/Twitch connections
-        timeout: 8_000,
-        keepalive: 15_000,
+        timeout: Duration.new!(second: 8),
+        keepalive: Duration.new!(second: 15),
         retry_limit: 3
       },
       http: %{
         # Local API calls should be very fast
-        timeout: 5_000,
-        receive_timeout: 10_000,
+        timeout: Duration.new!(second: 5),
+        receive_timeout: Duration.new!(second: 10),
         pool_size: 3
       },
       telemetry: %{
         # More frequent telemetry for development monitoring
-        reporting_interval: 15_000
+        reporting_interval: Duration.new!(second: 15)
       }
     }
   end
 
   defp environment_overrides(:docker) do
     %{
-      connection_timeout: 15_000,
-      reconnect_interval: 10_000,
+      connection_timeout: Duration.new!(second: 15),
+      reconnect_interval: Duration.new!(second: 10),
       websocket: %{
-        timeout: 45_000,
-        keepalive: 90_000,
+        timeout: Duration.new!(second: 45),
+        keepalive: Duration.new!(second: 90),
         retry_limit: 10
       },
       http: %{
-        timeout: 20_000,
-        receive_timeout: 45_000,
+        timeout: Duration.new!(second: 20),
+        receive_timeout: Duration.new!(second: 45),
         pool_size: 20
       },
       telemetry: %{
-        reporting_interval: 120_000
+        reporting_interval: Duration.new!(minute: 2)
       }
     }
   end
 
   defp environment_overrides(:production) do
     %{
-      connection_timeout: 20_000,
-      reconnect_interval: 15_000,
+      connection_timeout: Duration.new!(second: 20),
+      reconnect_interval: Duration.new!(second: 15),
       websocket: %{
-        timeout: 60_000,
-        keepalive: 120_000,
+        timeout: Duration.new!(minute: 1),
+        keepalive: Duration.new!(minute: 2),
         retry_limit: 15
       },
       http: %{
-        timeout: 30_000,
-        receive_timeout: 60_000,
+        timeout: Duration.new!(second: 30),
+        receive_timeout: Duration.new!(minute: 1),
         pool_size: 50
       },
       telemetry: %{
-        reporting_interval: 300_000
+        reporting_interval: Duration.new!(minute: 5)
       }
     }
   end

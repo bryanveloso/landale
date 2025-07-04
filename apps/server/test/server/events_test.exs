@@ -1,6 +1,8 @@
 defmodule Server.EventsTest do
   use ExUnit.Case, async: false
 
+  @moduletag :unit
+
   alias Server.Events
 
   describe "Event publishing and subscription" do

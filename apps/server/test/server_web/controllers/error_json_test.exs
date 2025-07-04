@@ -1,6 +1,8 @@
 defmodule ServerWeb.ErrorJSONTest do
   use ServerWeb.ConnCase, async: true
 
+  @moduletag :web
+
   test "renders 404" do
     assert ServerWeb.ErrorJSON.render("404.json", %{}) == %{errors: %{detail: "Not Found"}}
   end

@@ -1,6 +1,8 @@
 defmodule Server.NetworkConfigTest do
   use ExUnit.Case, async: false
 
+  @moduletag :unit
+
   alias Server.NetworkConfig
 
   describe "environment detection" do
@@ -34,46 +36,46 @@ defmodule Server.NetworkConfigTest do
     test "returns development configuration" do
       config = NetworkConfig.get_config_for_environment(:development)
 
-      assert config.connection_timeout == 3_000
-      assert config.reconnect_interval == 1_000
-      assert config.websocket.timeout == 8_000
-      assert config.websocket.keepalive == 15_000
+      assert config.connection_timeout == Duration.new!(second: 3)
+      assert config.reconnect_interval == Duration.new!(second: 1)
+      assert config.websocket.timeout == Duration.new!(second: 8)
+      assert config.websocket.keepalive == Duration.new!(second: 15)
       assert config.websocket.retry_limit == 3
-      assert config.http.timeout == 5_000
-      assert config.http.receive_timeout == 10_000
+      assert config.http.timeout == Duration.new!(second: 5)
+      assert config.http.receive_timeout == Duration.new!(second: 10)
       assert config.http.pool_size == 3
       assert config.telemetry.enabled == true
-      assert config.telemetry.reporting_interval == 15_000
+      assert config.telemetry.reporting_interval == Duration.new!(second: 15)
     end
 
     test "returns Docker configuration" do
       config = NetworkConfig.get_config_for_environment(:docker)
 
-      assert config.connection_timeout == 15_000
-      assert config.reconnect_interval == 10_000
-      assert config.websocket.timeout == 45_000
-      assert config.websocket.keepalive == 90_000
+      assert config.connection_timeout == Duration.new!(second: 15)
+      assert config.reconnect_interval == Duration.new!(second: 10)
+      assert config.websocket.timeout == Duration.new!(second: 45)
+      assert config.websocket.keepalive == Duration.new!(second: 90)
       assert config.websocket.retry_limit == 10
-      assert config.http.timeout == 20_000
-      assert config.http.receive_timeout == 45_000
+      assert config.http.timeout == Duration.new!(second: 20)
+      assert config.http.receive_timeout == Duration.new!(second: 45)
       assert config.http.pool_size == 20
       assert config.telemetry.enabled == true
-      assert config.telemetry.reporting_interval == 120_000
+      assert config.telemetry.reporting_interval == Duration.new!(minute: 2)
     end
 
     test "returns production configuration" do
       config = NetworkConfig.get_config_for_environment(:production)
 
-      assert config.connection_timeout == 20_000
-      assert config.reconnect_interval == 15_000
-      assert config.websocket.timeout == 60_000
-      assert config.websocket.keepalive == 120_000
+      assert config.connection_timeout == Duration.new!(second: 20)
+      assert config.reconnect_interval == Duration.new!(second: 15)
+      assert config.websocket.timeout == Duration.new!(minute: 1)
+      assert config.websocket.keepalive == Duration.new!(minute: 2)
       assert config.websocket.retry_limit == 15
-      assert config.http.timeout == 30_000
-      assert config.http.receive_timeout == 60_000
+      assert config.http.timeout == Duration.new!(second: 30)
+      assert config.http.receive_timeout == Duration.new!(minute: 1)
       assert config.http.pool_size == 50
       assert config.telemetry.enabled == true
-      assert config.telemetry.reporting_interval == 300_000
+      assert config.telemetry.reporting_interval == Duration.new!(minute: 5)
     end
   end
 
@@ -96,14 +98,26 @@ defmodule Server.NetworkConfigTest do
 
     test "connection_timeout returns timeout value" do
       timeout = NetworkConfig.connection_timeout()
-      assert is_integer(timeout)
-      assert timeout > 0
+      assert %Duration{} = timeout
+      assert System.convert_time_unit(timeout.second, :second, :millisecond) > 0
     end
 
     test "reconnect_interval returns interval value" do
       interval = NetworkConfig.reconnect_interval()
-      assert is_integer(interval)
-      assert interval > 0
+      assert %Duration{} = interval
+      assert System.convert_time_unit(interval.second, :second, :millisecond) > 0
+    end
+
+    test "connection_timeout_ms returns timeout in milliseconds" do
+      timeout_ms = NetworkConfig.connection_timeout_ms()
+      assert is_integer(timeout_ms)
+      assert timeout_ms > 0
+    end
+
+    test "reconnect_interval_ms returns interval in milliseconds" do
+      interval_ms = NetworkConfig.reconnect_interval_ms()
+      assert is_integer(interval_ms)
+      assert interval_ms > 0
     end
   end
 

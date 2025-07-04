@@ -1,6 +1,8 @@
 defmodule Server.SubscriptionMonitorTest do
   use Server.DataCase, async: true
 
+  @moduletag :database
+
   alias Server.{SubscriptionMonitor, SubscriptionStorage}
 
   # Following official Elixir testing patterns from the documentation

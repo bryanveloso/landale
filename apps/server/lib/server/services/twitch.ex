@@ -273,7 +273,7 @@ defmodule Server.Services.Twitch do
 
       {:error, reason} ->
         Logger.info("Connection retry scheduled", error: reason)
-        timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval())
+        timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval_ms())
         {:ok, %{state | reconnect_timer: timer}}
     end
   end
@@ -463,7 +463,7 @@ defmodule Server.Services.Twitch do
 
       {:error, reason} ->
         Logger.info("Connection retry rescheduled", error: reason)
-        timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval())
+        timer = Process.send_after(self(), :retry_connection, Server.NetworkConfig.reconnect_interval_ms())
         {:noreply, %{state | reconnect_timer: timer}}
     end
   end
@@ -505,7 +505,7 @@ defmodule Server.Services.Twitch do
           })
 
         # Schedule reconnect
-        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
         state = %{state | reconnect_timer: timer}
         {:noreply, state}
     end
@@ -644,7 +644,7 @@ defmodule Server.Services.Twitch do
       {:error, reason} ->
         Logging.log_error("Token refresh failed", reason)
         # Try again in a shorter interval
-        timer = Process.send_after(self(), :refresh_token, Server.NetworkConfig.reconnect_interval())
+        timer = Process.send_after(self(), :refresh_token, Server.NetworkConfig.reconnect_interval_ms())
         state = %{state | token_refresh_timer: timer, token_refresh_task: nil}
         {:noreply, state}
     end
@@ -655,7 +655,7 @@ defmodule Server.Services.Twitch do
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{token_validation_task: %Task{ref: ref}} = state) do
     Logging.log_error("Token validation task crashed", inspect(reason))
     # Retry validation after a delay
-    timer = Process.send_after(self(), :validate_token, Server.NetworkConfig.reconnect_interval())
+    timer = Process.send_after(self(), :validate_token, Server.NetworkConfig.reconnect_interval_ms())
     {:noreply, %{state | token_validation_task: nil, reconnect_timer: timer}}
   end
 
@@ -663,7 +663,7 @@ defmodule Server.Services.Twitch do
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{token_refresh_task: %Task{ref: ref}} = state) do
     Logging.log_error("Token refresh task crashed", inspect(reason))
     # Retry refresh after a delay
-    timer = Process.send_after(self(), :refresh_token, Server.NetworkConfig.reconnect_interval())
+    timer = Process.send_after(self(), :refresh_token, Server.NetworkConfig.reconnect_interval_ms())
     {:noreply, %{state | token_refresh_task: nil, token_refresh_timer: timer}}
   end
 
@@ -712,7 +712,7 @@ defmodule Server.Services.Twitch do
     Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_disconnected, %{reason: reason}})
 
     # Schedule reconnect
-    timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+    timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
     state = %{state | reconnect_timer: timer}
 
     {:noreply, state}
@@ -781,7 +781,7 @@ defmodule Server.Services.Twitch do
           )
 
           # Fall back to normal reconnect cycle
-          timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+          timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
           new_state = %{state | reconnect_timer: timer, cloudfront_retry_count: 0}
           {:noreply, new_state}
         end
@@ -819,7 +819,7 @@ defmodule Server.Services.Twitch do
         )
 
         # For other errors, retry with backoff
-        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
         new_state = %{state | reconnect_timer: timer}
         {:noreply, new_state}
     end
@@ -932,7 +932,7 @@ defmodule Server.Services.Twitch do
           })
 
         # Schedule normal reconnect after enhanced retry fails
-        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval())
+        timer = Process.send_after(self(), :connect, Server.NetworkConfig.reconnect_interval_ms())
         state = %{state | reconnect_timer: timer, cloudfront_retry_count: 0}
         {:noreply, state}
     end
