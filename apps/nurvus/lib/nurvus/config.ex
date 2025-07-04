@@ -66,7 +66,7 @@ defmodule Nurvus.Config do
     case ensure_config_directory(file_path) do
       :ok ->
         try do
-          json_data = Jason.encode!(processes, pretty: true)
+          json_data = JSON.encode!(processes)
           File.write!(file_path, json_data)
           Logger.info("Saved configuration to #{file_path}")
           :ok
@@ -85,7 +85,7 @@ defmodule Nurvus.Config do
   Validates a process configuration map.
   """
   @spec validate_process_config(map()) :: {:ok, process_config()} | {:error, term()}
-  def validate_process_config(config) when is_map(config) do
+  def validate_process_config(config) when is_non_struct_map(config) do
     with {:ok, required_fields} <- validate_required_fields(config),
          {:ok, optional_fields} <- validate_optional_fields(config) do
       validated_config = Map.merge(required_fields, optional_fields)
@@ -158,9 +158,6 @@ defmodule Nurvus.Config do
 
   ## Private Functions
 
-  @doc """
-  Attempts to initialize config from a local processes.json file on first run.
-  """
   @spec initialize_config_from_local(String.t()) :: :ok | :no_local_config | {:error, term()}
   defp initialize_config_from_local(target_path) do
     local_config = "./processes.json"
@@ -249,20 +246,16 @@ defmodule Nurvus.Config do
   defp load_from_file(file_path) do
     file_path
     |> File.read!()
-    |> Jason.decode!()
+    |> JSON.decode!()
     |> validate_process_list()
   rescue
-    error in Jason.DecodeError ->
-      Logger.error("Invalid JSON in config file #{file_path}: #{inspect(error)}")
-      {:error, :invalid_json}
-
     error in File.Error ->
       Logger.error("Failed to read config file #{file_path}: #{inspect(error)}")
       {:error, :file_read_error}
 
     error ->
-      Logger.error("Unexpected error loading config: #{inspect(error)}")
-      {:error, error}
+      Logger.error("Invalid JSON or config format in #{file_path}: #{inspect(error)}")
+      {:error, :invalid_format}
   end
 
   defp validate_process_list(json_data) when is_list(json_data) do
@@ -314,7 +307,7 @@ defmodule Nurvus.Config do
 
   defp validate_env(config) do
     case Map.get(config, "env", %{}) do
-      env when is_map(env) ->
+      env when is_non_struct_map(env) ->
         # Ensure all keys and values are strings
         string_env =
           env
@@ -372,7 +365,7 @@ defmodule Nurvus.Config do
       nil ->
         {:ok, nil}
 
-      detection when is_map(detection) ->
+      detection when is_non_struct_map(detection) ->
         with {:ok, _} <- validate_required_string(detection, "name"),
              {:ok, _} <- validate_optional_string(detection, "check_command"),
              {:ok, _} <- validate_optional_list(detection, "check_args"),
@@ -392,7 +385,7 @@ defmodule Nurvus.Config do
       nil ->
         {:ok, nil}
 
-      health_check when is_map(health_check) ->
+      health_check when is_non_struct_map(health_check) ->
         with {:ok, _} <- validate_optional_string(health_check, "type"),
              {:ok, _} <- validate_optional_string(health_check, "url"),
              {:ok, _} <- validate_optional_integer(health_check, "interval"),
