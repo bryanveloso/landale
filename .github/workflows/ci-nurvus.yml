@@ -47,17 +47,17 @@ jobs:
       - name: Compile project
         run: |
           cd apps/nurvus
-          mix compile
+          MIX_ENV=dev mix compile
 
       - name: Run tests
         run: |
           cd apps/nurvus
-          mix test
+          MIX_ENV=test mix test
 
       - name: Run Credo
         run: |
           cd apps/nurvus
-          mix credo
+          MIX_ENV=dev mix credo
 
       - name: Install production dependencies
         run: |
@@ -67,7 +67,7 @@ jobs:
       - name: Build release
         run: |
           cd apps/nurvus
-          mix release
+          MIX_ENV=prod mix release
 
       - name: Create machine-specific artifacts
         run: |
