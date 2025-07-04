@@ -1,4 +1,4 @@
-name: Build Nurvus Releases
+name: Build Nurvus Single Executables
 
 on:
   push:
@@ -11,12 +11,13 @@ on:
 
 env:
   MIX_ENV: prod
-  ELIXIR_VERSION: "1.16.3"
+  ELIXIR_VERSION: "1.18.4"
   OTP_VERSION: "26.2"
+  ZIG_VERSION: "0.14.0"
 
 jobs:
-  build-release:
-    name: Build Release
+  build-executables:
+    name: Build Single Executables
     runs-on: ubuntu-latest
     
     steps:
@@ -29,15 +30,25 @@ jobs:
           elixir-version: ${{ env.ELIXIR_VERSION }}
           otp-version: ${{ env.OTP_VERSION }}
 
+      - name: Install Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+
+      - name: Install 7zip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full
+
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
           path: |
             apps/nurvus/deps
             apps/nurvus/_build
-          key: ${{ runner.os }}-mix-${{ hashFiles('apps/nurvus/mix.lock') }}
+          key: ${{ runner.os }}-mix-elixir-${{ env.ELIXIR_VERSION }}-${{ hashFiles('apps/nurvus/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-
+            ${{ runner.os }}-mix-elixir-${{ env.ELIXIR_VERSION }}-
 
       - name: Install dependencies
         run: |
@@ -64,99 +75,130 @@ jobs:
           cd apps/nurvus
           mix deps.get --only prod
 
-      - name: Build release
+      - name: Build Windows executable
         run: |
           cd apps/nurvus
-          MIX_ENV=prod mix release
+          BURRITO_TARGET=windows MIX_ENV=prod mix release
 
-      - name: Create machine-specific artifacts
+      - name: Build Linux executable  
+        run: |
+          cd apps/nurvus
+          BURRITO_TARGET=linux MIX_ENV=prod mix release
+
+      - name: Build macOS executable
+        run: |
+          cd apps/nurvus
+          BURRITO_TARGET=macos MIX_ENV=prod mix release
+
+      - name: Create machine-specific packages
         run: |
           cd apps/nurvus
           
-          # Create release packages for each machine
+          # Create artifacts directory
           mkdir -p artifacts
           
-          # Base release tarball
-          tar -czf artifacts/nurvus-release-base.tar.gz -C _build/prod/rel/nurvus .
+          # Copy executables with proper names and extensions
+          cp burrito_out/nurvus_windows artifacts/nurvus.exe
+          cp burrito_out/nurvus_linux artifacts/nurvus
+          cp burrito_out/nurvus_macos artifacts/nurvus_macos
           
-          # Zelan (Mac Studio) - AI Services
+          # Create Zelan (Mac Studio) package - AI Services
           mkdir -p artifacts/zelan
-          tar -xzf artifacts/nurvus-release-base.tar.gz -C artifacts/zelan
-          mkdir -p artifacts/zelan/config
-          cp config/zelan.json artifacts/zelan/config/processes.json
-          # Add deployment scripts
+          cp burrito_out/nurvus_macos artifacts/zelan/nurvus
+          cp config/zelan.json artifacts/zelan/processes.json
           cp -r deployment artifacts/zelan/
           cp deployment/systemd/nurvus-zelan.service artifacts/zelan/nurvus.service
           tar -czf artifacts/nurvus-zelan.tar.gz -C artifacts/zelan .
           
-          # Saya (Mac Mini) - Docker Services  
+          # Create Saya (Mac Mini) package - Docker Services  
           mkdir -p artifacts/saya
-          tar -xzf artifacts/nurvus-release-base.tar.gz -C artifacts/saya
-          mkdir -p artifacts/saya/config
-          cp config/saya.json artifacts/saya/config/processes.json
-          # Add deployment scripts
+          cp burrito_out/nurvus_macos artifacts/saya/nurvus
+          cp config/saya.json artifacts/saya/processes.json
           cp -r deployment artifacts/saya/
           cp deployment/systemd/nurvus-saya.service artifacts/saya/nurvus.service
           tar -czf artifacts/nurvus-saya.tar.gz -C artifacts/saya .
           
-          # Demi (Windows PC) - Streaming Apps
+          # Create Demi (Windows PC) package - Streaming Apps
           mkdir -p artifacts/demi
-          tar -xzf artifacts/nurvus-release-base.tar.gz -C artifacts/demi
-          mkdir -p artifacts/demi/config
-          cp config/demi.json artifacts/demi/config/processes.json
-          # Add deployment scripts (Windows)
+          cp burrito_out/nurvus_windows artifacts/demi/nurvus.exe
+          cp config/demi.json artifacts/demi/processes.json
           cp -r deployment artifacts/demi/
           tar -czf artifacts/nurvus-demi.tar.gz -C artifacts/demi .
           
-          # Alys (Windows VM) - Automation
+          # Create Alys (Windows VM) package - Automation
           mkdir -p artifacts/alys
-          tar -xzf artifacts/nurvus-release-base.tar.gz -C artifacts/alys
-          mkdir -p artifacts/alys/config
-          cp config/alys.json artifacts/alys/config/processes.json
-          # Add deployment scripts (Windows)
+          cp burrito_out/nurvus_windows artifacts/alys/nurvus.exe
+          cp config/alys.json artifacts/alys/processes.json
           cp -r deployment artifacts/alys/
           tar -czf artifacts/nurvus-alys.tar.gz -C artifacts/alys .
           
-          # Cleanup temporary directories
-          rm -rf artifacts/{zelan,saya,demi,alys}
+          # Create standalone executables archive
+          mkdir -p artifacts/standalone
+          cp burrito_out/nurvus_windows artifacts/standalone/nurvus.exe
+          cp burrito_out/nurvus_linux artifacts/standalone/nurvus_linux
+          cp burrito_out/nurvus_macos artifacts/standalone/nurvus_macos
+          tar -czf artifacts/nurvus-standalone.tar.gz -C artifacts/standalone .
           
-          # List created artifacts
+          # Cleanup temporary directories
+          rm -rf artifacts/{zelan,saya,demi,alys,standalone}
+          
+          # List created artifacts with sizes
           ls -la artifacts/
+          echo "Executable sizes:"
+          du -h artifacts/nurvus*
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: nurvus-releases-${{ github.sha }}
-          path: apps/nurvus/artifacts/*.tar.gz
+          name: nurvus-executables-${{ github.sha }}
+          path: |
+            apps/nurvus/artifacts/*.tar.gz
+            apps/nurvus/artifacts/nurvus*
           retention-days: 30
 
       - name: Create release summary
         run: |
           cd apps/nurvus
-          echo "## Nurvus Release Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Nurvus Single Executable Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Artifacts Created:" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus-release-base.tar.gz** - Base release (all platforms)" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus-zelan.tar.gz** - Mac Studio (AI services + deployment scripts)" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus-saya.tar.gz** - Mac Mini (Docker services + deployment scripts)" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus-demi.tar.gz** - Windows PC (streaming apps + deployment scripts)" >> $GITHUB_STEP_SUMMARY
-          echo "- **nurvus-alys.tar.gz** - Windows VM (automation + deployment scripts)" >> $GITHUB_STEP_SUMMARY
+          echo "### Single Executables Created:" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus.exe** - Windows x86_64 single executable" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus** - Linux x86_64 single executable" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus_macos** - macOS ARM64 single executable" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Machine-Specific Packages:" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus-zelan.tar.gz** - Mac Studio (AI services + config + deployment)" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus-saya.tar.gz** - Mac Mini (Docker services + config + deployment)" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus-demi.tar.gz** - Windows PC (streaming apps + config + deployment)" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus-alys.tar.gz** - Windows VM (automation + config + deployment)" >> $GITHUB_STEP_SUMMARY
+          echo "- **nurvus-standalone.tar.gz** - All platforms standalone executables" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Deployment:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the appropriate machine artifact" >> $GITHUB_STEP_SUMMARY
-          echo "2. Extract to target machine" >> $GITHUB_STEP_SUMMARY
-          echo "3. Run deployment script or manual setup" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the appropriate package or standalone executable" >> $GITHUB_STEP_SUMMARY
+          echo "2. Extract (for packages) or place executable directly" >> $GITHUB_STEP_SUMMARY
+          echo "3. Run: \`./nurvus\` (Unix) or \`nurvus.exe\` (Windows)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### File Sizes:" >> $GITHUB_STEP_SUMMARY
-          du -h artifacts/*.tar.gz | while read size file; do
-            filename=$(basename "$file")
-            echo "- $filename: $size" >> $GITHUB_STEP_SUMMARY
+          if [ -f artifacts/nurvus.exe ]; then
+            echo "- nurvus.exe: $(du -h artifacts/nurvus.exe | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -f artifacts/nurvus ]; then
+            echo "- nurvus (Linux): $(du -h artifacts/nurvus | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -f artifacts/nurvus_macos ]; then
+            echo "- nurvus_macos: $(du -h artifacts/nurvus_macos | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          fi
+          for archive in artifacts/*.tar.gz; do
+            if [ -f "$archive" ]; then
+              filename=$(basename "$archive")
+              echo "- $filename: $(du -h "$archive" | cut -f1)" >> $GITHUB_STEP_SUMMARY
+            fi
           done
 
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: build-release
+    needs: build-executables
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
@@ -166,7 +208,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: nurvus-releases-${{ github.sha }}
+          name: nurvus-executables-${{ github.sha }}
           path: artifacts
 
       - name: Get version
@@ -181,34 +223,56 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nurvus-${{ steps.version.outputs.version }}-${{ github.sha }}
-          name: "Nurvus ${{ steps.version.outputs.version }} Build ${{ github.sha }}"
+          name: "Nurvus ${{ steps.version.outputs.version }} Single Executables"
           body: |
-            ## Nurvus Process Manager Release
+            ## Nurvus Process Manager - Single Executable Release 🌯
 
             Automated build from commit ${{ github.sha }}.
 
-            ### Machine-Specific Artifacts:
-            Each archive contains the release + deployment scripts + machine config:
-            - `nurvus-zelan.tar.gz` - Mac Studio (AI services: Phononmaser, Analysis, LM Studio)
-            - `nurvus-saya.tar.gz` - Mac Mini (Docker services: Landale stack)
-            - `nurvus-demi.tar.gz` - Windows PC (Streaming: OBS, VTube Studio, TITS)
-            - `nurvus-alys.tar.gz` - Windows VM (Automation: Streamer.Bot)
+            ### Single Executables (Download & Go):
+            - `nurvus.exe` - **Windows** x86_64 single executable  
+            - `nurvus` - **Linux** x86_64 single executable
+            - `nurvus_macos` - **macOS** ARM64 single executable
+            - `nurvus-standalone.tar.gz` - All platform executables in one archive
 
-            ### Quick Deploy:
+            ### Machine-Specific Packages (Executable + Config + Deployment):
+            - `nurvus-zelan.tar.gz` - **Mac Studio** (AI services: Phononmaser, Analysis, LM Studio)
+            - `nurvus-saya.tar.gz` - **Mac Mini** (Docker services: Landale stack)
+            - `nurvus-demi.tar.gz` - **Windows PC** (Streaming: OBS, VTube Studio, TITS)
+            - `nurvus-alys.tar.gz` - **Windows VM** (Automation: Streamer.Bot)
+
+            ### Quick Start:
             ```bash
-            # Download and extract for your machine
-            wget https://github.com/bryanveloso/landale/releases/download/nurvus-${{ steps.version.outputs.version }}-${{ github.sha }}/nurvus-[machine].tar.gz
-            sudo mkdir -p /opt/nurvus
-            sudo tar -xzf nurvus-[machine].tar.gz -C /opt/nurvus/
+            # Windows
+            curl -L -o nurvus.exe https://github.com/bryanveloso/landale/releases/download/nurvus-${{ steps.version.outputs.version }}-${{ github.sha }}/nurvus.exe
+            ./nurvus.exe
+            
+            # Linux  
+            curl -L -o nurvus https://github.com/bryanveloso/landale/releases/download/nurvus-${{ steps.version.outputs.version }}-${{ github.sha }}/nurvus
+            chmod +x nurvus
+            ./nurvus
+            
+            # macOS
+            curl -L -o nurvus https://github.com/bryanveloso/landale/releases/download/nurvus-${{ steps.version.outputs.version }}-${{ github.sha }}/nurvus_macos
+            chmod +x nurvus
+            ./nurvus
+            ```
+
+            ### Machine-Specific Deployment:
+            ```bash
+            # Download your machine's package
+            curl -L -o nurvus-[machine].tar.gz https://github.com/bryanveloso/landale/releases/download/nurvus-${{ steps.version.outputs.version }}-${{ github.sha }}/nurvus-[machine].tar.gz
+            tar -xzf nurvus-[machine].tar.gz
+            cd nurvus-[machine]
             
             # Unix: Run deployment script
-            cd /opt/nurvus && sudo ./deployment/scripts/deploy.sh
+            sudo ./deployment/scripts/deploy.sh
             
             # Windows: Run deployment script  
-            cd C:\nurvus && .\deployment\scripts\deploy-windows.ps1
+            .\deployment\scripts\deploy-windows.ps1
             
             # Or start manually
-            /opt/nurvus/bin/nurvus start
+            ./nurvus  # or nurvus.exe on Windows
             ```
 
             ### API Endpoints:
@@ -219,6 +283,6 @@ jobs:
 
             See `DEPLOYMENT.md` for complete setup instructions.
           files: |
-            artifacts/nurvus-*.tar.gz
+            artifacts/*
           draft: false
           prerelease: false
