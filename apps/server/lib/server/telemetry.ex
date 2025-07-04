@@ -381,31 +381,39 @@ defmodule Server.Telemetry do
   """
   @spec start_tprof_profiler(keyword()) :: {:ok, pid()} | {:error, term()}
   def start_tprof_profiler(opts \\ []) do
-    try do
-      # Configure tprof profiler with Elixir 1.18 settings
-      profile_config = %{
-        pid: Keyword.get(opts, :pid, :all),
-        pattern: Keyword.get(opts, :pattern, :_),
-        time: Keyword.get(opts, :time, 5000),
-        type: Keyword.get(opts, :type, :time)
-      }
+    if function_exported?(:tprof, :profile, 4) do
+      try do
+        # Configure tprof profiler settings
+        profile_config = %{
+          pid: Keyword.get(opts, :pid, :all),
+          pattern: Keyword.get(opts, :pattern, :_),
+          time: Keyword.get(opts, :time, 5000),
+          type: Keyword.get(opts, :type, :time)
+        }
 
-      # Start profiling with enhanced pattern matching
-      :tprof.profile(profile_config.pid, profile_config.pattern, profile_config.time, [
-        {profile_config.type, true}
-      ])
+        # Start profiling with enhanced pattern matching
+        apply(:tprof, :profile, [
+          profile_config.pid,
+          profile_config.pattern,
+          profile_config.time,
+          [{profile_config.type, true}]
+        ])
 
-      # Emit telemetry for profiler activation
-      :telemetry.execute([:server, :tprof, :started], %{duration: profile_config.time}, %{
-        pattern: inspect(profile_config.pattern),
-        type: profile_config.type
-      })
+        # Emit telemetry for profiler activation
+        :telemetry.execute([:server, :tprof, :started], %{duration: profile_config.time}, %{
+          pattern: inspect(profile_config.pattern),
+          type: profile_config.type
+        })
 
-      {:ok, :profiler_started}
-    rescue
-      error ->
-        Logger.warning("Failed to start tprof profiler", error: inspect(error))
-        {:error, error}
+        {:ok, :profiler_started}
+      rescue
+        error ->
+          Logger.warning("Failed to start tprof profiler", error: inspect(error))
+          {:error, error}
+      end
+    else
+      Logger.info("tprof profiler not available in this Elixir/OTP version")
+      {:error, :tprof_not_available}
     end
   end
 
@@ -414,45 +422,49 @@ defmodule Server.Telemetry do
   """
   @spec collect_tprof_results() :: {:ok, map()} | {:error, term()}
   def collect_tprof_results do
-    try do
-      # Get profiling results from tprof
-      results = :tprof.analyze([])
+    if function_exported?(:tprof, :analyze, 1) do
+      try do
+        # Get profiling results from tprof
+        results = apply(:tprof, :analyze, [[]])
 
-      # Process results for telemetry emission
-      total_calls = Enum.reduce(results, 0, fn {_func, calls, _time}, acc -> acc + calls end)
-      total_time = Enum.reduce(results, 0, fn {_func, _calls, time}, acc -> acc + time end)
+        # Process results for telemetry emission
+        total_calls = Enum.reduce(results, 0, fn {_func, calls, _time}, acc -> acc + calls end)
+        total_time = Enum.reduce(results, 0, fn {_func, _calls, time}, acc -> acc + time end)
 
-      # Emit aggregated profiling metrics
-      :telemetry.execute(
-        [:server, :tprof, :results],
-        %{
-          total_calls: total_calls,
-          total_time: total_time,
-          functions_profiled: length(results)
-        },
-        %{}
-      )
-
-      # Emit top functions by call count
-      top_functions = Enum.take(Enum.sort_by(results, fn {_, calls, _} -> calls end, :desc), 10)
-
-      Enum.each(top_functions, fn {func, calls, time} ->
+        # Emit aggregated profiling metrics
         :telemetry.execute(
-          [:server, :tprof, :function],
+          [:server, :tprof, :results],
           %{
-            calls: calls,
-            time: time,
-            avg_time: if(calls > 0, do: time / calls, else: 0)
+            total_calls: total_calls,
+            total_time: total_time,
+            functions_profiled: length(results)
           },
-          %{function: inspect(func)}
+          %{}
         )
-      end)
 
-      {:ok, %{total_calls: total_calls, total_time: total_time, results: results}}
-    rescue
-      error ->
-        Logger.warning("Failed to collect tprof results", error: inspect(error))
-        {:error, error}
+        # Emit top functions by call count
+        top_functions = Enum.take(Enum.sort_by(results, fn {_, calls, _} -> calls end, :desc), 10)
+
+        Enum.each(top_functions, fn {func, calls, time} ->
+          :telemetry.execute(
+            [:server, :tprof, :function],
+            %{
+              calls: calls,
+              time: time,
+              avg_time: if(calls > 0, do: time / calls, else: 0)
+            },
+            %{function: inspect(func)}
+          )
+        end)
+
+        {:ok, %{total_calls: total_calls, total_time: total_time, results: results}}
+      rescue
+        error ->
+          Logger.warning("Failed to collect tprof results", error: inspect(error))
+          {:error, error}
+      end
+    else
+      {:error, :tprof_not_available}
     end
   end
 
@@ -461,45 +473,49 @@ defmodule Server.Telemetry do
   """
   @spec profile_function(module(), atom(), integer(), keyword()) :: {:ok, map()} | {:error, term()}
   def profile_function(module, function, arity, opts \\ []) do
-    duration = Keyword.get(opts, :duration, 1000)
+    if function_exported?(:tprof, :profile, 4) do
+      duration = Keyword.get(opts, :duration, 1000)
 
-    try do
-      # Use enhanced pattern matching for specific function profiling
-      pattern = {module, function, arity}
+      try do
+        # Use enhanced pattern matching for specific function profiling
+        pattern = {module, function, arity}
 
-      # Start targeted profiling
-      :tprof.profile(:all, pattern, duration, [{:time, true}, {:memory, true}])
+        # Start targeted profiling
+        apply(:tprof, :profile, [:all, pattern, duration, [{:time, true}, {:memory, true}]])
 
-      # Collect results after profiling period
-      Process.sleep(duration + 100)
-      results = :tprof.analyze([])
+        # Collect results after profiling period
+        Process.sleep(duration + 100)
+        results = apply(:tprof, :analyze, [[]])
 
-      # Emit specific function telemetry
-      case Enum.find(results, fn {func, _, _} -> func == pattern end) do
-        {^pattern, calls, time} ->
-          :telemetry.execute(
-            [:server, :tprof, :specific_function],
-            %{
-              calls: calls,
-              time: time,
-              avg_time: if(calls > 0, do: time / calls, else: 0)
-            },
-            %{
-              module: module,
-              function: function,
-              arity: arity
-            }
-          )
+        # Emit specific function telemetry
+        case Enum.find(results, fn {func, _, _} -> func == pattern end) do
+          {^pattern, calls, time} ->
+            :telemetry.execute(
+              [:server, :tprof, :specific_function],
+              %{
+                calls: calls,
+                time: time,
+                avg_time: if(calls > 0, do: time / calls, else: 0)
+              },
+              %{
+                module: module,
+                function: function,
+                arity: arity
+              }
+            )
 
-          {:ok, %{calls: calls, time: time, avg_time: if(calls > 0, do: time / calls, else: 0)}}
+            {:ok, %{calls: calls, time: time, avg_time: if(calls > 0, do: time / calls, else: 0)}}
 
-        nil ->
-          {:ok, %{calls: 0, time: 0, avg_time: 0}}
+          nil ->
+            {:ok, %{calls: 0, time: 0, avg_time: 0}}
+        end
+      rescue
+        error ->
+          Logger.warning("Failed to profile function #{module}.#{function}/#{arity}", error: inspect(error))
+          {:error, error}
       end
-    rescue
-      error ->
-        Logger.warning("Failed to profile function #{module}.#{function}/#{arity}", error: inspect(error))
-        {:error, error}
+    else
+      {:error, :tprof_not_available}
     end
   end
 end
