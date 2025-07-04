@@ -106,17 +106,6 @@ defmodule ServerWeb.EventsChannel do
   end
 
   @impl true
-  def handle_info({:twitch_event, event}, socket) do
-    push(socket, "twitch_event", %{
-      type: event.type,
-      data: event,
-      timestamp: event.timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_info({:chat_message, event}, socket) do
     push(socket, "chat_message", %{
       type: "chat_message",
@@ -130,7 +119,7 @@ defmodule ServerWeb.EventsChannel do
   @impl true
   def handle_info({:chat_clear, event}, socket) do
     push(socket, "chat_clear", %{
-      type: "chat_clear", 
+      type: "chat_clear",
       data: event,
       timestamp: event.timestamp
     })
@@ -192,7 +181,6 @@ defmodule ServerWeb.EventsChannel do
 
     {:noreply, socket}
   end
-
 
   # Handle ping for connection health
   @impl true

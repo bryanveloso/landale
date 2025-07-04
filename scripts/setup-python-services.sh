@@ -14,9 +14,9 @@ cd apps/phononmaser
 uv venv
 uv pip sync
 
-# Setup analysis service
-echo "Setting up analysis service..."
-cd ../analysis
+# Setup seed service
+echo "Setting up seed service..."
+cd ../seed
 uv venv
 uv pip sync
 

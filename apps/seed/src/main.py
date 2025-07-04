@@ -1,4 +1,4 @@
-"""Main entry point for the analysis service."""
+"""Main entry point for the SEED intelligence service."""
 import asyncio
 import logging
 import os
@@ -12,7 +12,8 @@ from .websocket_client import PhononmaserClient, ServerClient
 from .transcription_client import TranscriptionWebSocketClient
 from .lms_client import LMSClient
 from .correlator import StreamCorrelator
-from .events import TranscriptionEvent, ChatMessage, EmoteEvent, AnalysisResult
+from .context_client import ContextClient
+from .events import TranscriptionEvent, ChatMessage, EmoteEvent, ViewerInteractionEvent, AnalysisResult
 from .health import create_health_app
 from .service_config import get_phononmaser_url, get_server_events_url, get_lms_api_url
 
@@ -27,8 +28,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class AnalysisService:
-    """Main analysis service that coordinates all components."""
+class SeedService:
+    """Main SEED intelligence service that coordinates all components."""
     
     def __init__(self):
         # Configuration from environment with service-config defaults
@@ -41,6 +42,7 @@ class AnalysisService:
         self.transcription_client = TranscriptionWebSocketClient(self.server_ws_url)
         self.server_client = ServerClient(self.server_events_url)
         self.lms_client = LMSClient(self.lms_url, self.lms_model)
+        self.context_client = ContextClient(self.server_events_url.replace('ws://', 'http://').replace('/events', ''))
         self.correlator: Optional[StreamCorrelator] = None
         
         # State
@@ -49,19 +51,23 @@ class AnalysisService:
         self.health_runner = None
         
     async def start(self):
-        """Start the analysis service."""
-        logger.info("Starting analysis service...")
+        """Start the SEED intelligence service."""
+        logger.info("Starting SEED intelligence service...")
         
         # Initialize LMS client
         await self.lms_client.__aenter__()
         
-        # Initialize correlator
-        self.correlator = StreamCorrelator(self.lms_client)
+        # Initialize context client
+        await self.context_client.__aenter__()
+        
+        # Initialize correlator with context client
+        self.correlator = StreamCorrelator(self.lms_client, self.context_client)
         
         # Register event handlers
         self.transcription_client.on_transcription(self._handle_transcription)
         self.server_client.on_chat_message(self._handle_chat_message)
         self.server_client.on_emote(self._handle_emote)
+        self.server_client.on_viewer_interaction(self._handle_viewer_interaction)
         self.correlator.on_analysis(self._handle_analysis_result)
         
         # Connect to services
@@ -83,7 +89,7 @@ class AnalysisService:
         
         # Start health check endpoint
         from .service_config import ServiceConfig, SERVICES
-        health_port = SERVICES['analysis']['ports']['health']
+        health_port = SERVICES.get('seed', {}).get('ports', {}).get('health', 8891)
         self.health_runner = await create_health_app(port=health_port)
         
         # Start listening tasks
@@ -94,11 +100,11 @@ class AnalysisService:
             asyncio.create_task(self._health_check_loop())
         ]
         
-        logger.info("Analysis service started successfully")
+        logger.info("SEED intelligence service started successfully")
         
     async def stop(self):
-        """Stop the analysis service."""
-        logger.info("Stopping analysis service...")
+        """Stop the SEED intelligence service."""
+        logger.info("Stopping SEED intelligence service...")
         self.running = False
         
         # Cancel tasks
@@ -112,12 +118,13 @@ class AnalysisService:
         await self.transcription_client.disconnect()
         await self.server_client.disconnect()
         await self.lms_client.__aexit__(None, None, None)
+        await self.context_client.__aexit__(None, None, None)
         
         # Cleanup health endpoint
         if self.health_runner:
             await self.health_runner.cleanup()
         
-        logger.info("Analysis service stopped")
+        logger.info("SEED intelligence service stopped")
         
     async def _handle_transcription(self, event: TranscriptionEvent):
         """Handle transcription events from Phoenix server."""
@@ -141,23 +148,34 @@ class AnalysisService:
         if self.correlator:
             await self.correlator.add_emote(event)
             
+    async def _handle_viewer_interaction(self, event: ViewerInteractionEvent):
+        """Handle viewer interaction events from server."""
+        logger.debug(f"Viewer interaction: {event.interaction_type} from {event.username}")
+        
+        if self.correlator:
+            await self.correlator.add_viewer_interaction(event)
+            
     async def _handle_analysis_result(self, result: AnalysisResult):
         """Handle analysis results from correlator."""
-        logger.info(f"Analysis result: {result.sentiment} sentiment, momentum: {result.stream_momentum}")
+        logger.info(f"Analysis result: {result.sentiment} sentiment")
         
-        # Log detailed results
+        # Log detailed results with new flexible patterns
         logger.info(f"Topics: {result.topics}")
-        logger.info(f"Patterns: {result.patterns}")
+        if result.patterns:
+            logger.info(f"Energy level: {result.patterns.energy_level:.2f}")
+            logger.info(f"Engagement depth: {result.patterns.engagement_depth:.2f}")
+            logger.info(f"Community sync: {result.patterns.community_sync:.2f}")
+            logger.info(f"Content focus: {result.patterns.content_focus}")
+            logger.info(f"Temporal flow: {result.patterns.temporal_flow}")
         if result.chat_velocity:
             logger.info(f"Chat velocity: {result.chat_velocity:.1f} msg/min")
         if result.emote_frequency:
             logger.info(f"Top emotes: {list(result.emote_frequency.keys())[:5]}")
             
-        # TODO: Future enhancements
-        # - Send to server via WebSocket for overlay display
-        # - Store in database for historical analysis
-        # - Trigger overlay effects based on patterns
-        # - Send notifications for significant events
+        # Future enhancements for training data pipeline
+        # - Export rich context data for training datasets
+        # - Build personalized pattern detection from accumulated data
+        # - Train specialized models on your streaming patterns
             
     async def _health_check_loop(self):
         """Periodic health check."""
@@ -168,7 +186,7 @@ class AnalysisService:
 
 async def main():
     """Main entry point."""
-    service = AnalysisService()
+    service = SeedService()
     
     # Handle shutdown signals
     loop = asyncio.get_event_loop()

@@ -21,18 +21,26 @@
     }
   },
   {
-    "id": "analysis",
-    "name": "Analysis Service",
-    "command": "/Users/Avalonstar/Code/bryanveloso/landale/apps/analysis/.venv/bin/python",
-    "args": ["-m", "src.main"],
-    "cwd": "/Users/Avalonstar/Code/bryanveloso/landale/apps/analysis",
+    "id": "seed",
+    "name": "SEED Intelligence Service",
+    "command": "uv",
+    "args": ["run", "python", "start.py"],
+    "cwd": "/Users/Avalonstar/Code/bryanveloso/landale/apps/seed",
     "env": {
-      "PYTHONPATH": "/Users/Avalonstar/Code/bryanveloso/landale/apps/analysis"
+      "SERVER_URL": "http://localhost:8080",
+      "SERVER_WS_URL": "ws://localhost:7175",
+      "LMS_API_URL": "http://localhost:1234/v1",
+      "LMS_MODEL": "meta/llama-3.3-70b"
     },
     "auto_restart": true,
     "max_restarts": 3,
     "restart_window": 60,
-    "platform": "darwin"
+    "platform": "darwin",
+    "health_check": {
+      "type": "http",
+      "url": "http://localhost:8891/health",
+      "interval": 30
+    }
   },
   {
     "id": "lms",

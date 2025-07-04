@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 import aiohttp
 
-from .events import StreamPatterns, StreamDynamics, AnalysisResult
+from .events import FlexiblePatterns, StreamDynamics, AnalysisResult, RichContextData
 
 logger = logging.getLogger(__name__)
 
@@ -58,25 +58,46 @@ class LMSClient:
                     return None
                     
                 data = await response.json()
+                
+                # Validate response structure
+                if "choices" not in data or not data["choices"]:
+                    logger.error("Invalid LMS response: missing choices")
+                    return None
+                    
                 content = data["choices"][0]["message"]["content"]
                 
-                # Parse JSON response
-                result_data = json.loads(content)
+                # Parse JSON response with proper error handling
+                try:
+                    result_data = json.loads(content)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse LMS JSON response: {e}")
+                    return None
                 
-                # Convert to AnalysisResult
-                return AnalysisResult(
-                    timestamp=int(result_data.get("timestamp", 0)),
-                    patterns=StreamPatterns(**result_data["patterns"]),
-                    dynamics=StreamDynamics(**result_data["dynamics"]) if "dynamics" in result_data else None,
-                    sentiment=result_data["sentiment"],
-                    sentiment_trajectory=result_data.get("sentimentTrajectory"),
-                    topics=result_data.get("topics", []),
-                    context=result_data["context"],
-                    suggested_actions=result_data.get("suggestedActions", []),
-                    stream_momentum=result_data.get("streamMomentum"),
-                    transcription_context=transcription_context,
-                    chat_context=chat_context
-                )
+                # Validate required fields
+                required_fields = ["patterns", "sentiment", "context"]
+                for field in required_fields:
+                    if field not in result_data:
+                        logger.error(f"Missing required field in LMS response: {field}")
+                        return None
+                
+                # Convert to AnalysisResult with error handling
+                try:
+                    return AnalysisResult(
+                        timestamp=int(result_data.get("timestamp", 0)),
+                        patterns=FlexiblePatterns(**result_data["patterns"]),
+                        dynamics=StreamDynamics(**result_data["dynamics"]) if "dynamics" in result_data else None,
+                        sentiment=result_data["sentiment"],
+                        sentiment_trajectory=result_data.get("sentimentTrajectory"),
+                        topics=result_data.get("topics", []),
+                        context=result_data["context"],
+                        suggested_actions=result_data.get("suggestedActions", []),
+                        stream_momentum=result_data.get("streamMomentum"),
+                        transcription_context=transcription_context,
+                        chat_context=chat_context
+                    )
+                except (KeyError, TypeError, ValueError) as e:
+                    logger.error(f"Failed to create AnalysisResult: {e}")
+                    return None
                 
         except Exception as e:
             logger.error(f"Failed to analyze with LMS: {e}")
@@ -84,7 +105,7 @@ class LMSClient:
             
     def _build_prompt(self, transcription_context: str, chat_context: Optional[str] = None) -> str:
         """Build analysis prompt with available context."""
-        base_prompt = f"""You are analyzing a streamer's content. This represents the last 2 minutes.
+        base_prompt = f"""You are analyzing a streamer's content to build training data. This represents the last 2 minutes.
 
 Streamer's speech: "{transcription_context}"
 """
@@ -100,36 +121,34 @@ Analyze BOTH the streamer's words AND how chat is reacting. Consider:
 """
         
         base_prompt += """
-Provide analysis of:
-1. Current patterns and their intensity (0.0-1.0)
-2. How these patterns are changing over time
-3. Overall sentiment and trajectory
-4. Key topics being discussed
-5. Momentum and energy of the stream
+Provide flexible analysis for training data collection:
+1. Energy level and engagement depth
+2. How content and community are evolving
+3. Dynamic topics and mood indicators
+4. Overall momentum and flow
 
 Respond with JSON in this exact format:
 {
   "timestamp": <current_unix_timestamp>,
   "patterns": {
-    "technical_discussion": 0.0-1.0,
-    "excitement": 0.0-1.0,
-    "frustration": 0.0-1.0,
-    "game_event": 0.0-1.0,
-    "viewer_interaction": 0.0-1.0,
-    "question": 0.0-1.0
+    "energy_level": 0.0-1.0,
+    "engagement_depth": 0.0-1.0,
+    "community_sync": 0.0-1.0,
+    "content_focus": ["topic1", "topic2"],
+    "mood_indicators": {"mood_name": 0.0-1.0},
+    "temporal_flow": "description of how things are evolving"
   },
   "dynamics": {
-    "technical_discussion": "increasing|decreasing|stable|fluctuating",
-    "excitement": "increasing|decreasing|stable|fluctuating",
-    "frustration": "increasing|decreasing|stable|fluctuating",
-    "game_event": "increasing|decreasing|stable|fluctuating",
-    "viewer_interaction": "increasing|decreasing|stable|fluctuating",
-    "overall_energy": "building|declining|sustained|volatile"
+    "energy_trajectory": "ramping_up|winding_down|steady_state|volatile",
+    "engagement_trend": "deepening|surfacing|stable|fluctuating",
+    "community_trend": "synchronizing|diverging|stable|chaotic",
+    "content_evolution": "focused|exploring|transitioning|scattered",
+    "overall_momentum": "building|declining|sustained|shifting"
   },
   "sentiment": "positive|negative|neutral|mixed",
   "sentimentTrajectory": "improving|declining|stable|swinging",
-  "topics": ["topic1", "topic2"],
-  "context": "brief summary of what's happening",
+  "topics": ["emergent_topic1", "emergent_topic2"],
+  "context": "rich description of what's happening and why",
   "suggestedActions": ["action1", "action2"],
   "streamMomentum": {
     "description": "what's driving the current flow",

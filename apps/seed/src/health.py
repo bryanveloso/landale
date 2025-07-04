@@ -11,7 +11,7 @@ async def health_check(request):
     """Health check endpoint."""
     return web.json_response({
         "status": "healthy",
-        "service": "landale-analysis",
+        "service": "landale-seed",
         "timestamp": int(request.app["start_time"])
     })
 
@@ -24,7 +24,7 @@ async def create_health_app(port: int = 8891):
     
     runner = web.AppRunner(app)
     await runner.setup()
-    host = os.getenv("ANALYSIS_HOST", "0.0.0.0")
+    host = os.getenv("SEED_HOST", "0.0.0.0")
     site = web.TCPSite(runner, host, port)
     await site.start()
     

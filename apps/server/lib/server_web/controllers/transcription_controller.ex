@@ -11,7 +11,7 @@ defmodule ServerWeb.TranscriptionController do
 
   operation(:create,
     summary: "Create transcription",
-    description: "Creates a new transcription entry from the analysis service",
+    description: "Creates a new transcription entry from the seed service",
     request_body:
       {"Transcription data", "application/json",
        %OpenApiSpex.Schema{

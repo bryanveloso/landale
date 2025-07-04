@@ -1,7 +1,7 @@
 [project]
-name = "landale-analysis"
+name = "landale-seed"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI companion memory intelligence layer that aggregates audio fragments into meaningful contexts"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
