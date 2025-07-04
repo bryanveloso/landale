@@ -12,7 +12,7 @@ on:
 env:
   MIX_ENV: prod
   ELIXIR_VERSION: "1.18.4"
-  OTP_VERSION: "26.2"
+  OTP_VERSION: "26.1"
   ZIG_VERSION: "0.14.0"
 
 jobs:
