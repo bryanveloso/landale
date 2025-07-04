@@ -1,0 +1,45 @@
+[Unit]
+Description=Nurvus Process Manager (Saya - Docker Services)
+Documentation=https://github.com/bryanveloso/landale/apps/nurvus
+After=network.target network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=exec
+User=bryan
+Group=bryan
+WorkingDirectory=/opt/nurvus
+ExecStart=/opt/nurvus/bin/nurvus start
+ExecStop=/opt/nurvus/bin/nurvus stop
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=always
+RestartSec=10
+RestartKillSignal=SIGKILL
+
+# Saya-specific environment
+Environment=MIX_ENV=prod
+Environment=NURVUS_PORT=4001
+Environment=NURVUS_CONFIG_FILE=/opt/nurvus/config/saya.json
+Environment=NURVUS_LOG_LEVEL=info
+Environment=HOSTNAME=saya
+
+# Docker integration
+Environment=DOCKER_HOST=unix:///var/run/docker.sock
+
+# Security settings (allow docker access)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/nurvus /var/log/nurvus /var/run/docker.sock
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

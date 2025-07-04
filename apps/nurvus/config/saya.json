@@ -1,0 +1,29 @@
+[
+  {
+    "id": "landale-stack",
+    "name": "Landale Docker Stack",
+    "command": "docker-compose",
+    "args": ["up", "-d"],
+    "cwd": "/opt/landale",
+    "env": {
+      "COMPOSE_FILE": "docker-compose.yml"
+    },
+    "auto_restart": true,
+    "max_restarts": 3,
+    "restart_window": 180,
+    "platform": "darwin",
+    "process_detection": {
+      "type": "docker",
+      "check_command": "docker-compose",
+      "check_args": ["ps", "-q"],
+      "containers": ["landale-server", "landale-overlays", "postgres", "seq"]
+    },
+    "health_check": {
+      "type": "http",
+      "url": "http://localhost:4000/health",
+      "interval": 60
+    },
+    "stop_command": "docker-compose",
+    "stop_args": ["down"]
+  }
+]
