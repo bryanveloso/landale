@@ -91,9 +91,9 @@ defmodule Nurvus do
   @doc """
   Lists all configured processes with their current status.
   """
-  @spec list_processes() :: [map()]
+  @spec list_processes() :: {:ok, [map()]}
   def list_processes do
-    ProcessManager.list_processes()
+    {:ok, ProcessManager.list_processes()}
   end
 
   ## Monitoring API
@@ -135,18 +135,19 @@ defmodule Nurvus do
   @doc """
   Gets overall system status including process count and health.
   """
-  @spec system_status() :: map()
+  @spec system_status() :: {:ok, map()}
   def system_status do
-    processes = list_processes()
+    {:ok, processes} = list_processes()
 
-    %{
+    {:ok, %{
       total_processes: length(processes),
       running: Enum.count(processes, &(&1.status == :running)),
       stopped: Enum.count(processes, &(&1.status == :stopped)),
       failed: Enum.count(processes, &(&1.status == :failed)),
       alerts: length(get_alerts()),
-      uptime: get_uptime()
-    }
+      uptime: get_uptime(),
+      platform: Nurvus.Platform.current_platform()
+    }}
   end
 
   defp get_uptime do
