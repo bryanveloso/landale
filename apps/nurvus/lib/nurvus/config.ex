@@ -25,7 +25,6 @@ defmodule Nurvus.Config do
           stop_args: [String.t()] | nil
         }
 
-
   ## Public API
 
   @doc """
@@ -44,11 +43,11 @@ defmodule Nurvus.Config do
         case initialize_config_from_local(file_path) do
           :ok ->
             load_from_file(file_path)
-          
+
           :no_local_config ->
             Logger.info("No configuration file found at #{file_path}, starting with empty config")
             {:ok, []}
-            
+
           {:error, reason} ->
             Logger.warning("Failed to copy local config: #{reason}, starting with empty config")
             {:ok, []}
@@ -165,7 +164,7 @@ defmodule Nurvus.Config do
   @spec initialize_config_from_local(String.t()) :: :ok | :no_local_config | {:error, term()}
   defp initialize_config_from_local(target_path) do
     local_config = "./processes.json"
-    
+
     case File.exists?(local_config) do
       true ->
         try do
@@ -175,7 +174,7 @@ defmodule Nurvus.Config do
               File.cp!(local_config, target_path)
               Logger.info("Copied local config from #{local_config} to #{target_path}")
               :ok
-              
+
             error ->
               error
           end
@@ -183,7 +182,7 @@ defmodule Nurvus.Config do
           error ->
             {:error, "Failed to copy config: #{inspect(error)}"}
         end
-        
+
       false ->
         :no_local_config
     end
