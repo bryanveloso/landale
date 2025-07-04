@@ -90,5 +90,11 @@ defmodule ServerWeb.Router do
     get "/transcriptions/recent", TranscriptionController, :recent
     get "/transcriptions/session/:session_id", TranscriptionController, :session
     get "/transcriptions/stats", TranscriptionController, :stats
+
+    # SEED memory contexts
+    post "/contexts", ContextController, :create
+    get "/contexts", ContextController, :index
+    get "/contexts/search", ContextController, :search
+    get "/contexts/stats", ContextController, :stats
   end
 end

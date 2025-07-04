@@ -433,4 +433,107 @@ defmodule ServerWeb.Schemas do
       required: [:success, :data]
     })
   end
+
+  defmodule ContextResponse do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        status: %Schema{type: :string, example: "success"},
+        data: %Schema{
+          type: :object,
+          properties: %{
+            started: %Schema{type: :string, format: :datetime, example: "2024-07-04T10:00:00Z"},
+            ended: %Schema{type: :string, format: :datetime, example: "2024-07-04T10:02:00Z"},
+            session: %Schema{type: :string, example: "stream_2024_07_04"},
+            duration: %Schema{type: :number, example: 120.0},
+            sentiment: %Schema{type: :string, example: "positive"},
+            topics: %Schema{type: :array, items: %Schema{type: :string}, example: ["coding", "react"]}
+          }
+        }
+      },
+      required: [:status, :data]
+    })
+  end
+
+  defmodule ContextListResponse do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        status: %Schema{type: :string, example: "success"},
+        data: %Schema{
+          type: :array,
+          items: %Schema{
+            type: :object,
+            properties: %{
+              started: %Schema{type: :string, format: :datetime, example: "2024-07-04T10:00:00Z"},
+              ended: %Schema{type: :string, format: :datetime, example: "2024-07-04T10:02:00Z"},
+              session: %Schema{type: :string, example: "stream_2024_07_04"},
+              transcript: %Schema{type: :string, example: "Hello everyone, let's start coding..."},
+              duration: %Schema{type: :number, example: 120.0},
+              sentiment: %Schema{type: :string, example: "positive"},
+              topics: %Schema{type: :array, items: %Schema{type: :string}, example: ["coding", "react"]},
+              chat_summary: %Schema{type: :object, nullable: true},
+              interactions_summary: %Schema{type: :object, nullable: true},
+              emotes_summary: %Schema{type: :object, nullable: true}
+            }
+          }
+        }
+      },
+      required: [:status, :data]
+    })
+  end
+
+  defmodule ContextStatsResponse do
+    @moduledoc false
+    require OpenApiSpex
+
+    OpenApiSpex.schema(%{
+      type: :object,
+      properties: %{
+        status: %Schema{type: :string, example: "success"},
+        data: %Schema{
+          type: :object,
+          properties: %{
+            overall: %Schema{
+              type: :object,
+              properties: %{
+                total_count: %Schema{type: :integer, example: 150},
+                total_duration: %Schema{type: :number, example: 18000.0},
+                unique_sessions: %Schema{type: :integer, example: 3},
+                avg_duration: %Schema{type: :number, example: 120.0}
+              }
+            },
+            sentiment_distribution: %Schema{
+              type: :array,
+              items: %Schema{
+                type: :object,
+                properties: %{
+                  sentiment: %Schema{type: :string, example: "positive"},
+                  count: %Schema{type: :integer, example: 75}
+                }
+              }
+            },
+            popular_topics: %Schema{
+              type: :array,
+              items: %Schema{
+                type: :object,
+                properties: %{
+                  topic: %Schema{type: :string, example: "coding"},
+                  count: %Schema{type: :integer, example: 42}
+                }
+              }
+            },
+            time_window_hours: %Schema{type: :integer, example: 24}
+          }
+        }
+      },
+      required: [:status, :data]
+    })
+  end
 end

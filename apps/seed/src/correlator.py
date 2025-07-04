@@ -1,11 +1,12 @@
 """Correlates audio transcriptions with chat activity."""
 import asyncio
 import logging
-from collections import deque, Counter
-from datetime import datetime
-from typing import List, Optional, Dict
+from collections import Counter, deque
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 
-from .events import TranscriptionEvent, ChatMessage, EmoteEvent, ViewerInteractionEvent, AnalysisResult
+from .context_client import ContextClient
+from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from .lms_client import LMSClient
 
 logger = logging.getLogger(__name__)
@@ -17,11 +18,13 @@ class StreamCorrelator:
     def __init__(
         self,
         lms_client: LMSClient,
+        context_client: Optional[ContextClient] = None,
         context_window_seconds: int = 120,  # 2 minutes
         analysis_interval_seconds: int = 30,
         correlation_window_seconds: int = 10  # How far to look for chat reactions
     ):
         self.lms_client = lms_client
+        self.context_client = context_client
         self.context_window = context_window_seconds
         self.analysis_interval = analysis_interval_seconds
         self.correlation_window = correlation_window_seconds
@@ -36,6 +39,10 @@ class StreamCorrelator:
         self.last_analysis_time = 0
         self.is_analyzing = False
         
+        # Context tracking
+        self.context_start_time: Optional[datetime] = None
+        self.current_session_id: Optional[str] = None
+        
         # No trigger keywords - patterns emerge naturally through periodic analysis
         
         # Analysis result callbacks
@@ -43,8 +50,16 @@ class StreamCorrelator:
         
     async def add_transcription(self, event: TranscriptionEvent):
         """Add a transcription event for periodic analysis."""
+        # Initialize context window if first transcription
+        if not self.context_start_time:
+            self.context_start_time = datetime.fromtimestamp(event.timestamp)
+            self.current_session_id = self._generate_session_id()
+            
         self.transcription_buffer.append(event)
         self._cleanup_old_events()
+        
+        # Check if we should create a context (every 2 minutes)
+        await self._check_context_completion()
             
     async def add_chat_message(self, event: ChatMessage):
         """Add a chat message event."""
@@ -278,3 +293,138 @@ class StreamCorrelator:
                 native_emote_counts[emote] += 1
                 
         return dict(native_emote_counts.most_common(10))  # Top 10 native emotes
+        
+    def _generate_session_id(self) -> str:
+        """Generate a session ID in the format stream_YYYY_MM_DD."""
+        now = datetime.now()
+        return f"stream_{now.year}_{now.month:02d}_{now.day:02d}"
+        
+    async def _check_context_completion(self):
+        """Check if we should complete the current context window."""
+        if not self.context_start_time or not self.transcription_buffer:
+            return
+            
+        # Check if 2 minutes have passed
+        now = datetime.now()
+        time_elapsed = (now - self.context_start_time).total_seconds()
+        
+        if time_elapsed >= self.context_window:
+            await self._create_context()
+            
+    async def _create_context(self):
+        """Create a memory context from the current window."""
+        if not self.transcription_buffer or not self.context_start_time:
+            return
+            
+        try:
+            # Calculate context window end time
+            context_end_time = self.context_start_time + timedelta(seconds=self.context_window)
+            
+            # Build transcript from all transcriptions in window
+            transcript = self._build_transcription_context()
+            if not transcript:
+                logger.warning("No transcript content for context")
+                return
+                
+            # Calculate actual duration based on transcriptions
+            first_transcription = self.transcription_buffer[0]
+            last_transcription = self.transcription_buffer[-1]
+            actual_duration = last_transcription.timestamp - first_transcription.timestamp
+            
+            # Build rich context data
+            chat_summary = self._build_chat_summary()
+            interactions_summary = self._build_interactions_summary()
+            emotes_summary = self._build_emotes_summary()
+            
+            # Get AI analysis if available
+            analysis_result = await self.analyze(immediate=True)
+            
+            # Build context data
+            context_data = {
+                'started': self.context_start_time,
+                'ended': context_end_time,
+                'session': self.current_session_id,
+                'transcript': transcript,
+                'duration': actual_duration,
+                'chat': chat_summary,
+                'interactions': interactions_summary,
+                'emotes': emotes_summary
+            }
+            
+            # Add AI analysis results if available
+            if analysis_result:
+                context_data['patterns'] = {
+                    'stream_momentum': analysis_result.stream_momentum,
+                    'patterns': analysis_result.patterns
+                }
+                context_data['sentiment'] = analysis_result.sentiment
+                context_data['topics'] = analysis_result.topics
+                
+            # Store context in TimescaleDB
+            if self.context_client:
+                success = await self.context_client.create_context(context_data)
+                if success:
+                    logger.info(f"Context stored: {self.current_session_id} ({actual_duration:.1f}s)")
+                else:
+                    logger.error("Failed to store context in TimescaleDB")
+            else:
+                logger.warning("No context client available, context not stored")
+                
+            # Reset for next context window
+            self._reset_context_window()
+            
+        except Exception as e:
+            logger.error(f"Error creating context: {e}")
+            self._reset_context_window()
+            
+    def _reset_context_window(self):
+        """Reset the context window for the next 2-minute period."""
+        self.context_start_time = None
+        # Keep current_session_id for the same day
+        current_date = datetime.now().strftime("%Y_%m_%d")
+        if not self.current_session_id or not self.current_session_id.endswith(current_date):
+            self.current_session_id = self._generate_session_id()
+            
+    def _build_chat_summary(self) -> Optional[Dict]:
+        """Build chat activity summary for context storage."""
+        if not self.chat_buffer:
+            return None
+            
+        participants = set(msg.username for msg in self.chat_buffer)
+        message_count = len(self.chat_buffer)
+        velocity = self._calculate_chat_velocity()
+        
+        return {
+            'message_count': message_count,
+            'velocity': velocity,
+            'participants': list(participants)
+        }
+        
+    def _build_interactions_summary(self) -> Optional[Dict]:
+        """Build viewer interactions summary for context storage."""
+        if not self.interaction_buffer:
+            return None
+            
+        interaction_counts = Counter()
+        for interaction in self.interaction_buffer:
+            interaction_counts[interaction.interaction_type] += 1
+            
+        return dict(interaction_counts)
+        
+    def _build_emotes_summary(self) -> Optional[Dict]:
+        """Build emote usage summary for context storage."""
+        emote_frequency = self._calculate_emote_frequency()
+        native_emote_frequency = self._calculate_native_emote_frequency()
+        
+        if not emote_frequency and not native_emote_frequency:
+            return None
+            
+        total_emotes = sum(emote_frequency.values()) if emote_frequency else 0
+        unique_emotes = len(emote_frequency) if emote_frequency else 0
+        
+        return {
+            'total_count': total_emotes,
+            'unique_emotes': unique_emotes,
+            'top_emotes': emote_frequency or {},
+            'native_emotes': native_emote_frequency or {}
+        }

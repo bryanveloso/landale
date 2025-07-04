@@ -12,7 +12,8 @@ from .websocket_client import PhononmaserClient, ServerClient
 from .transcription_client import TranscriptionWebSocketClient
 from .lms_client import LMSClient
 from .correlator import StreamCorrelator
-from .events import TranscriptionEvent, ChatMessage, EmoteEvent, AnalysisResult
+from .context_client import ContextClient
+from .events import TranscriptionEvent, ChatMessage, EmoteEvent, ViewerInteractionEvent, AnalysisResult
 from .health import create_health_app
 from .service_config import get_phononmaser_url, get_server_events_url, get_lms_api_url
 
@@ -41,6 +42,7 @@ class SeedService:
         self.transcription_client = TranscriptionWebSocketClient(self.server_ws_url)
         self.server_client = ServerClient(self.server_events_url)
         self.lms_client = LMSClient(self.lms_url, self.lms_model)
+        self.context_client = ContextClient(self.server_events_url.replace('ws://', 'http://').replace('/events', ''))
         self.correlator: Optional[StreamCorrelator] = None
         
         # State
@@ -55,13 +57,17 @@ class SeedService:
         # Initialize LMS client
         await self.lms_client.__aenter__()
         
-        # Initialize correlator
-        self.correlator = StreamCorrelator(self.lms_client)
+        # Initialize context client
+        await self.context_client.__aenter__()
+        
+        # Initialize correlator with context client
+        self.correlator = StreamCorrelator(self.lms_client, self.context_client)
         
         # Register event handlers
         self.transcription_client.on_transcription(self._handle_transcription)
         self.server_client.on_chat_message(self._handle_chat_message)
         self.server_client.on_emote(self._handle_emote)
+        self.server_client.on_viewer_interaction(self._handle_viewer_interaction)
         self.correlator.on_analysis(self._handle_analysis_result)
         
         # Connect to services
@@ -112,6 +118,7 @@ class SeedService:
         await self.transcription_client.disconnect()
         await self.server_client.disconnect()
         await self.lms_client.__aexit__(None, None, None)
+        await self.context_client.__aexit__(None, None, None)
         
         # Cleanup health endpoint
         if self.health_runner:
@@ -140,6 +147,13 @@ class SeedService:
         
         if self.correlator:
             await self.correlator.add_emote(event)
+            
+    async def _handle_viewer_interaction(self, event: ViewerInteractionEvent):
+        """Handle viewer interaction events from server."""
+        logger.debug(f"Viewer interaction: {event.interaction_type} from {event.username}")
+        
+        if self.correlator:
+            await self.correlator.add_viewer_interaction(event)
             
     async def _handle_analysis_result(self, result: AnalysisResult):
         """Handle analysis results from correlator."""

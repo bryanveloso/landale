@@ -3,7 +3,7 @@ defmodule Server.Repo.Migrations.CreateContextsTable do
 
   def up do
     # Create contexts table
-    create table(:contexts, primary_key: false) do
+    create table(:contexts, primary_key: [name: :id, type: :binary_id]) do
       add :started, :utc_datetime_usec, null: false
       add :ended, :utc_datetime_usec, null: false
       add :session, :string, null: false
