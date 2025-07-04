@@ -3,11 +3,11 @@ ExUnit.start(
   # Configure test groups for better organization and parallel execution
   exclude: [:skip],
   include: [
-    unit: [:unit],
-    integration: [:integration],
-    web: [:web],
-    services: [:services],
-    database: [:database]
+    unit: true,
+    integration: true,
+    web: true,
+    services: true,
+    database: true
   ]
 )
 

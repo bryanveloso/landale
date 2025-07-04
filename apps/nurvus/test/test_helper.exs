@@ -1,9 +1,9 @@
 ExUnit.start(
   exclude: [:skip],
   include: [
-    unit: [:unit],
-    integration: [:integration],
-    api: [:api],
-    process: [:process]
+    unit: true,
+    integration: true,
+    api: true,
+    process: true
   ]
 )
