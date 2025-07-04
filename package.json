@@ -22,7 +22,13 @@
     "dev:analysis": "cd apps/analysis && source .venv/bin/activate && python -m src.main",
     "manage": "bun run scripts/manage-services.ts",
     "status": "bun run manage status",
-    "deploy": "bun run manage deploy"
+    "deploy": "bun run manage deploy",
+    "pre-commit:install": "pre-commit install",
+    "pre-commit:install-hooks": "pre-commit install --hook-type pre-commit --hook-type pre-push",
+    "pre-commit:uninstall": "pre-commit uninstall",
+    "pre-commit:run": "pre-commit run --all-files",
+    "pre-commit:run-staged": "pre-commit run",
+    "pre-commit:update": "pre-commit autoupdate"
   },
   "type": "module",
   "workspaces": [
@@ -43,5 +49,9 @@
     "prettier-plugin-tailwindcss": "^0.6.13",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.35.0"
+  },
+  "engines": {
+    "bun": ">=1.2.0",
+    "node": ">=20.0.0"
   }
 }

@@ -1,0 +1,120 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  # General/Multi-language hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '.*\.md$'
+      - id: end-of-file-fixer
+        exclude: '.*\.md$'
+      - id: check-yaml
+        exclude: '^\.github/.*\.yml$'
+      - id: check-json
+        exclude: '(tsconfig.*\.json$|\.vscode/.*\.json$)'
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # TypeScript/JavaScript hooks
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: sh -c 'if command -v bun >/dev/null 2>&1; then bun run lint:fix; else echo "Skipping ESLint - Bun not available"; fi'
+        language: system
+        files: '\.(js|jsx|ts|tsx)$'
+        exclude: '^(node_modules|dist|build|coverage|\.turbo)/.*$'
+        pass_filenames: false
+
+      - id: prettier
+        name: prettier
+        entry: sh -c 'if command -v bun >/dev/null 2>&1; then bun run format; else echo "Skipping Prettier - Bun not available"; fi'
+        language: system
+        files: '\.(js|jsx|ts|tsx|json|css|scss|md|yml|yaml)$'
+        exclude: '^(node_modules|dist|build|coverage|\.turbo)/.*$'
+        pass_filenames: false
+
+      - id: typescript-check
+        name: typescript-check
+        entry: sh -c 'if command -v bun >/dev/null 2>&1; then bun run typecheck; else echo "Skipping TypeScript check - Bun not available"; fi'
+        language: system
+        files: '\.(ts|tsx)$'
+        exclude: '^(node_modules|dist|build|coverage|\.turbo)/.*$'
+        pass_filenames: false
+
+  # Elixir hooks
+  - repo: local
+    hooks:
+      - id: mix-format
+        name: mix format
+        entry: sh -c 'if command -v mix >/dev/null 2>&1; then cd apps/server && mix format; else echo "Skipping mix format - Elixir not available"; fi'
+        language: system
+        files: '\.(ex|exs)$'
+        pass_filenames: false
+
+      - id: mix-credo
+        name: mix credo
+        entry: sh -c 'if command -v mix >/dev/null 2>&1; then cd apps/server && mix credo --strict; else echo "Skipping mix credo - Elixir not available"; fi'
+        language: system
+        files: '\.(ex|exs)$'
+        pass_filenames: false
+
+      - id: mix-compile
+        name: mix compile
+        entry: sh -c 'if command -v mix >/dev/null 2>&1; then cd apps/server && mix compile --warnings-as-errors; else echo "Skipping mix compile - Elixir not available"; fi'
+        language: system
+        files: '\.(ex|exs)$'
+        pass_filenames: false
+
+  # Python hooks
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        language_version: python3
+        files: '\.py$'
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort (python)
+        files: '\.py$'
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1
+    hooks:
+      - id: flake8
+        files: '\.py$'
+        args: ['--max-line-length=88', '--extend-ignore=E203,W503']
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        files: '\.py$'
+        args: ['--ignore-missing-imports', '--no-strict-optional']
+        additional_dependencies: [types-requests]
+
+  # Additional validation hooks
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        files: '\.(md|yml|yaml)$'
+        exclude: '^(node_modules|dist|build|coverage|\.turbo)/.*$'
+
+# Configuration
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+fail_fast: false
+minimum_pre_commit_version: '2.15.0'
