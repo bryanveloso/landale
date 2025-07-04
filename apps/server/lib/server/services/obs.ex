@@ -1457,7 +1457,7 @@ defmodule Server.Services.OBS do
     Logger.debug("OBS Event received",
       event_type: event_type,
       event_intent: event_intent,
-      has_data: event_data != %{}
+      has_data: map_size(event_data) > 0
     )
 
     # Verify client is subscribed to this event intent
@@ -1482,7 +1482,7 @@ defmodule Server.Services.OBS do
     Logger.info("OBS Request received",
       request_type: request_type,
       request_id: request_id,
-      has_data: request_data_payload != %{}
+      has_data: map_size(request_data_payload) > 0
     )
 
     # Validate request format according to OBS WebSocket v5 spec

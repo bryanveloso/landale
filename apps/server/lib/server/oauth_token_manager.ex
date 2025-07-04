@@ -585,7 +585,7 @@ defmodule Server.OAuthTokenManager do
   defp validate_dets_integrity(table) do
     try do
       case :dets.lookup(table, :token) do
-        [{:token, token_data}] when is_map(token_data) ->
+        [{:token, token_data}] when is_non_struct_map(token_data) ->
           {:ok, deserialize_token(token_data)}
 
         [] ->

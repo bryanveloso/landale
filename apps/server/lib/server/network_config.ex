@@ -238,9 +238,9 @@ defmodule Server.NetworkConfig do
     end
   end
 
-  defp deep_merge(base, overrides) when is_map(base) and is_map(overrides) do
+  defp deep_merge(base, overrides) when is_non_struct_map(base) and is_non_struct_map(overrides) do
     Map.merge(base, overrides, fn
-      _key, base_val, override_val when is_map(base_val) and is_map(override_val) ->
+      _key, base_val, override_val when is_non_struct_map(base_val) and is_non_struct_map(override_val) ->
         deep_merge(base_val, override_val)
 
       _key, _base_val, override_val ->

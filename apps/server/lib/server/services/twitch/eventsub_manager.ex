@@ -536,7 +536,7 @@ defmodule Server.Services.Twitch.EventSubManager do
   - Unique string key for the subscription
   """
   @spec generate_subscription_key(binary(), map()) :: binary()
-  def generate_subscription_key(event_type, condition) when is_map(condition) do
+  def generate_subscription_key(event_type, condition) when is_non_struct_map(condition) do
     # Sort condition keys for consistent key generation
     sorted_condition =
       condition

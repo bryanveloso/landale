@@ -490,7 +490,7 @@ defmodule ServerWeb.OverlayChannel do
   # Private helper functions
 
   # Parameter validation
-  defp validate_params(params, required_keys) when is_map(params) and is_list(required_keys) do
+  defp validate_params(params, required_keys) when is_non_struct_map(params) and is_list(required_keys) do
     missing_keys =
       required_keys
       |> Enum.reject(&Map.has_key?(params, &1))
@@ -501,7 +501,7 @@ defmodule ServerWeb.OverlayChannel do
     end
   end
 
-  defp validate_integer_param(params, key) when is_map(params) do
+  defp validate_integer_param(params, key) when is_non_struct_map(params) do
     case Map.get(params, key) do
       value when is_integer(value) and value > 0 ->
         {:ok, value}

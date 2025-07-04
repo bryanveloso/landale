@@ -877,7 +877,7 @@ defmodule Mix.Tasks.Twitch.Token do
   defp warning_icon, do: yellow("⚠")
   defp info_icon, do: cyan("ℹ")
 
-  defp format_oauth_error({:http_error, status, body}) when is_map(body) do
+  defp format_oauth_error({:http_error, status, body}) when is_non_struct_map(body) do
     error_msg = Map.get(body, "error", "Unknown error")
     error_desc = Map.get(body, "error_description", "")
     "HTTP #{status}: #{error_msg}#{if error_desc != "", do: " - #{error_desc}", else: ""}"

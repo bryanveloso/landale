@@ -369,7 +369,7 @@ defmodule Server.Services.IronmonTCP do
   end
 
   defp validate_message(%{"type" => type, "metadata" => metadata} = json)
-       when is_map(metadata) do
+       when is_non_struct_map(metadata) do
     case type do
       "init" ->
         validate_init_message(json)
