@@ -236,7 +236,7 @@ defmodule Server.Services.Rainwave do
   end
 
   defp normalize_station_id(station) when is_integer(station) do
-    if station in 1..5, do: station, else: @stations.covers
+    if station in 1..5//1, do: station, else: @stations.covers
   end
 
   defp normalize_station_id(_), do: @stations.covers
