@@ -45,6 +45,17 @@ defmodule ServerWeb.StreamChannel do
     {:noreply, socket}
   end
 
+  # Catch-all for unhandled messages
+  @impl true
+  def handle_in(event, payload, socket) do
+    Logger.warning("Unhandled stream channel message",
+      event: event,
+      payload: payload,
+      correlation_id: socket.assigns.correlation_id
+    )
+    {:noreply, socket}
+  end
+
   # Handle stream updates from StreamProducer
   @impl true
   def handle_info({:stream_update, state}, socket) do
@@ -84,17 +95,6 @@ defmodule ServerWeb.StreamChannel do
       data: update_data.data,
       timestamp: update_data.timestamp
     })
-    {:noreply, socket}
-  end
-
-  # Catch-all for unhandled messages
-  @impl true
-  def handle_in(event, payload, socket) do
-    Logger.warning("Unhandled stream channel message",
-      event: event,
-      payload: payload,
-      correlation_id: socket.assigns.correlation_id
-    )
     {:noreply, socket}
   end
 

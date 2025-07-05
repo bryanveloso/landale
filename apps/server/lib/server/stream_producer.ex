@@ -22,6 +22,8 @@ defmodule Server.StreamProducer do
   # Default ticker rotation intervals (milliseconds)
   @ticker_interval 15_000
   @sub_train_duration 300_000  # 5 minutes
+  @cleanup_interval 600_000    # 10 minutes - cleanup stale data
+  @max_timers 100              # Maximum number of active timers
 
   defstruct [
     current_show: :variety,
@@ -88,8 +90,9 @@ defmodule Server.StreamProducer do
       ticker_rotation: default_ticker_content(:variety)
     }
 
-    # Start ticker rotation
+    # Start ticker rotation and cleanup timer
     schedule_ticker_rotation()
+    schedule_cleanup()
 
     {:ok, state}
   end
@@ -159,13 +162,13 @@ defmodule Server.StreamProducer do
 
   @impl true
   def handle_cast({:remove_interrupt, interrupt_id}, state) do
-    # Cancel timer if exists
-    if timer_ref = state.timers[interrupt_id] do
+    # Cancel timer atomically if exists
+    {timer_ref, new_timers} = Map.pop(state.timers, interrupt_id)
+    if timer_ref do
       Process.cancel_timer(timer_ref)
     end
 
     new_stack = Enum.reject(state.interrupt_stack, &(&1.id == interrupt_id))
-    new_timers = Map.delete(state.timers, interrupt_id)
 
     new_state = %{state |
       interrupt_stack: new_stack,
@@ -194,8 +197,8 @@ defmodule Server.StreamProducer do
 
   @impl true
   def handle_cast({:force_content, content_type, data, duration}, state) do
-    # Create high-priority override interrupt
-    add_interrupt(:manual_override, %{type: content_type, data: data}, [duration: duration])
+    # Create high-priority override interrupt via async cast
+    GenServer.cast(self(), {:add_interrupt, :manual_override, %{type: content_type, data: data}, [duration: duration]})
     {:noreply, state}
   end
 
@@ -204,6 +207,15 @@ defmodule Server.StreamProducer do
   def handle_info(:ticker_tick, state) do
     new_state = advance_ticker(state)
     schedule_ticker_rotation()
+    {:noreply, new_state}
+  end
+
+  # Handle periodic cleanup
+  @impl true
+  def handle_info(:cleanup, state) do
+    Logger.debug("Running periodic cleanup")
+    new_state = cleanup_stale_data(state)
+    schedule_cleanup()
     {:noreply, new_state}
   end
 
@@ -316,11 +328,12 @@ defmodule Server.StreamProducer do
     case Map.get(@game_to_show_mapping, game_id) do
       nil ->
         # Fall back to name-based detection for edge cases
-        case String.downcase(game_name || "") do
-          name when name =~ "pokemon" and name =~ "fire" -> :ironmon
-          name when name =~ "software" or name =~ "development" -> :coding
-          name when name =~ "just chatting" -> :variety
-          _ -> :variety  # Default fallback
+        game_name_lower = String.downcase(game_name || "")
+        cond do
+          String.contains?(game_name_lower, "pokemon") and String.contains?(game_name_lower, "fire") -> :ironmon
+          String.contains?(game_name_lower, "software") or String.contains?(game_name_lower, "development") -> :coding
+          String.contains?(game_name_lower, "just chatting") -> :variety
+          true -> :variety  # Default fallback
         end
       
       show -> show
@@ -365,21 +378,23 @@ defmodule Server.StreamProducer do
   end
 
   defp advance_ticker(state) do
-    return state if length(state.ticker_rotation) == 0
-    
-    new_index = rem(state.ticker_index + 1, length(state.ticker_rotation))
-    new_state = %{state | 
-      ticker_index: new_index,
-      version: state.version + 1
-    }
-    
-    # Only update if no interrupts are active
-    if length(state.interrupt_stack) == 0 do
-      new_state = update_active_content(new_state)
-      broadcast_state_update(new_state)
-      new_state
+    if length(state.ticker_rotation) == 0 do
+      state
     else
-      new_state
+      new_index = rem(state.ticker_index + 1, length(state.ticker_rotation))
+      new_state = %{state | 
+        ticker_index: new_index,
+        version: state.version + 1
+      }
+      
+      # Only update if no interrupts are active
+      if length(state.interrupt_stack) == 0 do
+        new_state = update_active_content(new_state)
+        broadcast_state_update(new_state)
+        new_state
+      else
+        new_state
+      end
     end
   end
 
@@ -397,8 +412,9 @@ defmodule Server.StreamProducer do
   end
 
   defp extend_sub_train(state, sub_train_id, event) do
-    # Cancel existing timer
-    if timer_ref = state.timers[sub_train_id] do
+    # Cancel existing timer atomically
+    {timer_ref, new_timers} = Map.pop(state.timers, sub_train_id)
+    if timer_ref do
       Process.cancel_timer(timer_ref)
     end
 
@@ -420,11 +436,11 @@ defmodule Server.StreamProducer do
 
     # Set new timer
     new_timer_ref = Process.send_after(self(), {:interrupt_expired, sub_train_id}, @sub_train_duration)
-    new_timers = Map.put(state.timers, sub_train_id, new_timer_ref)
+    final_timers = Map.put(new_timers, sub_train_id, new_timer_ref)
 
     %{state |
       interrupt_stack: new_stack,
-      timers: new_timers,
+      timers: final_timers,
       version: state.version + 1
     }
   end
@@ -440,16 +456,46 @@ defmodule Server.StreamProducer do
     Process.send_after(self(), :ticker_tick, @ticker_interval)
   end
 
+  defp safe_service_call(service_fun, fallback_data) do
+    try do
+      service_fun.()
+    rescue
+      error ->
+        Logger.warning("Service call failed, using fallback data", 
+          error: inspect(error),
+          fallback: inspect(fallback_data)
+        )
+        fallback_data
+    catch
+      :exit, reason ->
+        Logger.warning("Service call exited, using fallback data", 
+          reason: inspect(reason),
+          fallback: inspect(fallback_data)
+        )
+        fallback_data
+    end
+  end
+
   defp get_content_data(content_type) do
     case content_type do
       :emote_stats ->
-        Server.ContentAggregator.get_emote_stats()
+        safe_service_call(
+          fn -> Server.ContentAggregator.get_emote_stats() end,
+          %{regular_emotes: %{}, native_emotes: %{}}
+        )
       
       :recent_follows ->
-        %{recent_followers: Server.ContentAggregator.get_recent_followers(5)}
+        recent_followers = safe_service_call(
+          fn -> Server.ContentAggregator.get_recent_followers(5) end,
+          []
+        )
+        %{recent_followers: recent_followers}
       
       :daily_stats ->
-        Server.ContentAggregator.get_daily_stats()
+        safe_service_call(
+          fn -> Server.ContentAggregator.get_daily_stats() end,
+          %{total_messages: 0, total_follows: 0, started_at: DateTime.utc_now()}
+        )
       
       :ironmon_run_stats ->
         # TODO: Get from IronMON service
@@ -490,5 +536,52 @@ defmodule Server.StreamProducer do
 
   defp broadcast_state_update(state) do
     Phoenix.PubSub.broadcast(Server.PubSub, "stream:updates", {:stream_update, state})
+  end
+
+  defp schedule_cleanup do
+    Process.send_after(self(), :cleanup, @cleanup_interval)
+  end
+
+  defp cleanup_stale_data(state) do
+    initial_timer_count = map_size(state.timers)
+    initial_stack_size = length(state.interrupt_stack)
+
+    # Clean up timers that might be stale (shouldn't happen with atomic operations, but safety net)
+    active_interrupt_ids = MapSet.new(state.interrupt_stack, & &1.id)
+    stale_timers = Map.drop(state.timers, MapSet.to_list(active_interrupt_ids))
+    
+    # Cancel stale timers
+    Enum.each(stale_timers, fn {_id, timer_ref} ->
+      Process.cancel_timer(timer_ref)
+    end)
+
+    new_timers = Map.take(state.timers, MapSet.to_list(active_interrupt_ids))
+
+    # Limit interrupt stack size (should not be needed in normal operation)
+    new_interrupt_stack = if length(state.interrupt_stack) > 50 do
+      # Keep only the highest priority interrupts
+      state.interrupt_stack
+      |> Enum.sort_by(& &1.priority, :desc)
+      |> Enum.take(25)
+    else
+      state.interrupt_stack
+    end
+
+    # Log cleanup if anything was cleaned
+    if map_size(stale_timers) > 0 or length(state.interrupt_stack) != length(new_interrupt_stack) do
+      Logger.info("Cleanup completed", 
+        timers_before: initial_timer_count,
+        timers_after: map_size(new_timers),
+        stale_timers_removed: map_size(stale_timers),
+        stack_before: initial_stack_size,
+        stack_after: length(new_interrupt_stack)
+      )
+    end
+
+    %{state | 
+      timers: new_timers,
+      interrupt_stack: new_interrupt_stack,
+      version: state.version + 1
+    }
   end
 end
