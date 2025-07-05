@@ -24,11 +24,8 @@ defmodule ServerWeb.StreamChannel do
     Phoenix.PubSub.subscribe(Server.PubSub, "stream:updates")
     Phoenix.PubSub.subscribe(Server.PubSub, "show:change")
     
-    # Get current state from StreamProducer
-    current_state = StreamProducer.get_current_state()
-    
-    # Send initial state to client
-    push(socket, "stream_state", format_state_for_client(current_state))
+    # Send initial state after join completes
+    send(self(), :after_join)
 
     {:ok, socket}
   end
@@ -53,6 +50,31 @@ defmodule ServerWeb.StreamChannel do
       payload: payload,
       correlation_id: socket.assigns.correlation_id
     )
+    {:noreply, socket}
+  end
+
+  # Handle after join to send initial state
+  @impl true
+  def handle_info(:after_join, socket) do
+    try do
+      current_state = StreamProducer.get_current_state()
+      push(socket, "stream_state", format_state_for_client(current_state))
+    rescue
+      error ->
+        Logger.error("Failed to get StreamProducer state", error: inspect(error))
+        # Send default state
+        push(socket, "stream_state", %{
+          current_show: :variety,
+          active_content: nil,
+          priority_level: :ticker,
+          interrupt_stack: [],
+          ticker_rotation: [],
+          metadata: %{
+            last_updated: DateTime.utc_now(),
+            state_version: 0
+          }
+        })
+    end
     {:noreply, socket}
   end
 
@@ -120,7 +142,7 @@ defmodule ServerWeb.StreamChannel do
       type: content.type,
       data: content.data,
       priority: content.priority,
-      duration: content.duration,
+      duration: Map.get(content, :duration),
       started_at: content.started_at
     }
   end
