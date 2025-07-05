@@ -1,7 +1,7 @@
 defmodule Server.ContentAggregator do
   @moduledoc """
   Content aggregation service for the omnibar system.
-  
+
   Aggregates real-time data for different content types:
   - Emote statistics and usage tracking
   - Recent follower lists
@@ -147,6 +147,7 @@ defmodule Server.ContentAggregator do
       error ->
         Logger.error("Failed to record emote usage", error: inspect(error), event: inspect(event))
     end
+
     {:noreply, state}
   end
 
@@ -159,6 +160,7 @@ defmodule Server.ContentAggregator do
       error ->
         Logger.error("Failed to record follower", error: inspect(error), event: inspect(event))
     end
+
     {:noreply, state}
   end
 
@@ -167,10 +169,10 @@ defmodule Server.ContentAggregator do
   def handle_info(:daily_reset, state) do
     Logger.info("Performing daily stats reset")
     reset_daily_stats()
-    
+
     # Schedule next reset
     daily_reset_timer = schedule_daily_reset()
-    
+
     new_state = %{state | daily_reset_timer: daily_reset_timer}
     {:noreply, new_state}
   end
@@ -181,7 +183,7 @@ defmodule Server.ContentAggregator do
     Logger.debug("Performing memory cleanup")
     cleanup_old_followers()
     cleanup_excess_emotes()
-    
+
     # Schedule next cleanup (every hour)
     Process.send_after(self(), :cleanup_memory, 3_600_000)
     {:noreply, state}
@@ -190,17 +192,31 @@ defmodule Server.ContentAggregator do
   ## Private Functions
 
   defp get_all_emote_stats do
-    regular_emotes = :ets.foldl(fn
-      {{emote, :regular}, {count_today, count_alltime}}, acc ->
-        Map.put(acc, emote, %{today: count_today, alltime: count_alltime, type: :regular})
-      _, acc -> acc
-    end, %{}, @emote_stats_table)
+    regular_emotes =
+      :ets.foldl(
+        fn
+          {{emote, :regular}, {count_today, count_alltime}}, acc ->
+            Map.put(acc, emote, %{today: count_today, alltime: count_alltime, type: :regular})
 
-    native_emotes = :ets.foldl(fn
-      {{emote, :native}, {count_today, count_alltime}}, acc ->
-        Map.put(acc, emote, %{today: count_today, alltime: count_alltime, type: :native})
-      _, acc -> acc
-    end, %{}, @emote_stats_table)
+          _, acc ->
+            acc
+        end,
+        %{},
+        @emote_stats_table
+      )
+
+    native_emotes =
+      :ets.foldl(
+        fn
+          {{emote, :native}, {count_today, count_alltime}}, acc ->
+            Map.put(acc, emote, %{today: count_today, alltime: count_alltime, type: :native})
+
+          _, acc ->
+            acc
+        end,
+        %{},
+        @emote_stats_table
+      )
 
     %{
       regular_emotes: regular_emotes,
@@ -211,34 +227,46 @@ defmodule Server.ContentAggregator do
   end
 
   defp get_top_emotes_today(limit) do
-    :ets.foldl(fn
-      {{emote, type}, {count_today, _count_alltime}}, acc ->
-        [{count_today, emote, type} | acc]
-      _, acc -> acc
-    end, [], @emote_stats_table)
+    :ets.foldl(
+      fn
+        {{emote, type}, {count_today, _count_alltime}}, acc ->
+          [{count_today, emote, type} | acc]
+
+        _, acc ->
+          acc
+      end,
+      [],
+      @emote_stats_table
+    )
     |> Enum.sort(:desc)
     |> Enum.take(limit)
-    |> Enum.map(fn {count, emote, type} -> 
+    |> Enum.map(fn {count, emote, type} ->
       %{emote: emote, count: count, type: type}
     end)
   end
 
   defp get_top_emotes_alltime(limit) do
-    :ets.foldl(fn
-      {{emote, type}, {_count_today, count_alltime}}, acc ->
-        [{count_alltime, emote, type} | acc]
-      _, acc -> acc
-    end, [], @emote_stats_table)
+    :ets.foldl(
+      fn
+        {{emote, type}, {_count_today, count_alltime}}, acc ->
+          [{count_alltime, emote, type} | acc]
+
+        _, acc ->
+          acc
+      end,
+      [],
+      @emote_stats_table
+    )
     |> Enum.sort(:desc)
     |> Enum.take(limit)
-    |> Enum.map(fn {count, emote, type} -> 
+    |> Enum.map(fn {count, emote, type} ->
       %{emote: emote, count: count, type: type}
     end)
   end
 
   defp increment_emote_count(emote, type) do
     key = {emote, type}
-    
+
     # Use atomic update_counter with default value fallback
     try do
       :ets.update_counter(@emote_stats_table, key, [{2, 1}, {3, 1}])
@@ -251,9 +279,13 @@ defmodule Server.ContentAggregator do
   end
 
   defp get_recent_followers_list(limit) do
-    :ets.foldl(fn {timestamp, username}, acc ->
-      [{timestamp, username} | acc]
-    end, [], @followers_table)
+    :ets.foldl(
+      fn {timestamp, username}, acc ->
+        [{timestamp, username} | acc]
+      end,
+      [],
+      @followers_table
+    )
     |> Enum.sort(:desc)
     |> Enum.take(limit)
     |> Enum.map(fn {_timestamp, username} -> username end)
@@ -261,11 +293,12 @@ defmodule Server.ContentAggregator do
 
   defp cleanup_old_followers do
     all_followers = :ets.tab2list(@followers_table)
+
     if length(all_followers) > @max_followers do
       # Keep only the most recent followers
       sorted_followers = Enum.sort(all_followers, :desc)
       {_keep, remove} = Enum.split(sorted_followers, @max_followers)
-      
+
       Enum.each(remove, fn {timestamp, _username} ->
         :ets.delete(@followers_table, timestamp)
       end)
@@ -274,25 +307,30 @@ defmodule Server.ContentAggregator do
 
   defp get_current_daily_stats do
     # Get individual counters
-    total_messages = case :ets.lookup(@daily_stats_table, {:daily_counter, :total_messages}) do
-      [{_, count}] -> count
-      [] -> 0
-    end
-    
-    total_follows = case :ets.lookup(@daily_stats_table, {:daily_counter, :total_follows}) do
-      [{_, count}] -> count
-      [] -> 0
-    end
-    
+    total_messages =
+      case :ets.lookup(@daily_stats_table, {:daily_counter, :total_messages}) do
+        [{_, count}] -> count
+        [] -> 0
+      end
+
+    total_follows =
+      case :ets.lookup(@daily_stats_table, {:daily_counter, :total_follows}) do
+        [{_, count}] -> count
+        [] -> 0
+      end
+
     # Get or create started_at timestamp
-    started_at = case :ets.lookup(@daily_stats_table, :started_at) do
-      [{:started_at, timestamp}] -> timestamp
-      [] -> 
-        timestamp = DateTime.utc_now()
-        :ets.insert(@daily_stats_table, {:started_at, timestamp})
-        timestamp
-    end
-    
+    started_at =
+      case :ets.lookup(@daily_stats_table, :started_at) do
+        [{:started_at, timestamp}] ->
+          timestamp
+
+        [] ->
+          timestamp = DateTime.utc_now()
+          :ets.insert(@daily_stats_table, {:started_at, timestamp})
+          timestamp
+      end
+
     %{
       total_messages: total_messages,
       total_follows: total_follows,
@@ -304,7 +342,7 @@ defmodule Server.ContentAggregator do
     # Atomic increment using update_counter pattern
     # For map-based stats, we need to use a different key for each stat
     stat_counter_key = {:daily_counter, stat_key}
-    
+
     try do
       :ets.update_counter(@daily_stats_table, stat_counter_key, 1)
     catch
@@ -317,12 +355,18 @@ defmodule Server.ContentAggregator do
 
   defp reset_daily_stats do
     # Reset daily emote counts but keep all-time counts
-    :ets.foldl(fn
-      {{emote, type}, {_count_today, count_alltime}}, _acc ->
-        :ets.insert(@emote_stats_table, {{emote, type}, {0, count_alltime}})
-        :ok
-      _, acc -> acc
-    end, :ok, @emote_stats_table)
+    :ets.foldl(
+      fn
+        {{emote, type}, {_count_today, count_alltime}}, _acc ->
+          :ets.insert(@emote_stats_table, {{emote, type}, {0, count_alltime}})
+          :ok
+
+        _, acc ->
+          acc
+      end,
+      :ok,
+      @emote_stats_table
+    )
 
     # Reset daily counters
     :ets.insert(@daily_stats_table, {{:daily_counter, :total_messages}, 0})
@@ -334,21 +378,21 @@ defmodule Server.ContentAggregator do
 
   defp cleanup_excess_emotes do
     emote_count = :ets.info(@emote_stats_table, :size)
-    
+
     if emote_count > @max_emote_entries do
       # Get all emotes sorted by all-time count (descending)
       all_emotes = :ets.tab2list(@emote_stats_table)
       sorted_emotes = Enum.sort_by(all_emotes, fn {_key, {_today, alltime}} -> alltime end, :desc)
-      
+
       # Keep only the top emotes
       {keep, remove} = Enum.split(sorted_emotes, @max_emote_entries)
-      
+
       # Remove the least popular emotes
       Enum.each(remove, fn {key, _counts} ->
         :ets.delete(@emote_stats_table, key)
       end)
 
-      Logger.info("Emote cleanup completed", 
+      Logger.info("Emote cleanup completed",
         emotes_before: emote_count,
         emotes_after: length(keep),
         emotes_removed: length(remove)
@@ -361,9 +405,9 @@ defmodule Server.ContentAggregator do
     now = DateTime.utc_now()
     tomorrow = DateTime.add(now, 1, :day)
     midnight_tomorrow = %{tomorrow | hour: 0, minute: 0, second: 0, microsecond: {0, 0}}
-    
+
     milliseconds_until_midnight = DateTime.diff(midnight_tomorrow, now, :millisecond)
-    
+
     Process.send_after(self(), :daily_reset, milliseconds_until_midnight)
   end
 end

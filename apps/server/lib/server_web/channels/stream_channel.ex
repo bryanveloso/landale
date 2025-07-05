@@ -1,7 +1,7 @@
 defmodule ServerWeb.StreamChannel do
   @moduledoc """
   Unified coordination channel for all overlay state management.
-  
+
   Handles the omnibar revival with priority-based content coordination:
   - Show detection and transitions
   - Priority interrupt management (alerts > sub train > ticker)
@@ -16,14 +16,14 @@ defmodule ServerWeb.StreamChannel do
 
   @impl true
   def join("stream:overlays", _payload, socket) do
-    Logger.info("Stream overlays channel joined", 
+    Logger.info("Stream overlays channel joined",
       correlation_id: socket.assigns.correlation_id
     )
 
     # Subscribe to stream events
     Phoenix.PubSub.subscribe(Server.PubSub, "stream:updates")
     Phoenix.PubSub.subscribe(Server.PubSub, "show:change")
-    
+
     # Send initial state after join completes
     send(self(), :after_join)
 
@@ -50,6 +50,7 @@ defmodule ServerWeb.StreamChannel do
       payload: payload,
       correlation_id: socket.assigns.correlation_id
     )
+
     {:noreply, socket}
   end
 
@@ -75,6 +76,7 @@ defmodule ServerWeb.StreamChannel do
           }
         })
     end
+
     {:noreply, socket}
   end
 
@@ -93,6 +95,7 @@ defmodule ServerWeb.StreamChannel do
       game: show_data.game,
       changed_at: show_data.changed_at
     })
+
     {:noreply, socket}
   end
 
@@ -106,6 +109,7 @@ defmodule ServerWeb.StreamChannel do
       duration: interrupt_data.duration,
       id: interrupt_data.id
     })
+
     {:noreply, socket}
   end
 
@@ -117,6 +121,7 @@ defmodule ServerWeb.StreamChannel do
       data: update_data.data,
       timestamp: update_data.timestamp
     })
+
     {:noreply, socket}
   end
 
@@ -137,6 +142,7 @@ defmodule ServerWeb.StreamChannel do
   end
 
   defp format_active_content(nil), do: nil
+
   defp format_active_content(content) do
     %{
       type: content.type,

@@ -65,7 +65,7 @@ function EmoteStatsContent(props: { data: any }) {
         {Object.entries(props.data.emotes || {})
           .slice(0, 3)
           .map(([emote, count]) => (
-            <div data-emote key={emote}>
+            <div data-emote>
               <span data-emote-name>{emote}</span>
               <span data-emote-count>{count as number}</span>
             </div>
@@ -111,7 +111,7 @@ function FollowsContent(props: { data: any }) {
       <div data-content-type>Recent Follows</div>
       <div data-follow-list>
         {(props.data.recent_followers || []).slice(0, 3).map((follower: string) => (
-          <div data-follower key={follower}>
+          <div data-follower>
             {follower}
           </div>
         ))}

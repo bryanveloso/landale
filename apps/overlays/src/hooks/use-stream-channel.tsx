@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onCleanup, onMount } from 'solid-js'
+import { createSignal, createEffect, onCleanup } from 'solid-js'
 import { Channel } from 'phoenix'
 import { useSocket } from '../providers/socket-provider'
 
