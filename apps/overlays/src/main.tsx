@@ -1,38 +1,25 @@
-import '@fontsource-variable/inter'
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { RouterProvider, createRouter } from '@tanstack/react-router'
-
-import { ErrorBoundary } from '@/components/error-boundary'
-import { QueryProvider, queryClient } from '@/lib/providers/query'
-
+import { render } from 'solid-js/web'
+import { RouterProvider, createRouter } from '@tanstack/solid-router'
 import { routeTree } from './routeTree.gen'
+import './styles.css'
 
-import './index.css'
-
+// Set up a Router instance
 const router = createRouter({
   routeTree,
-  context: { queryClient },
   defaultPreload: 'intent',
-  defaultPreloadStaleTime: 0
+  defaultStaleTime: 5000,
+  scrollRestoration: true
 })
 
-// Register router for type-safety.
-declare module '@tanstack/react-router' {
+// Register things for typesafety
+declare module '@tanstack/solid-router' {
   interface Register {
     router: typeof router
   }
 }
 
-const rootElement = document.getElementById('root')
-if (!rootElement) throw new Error('Root element not found')
+const rootElement = document.getElementById('app')!
 
-ReactDOM.createRoot(rootElement).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <QueryProvider>
-        <RouterProvider router={router} />
-      </QueryProvider>
-    </ErrorBoundary>
-  </React.StrictMode>
-)
+if (!rootElement.innerHTML) {
+  render(() => <RouterProvider router={router} />, rootElement)
+}

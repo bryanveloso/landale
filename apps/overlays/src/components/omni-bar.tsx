@@ -1,5 +1,5 @@
 import { createSignal, createEffect, Show } from 'solid-js'
-import { useStreamChannel, StreamState } from '../hooks/useStreamChannel'
+import { useStreamChannel, type StreamState } from '../hooks/use-stream-channel'
 
 interface OmnibarProps {
   serverUrl?: string
@@ -8,18 +8,18 @@ interface OmnibarProps {
 export function Omnibar(props: OmnibarProps) {
   const { streamState, isConnected } = useStreamChannel(props.serverUrl)
   const [isVisible, setIsVisible] = createSignal(true)
-  
+
   // Show/hide based on active content
   createEffect(() => {
     const state = streamState()
     const hasContent = state.active_content !== null
     setIsVisible(hasContent)
   })
-  
+
   const renderContent = () => {
     const content = streamState().active_content
     if (!content) return null
-    
+
     switch (content.type) {
       case 'emote_stats':
         return <EmoteStatsContent data={content.data} />
@@ -35,17 +35,16 @@ export function Omnibar(props: OmnibarProps) {
         return <DefaultContent type={content.type} data={content.data} />
     }
   }
-  
+
   return (
     <Show when={isVisible()}>
-      <div 
+      <div
         data-omnibar
         data-show={streamState().current_show}
         data-priority={streamState().priority_level}
-        data-connected={isConnected()}
-      >
+        data-connected={isConnected()}>
         {renderContent()}
-        
+
         {/* Debug info - you can style or remove this */}
         {import.meta.env.DEV && (
           <div data-omnibar-debug>
@@ -67,12 +66,14 @@ function EmoteStatsContent(props: { data: any }) {
     <div data-content="emote-stats">
       <div data-content-type>Emote Stats</div>
       <div data-emote-list>
-        {Object.entries(props.data.emotes || {}).slice(0, 3).map(([emote, count]) => (
-          <div data-emote key={emote}>
-            <span data-emote-name>{emote}</span>
-            <span data-emote-count>{count as number}</span>
-          </div>
-        ))}
+        {Object.entries(props.data.emotes || {})
+          .slice(0, 3)
+          .map(([emote, count]) => (
+            <div data-emote key={emote}>
+              <span data-emote-name>{emote}</span>
+              <span data-emote-count>{count as number}</span>
+            </div>
+          ))}
       </div>
     </div>
   )
@@ -114,7 +115,9 @@ function FollowsContent(props: { data: any }) {
       <div data-content-type>Recent Follows</div>
       <div data-follow-list>
         {(props.data.recent_followers || []).slice(0, 3).map((follower: string) => (
-          <div data-follower key={follower}>{follower}</div>
+          <div data-follower key={follower}>
+            {follower}
+          </div>
         ))}
       </div>
     </div>

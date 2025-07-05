@@ -9,179 +9,38 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as NowPlayingRouteImport } from './routes/now-playing'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as widgetStatusTextRouteImport } from './routes/(widget)/status-text'
-import { Route as widgetStatusBarRouteImport } from './routes/(widget)/status-bar'
-import { Route as widgetOmnywidgetRouteImport } from './routes/(widget)/omnywidget'
-import { Route as widgetAlertsRouteImport } from './routes/(widget)/alerts'
-import { Route as fullSpeedrunningRouteImport } from './routes/(full)/speedrunning'
-import { Route as fullIronmonRouteImport } from './routes/(full)/ironmon'
-import { Route as fullFoundationRouteImport } from './routes/(full)/foundation'
-import { Route as fullFlyingToastersRouteImport } from './routes/(full)/flying-toasters'
-import { Route as fullEmoterainRouteImport } from './routes/(full)/emoterain'
 
-const NowPlayingRoute = NowPlayingRouteImport.update({
-  id: '/now-playing',
-  path: '/now-playing',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const widgetStatusTextRoute = widgetStatusTextRouteImport.update({
-  id: '/(widget)/status-text',
-  path: '/status-text',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const widgetStatusBarRoute = widgetStatusBarRouteImport.update({
-  id: '/(widget)/status-bar',
-  path: '/status-bar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const widgetOmnywidgetRoute = widgetOmnywidgetRouteImport.update({
-  id: '/(widget)/omnywidget',
-  path: '/omnywidget',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const widgetAlertsRoute = widgetAlertsRouteImport.update({
-  id: '/(widget)/alerts',
-  path: '/alerts',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const fullSpeedrunningRoute = fullSpeedrunningRouteImport.update({
-  id: '/(full)/speedrunning',
-  path: '/speedrunning',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const fullIronmonRoute = fullIronmonRouteImport.update({
-  id: '/(full)/ironmon',
-  path: '/ironmon',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const fullFoundationRoute = fullFoundationRouteImport.update({
-  id: '/(full)/foundation',
-  path: '/foundation',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const fullFlyingToastersRoute = fullFlyingToastersRouteImport.update({
-  id: '/(full)/flying-toasters',
-  path: '/flying-toasters',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const fullEmoterainRoute = fullEmoterainRouteImport.update({
-  id: '/(full)/emoterain',
-  path: '/emoterain',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/now-playing': typeof NowPlayingRoute
-  '/emoterain': typeof fullEmoterainRoute
-  '/flying-toasters': typeof fullFlyingToastersRoute
-  '/foundation': typeof fullFoundationRoute
-  '/ironmon': typeof fullIronmonRoute
-  '/speedrunning': typeof fullSpeedrunningRoute
-  '/alerts': typeof widgetAlertsRoute
-  '/omnywidget': typeof widgetOmnywidgetRoute
-  '/status-bar': typeof widgetStatusBarRoute
-  '/status-text': typeof widgetStatusTextRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/now-playing': typeof NowPlayingRoute
-  '/emoterain': typeof fullEmoterainRoute
-  '/flying-toasters': typeof fullFlyingToastersRoute
-  '/foundation': typeof fullFoundationRoute
-  '/ironmon': typeof fullIronmonRoute
-  '/speedrunning': typeof fullSpeedrunningRoute
-  '/alerts': typeof widgetAlertsRoute
-  '/omnywidget': typeof widgetOmnywidgetRoute
-  '/status-bar': typeof widgetStatusBarRoute
-  '/status-text': typeof widgetStatusTextRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/now-playing': typeof NowPlayingRoute
-  '/(full)/emoterain': typeof fullEmoterainRoute
-  '/(full)/flying-toasters': typeof fullFlyingToastersRoute
-  '/(full)/foundation': typeof fullFoundationRoute
-  '/(full)/ironmon': typeof fullIronmonRoute
-  '/(full)/speedrunning': typeof fullSpeedrunningRoute
-  '/(widget)/alerts': typeof widgetAlertsRoute
-  '/(widget)/omnywidget': typeof widgetOmnywidgetRoute
-  '/(widget)/status-bar': typeof widgetStatusBarRoute
-  '/(widget)/status-text': typeof widgetStatusTextRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/now-playing'
-    | '/emoterain'
-    | '/flying-toasters'
-    | '/foundation'
-    | '/ironmon'
-    | '/speedrunning'
-    | '/alerts'
-    | '/omnywidget'
-    | '/status-bar'
-    | '/status-text'
+  fullPaths: '/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/now-playing'
-    | '/emoterain'
-    | '/flying-toasters'
-    | '/foundation'
-    | '/ironmon'
-    | '/speedrunning'
-    | '/alerts'
-    | '/omnywidget'
-    | '/status-bar'
-    | '/status-text'
-  id:
-    | '__root__'
-    | '/'
-    | '/now-playing'
-    | '/(full)/emoterain'
-    | '/(full)/flying-toasters'
-    | '/(full)/foundation'
-    | '/(full)/ironmon'
-    | '/(full)/speedrunning'
-    | '/(widget)/alerts'
-    | '/(widget)/omnywidget'
-    | '/(widget)/status-bar'
-    | '/(widget)/status-text'
+  to: '/'
+  id: '__root__' | '/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  NowPlayingRoute: typeof NowPlayingRoute
-  fullEmoterainRoute: typeof fullEmoterainRoute
-  fullFlyingToastersRoute: typeof fullFlyingToastersRoute
-  fullFoundationRoute: typeof fullFoundationRoute
-  fullIronmonRoute: typeof fullIronmonRoute
-  fullSpeedrunningRoute: typeof fullSpeedrunningRoute
-  widgetAlertsRoute: typeof widgetAlertsRoute
-  widgetOmnywidgetRoute: typeof widgetOmnywidgetRoute
-  widgetStatusBarRoute: typeof widgetStatusBarRoute
-  widgetStatusTextRoute: typeof widgetStatusTextRoute
 }
 
-declare module '@tanstack/react-router' {
+declare module '@tanstack/solid-router' {
   interface FileRoutesByPath {
-    '/now-playing': {
-      id: '/now-playing'
-      path: '/now-playing'
-      fullPath: '/now-playing'
-      preLoaderRoute: typeof NowPlayingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -189,84 +48,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/(widget)/status-text': {
-      id: '/(widget)/status-text'
-      path: '/status-text'
-      fullPath: '/status-text'
-      preLoaderRoute: typeof widgetStatusTextRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(widget)/status-bar': {
-      id: '/(widget)/status-bar'
-      path: '/status-bar'
-      fullPath: '/status-bar'
-      preLoaderRoute: typeof widgetStatusBarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(widget)/omnywidget': {
-      id: '/(widget)/omnywidget'
-      path: '/omnywidget'
-      fullPath: '/omnywidget'
-      preLoaderRoute: typeof widgetOmnywidgetRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(widget)/alerts': {
-      id: '/(widget)/alerts'
-      path: '/alerts'
-      fullPath: '/alerts'
-      preLoaderRoute: typeof widgetAlertsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(full)/speedrunning': {
-      id: '/(full)/speedrunning'
-      path: '/speedrunning'
-      fullPath: '/speedrunning'
-      preLoaderRoute: typeof fullSpeedrunningRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(full)/ironmon': {
-      id: '/(full)/ironmon'
-      path: '/ironmon'
-      fullPath: '/ironmon'
-      preLoaderRoute: typeof fullIronmonRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(full)/foundation': {
-      id: '/(full)/foundation'
-      path: '/foundation'
-      fullPath: '/foundation'
-      preLoaderRoute: typeof fullFoundationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(full)/flying-toasters': {
-      id: '/(full)/flying-toasters'
-      path: '/flying-toasters'
-      fullPath: '/flying-toasters'
-      preLoaderRoute: typeof fullFlyingToastersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/(full)/emoterain': {
-      id: '/(full)/emoterain'
-      path: '/emoterain'
-      fullPath: '/emoterain'
-      preLoaderRoute: typeof fullEmoterainRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  NowPlayingRoute: NowPlayingRoute,
-  fullEmoterainRoute: fullEmoterainRoute,
-  fullFlyingToastersRoute: fullFlyingToastersRoute,
-  fullFoundationRoute: fullFoundationRoute,
-  fullIronmonRoute: fullIronmonRoute,
-  fullSpeedrunningRoute: fullSpeedrunningRoute,
-  widgetAlertsRoute: widgetAlertsRoute,
-  widgetOmnywidgetRoute: widgetOmnywidgetRoute,
-  widgetStatusBarRoute: widgetStatusBarRoute,
-  widgetStatusTextRoute: widgetStatusTextRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

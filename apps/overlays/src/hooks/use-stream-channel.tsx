@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onCleanup } from 'solid-js'
+import { createSignal, createEffect, onCleanup, onMount } from 'solid-js'
 
 export interface StreamState {
   current_show: 'ironmon' | 'variety' | 'coding'
@@ -51,7 +51,7 @@ const DEFAULT_STATE: StreamState = {
   }
 }
 
-export function useStreamChannel(serverUrl: string = 'ws://localhost:4000/socket') {
+export function useStreamChannel(serverUrl: string = 'ws://localhost:7175/socket') {
   const [streamState, setStreamState] = createSignal<StreamState>(DEFAULT_STATE)
   const [isConnected, setIsConnected] = createSignal(false)
   const [reconnectAttempts, setReconnectAttempts] = createSignal(0)
@@ -193,8 +193,8 @@ export function useStreamChannel(serverUrl: string = 'ws://localhost:4000/socket
     }
   }
   
-  // Auto-connect on mount
-  createEffect(() => {
+  // Auto-connect on mount (only once)
+  onMount(() => {
     connect()
   })
   
