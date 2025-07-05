@@ -1,12 +1,8 @@
 import { createSignal, createEffect, Show } from 'solid-js'
 import { useStreamChannel } from '@/hooks/use-stream-channel'
 
-interface OmnibarProps {
-  serverUrl?: string
-}
-
-export function Omnibar(props: OmnibarProps) {
-  const { streamState, isConnected } = useStreamChannel(props.serverUrl)
+export function Omnibar() {
+  const { streamState, isConnected } = useStreamChannel()
   const [isVisible, setIsVisible] = createSignal(true)
 
   // Show/hide based on active content

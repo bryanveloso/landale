@@ -6,5 +6,5 @@ export const Route = createFileRoute('/')({
 })
 
 function Index() {
-  return <Omnibar serverUrl="ws://zelan:7175/socket" />
+  return <Omnibar />
 }

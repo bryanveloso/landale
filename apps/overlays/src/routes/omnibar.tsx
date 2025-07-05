@@ -8,7 +8,7 @@ export const Route = createFileRoute('/omnibar')({
 function RouteComponent() {
   return (
     <div class="w-canvas h-canvas flex items-end">
-      <Omnibar serverUrl="ws://zelan:7175/socket" />
+      <Omnibar />
     </div>
   )
 }
