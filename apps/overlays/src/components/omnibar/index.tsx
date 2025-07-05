@@ -1,5 +1,5 @@
 import { createSignal, createEffect, Show } from 'solid-js'
-import { useStreamChannel, type StreamState } from '../hooks/use-stream-channel'
+import { useStreamChannel, type StreamState } from '@/hooks/use-stream-channel'
 
 interface OmnibarProps {
   serverUrl?: string

@@ -9,38 +9,65 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as OmnibarRouteImport } from './routes/omnibar'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ShowsIronmonFullRouteImport } from './routes/shows/ironmon/full'
 
+const OmnibarRoute = OmnibarRouteImport.update({
+  id: '/omnibar',
+  path: '/omnibar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShowsIronmonFullRoute = ShowsIronmonFullRouteImport.update({
+  id: '/shows/ironmon/full',
+  path: '/shows/ironmon/full',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/omnibar': typeof OmnibarRoute
+  '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/omnibar': typeof OmnibarRoute
+  '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/omnibar': typeof OmnibarRoute
+  '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/omnibar' | '/shows/ironmon/full'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/omnibar' | '/shows/ironmon/full'
+  id: '__root__' | '/' | '/omnibar' | '/shows/ironmon/full'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  OmnibarRoute: typeof OmnibarRoute
+  ShowsIronmonFullRoute: typeof ShowsIronmonFullRoute
 }
 
 declare module '@tanstack/solid-router' {
   interface FileRoutesByPath {
+    '/omnibar': {
+      id: '/omnibar'
+      path: '/omnibar'
+      fullPath: '/omnibar'
+      preLoaderRoute: typeof OmnibarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +75,20 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/shows/ironmon/full': {
+      id: '/shows/ironmon/full'
+      path: '/shows/ironmon/full'
+      fullPath: '/shows/ironmon/full'
+      preLoaderRoute: typeof ShowsIronmonFullRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  OmnibarRoute: OmnibarRoute,
+  ShowsIronmonFullRoute: ShowsIronmonFullRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -19,6 +19,7 @@
     "@tanstack/router-plugin": "^1.124.0",
     "typescript": "~5.8.3",
     "vite": "^7.0.2",
-    "vite-plugin-solid": "^2.11.7"
+    "vite-plugin-solid": "^2.11.7",
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }
