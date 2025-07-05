@@ -24,6 +24,7 @@ defmodule Server.StreamProducer do
   @sub_train_duration 300_000  # 5 minutes
   @cleanup_interval 600_000    # 10 minutes - cleanup stale data
   @max_timers 100              # Maximum number of active timers
+  @state_persistence_table :stream_producer_state
 
   defstruct [
     current_show: :variety,
@@ -85,14 +86,34 @@ defmodule Server.StreamProducer do
     Phoenix.PubSub.subscribe(Server.PubSub, "twitch:events")
     Phoenix.PubSub.subscribe(Server.PubSub, "channel:updates")
 
-    state = %__MODULE__{
-      current_show: :variety,
-      ticker_rotation: default_ticker_content(:variety)
-    }
+    # Create persistence table (public so it survives process restarts)
+    :ets.new(@state_persistence_table, [:named_table, :set, :public])
+    
+    # Try to restore previous state
+    state = case restore_state() do
+      nil ->
+        Logger.info("Starting with fresh state")
+        %__MODULE__{
+          current_show: :variety,
+          ticker_rotation: default_ticker_content(:variety)
+        }
+      restored_state ->
+        Logger.info("Restored previous state", 
+          show: restored_state.current_show, 
+          version: restored_state.version,
+          interrupts: length(restored_state.interrupt_stack)
+        )
+        # Restore timers for active interrupts
+        restored_state = restore_interrupt_timers(restored_state)
+        restored_state
+    end
 
     # Start ticker rotation and cleanup timer
     schedule_ticker_rotation()
     schedule_cleanup()
+
+    # Save initial state
+    persist_state(state)
 
     {:ok, state}
   end
@@ -535,6 +556,8 @@ defmodule Server.StreamProducer do
   end
 
   defp broadcast_state_update(state) do
+    # Persist state whenever we broadcast it
+    persist_state(state)
     Phoenix.PubSub.broadcast(Server.PubSub, "stream:updates", {:stream_update, state})
   end
 
@@ -578,10 +601,90 @@ defmodule Server.StreamProducer do
       )
     end
 
-    %{state | 
+    new_state = %{state | 
       timers: new_timers,
       interrupt_stack: new_interrupt_stack,
       version: state.version + 1
     }
+    
+    # Persist the cleaned state
+    persist_state(new_state)
+    new_state
+  end
+
+  # State persistence functions
+  
+  defp persist_state(state) do
+    # Only persist essential state, not timers (they'll be recreated)
+    persisted_state = %{state | timers: %{}}
+    :ets.insert(@state_persistence_table, {:current_state, persisted_state})
+  end
+  
+  defp restore_state() do
+    try do
+      case :ets.lookup(@state_persistence_table, :current_state) do
+        [{:current_state, state}] when is_map(state) ->
+          # Validate state has required fields
+          if Map.has_key?(state, :current_show) and Map.has_key?(state, :version) do
+            state
+          else
+            Logger.warning("Persisted state missing required fields, starting fresh")
+            nil
+          end
+        [] -> 
+          nil
+        invalid ->
+          Logger.warning("Invalid persisted state format", data: inspect(invalid))
+          nil
+      end
+    rescue
+      error ->
+        Logger.error("Failed to restore state", error: inspect(error))
+        nil
+    end
+  end
+  
+  defp restore_interrupt_timers(state) do
+    # Recreate timers for active interrupts
+    new_timers = Enum.reduce(state.interrupt_stack, %{}, fn interrupt, acc ->
+      # Validate interrupt has required fields
+      with %{started_at: started_at, id: id} when not is_nil(started_at) <- interrupt do
+        # Calculate remaining time for interrupt (handle clock skew)
+        elapsed = DateTime.diff(DateTime.utc_now(), started_at, :millisecond)
+        total_duration = interrupt.duration || @sub_train_duration
+        
+        remaining = cond do
+          elapsed < 0 -> 
+            # Clock skew - use full duration
+            Logger.warning("Clock skew detected for interrupt", id: id)
+            total_duration
+          elapsed >= total_duration ->
+            # Already expired
+            0
+          true ->
+            # Normal case - at least 1 second remaining
+            max(1000, total_duration - elapsed)
+        end
+        
+        if remaining > 0 do
+          timer_ref = Process.send_after(self(), {:interrupt_expired, id}, remaining)
+          Map.put(acc, id, timer_ref)
+        else
+          Logger.debug("Interrupt expired during restoration", id: id)
+          acc
+        end
+      else
+        invalid_interrupt ->
+          Logger.warning("Invalid interrupt found during restoration", interrupt: inspect(invalid_interrupt))
+          acc
+      end
+    end)
+    
+    # Filter out expired interrupts
+    active_interrupts = Enum.filter(state.interrupt_stack, fn interrupt ->
+      Map.has_key?(new_timers, interrupt.id)
+    end)
+    
+    %{state | timers: new_timers, interrupt_stack: active_interrupts}
   end
 end
