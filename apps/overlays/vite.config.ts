@@ -5,5 +5,8 @@ import solid from 'vite-plugin-solid'
 import tsconfigPaths from 'vite-tsconfig-paths'
 
 export default defineConfig({
-  plugins: [tsconfigPaths(), tanstackRouter({ target: 'solid', autoCodeSplitting: true }), solid(), tailwindcss()]
+  plugins: [tsconfigPaths(), tanstackRouter({ target: 'solid', autoCodeSplitting: true }), solid(), tailwindcss()],
+  server: {
+    allowedHosts: ['zelan']
+  }
 })
