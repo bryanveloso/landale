@@ -3,6 +3,7 @@ defmodule ServerWeb.TwitchController do
 
   use ServerWeb, :controller
   use OpenApiSpex.ControllerSpecs
+  require Logger
 
   alias ServerWeb.Schemas
 
@@ -168,4 +169,73 @@ defmodule ServerWeb.TwitchController do
     |> put_status(:service_unavailable)
     |> json(%{success: false, error: reason})
   end
+
+  @doc """
+  Handle Twitch EventSub webhook notifications for CLI testing.
+
+  Processes incoming EventSub events from Twitch CLI and forwards them
+  to the existing event processing pipeline.
+  """
+  def webhook(conn, params) do
+    event_type = get_in(params, ["subscription", "type"])
+    event_data = params["event"]
+
+    case {event_type, event_data} do
+      {type, data} when is_binary(type) and is_map(data) ->
+        Logger.info("EventSub webhook received",
+          event_type: type,
+          event_id: data["id"],
+          source: "twitch_cli"
+        )
+
+        case Server.Services.Twitch.EventHandler.process_event(type, data) do
+          :ok ->
+            json(conn, %{success: true, message: "Event processed"})
+
+          {:error, reason} ->
+            Logger.error("Event processing failed",
+              event_type: type,
+              reason: reason
+            )
+
+            conn
+            |> put_status(:bad_request)
+            |> json(%{success: false, error: "Event processing failed: #{reason}"})
+        end
+
+      _ ->
+        Logger.warning("Invalid EventSub webhook payload", params: params)
+
+        conn
+        |> put_status(:bad_request)
+        |> json(%{success: false, error: "Invalid EventSub payload format"})
+    end
+  end
+
+  operation(:webhook,
+    summary: "EventSub webhook endpoint for CLI testing",
+    description: "Receives EventSub webhook notifications from Twitch CLI for testing purposes",
+    request_body:
+      {"EventSub notification", "application/json",
+       %OpenApiSpex.Schema{
+         type: :object,
+         required: ["subscription", "event"],
+         properties: %{
+           subscription: %OpenApiSpex.Schema{
+             type: :object,
+             properties: %{
+               type: %OpenApiSpex.Schema{type: :string, description: "Event type"}
+             }
+           },
+           event: %OpenApiSpex.Schema{
+             type: :object,
+             description: "Event data"
+           }
+         }
+       }},
+    responses: %{
+      200 => {"Success", "application/json", Schemas.SuccessResponse},
+      400 => {"Bad Request", "application/json", Schemas.ErrorResponse}
+    }
+  )
 end
