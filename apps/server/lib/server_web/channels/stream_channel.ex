@@ -22,7 +22,6 @@ defmodule ServerWeb.StreamChannel do
 
     # Subscribe to stream events
     Phoenix.PubSub.subscribe(Server.PubSub, "stream:updates")
-    Phoenix.PubSub.subscribe(Server.PubSub, "show:change")
 
     # Send initial state after join completes
     send(self(), :after_join)

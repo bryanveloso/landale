@@ -409,8 +409,8 @@ defmodule Server.StreamProducer do
           String.contains?(game_name_lower, "pokemon") and String.contains?(game_name_lower, "fire") -> :ironmon
           String.contains?(game_name_lower, "software") or String.contains?(game_name_lower, "development") -> :coding
           String.contains?(game_name_lower, "just chatting") -> :variety
-          # Default fallback
-          true -> :variety
+          # Default fallback - use config value
+          true -> Application.get_env(:server, :default_show, :variety)
         end
 
       show ->

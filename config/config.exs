@@ -19,7 +19,8 @@ config :server,
   cleanup_interval: 600_000,      # 10 minutes - cleanup stale data
   max_timers: 100,                # Maximum active timers
   alert_duration: 10_000,         # 10 seconds - alert display time
-  manual_override_duration: 30_000 # 30 seconds - manual override time
+  manual_override_duration: 30_000, # 30 seconds - manual override time
+  default_show: :variety          # Default show when game mapping fails
 
 # StreamProducer cleanup configuration
 config :server, :cleanup_settings,
