@@ -49,27 +49,40 @@ defmodule Server.Services.Twitch.EventHandler do
       broadcaster_id: event_data["broadcaster_user_id"]
     )
 
-    try do
-      normalized_event = normalize_event(event_type, event_data)
-      publish_event(event_type, normalized_event)
-      emit_telemetry(event_type, normalized_event)
+    # Validate input parameters
+    with :ok <- validate_event_type(event_type),
+         :ok <- validate_event_data(event_data) do
+      try do
+        normalized_event = normalize_event(event_type, event_data)
+        publish_event(event_type, normalized_event)
+        emit_telemetry(event_type, normalized_event)
 
-      Logger.info("Event processing completed",
-        event_type: event_type,
-        event_id: event_data["id"]
-      )
-
-      :ok
-    rescue
-      error ->
-        Logger.error("Event processing failed",
-          error: inspect(error),
+        Logger.info("Event processing completed",
           event_type: event_type,
-          event_id: event_data["id"],
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          event_id: event_data["id"]
         )
 
-        {:error, "Processing failed: #{inspect(error)}"}
+        :ok
+      rescue
+        error ->
+          Logger.error("Event processing failed",
+            error: inspect(error),
+            event_type: event_type,
+            event_id: event_data["id"],
+            stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          )
+
+          {:error, "Processing failed: #{inspect(error)}"}
+      end
+    else
+      {:error, reason} ->
+        Logger.warning("Invalid event data rejected",
+          event_type: event_type,
+          reason: reason,
+          event_id: event_data["id"]
+        )
+
+        {:error, reason}
     end
   end
 
@@ -354,4 +367,32 @@ defmodule Server.Services.Twitch.EventHandler do
   end
 
   defp extract_badges(_), do: []
+
+  # Input validation functions
+
+  defp validate_event_type(event_type) when is_binary(event_type) and byte_size(event_type) > 0 do
+    :ok
+  end
+
+  defp validate_event_type(event_type) do
+    {:error, "Invalid event_type: #{inspect(event_type)} - must be non-empty string"}
+  end
+
+  defp validate_event_data(event_data) when is_map(event_data) do
+    # Ensure basic required fields exist for most events
+    cond do
+      not is_binary(event_data["id"]) or byte_size(event_data["id"]) == 0 ->
+        {:error, "Missing or invalid event id"}
+
+      not is_binary(event_data["broadcaster_user_id"]) or byte_size(event_data["broadcaster_user_id"]) == 0 ->
+        {:error, "Missing or invalid broadcaster_user_id"}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_event_data(event_data) do
+    {:error, "Invalid event_data: #{inspect(event_data)} - must be a map"}
+  end
 end

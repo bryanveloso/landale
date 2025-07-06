@@ -19,14 +19,24 @@ defmodule Server.StreamProducer do
   @priority_sub_train 50
   @priority_ticker 10
 
-  # Default ticker rotation intervals (milliseconds)
-  @ticker_interval 15_000
-  # 5 minutes
-  @sub_train_duration 300_000
-  # 10 minutes - cleanup stale data
-  @cleanup_interval 600_000
-  # Maximum number of active timers
-  @max_timers 100
+  # Default timing configuration - can be overridden via Application config
+  defp ticker_interval, do: Application.get_env(:server, :ticker_interval, 15_000)
+  defp sub_train_duration, do: Application.get_env(:server, :sub_train_duration, 300_000)
+  defp cleanup_interval, do: Application.get_env(:server, :cleanup_interval, 600_000)
+  defp max_timers, do: Application.get_env(:server, :max_timers, 100)
+
+  # Alert and manual override durations
+  defp alert_duration, do: Application.get_env(:server, :alert_duration, 10_000)
+  defp manual_override_duration, do: Application.get_env(:server, :manual_override_duration, 30_000)
+
+  # Cleanup configuration
+  @cleanup_config Application.compile_env(:server, :cleanup_settings, %{
+                    max_interrupt_stack_size: 50,
+                    interrupt_stack_keep_count: 25
+                  })
+
+  defp max_interrupt_stack_size, do: Map.get(@cleanup_config, :max_interrupt_stack_size, 50)
+  defp interrupt_stack_keep_count, do: Map.get(@cleanup_config, :interrupt_stack_keep_count, 25)
   @state_persistence_table :stream_producer_state
 
   defstruct current_show: :variety,
@@ -176,9 +186,8 @@ defmodule Server.StreamProducer do
       [interrupt | state.interrupt_stack]
       |> Enum.sort_by(& &1.priority, :desc)
 
-    # Set timer for interrupt expiration
-    timer_ref = Process.send_after(self(), {:interrupt_expired, interrupt_id}, duration)
-    new_timers = Map.put(state.timers, interrupt_id, timer_ref)
+    # Set timer for interrupt expiration using atomic registration
+    {_timer_ref, new_timers} = register_timer_atomically(state.timers, interrupt_id, duration)
 
     new_state = %{state | interrupt_stack: new_stack, timers: new_timers, version: state.version + 1}
 
@@ -246,6 +255,10 @@ defmodule Server.StreamProducer do
   def handle_info({:interrupt_expired, interrupt_id}, state) do
     Logger.debug("Interrupt expired", interrupt_id: interrupt_id)
     new_state = remove_interrupt_by_id(state, interrupt_id)
+
+    # Enforce timer limits to prevent memory leaks
+    new_state = enforce_timer_limits(new_state)
+
     broadcast_state_update(new_state)
     {:noreply, new_state}
   end
@@ -302,8 +315,15 @@ defmodule Server.StreamProducer do
   # Handle subscription events for sub trains
   @impl true
   def handle_info({:new_subscription, event}, state) do
-    # Check if sub train is already active
-    existing_sub_train = Enum.find(state.interrupt_stack, &(&1.type == :sub_train))
+    # Check if sub train is already active (and not expired)
+    now = DateTime.utc_now()
+
+    existing_sub_train =
+      Enum.find(state.interrupt_stack, fn interrupt ->
+        interrupt.type == :sub_train and
+          Map.has_key?(state.timers, interrupt.id) and
+          DateTime.diff(now, interrupt.started_at, :millisecond) < (interrupt.duration || sub_train_duration())
+      end)
 
     if existing_sub_train do
       # Extend existing sub train
@@ -311,19 +331,40 @@ defmodule Server.StreamProducer do
       broadcast_state_update(new_state)
       {:noreply, new_state}
     else
-      # Start new sub train
-      add_interrupt(
-        :sub_train,
-        %{
-          subscriber: event.username,
-          tier: event.tier,
-          count: 1,
-          total_months: event.cumulative_months
-        },
-        duration: @sub_train_duration
-      )
+      # Start new sub train synchronously
+      priority = get_priority_for_type(:sub_train)
+      duration = sub_train_duration()
+      interrupt_id = generate_interrupt_id()
 
-      {:noreply, state}
+      interrupt = %{
+        id: interrupt_id,
+        type: :sub_train,
+        priority: priority,
+        data: %{
+          subscriber: Map.get(event, :user_name, "unknown"),
+          tier: Map.get(event, :tier, "1000"),
+          count: 1,
+          total_months: Map.get(event, :cumulative_months, 0)
+        },
+        duration: duration,
+        started_at: DateTime.utc_now()
+      }
+
+      # Add to interrupt stack and sort by priority
+      new_stack =
+        [interrupt | state.interrupt_stack]
+        |> Enum.sort_by(& &1.priority, :desc)
+
+      # Set timer for interrupt expiration using atomic registration
+      {_timer_ref, new_timers} = register_timer_atomically(state.timers, interrupt_id, duration)
+
+      new_state = %{state | interrupt_stack: new_stack, timers: new_timers, version: state.version + 1}
+
+      # Update active content if this interrupt has higher priority
+      new_state = update_active_content(new_state)
+
+      broadcast_state_update(new_state)
+      {:noreply, new_state}
     end
   end
 
@@ -343,21 +384,23 @@ defmodule Server.StreamProducer do
 
   defp default_ticker_content(_), do: default_ticker_content(:variety)
 
-  # Game ID to show mapping (using Twitch game IDs)
-  @game_to_show_mapping %{
-    # Pokemon FireRed/LeafGreen for IronMON
-    "490100" => :ironmon,
-    # Software and Game Development
-    "509658" => :coding,
-    # Just Chatting
-    "509660" => :variety
-  }
+  # Game ID to show mapping configuration
+  defp game_to_show_mapping do
+    Application.get_env(:server, :game_show_mapping, %{
+      # Pokemon FireRed/LeafGreen for IronMON
+      "490100" => :ironmon,
+      # Software and Game Development
+      "509658" => :coding,
+      # Just Chatting
+      "509660" => :variety
+    })
+  end
 
   defp determine_show_from_game(game_name, game_id) do
     Logger.debug("Determining show", game_name: game_name, game_id: game_id)
 
     # First try game ID mapping (most reliable)
-    case Map.get(@game_to_show_mapping, game_id) do
+    case Map.get(game_to_show_mapping(), game_id) do
       nil ->
         # Fall back to name-based detection for edge cases
         game_name_lower = String.downcase(game_name || "")
@@ -380,26 +423,53 @@ defmodule Server.StreamProducer do
   defp get_priority_for_type(:manual_override), do: @priority_alert
   defp get_priority_for_type(_), do: @priority_ticker
 
-  # 10 seconds
-  defp get_default_duration(:alert), do: 10_000
-  defp get_default_duration(:sub_train), do: @sub_train_duration
-  # 30 seconds
-  defp get_default_duration(:manual_override), do: 30_000
-  defp get_default_duration(_), do: @ticker_interval
+  defp get_default_duration(:alert), do: alert_duration()
+  defp get_default_duration(:sub_train), do: sub_train_duration()
+  defp get_default_duration(:manual_override), do: manual_override_duration()
+  defp get_default_duration(_), do: ticker_interval()
 
   defp generate_interrupt_id do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
+  end
+
+  defp register_timer_atomically(timers, interrupt_id, duration) do
+    case Map.get(timers, interrupt_id) do
+      nil ->
+        # No existing timer, safe to add
+        timer_ref = Process.send_after(self(), {:interrupt_expired, interrupt_id}, duration)
+        {timer_ref, Map.put(timers, interrupt_id, timer_ref)}
+
+      existing_timer ->
+        # Timer already exists (likely duplicate ID), keep existing
+        {existing_timer, timers}
+    end
   end
 
   defp update_active_content(state) do
     new_active =
       cond do
         # Highest priority interrupt wins
-        length(state.interrupt_stack) > 0 ->
-          List.first(state.interrupt_stack)
+        not Enum.empty?(state.interrupt_stack) ->
+          # For sub trains, pick the one with the highest count
+          # For other interrupts, pick the highest priority
+          state.interrupt_stack
+          |> Enum.sort_by(
+            fn interrupt ->
+              case interrupt.type do
+                :sub_train ->
+                  count = Map.get(interrupt.data, :count, 0)
+                  {interrupt.priority, -count}
+
+                _ ->
+                  {interrupt.priority, 0}
+              end
+            end,
+            :desc
+          )
+          |> List.first()
 
         # Fall back to ticker content
-        length(state.ticker_rotation) > 0 ->
+        not Enum.empty?(state.ticker_rotation) ->
           ticker_content = Enum.at(state.ticker_rotation, state.ticker_index)
 
           %{
@@ -418,14 +488,14 @@ defmodule Server.StreamProducer do
   end
 
   defp advance_ticker(state) do
-    if length(state.ticker_rotation) == 0 do
+    if Enum.empty?(state.ticker_rotation) do
       state
     else
       new_index = rem(state.ticker_index + 1, length(state.ticker_rotation))
       new_state = %{state | ticker_index: new_index, version: state.version + 1}
 
       # Only update if no interrupts are active
-      if length(state.interrupt_stack) == 0 do
+      if Enum.empty?(state.interrupt_stack) do
         new_state = update_active_content(new_state)
         broadcast_state_update(new_state)
         new_state
@@ -463,8 +533,8 @@ defmodule Server.StreamProducer do
             | data:
                 Map.merge(interrupt.data, %{
                   count: new_count,
-                  latest_subscriber: event.username,
-                  latest_tier: event.tier
+                  latest_subscriber: Map.get(event, :user_name, "unknown"),
+                  latest_tier: Map.get(event, :tier, "1000")
                 })
           }
         else
@@ -472,11 +542,13 @@ defmodule Server.StreamProducer do
         end
       end)
 
-    # Set new timer
-    new_timer_ref = Process.send_after(self(), {:interrupt_expired, sub_train_id}, @sub_train_duration)
-    final_timers = Map.put(new_timers, sub_train_id, new_timer_ref)
+    # Set new timer using atomic registration
+    {_new_timer_ref, final_timers} = register_timer_atomically(new_timers, sub_train_id, sub_train_duration())
 
-    %{state | interrupt_stack: new_stack, timers: final_timers, version: state.version + 1}
+    new_state = %{state | interrupt_stack: new_stack, timers: final_timers, version: state.version + 1}
+
+    # Update active content to reflect the new count
+    update_active_content(new_state)
   end
 
   defp active_content_type(state) do
@@ -487,7 +559,7 @@ defmodule Server.StreamProducer do
   end
 
   defp schedule_ticker_rotation do
-    Process.send_after(self(), :ticker_tick, @ticker_interval)
+    Process.send_after(self(), :ticker_tick, ticker_interval())
   end
 
   defp safe_service_call(service_fun, fallback_data) do
@@ -496,7 +568,8 @@ defmodule Server.StreamProducer do
     rescue
       error ->
         Logger.warning("Service call failed, using fallback data",
-          error: inspect(error),
+          error: Exception.message(error),
+          module: service_fun |> :erlang.fun_info(:module) |> elem(1),
           fallback: inspect(fallback_data)
         )
 
@@ -573,13 +646,27 @@ defmodule Server.StreamProducer do
   end
 
   defp broadcast_state_update(state) do
+    # Emit telemetry for state updates
+    :telemetry.execute(
+      [:server, :stream_producer, :state_update],
+      %{
+        interrupt_count: length(state.interrupt_stack),
+        timer_count: map_size(state.timers),
+        version: state.version
+      },
+      %{
+        show: state.current_show,
+        has_active_content: not is_nil(state.active_content)
+      }
+    )
+
     # Persist state whenever we broadcast it
     persist_state(state)
     Phoenix.PubSub.broadcast(Server.PubSub, "stream:updates", {:stream_update, state})
   end
 
   defp schedule_cleanup do
-    Process.send_after(self(), :cleanup, @cleanup_interval)
+    Process.send_after(self(), :cleanup, cleanup_interval())
   end
 
   defp cleanup_stale_data(state) do
@@ -599,16 +686,16 @@ defmodule Server.StreamProducer do
 
     # Limit interrupt stack size (should not be needed in normal operation)
     new_interrupt_stack =
-      if length(state.interrupt_stack) > 50 do
+      if not Enum.empty?(state.interrupt_stack) and length(state.interrupt_stack) > max_interrupt_stack_size() do
         # Keep only the highest priority interrupts
         state.interrupt_stack
         |> Enum.sort_by(& &1.priority, :desc)
-        |> Enum.take(25)
+        |> Enum.take(interrupt_stack_keep_count())
       else
         state.interrupt_stack
       end
 
-    # Log cleanup if anything was cleaned
+    # Log and emit telemetry for cleanup if anything was cleaned
     if map_size(stale_timers) > 0 or length(state.interrupt_stack) != length(new_interrupt_stack) do
       Logger.info("Cleanup completed",
         timers_before: initial_timer_count,
@@ -616,6 +703,19 @@ defmodule Server.StreamProducer do
         stale_timers_removed: map_size(stale_timers),
         stack_before: initial_stack_size,
         stack_after: length(new_interrupt_stack)
+      )
+
+      # Emit cleanup telemetry
+      :telemetry.execute(
+        [:server, :stream_producer, :cleanup],
+        %{
+          stale_timers_removed: map_size(stale_timers),
+          interrupts_pruned: initial_stack_size - length(new_interrupt_stack)
+        },
+        %{
+          timer_count_before: initial_timer_count,
+          timer_count_after: map_size(new_timers)
+        }
       )
     end
 
@@ -626,6 +726,51 @@ defmodule Server.StreamProducer do
     new_state
   end
 
+  defp enforce_timer_limits(state) do
+    timer_count = map_size(state.timers)
+
+    if timer_count > max_timers() do
+      Logger.warning("Timer limit exceeded, cleaning up oldest timers",
+        current_count: timer_count,
+        max_allowed: max_timers()
+      )
+
+      # Emit telemetry for timer limit breach
+      :telemetry.execute(
+        [:server, :stream_producer, :timer_limit_exceeded],
+        %{
+          current_count: timer_count,
+          max_allowed: max_timers(),
+          excess_count: timer_count - max_timers()
+        },
+        %{}
+      )
+
+      # Get oldest interrupts by started_at time
+      oldest_interrupts =
+        state.interrupt_stack
+        |> Enum.sort_by(& &1.started_at, DateTime)
+        |> Enum.take(timer_count - max_timers())
+
+      # Cancel timers for oldest interrupts
+      Enum.each(oldest_interrupts, fn interrupt ->
+        if timer_ref = Map.get(state.timers, interrupt.id) do
+          Process.cancel_timer(timer_ref)
+        end
+      end)
+
+      # Remove oldest interrupts from state
+      oldest_ids = MapSet.new(oldest_interrupts, & &1.id)
+      new_interrupt_stack = Enum.reject(state.interrupt_stack, &MapSet.member?(oldest_ids, &1.id))
+      new_timers = Map.drop(state.timers, MapSet.to_list(oldest_ids))
+
+      new_state = %{state | interrupt_stack: new_interrupt_stack, timers: new_timers, version: state.version + 1}
+      update_active_content(new_state)
+    else
+      state
+    end
+  end
+
   # State persistence functions
 
   defp persist_state(state) do
@@ -634,7 +779,7 @@ defmodule Server.StreamProducer do
     :ets.insert(@state_persistence_table, {:current_state, persisted_state})
   end
 
-  defp restore_state() do
+  defp restore_state do
     try do
       case :ets.lookup(@state_persistence_table, :current_state) do
         [{:current_state, state}] when is_map(state) ->
@@ -655,7 +800,11 @@ defmodule Server.StreamProducer do
       end
     rescue
       error ->
-        Logger.error("Failed to restore state", error: inspect(error))
+        Logger.error("Failed to restore state",
+          error: Exception.message(error),
+          type: error.__struct__
+        )
+
         nil
     end
   end
@@ -665,35 +814,36 @@ defmodule Server.StreamProducer do
     new_timers =
       Enum.reduce(state.interrupt_stack, %{}, fn interrupt, acc ->
         # Validate interrupt has required fields
-        with %{started_at: started_at, id: id} when not is_nil(started_at) <- interrupt do
-          # Calculate remaining time for interrupt (handle clock skew)
-          elapsed = DateTime.diff(DateTime.utc_now(), started_at, :millisecond)
-          total_duration = interrupt.duration || @sub_train_duration
+        case interrupt do
+          %{started_at: started_at, id: id} when not is_nil(started_at) ->
+            # Calculate remaining time for interrupt (handle clock skew)
+            elapsed = DateTime.diff(DateTime.utc_now(), started_at, :millisecond)
+            total_duration = interrupt.duration || sub_train_duration()
 
-          remaining =
-            cond do
-              elapsed < 0 ->
-                # Clock skew - use full duration
-                Logger.warning("Clock skew detected for interrupt", id: id)
-                total_duration
+            remaining =
+              cond do
+                elapsed < 0 ->
+                  # Clock skew - use full duration
+                  Logger.warning("Clock skew detected for interrupt", id: id)
+                  total_duration
 
-              elapsed >= total_duration ->
-                # Already expired
-                0
+                elapsed >= total_duration ->
+                  # Already expired
+                  0
 
-              true ->
-                # Normal case - at least 1 second remaining
-                max(1000, total_duration - elapsed)
+                true ->
+                  # Normal case - at least 1 second remaining
+                  max(1000, total_duration - elapsed)
+              end
+
+            if remaining > 0 do
+              timer_ref = Process.send_after(self(), {:interrupt_expired, id}, remaining)
+              Map.put(acc, id, timer_ref)
+            else
+              Logger.debug("Interrupt expired during restoration", id: id)
+              acc
             end
 
-          if remaining > 0 do
-            timer_ref = Process.send_after(self(), {:interrupt_expired, id}, remaining)
-            Map.put(acc, id, timer_ref)
-          else
-            Logger.debug("Interrupt expired during restoration", id: id)
-            acc
-          end
-        else
           invalid_interrupt ->
             Logger.warning("Invalid interrupt found during restoration", interrupt: inspect(invalid_interrupt))
             acc
