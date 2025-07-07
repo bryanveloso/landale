@@ -35,6 +35,7 @@ export function Omnibar() {
   return (
     <Show when={isVisible()}>
       <div
+        class="w-canvas"
         data-omnibar
         data-show={streamState().current_show}
         data-priority={streamState().priority_level}
@@ -46,10 +47,11 @@ export function Omnibar() {
           <div data-omnibar-debug>
             <div>Show: {streamState().current_show}</div>
             <div>Priority: {streamState().priority_level}</div>
-            <div>Connected: {isConnected() ? '✓' : '✗'}</div>
             <div>Content: {streamState().active_content?.type || 'none'}</div>
           </div>
         )}
+
+        <div classList={{ 'bg-buttermilk': !isConnected(), 'bg-lime': isConnected() }} class="h-0.5"></div>
       </div>
     </Show>
   )
@@ -80,7 +82,7 @@ function SubTrainContent(props: { data: any }) {
     <div data-content="sub-train">
       <div data-content-type>Sub Train</div>
       <div data-train-count>{props.data.count || 1}</div>
-      <div data-train-latest>{props.data.latest_subscriber}</div>
+      <div data-train-latest>{props.data.latest_subscriber || props.data.subscriber}</div>
     </div>
   )
 }
@@ -111,9 +113,7 @@ function FollowsContent(props: { data: any }) {
       <div data-content-type>Recent Follows</div>
       <div data-follow-list>
         {(props.data.recent_followers || []).slice(0, 3).map((follower: string) => (
-          <div data-follower>
-            {follower}
-          </div>
+          <div data-follower>{follower}</div>
         ))}
       </div>
     </div>

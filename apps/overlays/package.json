@@ -11,6 +11,7 @@
     "@tailwindcss/vite": "^4.1.11",
     "@tanstack/solid-router": "^1.125.0",
     "@tanstack/solid-router-devtools": "^1.125.0",
+    "gsap": "^3.13.0",
     "phoenix": "^1.7.21",
     "solid-js": "^1.9.7",
     "tailwindcss": "^4.1.11"
