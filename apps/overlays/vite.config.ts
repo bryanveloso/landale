@@ -1,15 +1,12 @@
-import { tanstackRouter } from '@tanstack/router-vite-plugin'
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
 import tailwindcss from '@tailwindcss/vite'
+import { tanstackRouter } from '@tanstack/router-plugin/vite'
+import { defineConfig } from 'vite'
+import solid from 'vite-plugin-solid'
 import tsconfigPaths from 'vite-tsconfig-paths'
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), tanstackRouter(), tsconfigPaths(), tailwindcss()],
+  plugins: [tsconfigPaths(), tanstackRouter({ target: 'solid', autoCodeSplitting: true }), solid(), tailwindcss()],
   server: {
-    allowedHosts: ['.local'],
-    host: true,
-    port: 8008
+    allowedHosts: ['zelan']
   }
 })

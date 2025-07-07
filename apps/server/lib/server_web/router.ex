@@ -59,6 +59,9 @@ defmodule ServerWeb.Router do
     delete "/twitch/subscriptions/:id", TwitchController, :delete_subscription
     get "/twitch/subscription-types", TwitchController, :subscription_types
 
+    # Twitch EventSub webhook for CLI testing
+    post "/eventsub", TwitchController, :webhook
+
     # IronMON data and statistics
     get "/ironmon/challenges", IronmonController, :list_challenges
     get "/ironmon/challenges/:id/checkpoints", IronmonController, :list_checkpoints

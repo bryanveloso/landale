@@ -36,6 +36,9 @@ defmodule Server.Application do
             Server.CorrelationIdPool,
             Server.Events.BatchPublisher,
             Server.Cache,
+            # Stream coordination
+            Server.ContentAggregator,
+            Server.StreamProducer,
             # Subscription monitoring
             {Server.SubscriptionStorage, [name: :subscriptions]},
             {Server.SubscriptionMonitor, [storage: :subscriptions]},
