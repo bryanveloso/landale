@@ -30,6 +30,21 @@ defmodule ServerWeb.StreamChannel do
   end
 
   @impl true
+  def join("stream:queue", _payload, socket) do
+    Logger.info("Stream queue channel joined",
+      correlation_id: socket.assigns.correlation_id
+    )
+
+    # Subscribe to queue events (same pubsub topic as overlays for now)
+    Phoenix.PubSub.subscribe(Server.PubSub, "stream:updates")
+
+    # Send initial queue state after join completes
+    send(self(), :after_queue_join)
+
+    {:ok, socket}
+  end
+
+  @impl true
   def handle_in("ping", _payload, socket) do
     {:reply, {:ok, %{pong: true, timestamp: System.system_time(:second)}}, socket}
   end
@@ -39,6 +54,33 @@ defmodule ServerWeb.StreamChannel do
     current_state = StreamProducer.get_current_state()
     push(socket, "stream_state", format_state_for_client(current_state))
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_in("request_queue_state", _payload, socket) do
+    current_state = StreamProducer.get_current_state()
+    push(socket, "queue_state", format_queue_state_for_client(current_state))
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_in("clear_queue", _payload, socket) do
+    Logger.info("Queue clear requested", correlation_id: socket.assigns.correlation_id)
+    # For now, don't implement this as it doesn't align with interrupt model
+    # Clearing all interrupts could be dangerous in a production stream
+    {:reply, {:error, %{reason: "queue_clear_not_supported"}}, socket}
+  end
+
+  @impl true
+  def handle_in("remove_queue_item", %{"id" => item_id}, socket) do
+    Logger.info("Queue item removal requested",
+      item_id: item_id,
+      correlation_id: socket.assigns.correlation_id
+    )
+
+    # This maps to removing an interrupt by ID
+    StreamProducer.remove_interrupt(item_id)
+    {:reply, {:ok, %{status: "item_removed", id: item_id}}, socket}
   end
 
   # Catch-all for unhandled messages
@@ -79,10 +121,47 @@ defmodule ServerWeb.StreamChannel do
     {:noreply, socket}
   end
 
+  # Handle after queue join to send initial queue state
+  @impl true
+  def handle_info(:after_queue_join, socket) do
+    try do
+      current_state = StreamProducer.get_current_state()
+      queue_state = format_queue_state_for_client(current_state)
+      push(socket, "queue_state", queue_state)
+    rescue
+      error ->
+        Logger.error("Failed to get queue state", error: inspect(error))
+        # Send default queue state
+        push(socket, "queue_state", %{
+          queue: [],
+          active_content: nil,
+          metrics: %{
+            total_items: 0,
+            active_items: 0,
+            pending_items: 0,
+            average_wait_time: 0,
+            last_processed: nil
+          },
+          is_processing: false
+        })
+    end
+
+    {:noreply, socket}
+  end
+
   # Handle stream updates from StreamProducer
   @impl true
   def handle_info({:stream_update, state}, socket) do
-    push(socket, "stream_state", format_state_for_client(state))
+    # Send overlay state to stream:overlays channels
+    if socket.topic == "stream:overlays" do
+      push(socket, "stream_state", format_state_for_client(state))
+    end
+
+    # Send queue state to stream:queue channels
+    if socket.topic == "stream:queue" do
+      push(socket, "queue_state", format_queue_state_for_client(state))
+    end
+
     {:noreply, socket}
   end
 
@@ -140,6 +219,37 @@ defmodule ServerWeb.StreamChannel do
     }
   end
 
+  defp format_queue_state_for_client(state) do
+    # Transform interrupt_stack to queue items format
+    queue_items =
+      Enum.with_index(state.interrupt_stack, fn interrupt, position ->
+        %{
+          id: interrupt.id,
+          type: convert_interrupt_type_to_queue_type(interrupt.type),
+          priority: interrupt.priority,
+          content_type: interrupt.type,
+          data: interrupt.data,
+          duration: Map.get(interrupt, :duration),
+          started_at: interrupt.started_at,
+          status: determine_queue_item_status(interrupt, state.active_content),
+          position: position
+        }
+      end)
+
+    %{
+      queue: queue_items,
+      active_content: format_active_content(state.active_content),
+      metrics: %{
+        total_items: length(state.interrupt_stack) + if(state.active_content, do: 1, else: 0),
+        active_items: if(state.active_content, do: 1, else: 0),
+        pending_items: length(state.interrupt_stack),
+        average_wait_time: calculate_average_wait_time(state.interrupt_stack),
+        last_processed: state.metadata.last_updated
+      },
+      is_processing: state.active_content != nil
+    }
+  end
+
   defp format_active_content(nil), do: nil
 
   defp format_active_content(content) do
@@ -178,5 +288,37 @@ defmodule ServerWeb.StreamChannel do
 
   defp has_sub_train?(stack) do
     Enum.any?(stack, fn interrupt -> interrupt.type == :sub_train end)
+  end
+
+  # Queue-specific helper functions
+
+  defp convert_interrupt_type_to_queue_type(:alert), do: "alert"
+  defp convert_interrupt_type_to_queue_type(:sub_train), do: "sub_train"
+  defp convert_interrupt_type_to_queue_type(:manual_override), do: "manual_override"
+  defp convert_interrupt_type_to_queue_type(type), do: "ticker"
+
+  defp determine_queue_item_status(interrupt, active_content) do
+    if active_content && active_content.id == interrupt.id do
+      "active"
+    else
+      "pending"
+    end
+  end
+
+  defp calculate_average_wait_time(interrupt_stack) do
+    if Enum.empty?(interrupt_stack) do
+      0
+    else
+      now = DateTime.utc_now()
+
+      total_wait_time =
+        interrupt_stack
+        |> Enum.map(fn interrupt ->
+          DateTime.diff(now, interrupt.started_at, :millisecond)
+        end)
+        |> Enum.sum()
+
+      div(total_wait_time, length(interrupt_stack))
+    end
   end
 end

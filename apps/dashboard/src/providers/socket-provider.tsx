@@ -32,7 +32,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
     if (props.serverUrl) return props.serverUrl
 
     // Auto-detect based on environment
-    return window.location.hostname === 'localhost' ? '/socket' : 'ws://zelan:7175/socket'
+    return window.location.hostname === 'localhost' ? 'ws://localhost:7175/socket' : 'ws://zelan:7175/socket'
   }
 
   onMount(() => {
@@ -45,6 +45,11 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
         console.log(`[Phoenix ${kind}] ${msg}`, data)
       }
     })
+
+    // Expose socket for debugging
+    if (import.meta.env.DEV) {
+      window.phoenixSocket = phoenixSocket
+    }
 
     // Handle socket events
     phoenixSocket.onOpen(() => {
