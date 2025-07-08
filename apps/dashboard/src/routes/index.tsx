@@ -2,7 +2,6 @@ import { createFileRoute } from '@tanstack/solid-router'
 import { StreamQueue } from '@/components/stream-queue'
 import { LayerStateMonitor } from '@/components/layer-state-monitor'
 import { EmergencyOverride } from '@/components/emergency-override'
-import { ConnectionStatus } from '@/components/connection-status'
 import { StatusBar } from '@/components/status-bar'
 
 export const Route = createFileRoute('/')({
@@ -11,26 +10,16 @@ export const Route = createFileRoute('/')({
 
 function Index() {
   return (
-    <div>
-      <div>
-        <ConnectionStatus />
-      </div>
+    <div class="grid h-full grid-rows-[auto_1fr_auto]" data-dashboard-layout>
+      <div></div>
 
-      <div>
+      <div class="flex">
         <EmergencyOverride />
-      </div>
-
-      <div>
         <StreamQueue />
-      </div>
-
-      <div>
         <LayerStateMonitor />
       </div>
 
-      <div>
-        <StatusBar />
-      </div>
+      <StatusBar />
     </div>
   )
 }

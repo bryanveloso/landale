@@ -9,6 +9,7 @@ import { createSignal } from 'solid-js'
 import { useStreamCommands } from '@/hooks/use-stream-commands'
 import { useLayerState } from '@/hooks/use-layer-state'
 import type { EmergencyOverrideCommand } from '@/types/stream'
+import { Button } from './ui/button'
 
 export function EmergencyOverride() {
   const commands = useStreamCommands()
@@ -23,7 +24,7 @@ export function EmergencyOverride() {
       console.error('[EmergencyOverride] No message provided for non-screen-cover emergency')
       return
     }
-    
+
     const emergencyData: EmergencyOverrideCommand = {
       type: emergencyType(),
       message: alertText().trim(),
@@ -75,9 +76,8 @@ export function EmergencyOverride() {
         <select
           value={emergencyType()}
           onInput={(e) => setEmergencyType(e.target.value)}
-          disabled={commands.emergencyState().loading}
-        >
-          {emergencyTypes.map(type => (
+          disabled={commands.emergencyState().loading}>
+          {emergencyTypes.map((type) => (
             <option value={type.value}>{type.label}</option>
           ))}
         </select>
@@ -100,7 +100,7 @@ export function EmergencyOverride() {
               }
             }}
           />
-          
+
           <div>
             <input
               type="number"
@@ -115,65 +115,51 @@ export function EmergencyOverride() {
         </div>
 
         <div>
-          <button
+          <Button
             onClick={sendEmergencyOverride}
             disabled={
-              (emergencyType() !== 'screen-cover' && !alertText().trim()) || 
-              commands.emergencyState().loading || 
+              (emergencyType() !== 'screen-cover' && !alertText().trim()) ||
+              commands.emergencyState().loading ||
               !isConnected()
-            }
-          >
+            }>
             {commands.emergencyState().loading ? 'Sending...' : 'Send Emergency'}
-          </button>
-          
-          <button
-            onClick={clearEmergency}
-            disabled={commands.emergencyState().loading || !isConnected()}
-          >
+          </Button>
+
+          <Button onClick={clearEmergency} disabled={commands.emergencyState().loading || !isConnected()}>
             Clear
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Quick Emergency Actions */}
       <div>
-        {quickEmergencies.map(emergency => (
-          <button
+        {quickEmergencies.map((emergency) => (
+          <Button
             onClick={() => {
               setEmergencyType(emergency.type)
               setAlertText(emergency.text)
               setDuration(emergency.duration)
             }}
-            disabled={commands.emergencyState().loading}
-          >
+            disabled={commands.emergencyState().loading}>
             {emergency.type === 'screen-cover' ? 'Screen Cover' : emergency.text}
-          </button>
+          </Button>
         ))}
       </div>
 
       {/* Status Info */}
       <div>
-        {commands.emergencyState().error && (
-          <div>
-            Error: {commands.emergencyState().error}
-          </div>
-        )}
-        
+        {commands.emergencyState().error && <div>Error: {commands.emergencyState().error}</div>}
+
         {commands.emergencyState().lastExecuted && (
-          <div>
-            Last executed: {new Date(commands.emergencyState().lastExecuted!).toLocaleTimeString()}
-          </div>
+          <div>Last executed: {new Date(commands.emergencyState().lastExecuted!).toLocaleTimeString()}</div>
         )}
-        
+
         {lastSent() && (
           <div>
             Last: {lastSent()}
-            <button
-              onClick={replayLastAlert}
-              disabled={commands.emergencyState().loading}
-            >
+            <Button onClick={replayLastAlert} disabled={commands.emergencyState().loading}>
               Replay
-            </button>
+            </Button>
           </div>
         )}
       </div>

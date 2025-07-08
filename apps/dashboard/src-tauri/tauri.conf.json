@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "Landale Dashboard",
-        "width": 1200,
-        "height": 800,
+        "width": 1920,
+        "height": 400,
         "minWidth": 800,
         "minHeight": 600,
         "resizable": true,

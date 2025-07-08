@@ -1,5 +1,6 @@
 import { createSignal, createEffect, Show, For } from 'solid-js'
 import { useStreamQueue } from '@/hooks/use-stream-queue'
+import { Button } from './ui/button'
 
 export function StreamQueue() {
   const { queueState, isConnected, clearQueue, removeQueueItem, reorderQueue } = useStreamQueue()
@@ -12,11 +13,9 @@ export function StreamQueue() {
         <div>
           <div>Stream Queue</div>
           <div>
-            <button 
-              onclick={() => clearQueue()}
-              disabled={queueState().queue.length === 0}>
+            <Button onClick={() => clearQueue()} disabled={queueState().queue.length === 0}>
               Clear Queue
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -50,7 +49,7 @@ export function StreamQueue() {
                   <div>{item.status}</div>
                   <div>{item.priority}</div>
                 </div>
-                
+
                 <div>
                   <div>{item.id}</div>
                   <Show when={item.duration}>
@@ -60,11 +59,9 @@ export function StreamQueue() {
                     <div>{new Date(item.started_at!).toLocaleTimeString()}</div>
                   </Show>
                 </div>
-                
+
                 <div>
-                  <button onclick={() => removeQueueItem(item.id)}>
-                    Remove
-                  </button>
+                  <Button onClick={() => removeQueueItem(item.id)}>Remove</Button>
                 </div>
               </div>
             )}
