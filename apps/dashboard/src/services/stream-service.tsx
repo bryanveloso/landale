@@ -71,8 +71,6 @@ interface StreamServiceContext {
   sendEmergencyOverride: (command: EmergencyOverrideCommand) => Promise<CommandResponse>
   clearEmergency: () => Promise<CommandResponse>
   removeQueueItem: (id: string) => Promise<CommandResponse>
-  clearQueue: () => Promise<CommandResponse>
-  reorderQueue: (id: string, position: number) => Promise<CommandResponse>
   
   // Utility functions
   requestState: () => void
@@ -452,73 +450,6 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     })
   }
 
-  const clearQueue = async (): Promise<CommandResponse> => {
-    if (!queueChannel || !connectionState().connected) {
-      throw new Error('Not connected to queue channel')
-    }
-
-    console.log('[StreamService] Clearing queue')
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Clear queue timeout'))
-      }, 5000)
-
-      queueChannel!.push('clear_queue', {})
-        .receive('ok', (resp: any) => {
-          clearTimeout(timeout)
-          console.log('[StreamService] Queue cleared successfully:', resp)
-          resolve({
-            status: 'ok',
-            data: resp,
-            timestamp: new Date().toISOString()
-          })
-        })
-        .receive('error', (resp: any) => {
-          clearTimeout(timeout)
-          console.error('[StreamService] Clear queue error:', resp)
-          reject(new Error(`Clear failed: ${resp?.reason || 'unknown'}`))
-        })
-        .receive('timeout', () => {
-          clearTimeout(timeout)
-          reject(new Error('Clear queue timeout'))
-        })
-    })
-  }
-
-  const reorderQueue = async (id: string, position: number): Promise<CommandResponse> => {
-    if (!queueChannel || !connectionState().connected) {
-      throw new Error('Not connected to queue channel')
-    }
-
-    console.log('[StreamService] Reordering queue item:', { id, position })
-
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Reorder queue timeout'))
-      }, 5000)
-
-      queueChannel!.push('reorder_queue', { id, position })
-        .receive('ok', (resp: any) => {
-          clearTimeout(timeout)
-          console.log('[StreamService] Queue reordered successfully:', resp)
-          resolve({
-            status: 'ok',
-            data: resp,
-            timestamp: new Date().toISOString()
-          })
-        })
-        .receive('error', (resp: any) => {
-          clearTimeout(timeout)
-          console.error('[StreamService] Reorder queue error:', resp)
-          reject(new Error(`Reorder failed: ${resp?.reason || 'unknown'}`))
-        })
-        .receive('timeout', () => {
-          clearTimeout(timeout)
-          reject(new Error('Reorder queue timeout'))
-        })
-    })
-  }
 
   // Utility functions
   const requestState = () => {
@@ -635,8 +566,6 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     sendEmergencyOverride,
     clearEmergency,
     removeQueueItem,
-    clearQueue,
-    reorderQueue,
     requestState,
     requestQueueState
   }

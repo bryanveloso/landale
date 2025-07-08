@@ -123,4 +123,3 @@ defmodule Integration.WebSocketFlowTest do
     end
   end
 end
-

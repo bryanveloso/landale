@@ -64,14 +64,6 @@ defmodule ServerWeb.StreamChannel do
   end
 
   @impl true
-  def handle_in("clear_queue", _payload, socket) do
-    Logger.info("Queue clear requested", correlation_id: socket.assigns.correlation_id)
-    # For now, don't implement this as it doesn't align with interrupt model
-    # Clearing all interrupts could be dangerous in a production stream
-    {:reply, {:error, %{reason: "queue_clear_not_supported"}}, socket}
-  end
-
-  @impl true
   def handle_in("remove_queue_item", %{"id" => item_id}, socket) do
     Logger.info("Queue item removal requested",
       item_id: item_id,

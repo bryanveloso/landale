@@ -80,11 +80,6 @@ defmodule ServerWeb.StreamChannelTest do
       assert is_integer(timestamp)
     end
 
-    test "clear_queue returns not supported", %{socket: socket} do
-      ref = push(socket, "clear_queue", %{})
-      assert_reply ref, :error, %{reason: "queue_clear_not_supported"}
-    end
-
     test "remove_queue_item with valid ID succeeds", %{socket: socket} do
       ref = push(socket, "remove_queue_item", %{"id" => "test-item"})
       assert_reply ref, :ok, %{status: "item_removed", id: "test-item"}
@@ -253,4 +248,3 @@ defmodule ServerWeb.StreamChannelTest do
     socket
   end
 end
-
