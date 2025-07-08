@@ -4,7 +4,7 @@ defmodule ServerWeb.OBSController do
   use ServerWeb, :controller
   use OpenApiSpex.ControllerSpecs
 
-  alias ServerWeb.Schemas
+  alias ServerWeb.{Schemas, ResponseBuilder}
 
   operation(:status,
     summary: "Get OBS WebSocket status",
@@ -18,22 +18,16 @@ defmodule ServerWeb.OBSController do
   def status(conn, _params) do
     case Server.Services.OBS.get_status() do
       {:ok, status} ->
-        json(conn, %{success: true, data: status})
+        ResponseBuilder.send_success(conn, status)
 
       {:error, %Server.ServiceError{message: message}} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: message})
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: to_string(reason)})
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
 
       _ ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: "OBS service unavailable"})
+        ResponseBuilder.send_error(conn, "service_unavailable", "OBS service unavailable", 503)
     end
   end
 
@@ -55,12 +49,14 @@ defmodule ServerWeb.OBSController do
       {:error, %Server.ServiceError{message: message}} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: message})
+
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: to_string(reason)})
+
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -82,12 +78,14 @@ defmodule ServerWeb.OBSController do
       {:error, %Server.ServiceError{message: message}} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: message})
+
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: to_string(reason)})
+
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -109,12 +107,14 @@ defmodule ServerWeb.OBSController do
       {:error, %Server.ServiceError{message: message}} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: message})
+
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: to_string(reason)})
+
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -136,12 +136,14 @@ defmodule ServerWeb.OBSController do
       {:error, %Server.ServiceError{message: message}} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: message})
+
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: to_string(reason)})
+
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -166,12 +168,14 @@ defmodule ServerWeb.OBSController do
       {:error, %Server.ServiceError{message: message}} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: message})
+
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: to_string(reason)})
+
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -190,14 +194,10 @@ defmodule ServerWeb.OBSController do
         json(conn, %{success: true, data: scene_data})
 
       {:error, %Server.ServiceError{message: message}} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: message})
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: to_string(reason)})
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -218,14 +218,10 @@ defmodule ServerWeb.OBSController do
         json(conn, %{success: true, data: scenes_data})
 
       {:error, %Server.ServiceError{message: message}} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: message})
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: to_string(reason)})
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -244,14 +240,10 @@ defmodule ServerWeb.OBSController do
         json(conn, %{success: true, data: stream_data})
 
       {:error, %Server.ServiceError{message: message}} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: message})
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: to_string(reason)})
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -270,14 +262,10 @@ defmodule ServerWeb.OBSController do
         json(conn, %{success: true, data: record_data})
 
       {:error, %Server.ServiceError{message: message}} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: message})
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: to_string(reason)})
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -303,19 +291,13 @@ defmodule ServerWeb.OBSController do
       json(conn, %{success: true, data: combined_stats})
     else
       {:error, %Server.ServiceError{message: message}} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: message})
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: to_string(reason)})
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
 
       _ ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: "OBS service unavailable"})
+        ResponseBuilder.send_error(conn, "service_unavailable", "OBS service unavailable", 503)
     end
   end
 
@@ -334,14 +316,10 @@ defmodule ServerWeb.OBSController do
         json(conn, %{success: true, data: version_data})
 
       {:error, %Server.ServiceError{message: message}} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: message})
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: to_string(reason)})
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -360,14 +338,10 @@ defmodule ServerWeb.OBSController do
         json(conn, %{success: true, data: virtual_cam_data})
 
       {:error, %Server.ServiceError{message: message}} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: message})
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: to_string(reason)})
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 
@@ -386,14 +360,10 @@ defmodule ServerWeb.OBSController do
         json(conn, %{success: true, data: outputs_data})
 
       {:error, %Server.ServiceError{message: message}} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: message})
+        ResponseBuilder.send_error(conn, "service_error", message, 503)
 
       {:error, reason} ->
-        conn
-        |> put_status(:service_unavailable)
-        |> json(%{success: false, error: to_string(reason)})
+        ResponseBuilder.send_error(conn, "service_error", to_string(reason), 503)
     end
   end
 end

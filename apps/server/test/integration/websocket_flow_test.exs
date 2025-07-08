@@ -45,7 +45,11 @@ defmodule Integration.WebSocketFlowTest do
       ref = push(dashboard, "emergency_override", @emergency_payload)
 
       # Verify dashboard gets acknowledgment
-      assert_reply ref, :ok, %{status: "emergency_sent"}
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{operation: "emergency_sent", type: _},
+        meta: %{timestamp: _, server_version: _}
+      }
 
       # Verify overlay receives emergency push
       assert_push "emergency_override", broadcast_message
@@ -72,7 +76,11 @@ defmodule Integration.WebSocketFlowTest do
       ref = push(dashboard, "emergency_clear", %{})
 
       # Verify dashboard gets acknowledgment
-      assert_reply ref, :ok, %{status: "emergency_cleared"}
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{operation: "emergency_cleared"},
+        meta: %{timestamp: _, server_version: _}
+      }
 
       # Verify overlay receives clear push
       assert_push "emergency_clear", clear_message
@@ -89,7 +97,12 @@ defmodule Integration.WebSocketFlowTest do
 
       # Send emergency from dashboard
       ref = push(dashboard, "emergency_override", @emergency_payload)
-      assert_reply ref, :ok, %{status: "emergency_sent"}
+
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{operation: "emergency_sent", type: _},
+        meta: %{timestamp: _, server_version: _}
+      }
 
       # Verify queue does NOT receive emergency
       refute_push "emergency_override", 100
@@ -111,7 +124,12 @@ defmodule Integration.WebSocketFlowTest do
 
       # Send emergency
       ref = push(dashboard, "emergency_override", @emergency_payload)
-      assert_reply ref, :ok, %{status: "emergency_sent"}
+
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{operation: "emergency_sent", type: _},
+        meta: %{timestamp: _, server_version: _}
+      }
 
       # Both overlays should receive emergency
       assert_push "emergency_override", msg1

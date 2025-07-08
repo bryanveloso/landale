@@ -29,7 +29,8 @@ defmodule Server.CircuitBreakerRegistry do
   alias Server.CircuitBreaker
 
   @table_name :circuit_breaker_registry
-  @cleanup_interval 60_000 # 1 minute
+  # 1 minute
+  @cleanup_interval 60_000
 
   ## Public API
 
@@ -95,21 +96,22 @@ defmodule Server.CircuitBreakerRegistry do
 
   @impl true
   def handle_call({:get_or_create, name, config}, _from, state) do
-    circuit_breaker = case :ets.lookup(@table_name, name) do
-      [{^name, existing_circuit}] ->
-        existing_circuit
+    circuit_breaker =
+      case :ets.lookup(@table_name, name) do
+        [{^name, existing_circuit}] ->
+          existing_circuit
 
-      [] ->
-        new_circuit = CircuitBreaker.new(name, config)
-        :ets.insert(@table_name, {name, new_circuit})
-        
-        Logger.debug("Created new circuit breaker", %{
-          name: name,
-          config: config
-        })
-        
-        new_circuit
-    end
+        [] ->
+          new_circuit = CircuitBreaker.new(name, config)
+          :ets.insert(@table_name, {name, new_circuit})
+
+          Logger.debug("Created new circuit breaker", %{
+            name: name,
+            config: config
+          })
+
+          new_circuit
+      end
 
     {:reply, circuit_breaker, state}
   end
@@ -118,7 +120,7 @@ defmodule Server.CircuitBreakerRegistry do
   def handle_call({:update, circuit_breaker}, _from, state) do
     name = circuit_breaker.name
     :ets.insert(@table_name, {name, circuit_breaker})
-    
+
     # Emit telemetry for circuit breaker updates
     :telemetry.execute(
       [:circuit_breaker, :updated],
@@ -129,13 +131,13 @@ defmodule Server.CircuitBreakerRegistry do
         failure_count: circuit_breaker.failure_count
       }
     )
-    
+
     {:reply, :ok, state}
   end
 
   @impl true
   def handle_call(:get_all_metrics, _from, state) do
-    metrics = 
+    metrics =
       @table_name
       |> :ets.tab2list()
       |> Enum.map(fn {_name, circuit_breaker} ->
@@ -147,15 +149,16 @@ defmodule Server.CircuitBreakerRegistry do
 
   @impl true
   def handle_call({:remove, name}, _from, state) do
-    result = case :ets.lookup(@table_name, name) do
-      [{^name, _circuit_breaker}] ->
-        :ets.delete(@table_name, name)
-        Logger.debug("Removed circuit breaker", %{name: name})
-        :ok
+    result =
+      case :ets.lookup(@table_name, name) do
+        [{^name, _circuit_breaker}] ->
+          :ets.delete(@table_name, name)
+          Logger.debug("Removed circuit breaker", %{name: name})
+          :ok
 
-      [] ->
-        {:error, :not_found}
-    end
+        [] ->
+          {:error, :not_found}
+      end
 
     {:reply, result, state}
   end
@@ -176,14 +179,14 @@ defmodule Server.CircuitBreakerRegistry do
   defp perform_cleanup do
     # Find circuit breakers that haven't been used recently and are in closed state
     cutoff_time = DateTime.add(DateTime.utc_now(), -@cleanup_interval * 5, :millisecond)
-    
-    circuits_to_remove = 
+
+    circuits_to_remove =
       @table_name
       |> :ets.tab2list()
       |> Enum.filter(fn {_name, circuit_breaker} ->
         circuit_breaker.state == :closed and
-        circuit_breaker.failure_count == 0 and
-        DateTime.compare(circuit_breaker.state_changed_at, cutoff_time) == :lt
+          circuit_breaker.failure_count == 0 and
+          DateTime.compare(circuit_breaker.state_changed_at, cutoff_time) == :lt
       end)
       |> Enum.map(fn {name, _circuit_breaker} -> name end)
 

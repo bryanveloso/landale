@@ -226,7 +226,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         console.error('[StreamService] Failed to join overlay channel:', resp)
         setConnectionState(prev => ({
           ...prev,
-          error: `Failed to join overlay channel: ${resp?.reason || 'unknown'}`
+          error: `Failed to join overlay channel: ${resp?.error?.message || resp?.reason || 'unknown'}`
         }))
       })
       .receive('timeout', () => {
@@ -308,7 +308,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         console.error('[StreamService] Failed to join queue channel:', resp)
         setConnectionState(prev => ({
           ...prev,
-          error: `Failed to join queue channel: ${resp?.reason || 'unknown'}`
+          error: `Failed to join queue channel: ${resp?.error?.message || resp?.reason || 'unknown'}`
         }))
       })
       .receive('timeout', () => {
@@ -373,7 +373,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         .receive('error', (resp: any) => {
           clearTimeout(timeout)
           console.error('[StreamService] Emergency send error:', resp)
-          reject(new Error(`Emergency failed: ${resp?.reason || 'unknown'}`))
+          reject(new Error(`Emergency failed: ${resp?.error?.message || resp?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
           clearTimeout(timeout)
@@ -407,7 +407,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         .receive('error', (resp: any) => {
           clearTimeout(timeout)
           console.error('[StreamService] Clear emergency error:', resp)
-          reject(new Error(`Clear failed: ${resp?.reason || 'unknown'}`))
+          reject(new Error(`Clear failed: ${resp?.error?.message || resp?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
           clearTimeout(timeout)

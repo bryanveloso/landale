@@ -13,6 +13,7 @@ defmodule ServerWeb.StreamChannel do
   require Logger
 
   alias Server.StreamProducer
+  alias ServerWeb.ResponseBuilder
 
   @impl true
   def join("stream:overlays", _payload, socket) do
@@ -46,7 +47,7 @@ defmodule ServerWeb.StreamChannel do
 
   @impl true
   def handle_in("ping", _payload, socket) do
-    {:reply, {:ok, %{pong: true, timestamp: System.system_time(:second)}}, socket}
+    {:reply, ResponseBuilder.success(%{pong: true, timestamp: System.system_time(:second)}), socket}
   end
 
   @impl true
@@ -72,7 +73,7 @@ defmodule ServerWeb.StreamChannel do
 
     # This maps to removing an interrupt by ID
     StreamProducer.remove_interrupt(item_id)
-    {:reply, {:ok, %{status: "item_removed", id: item_id}}, socket}
+    {:reply, ResponseBuilder.success(%{operation: "item_removed", id: item_id}), socket}
   end
 
   @impl true
@@ -85,7 +86,7 @@ defmodule ServerWeb.StreamChannel do
 
     # Send emergency override to StreamProducer
     StreamProducer.force_content(content_type, data, duration)
-    {:reply, {:ok, %{status: "override_sent", type: content_type}}, socket}
+    {:reply, ResponseBuilder.success(%{operation: "override_sent", type: content_type}), socket}
   end
 
   @impl true
@@ -119,7 +120,7 @@ defmodule ServerWeb.StreamChannel do
            }}
         )
 
-        {:reply, {:ok, %{status: "emergency_sent", type: emergency_type}}, socket}
+        {:reply, ResponseBuilder.success(%{operation: "emergency_sent", type: emergency_type}), socket}
 
       _ ->
         Logger.warning("Invalid emergency override payload",
@@ -127,7 +128,7 @@ defmodule ServerWeb.StreamChannel do
           correlation_id: socket.assigns.correlation_id
         )
 
-        {:reply, {:error, %{reason: "invalid_payload"}}, socket}
+        {:reply, ResponseBuilder.error("invalid_payload", "Missing required fields: type and message"), socket}
     end
   end
 
@@ -145,7 +146,7 @@ defmodule ServerWeb.StreamChannel do
       {:emergency_clear, %{timestamp: DateTime.utc_now()}}
     )
 
-    {:reply, {:ok, %{status: "emergency_cleared"}}, socket}
+    {:reply, ResponseBuilder.success(%{operation: "emergency_cleared"}), socket}
   end
 
   # Catch-all for unhandled messages

@@ -5,7 +5,7 @@ defmodule ServerWeb.TwitchController do
   use OpenApiSpex.ControllerSpecs
   require Logger
 
-  alias ServerWeb.Schemas
+  alias ServerWeb.{Schemas, ResponseBuilder}
 
   @subscription_types %{
     stream: [
@@ -92,12 +92,12 @@ defmodule ServerWeb.TwitchController do
 
     case Server.Services.Twitch.create_subscription(event_type, condition, opts) do
       {:ok, subscription} ->
-        json(conn, %{success: true, data: subscription})
+        ResponseBuilder.send_success(conn, subscription)
 
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: reason})
+        |> ResponseBuilder.send_error("subscription_failed", reason, 400)
     end
   end
 
@@ -114,7 +114,7 @@ defmodule ServerWeb.TwitchController do
   def create_subscription(conn, _params) do
     conn
     |> put_status(:bad_request)
-    |> json(%{success: false, error: "Missing required parameters: event_type, condition"})
+    |> ResponseBuilder.send_error("missing_parameters", "Missing required parameters: event_type, condition", 400)
   end
 
   operation(:delete_subscription,
@@ -132,12 +132,12 @@ defmodule ServerWeb.TwitchController do
   def delete_subscription(conn, %{"id" => subscription_id}) do
     case Server.Services.Twitch.delete_subscription(subscription_id) do
       :ok ->
-        json(conn, %{success: true, message: "Subscription deleted"})
+        ResponseBuilder.send_success(conn, %{operation: "subscription_deleted"})
 
       {:error, reason} ->
         conn
         |> put_status(:bad_request)
-        |> json(%{success: false, error: reason})
+        |> ResponseBuilder.send_error("subscription_failed", reason, 400)
     end
   end
 

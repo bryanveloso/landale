@@ -68,7 +68,7 @@ defmodule Server.CircuitBreaker do
   """
   def new(name, config \\ %{}) do
     full_config = Map.merge(@default_config, config)
-    
+
     %__MODULE__{
       name: name,
       config: full_config,
@@ -82,7 +82,7 @@ defmodule Server.CircuitBreaker do
 
   @doc """
   Executes a function with circuit breaker protection.
-  
+
   Returns `{:ok, result}` on success or `{:error, reason}` on failure.
   If the circuit is open, returns `{:error, :circuit_open}` without executing the function.
   """
@@ -90,7 +90,7 @@ defmodule Server.CircuitBreaker do
     case can_execute?(circuit_breaker) do
       {:ok, updated_circuit} ->
         execute_with_protection(updated_circuit, fun)
-      
+
       {:error, :circuit_open} = error ->
         log_circuit_blocked(circuit_breaker)
         error
@@ -145,7 +145,7 @@ defmodule Server.CircuitBreaker do
     catch
       :exit, reason ->
         handle_failure(circuit_breaker, {:error, {:exit, reason}})
-      
+
       :throw, value ->
         handle_failure(circuit_breaker, {:error, {:throw, value}})
     end
@@ -162,7 +162,7 @@ defmodule Server.CircuitBreaker do
       :half_open ->
         # Track successes in half-open state
         new_success_count = circuit_breaker.half_open_success_count + 1
-        
+
         if new_success_count >= circuit_breaker.config.success_threshold do
           # Enough successes, close the circuit
           updated_circuit = transition_to_closed(circuit_breaker)
@@ -183,11 +183,8 @@ defmodule Server.CircuitBreaker do
   defp handle_failure(circuit_breaker, error) do
     new_failure_count = circuit_breaker.failure_count + 1
     now = DateTime.utc_now()
-    
-    updated_circuit = %{circuit_breaker | 
-      failure_count: new_failure_count,
-      last_failure_time: now
-    }
+
+    updated_circuit = %{circuit_breaker | failure_count: new_failure_count, last_failure_time: now}
 
     # Check if we should open the circuit
     if new_failure_count >= circuit_breaker.config.failure_threshold do
@@ -211,7 +208,7 @@ defmodule Server.CircuitBreaker do
 
   defp transition_to_open(circuit_breaker) do
     now = DateTime.utc_now()
-    
+
     # Emit telemetry
     :telemetry.execute(
       [:circuit_breaker, :state_change],
@@ -223,16 +220,13 @@ defmodule Server.CircuitBreaker do
         failure_count: circuit_breaker.failure_count
       }
     )
-    
-    %{circuit_breaker | 
-      state: :open,
-      state_changed_at: now
-    }
+
+    %{circuit_breaker | state: :open, state_changed_at: now}
   end
 
   defp transition_to_half_open(circuit_breaker) do
     now = DateTime.utc_now()
-    
+
     # Emit telemetry
     :telemetry.execute(
       [:circuit_breaker, :state_change],
@@ -244,17 +238,13 @@ defmodule Server.CircuitBreaker do
         failure_count: circuit_breaker.failure_count
       }
     )
-    
-    %{circuit_breaker |
-      state: :half_open,
-      half_open_success_count: 0,
-      state_changed_at: now
-    }
+
+    %{circuit_breaker | state: :half_open, half_open_success_count: 0, state_changed_at: now}
   end
 
   defp transition_to_closed(circuit_breaker) do
     now = DateTime.utc_now()
-    
+
     # Emit telemetry
     :telemetry.execute(
       [:circuit_breaker, :state_change],
@@ -266,13 +256,14 @@ defmodule Server.CircuitBreaker do
         failure_count: 0
       }
     )
-    
-    %{circuit_breaker |
-      state: :closed,
-      failure_count: 0,
-      half_open_success_count: 0,
-      last_failure_time: nil,
-      state_changed_at: now
+
+    %{
+      circuit_breaker
+      | state: :closed,
+        failure_count: 0,
+        half_open_success_count: 0,
+        last_failure_time: nil,
+        state_changed_at: now
     }
   end
 

@@ -9,7 +9,7 @@ defmodule ServerWeb.ContextController do
   use OpenApiSpex.ControllerSpecs
 
   alias Server.Context
-  alias ServerWeb.Schemas
+  alias ServerWeb.{Schemas, ResponseBuilder}
 
   operation(:create,
     summary: "Create context",
@@ -83,34 +83,33 @@ defmodule ServerWeb.ContextController do
     case Context.create_context(params) do
       {:ok, context} ->
         conn
-        |> put_status(:created)
-        |> json(%{
-          status: "success",
-          data: %{
+        |> ResponseBuilder.send_success(
+          %{
             started: context.started,
             ended: context.ended,
             session: context.session,
             duration: context.duration,
             sentiment: context.sentiment,
             topics: context.topics || []
-          }
-        })
+          },
+          %{},
+          201
+        )
 
       {:error, changeset} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{
-          status: "error",
-          errors: format_changeset_errors(changeset)
-        })
+        |> ResponseBuilder.send_error(
+          "validation_failed",
+          "Context validation failed",
+          %{errors: format_changeset_errors(changeset)},
+          422
+        )
 
       _ ->
         conn
         |> put_status(:internal_server_error)
-        |> json(%{
-          status: "error",
-          message: "Unexpected error occurred"
-        })
+        |> ResponseBuilder.send_error("internal_error", "Unexpected error occurred", 500)
     end
   end
 
@@ -143,18 +142,14 @@ defmodule ServerWeb.ContextController do
       contexts = Context.list_contexts(opts)
 
       conn
-      |> json(%{
-        status: "success",
-        data: Enum.map(contexts, &format_context/1)
+      |> ResponseBuilder.send_success(%{
+        contexts: Enum.map(contexts, &format_context/1)
       })
     rescue
       ArgumentError ->
         conn
         |> put_status(:bad_request)
-        |> json(%{
-          status: "error",
-          message: "Invalid parameter format"
-        })
+        |> ResponseBuilder.send_error("invalid_parameters", "Invalid parameter format", 400)
     end
   end
 
@@ -194,28 +189,21 @@ defmodule ServerWeb.ContextController do
       contexts = Context.search_contexts(query, opts)
 
       conn
-      |> json(%{
-        status: "success",
-        data: Enum.map(contexts, &format_context/1)
+      |> ResponseBuilder.send_success(%{
+        contexts: Enum.map(contexts, &format_context/1)
       })
     rescue
       ArgumentError ->
         conn
         |> put_status(:bad_request)
-        |> json(%{
-          status: "error",
-          message: "Invalid parameter format"
-        })
+        |> ResponseBuilder.send_error("invalid_parameters", "Invalid parameter format", 400)
     end
   end
 
   def search(conn, _params) do
     conn
     |> put_status(:bad_request)
-    |> json(%{
-      status: "error",
-      message: "Search query 'q' parameter is required"
-    })
+    |> ResponseBuilder.send_error("missing_parameter", "Search query 'q' parameter is required", 400)
   end
 
   operation(:stats,
@@ -255,10 +243,7 @@ defmodule ServerWeb.ContextController do
       ArgumentError ->
         conn
         |> put_status(:bad_request)
-        |> json(%{
-          status: "error",
-          message: "Invalid parameter format"
-        })
+        |> ResponseBuilder.send_error("invalid_parameters", "Invalid parameter format", 400)
     end
   end
 

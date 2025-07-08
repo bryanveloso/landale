@@ -66,7 +66,7 @@ defmodule Server.OAuth2Client do
   """
 
   require Logger
-  
+
   alias Server.ExternalCall
 
   @type client_config :: %{
@@ -274,17 +274,21 @@ defmodule Server.OAuth2Client do
     # Extract service name from URL for circuit breaker
     uri = URI.parse(client.token_url)
     service_name = "oauth2-#{uri.host}"
-    
+
     # Use circuit breaker for token requests
-    case ExternalCall.http_request(service_name, fn ->
-      execute_token_request(client, params)
-    end, %{failure_threshold: 3, timeout_ms: 30_000}) do
+    case ExternalCall.http_request(
+           service_name,
+           fn ->
+             execute_token_request(client, params)
+           end,
+           %{failure_threshold: 3, timeout_ms: 30_000}
+         ) do
       {:ok, result} -> result
       {:error, :circuit_open} -> {:error, {:service_unavailable, "OAuth2 service circuit breaker is open"}}
       {:error, reason} -> {:error, reason}
     end
   end
-  
+
   defp execute_token_request(client, params) do
     uri = URI.parse(client.token_url)
 
@@ -312,17 +316,21 @@ defmodule Server.OAuth2Client do
     # Extract service name from URL for circuit breaker
     uri = URI.parse(validate_url)
     service_name = "oauth2-#{uri.host}"
-    
+
     # Use circuit breaker for validation requests
-    case ExternalCall.http_request(service_name, fn ->
-      execute_validation_request(client, validate_url, access_token)
-    end, %{failure_threshold: 3, timeout_ms: 30_000}) do
+    case ExternalCall.http_request(
+           service_name,
+           fn ->
+             execute_validation_request(client, validate_url, access_token)
+           end,
+           %{failure_threshold: 3, timeout_ms: 30_000}
+         ) do
       {:ok, result} -> result
       {:error, :circuit_open} -> {:error, {:service_unavailable, "OAuth2 service circuit breaker is open"}}
       {:error, reason} -> {:error, reason}
     end
   end
-  
+
   defp execute_validation_request(client, validate_url, access_token) do
     uri = URI.parse(validate_url)
 

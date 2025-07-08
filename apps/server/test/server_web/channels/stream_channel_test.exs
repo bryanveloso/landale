@@ -41,28 +41,52 @@ defmodule ServerWeb.StreamChannelTest do
       ref = push(socket, "ping", %{"hello" => "there"})
       assert_reply ref, :ok, response
 
-      assert %{pong: true, timestamp: timestamp} = response
+      assert %{
+               success: true,
+               data: %{pong: true, timestamp: timestamp},
+               meta: %{timestamp: _, server_version: _}
+             } = response
+
       assert is_integer(timestamp)
     end
 
     test "emergency_override with valid payload succeeds", %{socket: socket} do
       ref = push(socket, "emergency_override", @default_emergency_payload)
-      assert_reply ref, :ok, %{status: "emergency_sent", type: "technical-difficulties"}
+
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{operation: "emergency_sent", type: "technical-difficulties"},
+        meta: %{timestamp: _, server_version: _}
+      }
     end
 
     test "emergency_override with invalid payload fails", %{socket: socket} do
       ref = push(socket, "emergency_override", %{"invalid" => "payload"})
-      assert_reply ref, :error, %{reason: "invalid_payload"}
+
+      assert_reply ref, :error, %{
+        success: false,
+        error: %{code: "invalid_payload", message: _, timestamp: _}
+      }
     end
 
     test "emergency_clear succeeds", %{socket: socket} do
       ref = push(socket, "emergency_clear", %{})
-      assert_reply ref, :ok, %{status: "emergency_cleared"}
+
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{operation: "emergency_cleared"},
+        meta: %{timestamp: _, server_version: _}
+      }
     end
 
     test "force_content adds manual override", %{socket: socket} do
       ref = push(socket, "force_content", @default_force_content_payload)
-      assert_reply ref, :ok, %{status: "override_sent", type: "manual_override"}
+
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{operation: "override_sent", type: "manual_override"},
+        meta: %{timestamp: _, server_version: _}
+      }
     end
   end
 
@@ -76,13 +100,23 @@ defmodule ServerWeb.StreamChannelTest do
       ref = push(socket, "ping", %{"test" => "data"})
       assert_reply ref, :ok, response
 
-      assert %{pong: true, timestamp: timestamp} = response
+      assert %{
+               success: true,
+               data: %{pong: true, timestamp: timestamp},
+               meta: %{timestamp: _, server_version: _}
+             } = response
+
       assert is_integer(timestamp)
     end
 
     test "remove_queue_item with valid ID succeeds", %{socket: socket} do
       ref = push(socket, "remove_queue_item", %{"id" => "test-item"})
-      assert_reply ref, :ok, %{status: "item_removed", id: "test-item"}
+
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{operation: "item_removed", id: "test-item"},
+        meta: %{timestamp: _, server_version: _}
+      }
     end
   end
 
@@ -94,7 +128,12 @@ defmodule ServerWeb.StreamChannelTest do
 
       # Send emergency from first client
       ref = push(socket1, "emergency_override", @broadcast_emergency_payload)
-      assert_reply ref, :ok, %{status: "emergency_sent"}
+
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{operation: "emergency_sent", type: _},
+        meta: %{timestamp: _, server_version: _}
+      }
 
       # Both clients should receive the broadcast
       assert_push "emergency_override", broadcast1
@@ -113,7 +152,12 @@ defmodule ServerWeb.StreamChannelTest do
       _socket2 = setup_overlay_socket("client_2", %{correlation_id: "test-2"})
 
       ref = push(socket1, "emergency_clear", %{})
-      assert_reply ref, :ok, %{status: "emergency_cleared"}
+
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{operation: "emergency_cleared"},
+        meta: %{timestamp: _, server_version: _}
+      }
 
       # Both clients should receive the clear broadcast
       assert_push "emergency_clear", _clear1
@@ -129,18 +173,31 @@ defmodule ServerWeb.StreamChannelTest do
 
     test "emergency_override requires type field", %{socket: socket} do
       ref = push(socket, "emergency_override", %{"message" => "test"})
-      assert_reply ref, :error, %{reason: "invalid_payload"}
+
+      assert_reply ref, :error, %{
+        success: false,
+        error: %{code: "invalid_payload", message: _, timestamp: _}
+      }
     end
 
     test "emergency_override requires message field for most types", %{socket: socket} do
       ref = push(socket, "emergency_override", %{"type" => "technical-difficulties"})
-      assert_reply ref, :error, %{reason: "invalid_payload"}
+
+      assert_reply ref, :error, %{
+        success: false,
+        error: %{code: "invalid_payload", message: _, timestamp: _}
+      }
     end
 
     test "emergency_override accepts all valid types", %{socket: socket} do
       for type <- @valid_emergency_types do
         ref = push(socket, "emergency_override", %{"type" => type, "message" => "test"})
-        assert_reply ref, :ok, %{status: "emergency_sent", type: ^type}
+
+        assert_reply ref, :ok, %{
+          success: true,
+          data: %{operation: "emergency_sent", type: ^type},
+          meta: %{timestamp: _, server_version: _}
+        }
       end
     end
   end
@@ -154,17 +211,30 @@ defmodule ServerWeb.StreamChannelTest do
     test "handles nil correlation_id gracefully", %{} do
       nil_socket = setup_overlay_socket("test_user", %{correlation_id: nil})
       ref = push(nil_socket, "ping", %{})
-      assert_reply ref, :ok, %{pong: true}
+
+      assert_reply ref, :ok, %{
+        success: true,
+        data: %{pong: true, timestamp: _},
+        meta: %{timestamp: _, server_version: _}
+      }
     end
 
     test "handles emergency override with missing required fields", %{socket: socket} do
       # Test completely empty payload
       ref = push(socket, "emergency_override", %{})
-      assert_reply ref, :error, %{reason: "invalid_payload"}
+
+      assert_reply ref, :error, %{
+        success: false,
+        error: %{code: "invalid_payload", message: _, timestamp: _}
+      }
 
       # Test payload with only type (missing message)
       ref = push(socket, "emergency_override", %{"type" => "custom"})
-      assert_reply ref, :error, %{reason: "invalid_payload"}
+
+      assert_reply ref, :error, %{
+        success: false,
+        error: %{code: "invalid_payload", message: _, timestamp: _}
+      }
     end
 
     test "request_state sends stream state", %{socket: socket} do
