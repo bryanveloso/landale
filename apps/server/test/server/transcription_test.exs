@@ -302,7 +302,7 @@ defmodule Server.TranscriptionTest do
 
   # Helper functions
 
-  defp valid_transcription_attrs(attrs \\ %{}) do
+  defp valid_transcription_attrs(attrs) do
     %{
       timestamp: ~U[2024-01-01 12:00:00.000000Z],
       duration: 2.5,
@@ -314,8 +314,7 @@ defmodule Server.TranscriptionTest do
 
   defp insert_transcription(attrs \\ %{}) do
     {:ok, transcription} =
-      attrs
-      |> valid_transcription_attrs()
+      valid_transcription_attrs(attrs)
       |> Transcription.create_transcription()
 
     transcription

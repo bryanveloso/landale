@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as OmnibarRouteImport } from './routes/omnibar'
+import { Route as EmergencyRouteImport } from './routes/emergency'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShowsIronmonFullRouteImport } from './routes/shows/ironmon/full'
 
 const OmnibarRoute = OmnibarRouteImport.update({
   id: '/omnibar',
   path: '/omnibar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmergencyRoute = EmergencyRouteImport.update({
+  id: '/emergency',
+  path: '/emergency',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -31,30 +37,34 @@ const ShowsIronmonFullRoute = ShowsIronmonFullRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/emergency': typeof EmergencyRoute
   '/omnibar': typeof OmnibarRoute
   '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/emergency': typeof EmergencyRoute
   '/omnibar': typeof OmnibarRoute
   '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/emergency': typeof EmergencyRoute
   '/omnibar': typeof OmnibarRoute
   '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/omnibar' | '/shows/ironmon/full'
+  fullPaths: '/' | '/emergency' | '/omnibar' | '/shows/ironmon/full'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/omnibar' | '/shows/ironmon/full'
-  id: '__root__' | '/' | '/omnibar' | '/shows/ironmon/full'
+  to: '/' | '/emergency' | '/omnibar' | '/shows/ironmon/full'
+  id: '__root__' | '/' | '/emergency' | '/omnibar' | '/shows/ironmon/full'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EmergencyRoute: typeof EmergencyRoute
   OmnibarRoute: typeof OmnibarRoute
   ShowsIronmonFullRoute: typeof ShowsIronmonFullRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/solid-router' {
       path: '/omnibar'
       fullPath: '/omnibar'
       preLoaderRoute: typeof OmnibarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/emergency': {
+      id: '/emergency'
+      path: '/emergency'
+      fullPath: '/emergency'
+      preLoaderRoute: typeof EmergencyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -87,6 +104,7 @@ declare module '@tanstack/solid-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EmergencyRoute: EmergencyRoute,
   OmnibarRoute: OmnibarRoute,
   ShowsIronmonFullRoute: ShowsIronmonFullRoute,
 }

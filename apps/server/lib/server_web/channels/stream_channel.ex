@@ -83,6 +83,79 @@ defmodule ServerWeb.StreamChannel do
     {:reply, {:ok, %{status: "item_removed", id: item_id}}, socket}
   end
 
+  @impl true
+  def handle_in("force_content", %{"type" => content_type, "data" => data, "duration" => duration}, socket) do
+    Logger.info("Emergency override requested",
+      type: content_type,
+      duration: duration,
+      correlation_id: socket.assigns.correlation_id
+    )
+
+    # Send emergency override to StreamProducer
+    StreamProducer.force_content(content_type, data, duration)
+    {:reply, {:ok, %{status: "override_sent", type: content_type}}, socket}
+  end
+
+  @impl true
+  def handle_in("emergency_override", payload, socket) do
+    Logger.info("Emergency override handler called",
+      payload: inspect(payload),
+      correlation_id: socket.assigns.correlation_id
+    )
+
+    case payload do
+      %{"type" => emergency_type, "message" => message} = payload_data ->
+        duration = Map.get(payload_data, "duration")
+
+        Logger.info("Emergency full-screen override requested",
+          type: emergency_type,
+          message: message,
+          duration: duration,
+          correlation_id: socket.assigns.correlation_id
+        )
+
+        # Broadcast emergency override to all overlay clients
+        Phoenix.PubSub.broadcast(
+          Server.PubSub,
+          "stream:updates",
+          {:emergency_override,
+           %{
+             type: emergency_type,
+             message: message,
+             duration: duration,
+             timestamp: DateTime.utc_now()
+           }}
+        )
+
+        {:reply, {:ok, %{status: "emergency_sent", type: emergency_type}}, socket}
+
+      _ ->
+        Logger.warning("Invalid emergency override payload",
+          payload: inspect(payload),
+          correlation_id: socket.assigns.correlation_id
+        )
+
+        {:reply, {:error, %{reason: "invalid_payload"}}, socket}
+    end
+  end
+
+  @impl true
+  def handle_in("emergency_clear", payload, socket) do
+    Logger.info("Emergency clear handler called",
+      payload: inspect(payload),
+      correlation_id: socket.assigns.correlation_id
+    )
+
+    # Broadcast emergency clear to all overlay clients
+    Phoenix.PubSub.broadcast(
+      Server.PubSub,
+      "stream:updates",
+      {:emergency_clear, %{timestamp: DateTime.utc_now()}}
+    )
+
+    {:reply, {:ok, %{status: "emergency_cleared"}}, socket}
+  end
+
   # Catch-all for unhandled messages
   @impl true
   def handle_in(event, payload, socket) do
@@ -203,6 +276,28 @@ defmodule ServerWeb.StreamChannel do
     {:noreply, socket}
   end
 
+  # Handle emergency overlay events
+  @impl true
+  def handle_info({:emergency_override, emergency_data}, socket) do
+    push(socket, "emergency_override", %{
+      type: emergency_data.type,
+      message: emergency_data.message,
+      duration: emergency_data.duration,
+      timestamp: emergency_data.timestamp
+    })
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:emergency_clear, clear_data}, socket) do
+    push(socket, "emergency_clear", %{
+      timestamp: clear_data.timestamp
+    })
+
+    {:noreply, socket}
+  end
+
   # Private helper functions
 
   defp format_state_for_client(state) do
@@ -212,10 +307,7 @@ defmodule ServerWeb.StreamChannel do
       priority_level: get_priority_level(state),
       interrupt_stack: format_interrupt_stack(state.interrupt_stack),
       ticker_rotation: state.ticker_rotation,
-      metadata: %{
-        last_updated: DateTime.utc_now(),
-        state_version: state.version
-      }
+      metadata: Map.get(state, :metadata, %{last_updated: DateTime.utc_now(), state_version: state.version})
     }
   end
 
@@ -244,7 +336,7 @@ defmodule ServerWeb.StreamChannel do
         active_items: if(state.active_content, do: 1, else: 0),
         pending_items: length(state.interrupt_stack),
         average_wait_time: calculate_average_wait_time(state.interrupt_stack),
-        last_processed: state.metadata.last_updated
+        last_processed: Map.get(state, :metadata, %{last_updated: DateTime.utc_now()}).last_updated
       },
       is_processing: state.active_content != nil
     }
@@ -295,7 +387,7 @@ defmodule ServerWeb.StreamChannel do
   defp convert_interrupt_type_to_queue_type(:alert), do: "alert"
   defp convert_interrupt_type_to_queue_type(:sub_train), do: "sub_train"
   defp convert_interrupt_type_to_queue_type(:manual_override), do: "manual_override"
-  defp convert_interrupt_type_to_queue_type(type), do: "ticker"
+  defp convert_interrupt_type_to_queue_type(_type), do: "ticker"
 
   defp determine_queue_item_status(interrupt, active_content) do
     if active_content && active_content.id == interrupt.id do
