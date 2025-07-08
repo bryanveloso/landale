@@ -32,6 +32,7 @@
       "name": "@landale/overlays",
       "version": "0.0.0",
       "dependencies": {
+        "@landale/logger": "workspace:*",
         "@tailwindcss/vite": "^4.1.11",
         "@tanstack/solid-router": "^1.125.0",
         "@tanstack/solid-router-devtools": "^1.125.0",

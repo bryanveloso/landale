@@ -1,6 +1,7 @@
 import { createContext, useContext, createSignal, onCleanup, onMount } from 'solid-js'
 import type { Component, JSX } from 'solid-js'
 import { Socket } from 'phoenix'
+import { createLogger } from '@landale/logger/browser'
 
 interface SocketContextType {
   socket: () => Socket | null
@@ -27,6 +28,13 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
   const [socket, setSocket] = createSignal<Socket | null>(null)
   const [isConnected, setIsConnected] = createSignal(false)
   const [reconnectAttempts, setReconnectAttempts] = createSignal(0)
+  
+  // Initialize logger
+  const correlationId = `overlay-socket-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+  const logger = createLogger({
+    service: 'landale-overlays',
+    level: 'debug'
+  }).child({ module: 'socket-provider', correlationId })
 
   const getServerUrl = () => {
     if (props.serverUrl) return props.serverUrl
@@ -38,30 +46,45 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
   }
 
   onMount(() => {
-    const phoenixSocket = new Socket(getServerUrl(), {
+    const serverUrl = getServerUrl()
+    logger.info('Initializing socket provider', {
+      metadata: { serverUrl }
+    })
+    
+    const phoenixSocket = new Socket(serverUrl, {
       reconnectAfterMs: (tries: number) => {
         setReconnectAttempts(tries)
+        logger.info('WebSocket reconnection attempt', {
+          metadata: { attempt: tries, delay: Math.min(1000 * Math.pow(2, tries), 30000) }
+        })
         return Math.min(1000 * Math.pow(2, tries), 30000)
       },
       logger: (kind: string, msg: string, data: any) => {
-        console.log(`[Phoenix ${kind}] ${msg}`, data)
+        logger.debug('Phoenix WebSocket event', {
+          metadata: { kind, message: msg, data }
+        })
       }
     })
 
     // Handle socket events
     phoenixSocket.onOpen(() => {
-      console.log('[SocketProvider] Connected to server')
+      logger.info('Socket connection established')
       setIsConnected(true)
       setReconnectAttempts(0)
     })
 
     phoenixSocket.onError((error: any) => {
-      console.error('[SocketProvider] Socket error:', error)
+      logger.error('Socket connection error', {
+        error: { message: error?.message || 'Unknown socket error', type: 'SocketError' },
+        metadata: { reconnectAttempts: reconnectAttempts() }
+      })
       setIsConnected(false)
     })
 
     phoenixSocket.onClose(() => {
-      console.log('[SocketProvider] Socket closed')
+      logger.warn('Socket connection closed', {
+        metadata: { reconnectAttempts: reconnectAttempts() }
+      })
       setIsConnected(false)
     })
 

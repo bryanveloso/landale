@@ -1,6 +1,7 @@
 import { createSignal, createEffect, onCleanup } from 'solid-js'
 import { Channel } from 'phoenix'
 import { useSocket } from '../providers/socket-provider'
+import { createLogger } from '@landale/logger/browser'
 
 // Phoenix types for better TypeScript support
 type PhoenixResponse = { [key: string]: any }
@@ -62,6 +63,13 @@ export function useStreamChannel() {
   
   let channel: Channel | null = null
   
+  // Initialize logger
+  const correlationId = `overlay-stream-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+  const logger = createLogger({
+    service: 'landale-overlays',
+    level: 'debug'
+  }).child({ module: 'stream-channel', correlationId })
+  
   const joinChannel = () => {
     const currentSocket = socket()
     if (!currentSocket) return
@@ -71,37 +79,71 @@ export function useStreamChannel() {
     
     // Handle channel events
     channel.on('stream_state', (payload: StreamState) => {
-      console.log('[StreamChannel] Received stream state:', payload)
+      logger.info('Stream state received', {
+        metadata: {
+          currentShow: payload.current_show,
+          priorityLevel: payload.priority_level,
+          hasActiveContent: !!payload.active_content,
+          interruptCount: payload.interrupt_stack?.length || 0
+        }
+      })
       setStreamState(payload)
     })
     
     channel.on('show_changed', (payload: ShowChange) => {
-      console.log('[StreamChannel] Show changed:', payload)
+      logger.info('Show changed', {
+        metadata: {
+          newShow: payload.show,
+          game: payload.game?.name
+        }
+      })
       // Handle show changes for theme switching
     })
     
     channel.on('interrupt', (payload: any) => {
-      console.log('[StreamChannel] Priority interrupt:', payload)
+      logger.info('Priority interrupt received', {
+        metadata: {
+          type: payload.type,
+          priority: payload.priority,
+          id: payload.id
+        }
+      })
       // Handle priority interrupts
     })
     
     channel.on('content_update', (payload: ContentUpdate) => {
-      console.log('[StreamChannel] Content update:', payload)
+      logger.debug('Content update received', {
+        metadata: {
+          type: payload.type,
+          timestamp: payload.timestamp
+        }
+      })
       // Handle real-time content updates
     })
     
     // Join channel with error handling
     channel.join()
       .receive('ok', (resp: PhoenixResponse) => {
-        console.log('[StreamChannel] Successfully joined channel', resp)
+        logger.info('Channel joined successfully', {
+          operation: 'channel_join',
+          metadata: { channel: 'stream:overlays', response: resp }
+        })
         // Request initial state
         channel?.push('request_state', {})
       })
       .receive('error', (resp: PhoenixResponse) => {
-        console.error('[StreamChannel] Unable to join channel', resp)
+        logger.error('Channel join failed', {
+          operation: 'channel_join',
+          error: { message: resp?.reason || 'Unknown join error', type: 'ChannelJoinError' },
+          metadata: { channel: 'stream:overlays', response: resp }
+        })
       })
       .receive('timeout', () => {
-        console.error('[StreamChannel] Channel join timeout')
+        logger.error('Channel join timeout', {
+          operation: 'channel_join',
+          error: { message: 'Join operation timed out', type: 'ChannelJoinTimeout' },
+          metadata: { channel: 'stream:overlays' }
+        })
       })
   }
   
@@ -116,13 +158,23 @@ export function useStreamChannel() {
     if (channel && isConnected()) {
       channel.push(event, payload)
         .receive('ok', (resp: PhoenixResponse) => {
-          console.log(`[StreamChannel] ${event} sent successfully`, resp)
+          logger.debug('Message sent successfully', {
+            operation: event,
+            metadata: { response: resp }
+          })
         })
         .receive('error', (resp: PhoenixResponse) => {
-          console.error(`[StreamChannel] ${event} failed`, resp)
+          logger.error('Message send failed', {
+            operation: event,
+            error: { message: resp?.reason || 'Unknown send error', type: 'MessageSendError' },
+            metadata: { payload, response: resp }
+          })
         })
     } else {
-      console.warn(`[StreamChannel] Cannot send ${event}: not connected`)
+      logger.warn('Cannot send message: not connected', {
+        operation: event,
+        metadata: { payload, connected: isConnected() }
+      })
     }
   }
   

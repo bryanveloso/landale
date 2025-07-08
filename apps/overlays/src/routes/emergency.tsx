@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/solid-router'
 import { createSignal, createEffect, onCleanup, Show } from 'solid-js'
 import { Socket, Channel } from 'phoenix'
+import { createLogger } from '@landale/logger/browser'
 
 export const Route = createFileRoute('/emergency')({
   component: EmergencyOverlay
@@ -27,6 +28,13 @@ function EmergencyOverlay() {
   
   let channel: Channel | null = null
   let hideTimer: ReturnType<typeof setTimeout> | null = null
+  
+  // Initialize logger with correlation ID
+  const correlationId = `overlay-emergency-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+  const logger = createLogger({
+    service: 'landale-overlays',
+    level: 'debug'
+  }).child({ module: 'emergency', correlationId })
 
   // Connect to WebSocket
   createEffect(() => {
@@ -36,27 +44,34 @@ function EmergencyOverlay() {
     }
     
     const serverUrl = getServerUrl()
-    console.log('[Emergency] Connecting to:', serverUrl)
+    logger.info('Initializing WebSocket connection', {
+      metadata: { serverUrl }
+    })
     
     const phoenixSocket = new Socket(serverUrl, {
       logger: (kind: string, msg: string, data: any) => {
-        console.log(`[Emergency Phoenix ${kind}] ${msg}`, data)
+        logger.debug('Phoenix WebSocket event', {
+          metadata: { kind, message: msg, data }
+        })
       }
     })
 
     phoenixSocket.onOpen(() => {
-      console.log('[Emergency] Connected to server')
+      logger.info('WebSocket connection established')
       setIsConnected(true)
       joinChannel()
     })
 
     phoenixSocket.onError((error: any) => {
-      console.error('[Emergency] Socket error:', error)
+      logger.error('WebSocket connection error', {
+        error: { message: error?.message || 'Unknown socket error', type: 'WebSocketError' },
+        metadata: { serverUrl }
+      })
       setIsConnected(false)
     })
 
     phoenixSocket.onClose(() => {
-      console.log('[Emergency] Socket closed')
+      logger.warn('WebSocket connection closed')
       setIsConnected(false)
     })
 
@@ -72,7 +87,13 @@ function EmergencyOverlay() {
     
     // Handle emergency override events
     channel.on('emergency_override', (payload: any) => {
-      console.log('[Emergency] Received emergency override:', payload)
+      logger.info('Emergency override received', {
+        metadata: {
+          type: payload.type,
+          duration: payload.duration,
+          hasMessage: !!payload.message
+        }
+      })
       
       const newState: EmergencyState = {
         active: true,
@@ -95,16 +116,21 @@ function EmergencyOverlay() {
 
     // Handle emergency clear events
     channel.on('emergency_clear', () => {
-      console.log('[Emergency] Received emergency clear')
+      logger.info('Emergency clear received')
       hideEmergency()
     })
 
     channel.join()
       .receive('ok', () => {
-        console.log('[Emergency] Successfully joined stream channel')
+        logger.info('Channel joined successfully', {
+          metadata: { channel: 'stream:overlays' }
+        })
       })
       .receive('error', (resp: any) => {
-        console.error('[Emergency] Failed to join channel:', resp)
+        logger.error('Channel join failed', {
+          error: { message: resp?.reason || 'Unknown join error', type: 'ChannelJoinError' },
+          metadata: { channel: 'stream:overlays', response: resp }
+        })
       })
   }
 
