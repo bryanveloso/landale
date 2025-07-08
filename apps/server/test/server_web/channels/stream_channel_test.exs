@@ -12,7 +12,7 @@ defmodule ServerWeb.StreamChannelTest do
   @default_emergency_payload %{
     "type" => "technical-difficulties",
     "message" => "We'll be right back!",
-    "duration" => 30000
+    "duration" => 30_000
   }
   @default_force_content_payload %{
     "type" => "manual_override",
@@ -217,9 +217,10 @@ defmodule ServerWeb.StreamChannelTest do
 
   defp cleanup_stream_producer do
     case Process.whereis(StreamProducer) do
-      nil -> 
+      nil ->
         :ok
-      pid when is_pid(pid) -> 
+
+      pid when is_pid(pid) ->
         if Process.alive?(pid) do
           GenServer.stop(pid)
         else
@@ -251,5 +252,5 @@ defmodule ServerWeb.StreamChannelTest do
 
     socket
   end
-
 end
+
