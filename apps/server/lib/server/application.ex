@@ -36,6 +36,8 @@ defmodule Server.Application do
             Server.CorrelationIdPool,
             Server.Events.BatchPublisher,
             Server.Cache,
+            # Circuit breakers for external service resilience
+            Server.CircuitBreakerRegistry,
             # Stream coordination
             Server.ContentAggregator,
             Server.StreamProducer,
