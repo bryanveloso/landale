@@ -6,8 +6,8 @@
  */
 
 import { createSignal } from 'solid-js'
-import { useStreamService } from '../services/stream-service'
-import type { EmergencyOverrideCommand } from '../types/stream'
+import { useStreamService } from '@/services/stream-service'
+import type { EmergencyOverrideCommand } from '@/types/stream'
 
 interface CommandState {
   loading: boolean

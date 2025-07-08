@@ -18,12 +18,12 @@ import type {
   ServerStreamState,
   EmergencyOverrideCommand,
   CommandResponse
-} from '../types/stream'
+} from '@/types/stream'
 import {
   validateServerStreamState,
   validateServerQueueState,
   validateEmergencyCommand
-} from '../types/stream'
+} from '@/types/stream'
 
 // Default states
 const DEFAULT_LAYER_STATE: OverlayLayerState = {

@@ -6,11 +6,11 @@
  */
 
 import { createSignal, createEffect } from 'solid-js'
-import { useStreamService } from '../services/stream-service'
-import type { OverlayLayerState, ConnectionState } from '../types/stream'
+import { useStreamService } from '@/services/stream-service'
+import type { OverlayLayerState, ConnectionState } from '@/types/stream'
 
 // Re-export types for backward compatibility
-export type { OverlayLayerState, LayerState, StreamContent as LayerContent } from '../types/stream'
+export type { OverlayLayerState, LayerState, StreamContent as LayerContent } from '@/types/stream'
 
 const DEFAULT_LAYER_STATE: OverlayLayerState = {
   current_show: 'variety',

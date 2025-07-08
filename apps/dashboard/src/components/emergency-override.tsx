@@ -6,9 +6,9 @@
  */
 
 import { createSignal } from 'solid-js'
-import { useStreamCommands } from '../../hooks/use-stream-commands'
-import { useLayerState } from '../../hooks/use-layer-state'
-import type { EmergencyOverrideCommand } from '../../types/stream'
+import { useStreamCommands } from '@/hooks/use-stream-commands'
+import { useLayerState } from '@/hooks/use-layer-state'
+import type { EmergencyOverrideCommand } from '@/types/stream'
 
 export function EmergencyOverride() {
   const commands = useStreamCommands()
@@ -69,16 +69,12 @@ export function EmergencyOverride() {
   ]
 
   return (
-    <div 
-      data-emergency-override
-      data-connected={isConnected()}
-    >
+    <div>
       {/* Emergency Type Selection */}
-      <div data-emergency-type-selection>
+      <div>
         <select
           value={emergencyType()}
           onInput={(e) => setEmergencyType(e.target.value)}
-          data-emergency-type-select
           disabled={commands.emergencyState().loading}
         >
           {emergencyTypes.map(type => (
@@ -88,14 +84,13 @@ export function EmergencyOverride() {
       </div>
 
       {/* Main Emergency Control */}
-      <div data-emergency-main>
-        <div data-emergency-input>
+      <div>
+        <div>
           <input
             type="text"
             value={alertText()}
             onInput={(e) => setAlertText(e.target.value)}
             placeholder={emergencyType() === 'screen-cover' ? 'Optional message...' : 'Emergency message...'}
-            data-alert-input
             disabled={commands.emergencyState().loading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !commands.emergencyState().loading) {
@@ -106,7 +101,7 @@ export function EmergencyOverride() {
             }}
           />
           
-          <div data-duration-control>
+          <div>
             <input
               type="number"
               value={duration()}
@@ -114,28 +109,24 @@ export function EmergencyOverride() {
               min="5"
               max="180"
               step="5"
-              data-duration-input
             />
-            <span data-duration-label>sec</span>
+            <span>sec</span>
           </div>
         </div>
 
-        <div data-emergency-actions>
+        <div>
           <button
-            data-send-emergency
             onClick={sendEmergencyOverride}
             disabled={
               (emergencyType() !== 'screen-cover' && !alertText().trim()) || 
               commands.emergencyState().loading || 
               !isConnected()
             }
-            data-sending={commands.emergencyState().loading}
           >
             {commands.emergencyState().loading ? 'Sending...' : 'Send Emergency'}
           </button>
           
           <button
-            data-clear-emergency
             onClick={clearEmergency}
             disabled={commands.emergencyState().loading || !isConnected()}
           >
@@ -145,10 +136,9 @@ export function EmergencyOverride() {
       </div>
 
       {/* Quick Emergency Actions */}
-      <div data-quick-emergencies>
+      <div>
         {quickEmergencies.map(emergency => (
           <button
-            data-quick-emergency
             onClick={() => {
               setEmergencyType(emergency.type)
               setAlertText(emergency.text)
@@ -162,28 +152,23 @@ export function EmergencyOverride() {
       </div>
 
       {/* Status Info */}
-      <div data-override-status>
-        <div data-connection-status data-connected={isConnected()}>
-          {isConnected() ? 'Connected' : 'Disconnected'}
-        </div>
-        
+      <div>
         {commands.emergencyState().error && (
-          <div data-error-status>
+          <div>
             Error: {commands.emergencyState().error}
           </div>
         )}
         
         {commands.emergencyState().lastExecuted && (
-          <div data-last-executed>
+          <div>
             Last executed: {new Date(commands.emergencyState().lastExecuted!).toLocaleTimeString()}
           </div>
         )}
         
         {lastSent() && (
-          <div data-last-sent>
+          <div>
             Last: {lastSent()}
             <button
-              data-replay-button
               onClick={replayLastAlert}
               disabled={commands.emergencyState().loading}
             >
@@ -195,8 +180,7 @@ export function EmergencyOverride() {
 
       {/* Debug info in development */}
       {import.meta.env.DEV && (
-        <div data-debug-info>
-          <div>Connected: {isConnected() ? '✓' : '✗'}</div>
+        <div>
           <div>Emergency Loading: {commands.emergencyState().loading ? 'Yes' : 'No'}</div>
           <div>Emergency Error: {commands.emergencyState().error || 'None'}</div>
         </div>

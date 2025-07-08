@@ -6,12 +6,12 @@
  */
 
 import { createSignal, createEffect } from 'solid-js'
-import { useStreamService } from '../services/stream-service'
+import { useStreamService } from '@/services/stream-service'
 import { useStreamCommands } from './use-stream-commands'
-import type { StreamQueueState, ConnectionState } from '../types/stream'
+import type { StreamQueueState, ConnectionState } from '@/types/stream'
 
 // Re-export types for backward compatibility
-export type { QueueItem, QueueMetrics, StreamQueueState } from '../types/stream'
+export type { QueueItem, QueueMetrics, StreamQueueState } from '@/types/stream'
 
 const DEFAULT_QUEUE_STATE: StreamQueueState = {
   queue: [],
