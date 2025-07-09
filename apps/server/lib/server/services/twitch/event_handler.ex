@@ -28,6 +28,7 @@ defmodule Server.Services.Twitch.EventHandler do
   """
 
   require Logger
+  alias Server.ActivityLog
 
   @doc """
   Processes an incoming EventSub notification event.
@@ -54,6 +55,7 @@ defmodule Server.Services.Twitch.EventHandler do
          :ok <- validate_event_data(event_data) do
       try do
         normalized_event = normalize_event(event_type, event_data)
+        store_event_in_activity_log(event_type, normalized_event)
         publish_event(event_type, normalized_event)
         emit_telemetry(event_type, normalized_event)
 
@@ -394,5 +396,99 @@ defmodule Server.Services.Twitch.EventHandler do
 
   defp validate_event_data(event_data) do
     {:error, "Invalid event_data: #{inspect(event_data)} - must be a map"}
+  end
+
+  # Stores an event in the ActivityLog database.
+  # Only stores events that are valuable for the Activity Log interface.
+  # Excludes ephemeral events that don't need long-term storage.
+  @spec store_event_in_activity_log(binary(), map()) :: :ok
+  defp store_event_in_activity_log(event_type, normalized_event) do
+    # Only store events that are valuable for the Activity Log
+    if should_store_event?(event_type) do
+      # Prepare event attributes for database storage
+      event_attrs = %{
+        timestamp: normalized_event.timestamp,
+        event_type: event_type,
+        user_id: normalized_event[:user_id],
+        user_login: normalized_event[:user_login],
+        user_name: normalized_event[:user_name],
+        data: normalized_event,
+        correlation_id: generate_correlation_id()
+      }
+
+      # Store the event asynchronously to avoid blocking the event pipeline
+      Task.start(fn ->
+        case ActivityLog.store_event(event_attrs) do
+          {:ok, _event} ->
+            Logger.debug("Event stored in ActivityLog",
+              event_type: event_type,
+              event_id: normalized_event.id
+            )
+
+            # Also upsert user information if we have user data
+            if normalized_event[:user_id] do
+              upsert_user_from_event(normalized_event)
+            end
+
+          {:error, changeset} ->
+            Logger.warning("Failed to store event in ActivityLog",
+              event_type: event_type,
+              event_id: normalized_event.id,
+              errors: inspect(changeset.errors)
+            )
+        end
+      end)
+    end
+
+    :ok
+  end
+
+  # Determine which events should be stored in the ActivityLog
+  defp should_store_event?(event_type) do
+    valuable_events = [
+      "channel.chat.message",
+      "channel.chat.clear",
+      "channel.chat.message_delete",
+      "channel.follow",
+      "channel.subscribe",
+      "channel.subscription.gift",
+      "channel.cheer",
+      "channel.update",
+      "stream.online",
+      "stream.offline"
+    ]
+
+    event_type in valuable_events
+  end
+
+  # Upsert user information when we encounter them in events
+  defp upsert_user_from_event(normalized_event) do
+    if normalized_event[:user_id] && normalized_event[:user_login] do
+      user_attrs = %{
+        twitch_id: normalized_event.user_id,
+        login: normalized_event.user_login,
+        display_name: normalized_event[:user_name]
+      }
+
+      case ActivityLog.upsert_user(user_attrs) do
+        {:ok, _user} ->
+          Logger.debug("User upserted in ActivityLog",
+            user_id: normalized_event.user_id,
+            login: normalized_event.user_login
+          )
+
+        {:error, changeset} ->
+          Logger.warning("Failed to upsert user in ActivityLog",
+            user_id: normalized_event.user_id,
+            login: normalized_event.user_login,
+            errors: inspect(changeset.errors)
+          )
+      end
+    end
+  end
+
+  # Simple correlation ID generation for events
+  defp generate_correlation_id do
+    :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
   end
 end
