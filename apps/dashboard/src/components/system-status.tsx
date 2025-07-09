@@ -6,6 +6,7 @@
  */
 
 import { useLayerState } from '@/hooks/use-layer-state'
+import { FallbackIndicator } from './fallback-indicator'
 
 export function SystemStatus() {
   const { layerState } = useLayerState()
@@ -57,6 +58,7 @@ export function SystemStatus() {
       <div class="content-indicator">
         Content: {formatContent()}
       </div>
+      <FallbackIndicator content={layerState()} type="system" />
     </div>
   )
 }

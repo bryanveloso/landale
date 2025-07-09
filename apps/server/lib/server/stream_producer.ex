@@ -586,86 +586,71 @@ defmodule Server.StreamProducer do
     Process.send_after(self(), :ticker_tick, ticker_interval())
   end
 
-  defp safe_service_call(service_fun, fallback_data) do
+  # Enhanced safe service call that uses centralized fallback system
+  defp safe_service_call_with_fallback(service_fun, content_type) do
     try do
       service_fun.()
     rescue
       error ->
-        Logger.warning("Service call failed, using fallback data",
+        Logger.warning("Service call failed, using centralized fallback",
           error: Exception.message(error),
-          module: service_fun |> :erlang.fun_info(:module) |> elem(1),
-          fallback: inspect(fallback_data)
+          content_type: content_type,
+          module: service_fun |> :erlang.fun_info(:module) |> elem(1)
         )
 
-        fallback_data
+        Server.ContentFallbacks.get_fallback_content(content_type)
     catch
       :exit, reason ->
-        Logger.warning("Service call exited, using fallback data",
+        Logger.warning("Service call exited, using centralized fallback",
           reason: inspect(reason),
-          fallback: inspect(fallback_data)
+          content_type: content_type
         )
 
-        fallback_data
+        Server.ContentFallbacks.get_fallback_content(content_type)
     end
   end
 
   defp get_content_data(content_type) do
     case content_type do
       :emote_stats ->
-        safe_service_call(
+        safe_service_call_with_fallback(
           fn -> Server.ContentAggregator.get_emote_stats() end,
-          %{regular_emotes: %{}, native_emotes: %{}}
+          :emote_stats
         )
 
       :recent_follows ->
-        recent_followers =
-          safe_service_call(
-            fn -> Server.ContentAggregator.get_recent_followers(5) end,
-            []
-          )
-
-        %{recent_followers: recent_followers}
+        safe_service_call_with_fallback(
+          fn -> 
+            recent_followers = Server.ContentAggregator.get_recent_followers(5)
+            %{recent_followers: recent_followers}
+          end,
+          :recent_follows
+        )
 
       :daily_stats ->
-        safe_service_call(
+        safe_service_call_with_fallback(
           fn -> Server.ContentAggregator.get_daily_stats() end,
-          %{total_messages: 0, total_follows: 0, started_at: DateTime.utc_now()}
+          :daily_stats
         )
 
       :ironmon_run_stats ->
         # TODO: Get from IronMON service
-        %{
-          run_number: 47,
-          deaths: 3,
-          location: "Cerulean City",
-          gym_progress: 2
-        }
+        Server.ContentFallbacks.get_fallback_content(:ironmon_run_stats)
 
       :commit_stats ->
         # TODO: Get from git integration
-        %{
-          commits_today: 12,
-          lines_added: 245,
-          lines_removed: 89
-        }
+        Server.ContentFallbacks.get_fallback_content(:commit_stats)
 
       :build_status ->
         # TODO: Get from CI integration
-        %{
-          status: "passing",
-          last_build: "2 hours ago",
-          coverage: "85%"
-        }
+        Server.ContentFallbacks.get_fallback_content(:build_status)
 
       :stream_goals ->
         # TODO: Get from goals tracking
-        %{
-          follower_goal: %{current: 1250, target: 1500},
-          sub_goal: %{current: 42, target: 50}
-        }
+        Server.ContentFallbacks.get_fallback_content(:stream_goals)
 
       _ ->
-        %{message: "Content type #{content_type} not implemented yet"}
+        Server.ContentFallbacks.get_fallback_content(content_type)
     end
   end
 

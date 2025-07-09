@@ -182,19 +182,10 @@ defmodule ServerWeb.StreamChannel do
       push(socket, "stream_state", format_state_for_client(current_state))
     rescue
       error ->
-        Logger.error("Failed to get StreamProducer state", error: inspect(error))
-        # Send default state
-        push(socket, "stream_state", %{
-          current_show: :variety,
-          active_content: nil,
-          priority_level: :ticker,
-          interrupt_stack: [],
-          ticker_rotation: [],
-          metadata: %{
-            last_updated: DateTime.utc_now(),
-            state_version: 0
-          }
-        })
+        Logger.error("Failed to get StreamProducer state, using fallback", error: inspect(error))
+        # Send centralized fallback state
+        fallback_state = Server.ContentFallbacks.get_fallback_layer_state()
+        push(socket, "stream_state", fallback_state)
     end
 
     {:noreply, socket}
@@ -209,20 +200,10 @@ defmodule ServerWeb.StreamChannel do
       push(socket, "queue_state", queue_state)
     rescue
       error ->
-        Logger.error("Failed to get queue state", error: inspect(error))
-        # Send default queue state
-        push(socket, "queue_state", %{
-          queue: [],
-          active_content: nil,
-          metrics: %{
-            total_items: 0,
-            active_items: 0,
-            pending_items: 0,
-            average_wait_time: 0,
-            last_processed: nil
-          },
-          is_processing: false
-        })
+        Logger.error("Failed to get queue state, using fallback", error: inspect(error))
+        # Send centralized fallback queue state
+        fallback_queue_state = Server.ContentFallbacks.get_fallback_queue_state()
+        push(socket, "queue_state", fallback_queue_state)
     end
 
     {:noreply, socket}

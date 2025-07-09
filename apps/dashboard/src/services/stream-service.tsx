@@ -178,7 +178,13 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         const transformed = transformServerState(payload)
         setLayerState(transformed)
       } else {
-        console.warn('[StreamService] Invalid stream state payload:', payload)
+        console.warn('[StreamService] Invalid stream state payload, using fallback:', payload)
+        // Use fallback state when payload is invalid
+        setLayerState(prev => ({
+          ...prev,
+          fallback_mode: true,
+          last_updated: new Date().toISOString()
+        }))
       }
     })
 
