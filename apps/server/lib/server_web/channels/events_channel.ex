@@ -5,6 +5,8 @@ defmodule ServerWeb.EventsChannel do
 
   require Logger
 
+  alias ServerWeb.ResponseBuilder
+
   @impl true
   def join("events:" <> topic, _payload, socket) do
     Logger.info("Events channel joined",
@@ -185,7 +187,7 @@ defmodule ServerWeb.EventsChannel do
   # Handle ping for connection health
   @impl true
   def handle_in("ping", _payload, socket) do
-    {:reply, {:ok, %{pong: true, timestamp: System.system_time(:second)}}, socket}
+    {:reply, ResponseBuilder.success(%{pong: true, timestamp: System.system_time(:second)}), socket}
   end
 
   # Catch-all for unhandled messages

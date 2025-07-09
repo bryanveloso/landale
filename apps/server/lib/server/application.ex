@@ -32,10 +32,14 @@ defmodule Server.Application do
           [
             # Task supervision for async operations
             {Task.Supervisor, name: Server.TaskSupervisor},
+            # Dynamic supervisor for runtime-started services
+            {DynamicSupervisor, name: Server.DynamicSupervisor, strategy: :one_for_one},
             # Performance optimizations
             Server.CorrelationIdPool,
             Server.Events.BatchPublisher,
             Server.Cache,
+            # Circuit breakers for external service resilience
+            Server.CircuitBreakerRegistry,
             # Stream coordination
             Server.ContentAggregator,
             Server.StreamProducer,

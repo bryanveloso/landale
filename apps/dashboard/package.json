@@ -1,38 +1,33 @@
 {
   "name": "@landale/dashboard",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "bun tsc --noEmit",
-    "test": "bun test",
-    "test:watch": "bun test --watch"
+    "tauri:dev": "bunx tauri dev",
+    "tauri:build": "bunx tauri build",
+    "tauri:build:debug": "bunx tauri build --debug"
   },
   "dependencies": {
-    "@landale/server": "workspace:*",
-    "@landale/shared": "workspace:*",
+    "@landale/logger": "workspace:*",
     "@tailwindcss/vite": "^4.1.11",
-    "@tanstack/react-query": "^5.81.5",
-    "@tanstack/react-router": "^1.122.0",
-    "@trpc/client": "^11.4.3",
-    "date-fns": "^4.1.0",
-    "lucide-react": "^0.515.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "@tanstack/solid-router": "^1.125.2",
+    "@tanstack/solid-router-devtools": "^1.125.2",
+    "@tauri-apps/plugin-positioner": "^2.3.0",
+    "@tauri-apps/plugin-window-state": "^2.3.0",
+    "radix-ui": "^1.4.2",
+    "solid-js": "^1.9.7",
+    "tailwindcss": "^4.1.11"
   },
   "devDependencies": {
-    "@tanstack/router-vite-plugin": "^1.122.1",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "eslint": "^9.30.0",
-    "eslint-plugin-react-refresh": "^0.4.20",
-    "prettier": "^3.6.2",
-    "tailwindcss": "^4.1.11",
-    "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "@tanstack/router-plugin": "^1.125.1",
+    "@tauri-apps/api": "^2.6.0",
+    "@tauri-apps/cli": "^2.6.2",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.2",
+    "vite-plugin-solid": "^2.11.7",
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }

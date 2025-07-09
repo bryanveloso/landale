@@ -1,44 +1,28 @@
-# Landale Dashboard
-
-Control dashboard for managing Landale overlays and stream settings.
-
-## Features
-
-- **System Status**: Real-time server health monitoring
-- **Emote Rain Control**: Adjust physics settings, trigger bursts, clear all emotes
-- **Activity Feed**: Live stream of all system events
-- **Responsive Design**: Works on desktop and wide displays (1920x480)
-
-## Development
-
-```bash
-# Start the dashboard
-bun dev
-
-# Build for production
-bun build
-
-# Type check
-bun typecheck
-```
-
-## Configuration
-
-Set the API key in `.env`:
-
-```
-VITE_CONTROL_API_KEY=your-secret-key
-```
-
-Or use the default development key: `landale-control-key`
-
 ## Usage
 
-1. Make sure the Landale server is running
-2. Start the dashboard with `bun dev`
-3. Open http://localhost:5174 in your browser
-4. The dashboard will automatically connect to the server on the same hostname
+```bash
+$ npm install # or pnpm install or yarn install
+```
 
-## Future Enhancements
+### Learn more on the [Solid Website](https://solidjs.com) and come chat with us on our [Discord](https://discord.com/invite/solidjs)
 
-This dashboard is designed to be extracted into a separate desktop app (Omnymate) in the future. The API-first design ensures easy migration when ready.
+## Available Scripts
+
+In the project directory, you can run:
+
+### `npm run dev`
+
+Runs the app in the development mode.<br>
+Open [http://localhost:5173](http://localhost:5173) to view it in the browser.
+
+### `npm run build`
+
+Builds the app for production to the `dist` folder.<br>
+It correctly bundles Solid in production mode and optimizes the build for the best performance.
+
+The build is minified and the filenames include the hashes.<br>
+Your app is ready to be deployed!
+
+## Deployment
+
+Learn more about deploying your application with the [documentations](https://vite.dev/guide/static-deploy.html)

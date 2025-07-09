@@ -45,7 +45,8 @@ defmodule Server.StreamProducer do
             ticker_rotation: [],
             ticker_index: 0,
             timers: %{},
-            version: 0
+            version: 0,
+            metadata: %{last_updated: nil, state_version: 0}
 
   ## Client API
 
@@ -108,7 +109,8 @@ defmodule Server.StreamProducer do
 
           %__MODULE__{
             current_show: :variety,
-            ticker_rotation: default_ticker_content(:variety)
+            ticker_rotation: default_ticker_content(:variety),
+            metadata: %{last_updated: DateTime.utc_now(), state_version: 0}
           }
 
         restored_state ->
@@ -120,7 +122,15 @@ defmodule Server.StreamProducer do
 
           # Restore timers for active interrupts
           restored_state = restore_interrupt_timers(restored_state)
-          restored_state
+
+          # Ensure metadata exists (for backward compatibility)
+          case restored_state.metadata do
+            nil ->
+              %{restored_state | metadata: %{last_updated: DateTime.utc_now(), state_version: restored_state.version}}
+
+            _ ->
+              restored_state
+          end
       end
 
     # Start ticker rotation and cleanup timer
@@ -142,13 +152,14 @@ defmodule Server.StreamProducer do
   def handle_cast({:change_show, show, metadata}, state) do
     Logger.info("Show changed", show: show, metadata: metadata)
 
-    new_state = %{
-      state
-      | current_show: show,
-        ticker_rotation: default_ticker_content(show),
-        ticker_index: 0,
-        version: state.version + 1
-    }
+    new_state =
+      %{
+        state
+        | current_show: show,
+          ticker_rotation: default_ticker_content(show),
+          ticker_index: 0
+      }
+      |> update_metadata()
 
     # Broadcast show change
     Phoenix.PubSub.broadcast(
@@ -189,7 +200,9 @@ defmodule Server.StreamProducer do
     # Set timer for interrupt expiration using atomic registration
     {_timer_ref, new_timers} = register_timer_atomically(state.timers, interrupt_id, duration)
 
-    new_state = %{state | interrupt_stack: new_stack, timers: new_timers, version: state.version + 1}
+    new_state =
+      %{state | interrupt_stack: new_stack, timers: new_timers}
+      |> update_metadata()
 
     # Update active content if this interrupt has higher priority
     new_state = update_active_content(new_state)
@@ -209,7 +222,9 @@ defmodule Server.StreamProducer do
 
     new_stack = Enum.reject(state.interrupt_stack, &(&1.id == interrupt_id))
 
-    new_state = %{state | interrupt_stack: new_stack, timers: new_timers, version: state.version + 1}
+    new_state =
+      %{state | interrupt_stack: new_stack, timers: new_timers}
+      |> update_metadata()
 
     # Update active content after removal
     new_state = update_active_content(new_state)
@@ -220,7 +235,9 @@ defmodule Server.StreamProducer do
 
   @impl true
   def handle_cast({:update_ticker_content, content_list}, state) do
-    new_state = %{state | ticker_rotation: content_list, ticker_index: 0, version: state.version + 1}
+    new_state =
+      %{state | ticker_rotation: content_list, ticker_index: 0}
+      |> update_metadata()
 
     broadcast_state_update(new_state)
     {:noreply, new_state}
@@ -358,7 +375,9 @@ defmodule Server.StreamProducer do
       # Set timer for interrupt expiration using atomic registration
       {_timer_ref, new_timers} = register_timer_atomically(state.timers, interrupt_id, duration)
 
-      new_state = %{state | interrupt_stack: new_stack, timers: new_timers, version: state.version + 1}
+      new_state =
+        %{state | interrupt_stack: new_stack, timers: new_timers}
+        |> update_metadata()
 
       # Update active content if this interrupt has higher priority
       new_state = update_active_content(new_state)
@@ -492,7 +511,10 @@ defmodule Server.StreamProducer do
       state
     else
       new_index = rem(state.ticker_index + 1, length(state.ticker_rotation))
-      new_state = %{state | ticker_index: new_index, version: state.version + 1}
+
+      new_state =
+        %{state | ticker_index: new_index}
+        |> update_metadata()
 
       # Only update if no interrupts are active
       if Enum.empty?(state.interrupt_stack) do
@@ -509,7 +531,9 @@ defmodule Server.StreamProducer do
     new_stack = Enum.reject(state.interrupt_stack, &(&1.id == interrupt_id))
     new_timers = Map.delete(state.timers, interrupt_id)
 
-    new_state = %{state | interrupt_stack: new_stack, timers: new_timers, version: state.version + 1}
+    new_state =
+      %{state | interrupt_stack: new_stack, timers: new_timers}
+      |> update_metadata()
 
     update_active_content(new_state)
   end
@@ -562,86 +586,71 @@ defmodule Server.StreamProducer do
     Process.send_after(self(), :ticker_tick, ticker_interval())
   end
 
-  defp safe_service_call(service_fun, fallback_data) do
+  # Enhanced safe service call that uses centralized fallback system
+  defp safe_service_call_with_fallback(service_fun, content_type) do
     try do
       service_fun.()
     rescue
       error ->
-        Logger.warning("Service call failed, using fallback data",
+        Logger.warning("Service call failed, using centralized fallback",
           error: Exception.message(error),
-          module: service_fun |> :erlang.fun_info(:module) |> elem(1),
-          fallback: inspect(fallback_data)
+          content_type: content_type,
+          module: service_fun |> :erlang.fun_info(:module) |> elem(1)
         )
 
-        fallback_data
+        Server.ContentFallbacks.get_fallback_content(content_type)
     catch
       :exit, reason ->
-        Logger.warning("Service call exited, using fallback data",
+        Logger.warning("Service call exited, using centralized fallback",
           reason: inspect(reason),
-          fallback: inspect(fallback_data)
+          content_type: content_type
         )
 
-        fallback_data
+        Server.ContentFallbacks.get_fallback_content(content_type)
     end
   end
 
   defp get_content_data(content_type) do
     case content_type do
       :emote_stats ->
-        safe_service_call(
+        safe_service_call_with_fallback(
           fn -> Server.ContentAggregator.get_emote_stats() end,
-          %{regular_emotes: %{}, native_emotes: %{}}
+          :emote_stats
         )
 
       :recent_follows ->
-        recent_followers =
-          safe_service_call(
-            fn -> Server.ContentAggregator.get_recent_followers(5) end,
-            []
-          )
-
-        %{recent_followers: recent_followers}
+        safe_service_call_with_fallback(
+          fn ->
+            recent_followers = Server.ContentAggregator.get_recent_followers(5)
+            %{recent_followers: recent_followers}
+          end,
+          :recent_follows
+        )
 
       :daily_stats ->
-        safe_service_call(
+        safe_service_call_with_fallback(
           fn -> Server.ContentAggregator.get_daily_stats() end,
-          %{total_messages: 0, total_follows: 0, started_at: DateTime.utc_now()}
+          :daily_stats
         )
 
       :ironmon_run_stats ->
         # TODO: Get from IronMON service
-        %{
-          run_number: 47,
-          deaths: 3,
-          location: "Cerulean City",
-          gym_progress: 2
-        }
+        Server.ContentFallbacks.get_fallback_content(:ironmon_run_stats)
 
       :commit_stats ->
         # TODO: Get from git integration
-        %{
-          commits_today: 12,
-          lines_added: 245,
-          lines_removed: 89
-        }
+        Server.ContentFallbacks.get_fallback_content(:commit_stats)
 
       :build_status ->
         # TODO: Get from CI integration
-        %{
-          status: "passing",
-          last_build: "2 hours ago",
-          coverage: "85%"
-        }
+        Server.ContentFallbacks.get_fallback_content(:build_status)
 
       :stream_goals ->
         # TODO: Get from goals tracking
-        %{
-          follower_goal: %{current: 1250, target: 1500},
-          sub_goal: %{current: 42, target: 50}
-        }
+        Server.ContentFallbacks.get_fallback_content(:stream_goals)
 
       _ ->
-        %{message: "Content type #{content_type} not implemented yet"}
+        Server.ContentFallbacks.get_fallback_content(content_type)
     end
   end
 
@@ -768,6 +777,22 @@ defmodule Server.StreamProducer do
       update_active_content(new_state)
     else
       state
+    end
+  end
+
+  # Metadata management
+
+  defp update_metadata(state) do
+    state = ensure_metadata(state)
+    new_version = state.version + 1
+    %{state | version: new_version, metadata: %{last_updated: DateTime.utc_now(), state_version: new_version}}
+  end
+
+  # Safely ensure metadata exists (for backward compatibility)
+  defp ensure_metadata(state) do
+    case Map.get(state, :metadata) do
+      nil -> %{state | metadata: %{last_updated: DateTime.utc_now(), state_version: state.version}}
+      _ -> state
     end
   end
 

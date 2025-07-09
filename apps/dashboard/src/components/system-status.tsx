@@ -1,80 +1,66 @@
-import { Activity, CheckCircle, XCircle, Wifi, WifiOff } from 'lucide-react'
-import { useSubscription } from '@/hooks/use-subscription'
-import type { SystemStatus as SystemStatusType } from '@/types'
+/**
+ * System Status Component
+ *
+ * Displays comprehensive system context information for the dashboard.
+ * Shows current show, priority level, and active content status.
+ */
+
+import { useLayerState } from '@/hooks/use-layer-state'
+import { FallbackIndicator } from './fallback-indicator'
 
 export function SystemStatus() {
-  const {
-    data: status,
-    connectionState,
-    isConnected,
-    isError
-  } = useSubscription<SystemStatusType>('control.system.onStatusUpdate')
+  const { layerState } = useLayerState()
 
-  const getStatusIcon = () => {
-    if (isError) return <XCircle className="h-5 w-5 text-red-500" />
-    if (!isConnected) return <WifiOff className="h-5 w-5 text-gray-500" />
-    return <CheckCircle className="h-5 w-5 text-green-500" />
+  const currentShow = () => layerState().current_show
+  const priorityLevel = () => layerState().priority_level
+  const activeContent = () => layerState().active_content
+  const interruptCount = () => layerState().interrupt_stack.length
+
+  const formatShow = (show: string) => {
+    switch (show) {
+      case 'ironmon':
+        return 'IronMON'
+      case 'variety':
+        return 'Variety'
+      case 'coding':
+        return 'Coding'
+      default:
+        return show
+    }
   }
 
-  const getStatusText = () => {
-    if (isError) return 'Connection error'
-    if (!isConnected) return 'Connecting...'
-    return 'System Status'
+  const formatPriority = (priority: string) => {
+    switch (priority) {
+      case 'alert':
+        return 'Alert'
+      case 'sub_train':
+        return 'Sub Train'
+      case 'ticker':
+        return 'Ticker'
+      default:
+        return priority
+    }
   }
 
-  const getConnectionIndicator = () => {
-    const state = connectionState.state
-    if (state === 'connected') return <Wifi className="h-4 w-4 text-green-500" />
-    if (state === 'error') return <WifiOff className="h-4 w-4 text-red-500" />
-    return <Activity className="h-4 w-4 animate-pulse text-gray-500" />
+  const formatContent = () => {
+    const active = activeContent()
+    const interrupts = interruptCount()
+
+    if (active) {
+      return `Active: ${active.type}`
+    } else if (interrupts > 0) {
+      return `Queue: ${interrupts}`
+    } else {
+      return 'None'
+    }
   }
 
   return (
-    <div className="rounded-lg bg-gray-800 p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-xl font-semibold">
-          {getStatusIcon()}
-          {getStatusText()}
-        </h2>
-        {getConnectionIndicator()}
-      </div>
-
-      {isError && <div className="text-sm text-red-400">{connectionState.error || 'Unable to connect to server'}</div>}
-
-      {isConnected && status && (
-        <div className="space-y-3">
-          <div>
-            <div className="text-sm text-gray-400">Status</div>
-            <div className="font-medium text-green-400 uppercase">{status.status}</div>
-          </div>
-
-          <div>
-            <div className="text-sm text-gray-400">Uptime</div>
-            <div className="font-medium">{status.uptime.formatted}</div>
-          </div>
-
-          <div>
-            <div className="text-sm text-gray-400">Memory Usage</div>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Heap</span>
-                <span>
-                  {status.memory.heapUsed} / {status.memory.heapTotal}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">RSS</span>
-                <span>{status.memory.rss}</span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div className="text-sm text-gray-400">Version</div>
-            <div className="font-mono text-sm">{status.version}</div>
-          </div>
-        </div>
-      )}
+    <div class="system-status">
+      <div class="show-indicator">Show: {formatShow(currentShow())}</div>
+      <div class="priority-indicator">Priority: {formatPriority(priorityLevel())}</div>
+      <div class="content-indicator">Content: {formatContent()}</div>
+      <FallbackIndicator content={layerState()} type="system" />
     </div>
   )
 }

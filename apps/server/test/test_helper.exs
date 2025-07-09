@@ -1,3 +1,5 @@
+# Test support modules would be loaded here if needed
+
 # Configure ExUnit with test groups for better parallel execution
 ExUnit.start(
   # Configure test groups for better organization and parallel execution

@@ -14,7 +14,12 @@ defmodule ServerWeb.DashboardChannelTest do
 
   test "ping replies with status ok", %{socket: socket} do
     ref = push(socket, "ping", %{"hello" => "there"})
-    assert_reply ref, :ok, %{"hello" => "there"}
+
+    assert_reply ref, :ok, %{
+      success: true,
+      data: %{"hello" => "there"},
+      meta: %{timestamp: _, server_version: _}
+    }
   end
 
   test "shout broadcasts to dashboard:lobby", %{socket: socket} do

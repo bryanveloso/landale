@@ -2,8 +2,8 @@
 
 To start your Phoenix server:
 
-  * Run `mix setup` to install and setup dependencies
-  * Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+- Run `mix setup` to install and setup dependencies
+- Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
 
 Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
@@ -34,6 +34,7 @@ mix twitch.token help
 #### Initial Setup (One-time)
 
 1. **Create tokens on development machine:**
+
    ```bash
    mix twitch.token
    ```
@@ -66,7 +67,8 @@ Add to crontab for automatic token refresh:
 ### Environment Setup
 
 Required environment variables:
-- `TWITCH_CLIENT_ID` - Your Twitch application client ID  
+
+- `TWITCH_CLIENT_ID` - Your Twitch application client ID
 - `TWITCH_CLIENT_SECRET` - Your Twitch application client secret
 
 Get these from: https://dev.twitch.tv/console/apps
@@ -80,8 +82,8 @@ For detailed help and troubleshooting, run: `mix twitch.token help`
 
 ## Learn more
 
-  * Official website: https://www.phoenixframework.org/
-  * Guides: https://hexdocs.pm/phoenix/overview.html
-  * Docs: https://hexdocs.pm/phoenix
-  * Forum: https://elixirforum.com/c/phoenix-forum
-  * Source: https://github.com/phoenixframework/phoenix
+- Official website: https://www.phoenixframework.org/
+- Guides: https://hexdocs.pm/phoenix/overview.html
+- Docs: https://hexdocs.pm/phoenix
+- Forum: https://elixirforum.com/c/phoenix-forum
+- Source: https://github.com/phoenixframework/phoenix

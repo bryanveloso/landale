@@ -53,6 +53,7 @@ defmodule Server.MixProject do
       {:bandit, "~> 1.6"},
       {:uuid, "~> 1.1"},
       {:gun, "~> 2.0"},
+      {:httpoison, "~> 2.0"},
       {:open_api_spex, "~> 3.21"},
       {:benchee, "~> 1.3", only: [:dev, :test], runtime: false},
       {:benchee_html, "~> 1.0", only: [:dev, :test], runtime: false},
