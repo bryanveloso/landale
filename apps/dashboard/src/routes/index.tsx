@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/solid-router'
 import { StreamQueue } from '@/components/stream-queue'
 import { LayerStateMonitor } from '@/components/layer-state-monitor'
-import { EmergencyOverride } from '@/components/emergency-override'
+import { TakeoverPanel } from '@/components/takeover-panel'
 import { StatusBar } from '@/components/status-bar'
 
 export const Route = createFileRoute('/')({
@@ -14,7 +14,7 @@ function Index() {
       <div></div>
 
       <div class="flex">
-        <EmergencyOverride />
+        <TakeoverPanel />
         <StreamQueue />
         <LayerStateMonitor />
       </div>

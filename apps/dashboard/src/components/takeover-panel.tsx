@@ -1,8 +1,8 @@
 /**
- * Emergency Override Component
+ * Takeover Panel Component
  * 
+ * Manual overlay takeover controls for full-screen content and streaming interruptions.
  * Uses useStreamCommands for clean command/query separation.
- * No direct WebSocket management - eliminates channel conflicts.
  */
 
 import { createSignal } from 'solid-js'
@@ -11,59 +11,59 @@ import { useLayerState } from '@/hooks/use-layer-state'
 import type { EmergencyOverrideCommand } from '@/types/stream'
 import { Button } from './ui/button'
 
-export function EmergencyOverride() {
+export function TakeoverPanel() {
   const commands = useStreamCommands()
   const { isConnected } = useLayerState()
-  const [alertText, setAlertText] = createSignal('')
+  const [takeoverText, setTakeoverText] = createSignal('')
   const [duration, setDuration] = createSignal(10)
   const [lastSent, setLastSent] = createSignal('')
-  const [emergencyType, setEmergencyType] = createSignal<EmergencyOverrideCommand['type']>('technical-difficulties')
+  const [takeoverType, setTakeoverType] = createSignal<EmergencyOverrideCommand['type']>('technical-difficulties')
 
-  const sendEmergencyOverride = async () => {
-    if (emergencyType() !== 'screen-cover' && !alertText().trim()) {
-      console.error('[EmergencyOverride] No message provided for non-screen-cover emergency')
+  const sendTakeover = async () => {
+    if (takeoverType() !== 'screen-cover' && !takeoverText().trim()) {
+      console.error('[TakeoverPanel] No message provided for non-screen-cover takeover')
       return
     }
 
-    const emergencyData: EmergencyOverrideCommand = {
-      type: emergencyType(),
-      message: alertText().trim(),
+    const takeoverData: EmergencyOverrideCommand = {
+      type: takeoverType(),
+      message: takeoverText().trim(),
       duration: duration() * 1000
     }
 
-    console.log('[EmergencyOverride] Sending emergency data:', emergencyData)
+    console.log('[TakeoverPanel] Sending takeover data:', takeoverData)
 
     try {
-      await commands.sendEmergencyOverride(emergencyData)
+      await commands.sendEmergencyOverride(takeoverData)
       setLastSent(new Date().toLocaleTimeString())
-      setAlertText('')
+      setTakeoverText('')
     } catch (error) {
-      console.error('[EmergencyOverride] Failed to send emergency:', error)
+      console.error('[TakeoverPanel] Failed to send takeover:', error)
     }
   }
 
-  const clearEmergency = async () => {
+  const clearTakeover = async () => {
     try {
       await commands.clearEmergency()
     } catch (error) {
-      console.error('[EmergencyOverride] Failed to clear emergency:', error)
+      console.error('[TakeoverPanel] Failed to clear takeover:', error)
     }
   }
 
-  const replayLastAlert = () => {
+  const replayLastTakeover = () => {
     if (lastSent()) {
-      setAlertText(`REPLAY: ${lastSent()}`)
+      setTakeoverText(`REPLAY: ${lastSent()}`)
     }
   }
 
-  const emergencyTypes = [
+  const takeoverTypes = [
     { value: 'technical-difficulties', label: 'Technical Difficulties' },
     { value: 'screen-cover', label: 'Screen Cover' },
     { value: 'please-stand-by', label: 'Please Stand By' },
     { value: 'custom', label: 'Custom Message' }
   ]
 
-  const quickEmergencies = [
+  const quickTakeovers = [
     { type: 'technical-difficulties', text: 'Technical Difficulties - BRB!', duration: 30 },
     { type: 'screen-cover', text: '', duration: 10 },
     { type: 'please-stand-by', text: 'Stream will resume shortly', duration: 15 }
@@ -71,31 +71,31 @@ export function EmergencyOverride() {
 
   return (
     <div>
-      {/* Emergency Type Selection */}
+      {/* Takeover Type Selection */}
       <div>
         <select
-          value={emergencyType()}
-          onInput={(e) => setEmergencyType(e.target.value)}
+          value={takeoverType()}
+          onInput={(e) => setTakeoverType(e.target.value as any)}
           disabled={commands.emergencyState().loading}>
-          {emergencyTypes.map((type) => (
+          {takeoverTypes.map((type) => (
             <option value={type.value}>{type.label}</option>
           ))}
         </select>
       </div>
 
-      {/* Main Emergency Control */}
+      {/* Main Takeover Control */}
       <div>
         <div>
           <input
             type="text"
-            value={alertText()}
-            onInput={(e) => setAlertText(e.target.value)}
-            placeholder={emergencyType() === 'screen-cover' ? 'Optional message...' : 'Emergency message...'}
+            value={takeoverText()}
+            onInput={(e) => setTakeoverText(e.target.value)}
+            placeholder={takeoverType() === 'screen-cover' ? 'Optional message...' : 'Takeover message...'}
             disabled={commands.emergencyState().loading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !commands.emergencyState().loading) {
-                if (emergencyType() === 'screen-cover' || alertText().trim()) {
-                  sendEmergencyOverride()
+                if (takeoverType() === 'screen-cover' || takeoverText().trim()) {
+                  sendTakeover()
                 }
               }
             }}
@@ -116,32 +116,32 @@ export function EmergencyOverride() {
 
         <div>
           <Button
-            onClick={sendEmergencyOverride}
+            onClick={sendTakeover}
             disabled={
-              (emergencyType() !== 'screen-cover' && !alertText().trim()) ||
+              (takeoverType() !== 'screen-cover' && !takeoverText().trim()) ||
               commands.emergencyState().loading ||
               !isConnected()
             }>
-            {commands.emergencyState().loading ? 'Sending...' : 'Send Emergency'}
+            {commands.emergencyState().loading ? 'Sending...' : 'Send Takeover'}
           </Button>
 
-          <Button onClick={clearEmergency} disabled={commands.emergencyState().loading || !isConnected()}>
+          <Button onClick={clearTakeover} disabled={commands.emergencyState().loading || !isConnected()}>
             Clear
           </Button>
         </div>
       </div>
 
-      {/* Quick Emergency Actions */}
+      {/* Quick Takeover Actions */}
       <div>
-        {quickEmergencies.map((emergency) => (
+        {quickTakeovers.map((takeover) => (
           <Button
             onClick={() => {
-              setEmergencyType(emergency.type)
-              setAlertText(emergency.text)
-              setDuration(emergency.duration)
+              setTakeoverType(takeover.type as any)
+              setTakeoverText(takeover.text)
+              setDuration(takeover.duration)
             }}
             disabled={commands.emergencyState().loading}>
-            {emergency.type === 'screen-cover' ? 'Screen Cover' : emergency.text}
+            {takeover.type === 'screen-cover' ? 'Screen Cover' : takeover.text}
           </Button>
         ))}
       </div>
@@ -157,7 +157,7 @@ export function EmergencyOverride() {
         {lastSent() && (
           <div>
             Last: {lastSent()}
-            <Button onClick={replayLastAlert} disabled={commands.emergencyState().loading}>
+            <Button onClick={replayLastTakeover} disabled={commands.emergencyState().loading}>
               Replay
             </Button>
           </div>
@@ -167,8 +167,8 @@ export function EmergencyOverride() {
       {/* Debug info in development */}
       {import.meta.env.DEV && (
         <div>
-          <div>Emergency Loading: {commands.emergencyState().loading ? 'Yes' : 'No'}</div>
-          <div>Emergency Error: {commands.emergencyState().error || 'None'}</div>
+          <div>Takeover Loading: {commands.emergencyState().loading ? 'Yes' : 'No'}</div>
+          <div>Takeover Error: {commands.emergencyState().error || 'None'}</div>
         </div>
       )}
     </div>
