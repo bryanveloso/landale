@@ -1,6 +1,6 @@
 /**
  * Pure data hook for stream queue consumption
- * 
+ *
  * Consumes queue state from StreamService and provides command functions.
  * This eliminates channel conflicts and provides clean data access.
  */
@@ -36,30 +36,30 @@ export function useStreamQueue() {
     lastConnected: null,
     error: null
   })
-  
+
   // Subscribe to queue state changes from StreamService
   createEffect(() => {
     const currentState = streamService.queueState()
     setQueueState(currentState)
   })
-  
+
   // Subscribe to connection state changes from StreamService
   createEffect(() => {
     const currentConnection = streamService.connectionState()
     setConnectionState(currentConnection)
   })
-  
+
   // Utility function to request fresh queue state
   const requestQueueState = () => {
     streamService.requestQueueState()
   }
-  
+
   return {
     queueState,
     isConnected: () => connectionState().connected,
     connectionState,
     requestQueueState,
-    
+
     // Queue commands with proper loading states
     clearQueue: commands.clearQueue,
     removeQueueItem: commands.removeQueueItem,

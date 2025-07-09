@@ -7,22 +7,19 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 const host = process.env.TAURI_DEV_HOST || 'localhost'
 
 export default defineConfig(async () => ({
-  plugins: [
-    tsconfigPaths(), 
-    tanstackRouter({ target: 'solid', autoCodeSplitting: true }), 
-    solid(), 
-    tailwindcss()
-  ],
+  plugins: [tsconfigPaths(), tanstackRouter({ target: 'solid', autoCodeSplitting: true }), solid(), tailwindcss()],
   clearScreen: false,
   server: {
     host: host || false,
     port: 5174,
     strictPort: true,
-    hmr: host ? {
-      protocol: 'ws',
-      host: host,
-      port: 5175
-    } : undefined,
+    hmr: host
+      ? {
+          protocol: 'ws',
+          host: host,
+          port: 5175
+        }
+      : undefined,
     allowedHosts: ['zelan', 'localhost']
   },
   envPrefix: ['VITE_', 'TAURI_'],

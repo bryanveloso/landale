@@ -1,6 +1,6 @@
 /**
  * System Status Component
- * 
+ *
  * Displays comprehensive system context information for the dashboard.
  * Shows current show, priority level, and active content status.
  */
@@ -18,26 +18,34 @@ export function SystemStatus() {
 
   const formatShow = (show: string) => {
     switch (show) {
-      case 'ironmon': return 'IronMON'
-      case 'variety': return 'Variety'
-      case 'coding': return 'Coding'
-      default: return show
+      case 'ironmon':
+        return 'IronMON'
+      case 'variety':
+        return 'Variety'
+      case 'coding':
+        return 'Coding'
+      default:
+        return show
     }
   }
 
   const formatPriority = (priority: string) => {
     switch (priority) {
-      case 'alert': return 'Alert'
-      case 'sub_train': return 'Sub Train'
-      case 'ticker': return 'Ticker'
-      default: return priority
+      case 'alert':
+        return 'Alert'
+      case 'sub_train':
+        return 'Sub Train'
+      case 'ticker':
+        return 'Ticker'
+      default:
+        return priority
     }
   }
 
   const formatContent = () => {
     const active = activeContent()
     const interrupts = interruptCount()
-    
+
     if (active) {
       return `Active: ${active.type}`
     } else if (interrupts > 0) {
@@ -49,15 +57,9 @@ export function SystemStatus() {
 
   return (
     <div class="system-status">
-      <div class="show-indicator">
-        Show: {formatShow(currentShow())}
-      </div>
-      <div class="priority-indicator">
-        Priority: {formatPriority(priorityLevel())}
-      </div>
-      <div class="content-indicator">
-        Content: {formatContent()}
-      </div>
+      <div class="show-indicator">Show: {formatShow(currentShow())}</div>
+      <div class="priority-indicator">Priority: {formatPriority(priorityLevel())}</div>
+      <div class="content-indicator">Content: {formatContent()}</div>
       <FallbackIndicator content={layerState()} type="system" />
     </div>
   )

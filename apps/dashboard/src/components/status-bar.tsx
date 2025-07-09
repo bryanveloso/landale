@@ -1,5 +1,5 @@
-import { ConnectionStatus } from "./connection-status";
-import { SystemStatus } from "./system-status";
+import { ConnectionStatus } from './connection-status'
+import { SystemStatus } from './system-status'
 
 export function StatusBar() {
   return (

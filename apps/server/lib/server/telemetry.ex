@@ -352,6 +352,36 @@ defmodule Server.Telemetry do
   end
 
   @doc """
+  Emits telemetry event for successful Twitch API calls.
+  """
+  def twitch_api_call_success(method, path) do
+    :telemetry.execute([:server, :twitch, :api, :calls, :success], %{count: 1}, %{
+      method: method,
+      path: path
+    })
+  end
+
+  @doc """
+  Emits telemetry event for failed Twitch API calls.
+  """
+  def twitch_api_call_error(method, path, error_type) do
+    :telemetry.execute([:server, :twitch, :api, :calls, :error], %{count: 1}, %{
+      method: method,
+      path: path,
+      error_type: error_type
+    })
+  end
+
+  @doc """
+  Emits telemetry event for rate limited Twitch API calls.
+  """
+  def twitch_api_call_rate_limited(reset_seconds) do
+    :telemetry.execute([:server, :twitch, :api, :calls, :rate_limited], %{count: 1}, %{
+      reset_in_seconds: reset_seconds
+    })
+  end
+
+  @doc """
   Emits telemetry event for published events.
   """
   def event_published(event_type, topic) do

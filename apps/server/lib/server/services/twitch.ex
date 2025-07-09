@@ -599,6 +599,9 @@ defmodule Server.Services.Twitch do
           has_session: state.session_id != nil
         )
 
+        # Start API client now that we have validated token and user_id
+        start_api_client(state.token_manager, state.user_id)
+
         # If we already have a session established but deferred subscriptions, trigger them now
         if state.session_id do
           Logger.info("Token validation completed with active session",
@@ -1446,6 +1449,26 @@ defmodule Server.Services.Twitch do
 
   defp get_client_secret do
     System.get_env("TWITCH_CLIENT_SECRET")
+  end
+
+  # Start API client with validated token and user_id
+  defp start_api_client(token_manager, user_id) do
+    case DynamicSupervisor.start_child(
+           Server.DynamicSupervisor,
+           {Server.Services.Twitch.ApiClient, [token_manager: token_manager, user_id: user_id]}
+         ) do
+      {:ok, _pid} ->
+        Logger.info("Twitch API client started successfully", user_id: user_id)
+        :ok
+
+      {:error, {:already_started, _pid}} ->
+        Logger.debug("Twitch API client already running", user_id: user_id)
+        :ok
+
+      {:error, reason} ->
+        Logger.error("Failed to start Twitch API client", reason: reason, user_id: user_id)
+        {:error, reason}
+    end
   end
 
   # Helper to identify message types for better debugging

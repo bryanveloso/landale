@@ -1,14 +1,14 @@
 defmodule Server.ContentFallbacks do
   @moduledoc """
   Centralized content fallback system for graceful degradation.
-  
+
   Provides fallback content when external services fail or are unavailable.
   Ensures overlays never go blank and always have sensible default content.
   """
 
   @doc """
   Get fallback content for a given content type.
-  
+
   Returns static fallback data that's safe to display when services fail.
   """
   def get_fallback_content(:recent_follows) do
@@ -139,8 +139,8 @@ defmodule Server.ContentFallbacks do
   """
   def fallback_mode?(content) when is_map(content) do
     Map.get(content, :fallback_mode, false) or
-    Map.get(content, :fallback, false) or
-    Map.has_key?(content, :message)
+      Map.get(content, :fallback, false) or
+      Map.has_key?(content, :message)
   end
 
   def fallback_mode?(_), do: false

@@ -1,6 +1,6 @@
 /**
  * Takeover Panel Component
- * 
+ *
  * Manual overlay takeover controls for full-screen content and streaming interruptions.
  * Uses useStreamCommands for clean command/query separation.
  */
@@ -10,6 +10,14 @@ import { useStreamCommands } from '@/hooks/use-stream-commands'
 import { useLayerState } from '@/hooks/use-layer-state'
 import type { TakeoverCommand } from '@/types/stream'
 import { Button } from './ui/button'
+import { createLogger } from '@landale/logger/browser'
+import { handleError, handleAsyncOperation } from '@/services/error-handler'
+
+const logger = createLogger({
+  service: 'dashboard',
+  level: 'info',
+  enableConsole: true
+})
 
 export function TakeoverPanel() {
   const commands = useStreamCommands()
@@ -21,7 +29,9 @@ export function TakeoverPanel() {
 
   const sendTakeover = async () => {
     if (takeoverType() !== 'screen-cover' && !takeoverText().trim()) {
-      console.error('[TakeoverPanel] No message provided for non-screen-cover takeover')
+      logger.error('No message provided for non-screen-cover takeover', {
+        takeoverType: takeoverType()
+      })
       return
     }
 
@@ -31,23 +41,32 @@ export function TakeoverPanel() {
       duration: duration() * 1000
     }
 
-    console.log('[TakeoverPanel] Sending takeover data:', takeoverData)
+    logger.info('Sending takeover data', {
+      takeoverData: {
+        type: takeoverData.type,
+        message: takeoverData.message,
+        duration: takeoverData.duration
+      }
+    })
 
-    try {
-      await commands.sendTakeover(takeoverData)
+    const result = await handleAsyncOperation(() => commands.sendTakeover(takeoverData), {
+      component: 'TakeoverPanel',
+      operation: 'send takeover',
+      data: { takeoverType: takeoverData.type, duration: takeoverData.duration }
+    })
+
+    if (result.success) {
       setLastSent(new Date().toLocaleTimeString())
       setTakeoverText('')
-    } catch (error) {
-      console.error('[TakeoverPanel] Failed to send takeover:', error)
     }
   }
 
   const clearTakeover = async () => {
-    try {
-      await commands.clearTakeover()
-    } catch (error) {
-      console.error('[TakeoverPanel] Failed to clear takeover:', error)
-    }
+    await handleAsyncOperation(() => commands.clearTakeover(), {
+      component: 'TakeoverPanel',
+      operation: 'clear takeover',
+      data: {}
+    })
   }
 
   const replayLastTakeover = () => {

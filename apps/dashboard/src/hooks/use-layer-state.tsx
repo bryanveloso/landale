@@ -1,6 +1,6 @@
 /**
  * Pure data hook for layer state consumption
- * 
+ *
  * Consumes layer state from StreamService instead of managing Phoenix channels.
  * This eliminates channel conflicts and provides clean data access.
  */
@@ -35,24 +35,24 @@ export function useLayerState() {
     lastConnected: null,
     error: null
   })
-  
+
   // Subscribe to layer state changes from StreamService
   createEffect(() => {
     const currentState = streamService.layerState()
     setLayerState(currentState)
   })
-  
+
   // Subscribe to connection state changes from StreamService
   createEffect(() => {
     const currentConnection = streamService.connectionState()
     setConnectionState(currentConnection)
   })
-  
+
   // Utility function to request fresh state
   const requestState = () => {
     streamService.requestState()
   }
-  
+
   return {
     layerState,
     isConnected: () => connectionState().connected,

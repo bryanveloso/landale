@@ -128,7 +128,7 @@ export interface StreamServiceState {
 }
 
 // Event types for the service
-export type StreamServiceEvent = 
+export type StreamServiceEvent =
   | { type: 'connection_changed'; payload: ConnectionState }
   | { type: 'layer_state_updated'; payload: OverlayLayerState }
   | { type: 'queue_state_updated'; payload: StreamQueueState }
@@ -137,12 +137,7 @@ export type StreamServiceEvent =
   | { type: 'takeover_clear'; payload: any }
 
 // Validation schemas (we'll use these for runtime validation)
-export const TAKEOVER_TYPES = [
-  'technical-difficulties',
-  'screen-cover', 
-  'please-stand-by',
-  'custom'
-] as const
+export const TAKEOVER_TYPES = ['technical-difficulties', 'screen-cover', 'please-stand-by', 'custom'] as const
 
 export const SHOW_TYPES = ['ironmon', 'variety', 'coding'] as const
 

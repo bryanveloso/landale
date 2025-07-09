@@ -1,6 +1,6 @@
 /**
  * Clean command/query separation hook
- * 
+ *
  * Provides command functions with proper loading states and error handling.
  * Separates commands from data subscriptions for clean architecture.
  */
@@ -17,14 +17,14 @@ interface CommandState {
 
 export function useStreamCommands() {
   const streamService = useStreamService()
-  
+
   // Command state tracking
   const [takeoverState, setTakeoverState] = createSignal<CommandState>({
     loading: false,
     error: null,
     lastExecuted: null
   })
-  
+
   const [queueCommandState, setQueueCommandState] = createSignal<CommandState>({
     loading: false,
     error: null,
@@ -177,13 +177,13 @@ export function useStreamCommands() {
     sendTakeover,
     clearTakeover,
     takeoverState,
-    
+
     // Queue commands
     removeQueueItem,
     clearQueue,
     reorderQueue,
     queueCommandState,
-    
+
     // Utility
     requestState,
     requestQueueState

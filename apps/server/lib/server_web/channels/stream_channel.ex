@@ -162,6 +162,82 @@ defmodule ServerWeb.StreamChannel do
     {:reply, ResponseBuilder.success(%{operation: "takeover_cleared"}), socket}
   end
 
+  @impl true
+  def handle_in("update_channel_info", payload, socket) do
+    Logger.info("Channel info update requested",
+      payload: inspect(payload),
+      correlation_id: socket.assigns.correlation_id
+    )
+
+    case validate_channel_info_update(payload) do
+      {:ok, channel_data} ->
+        # Call Twitch API to update channel information
+        case Server.Services.Twitch.ApiClient.modify_channel_information(channel_data) do
+          :ok ->
+            {:reply, ResponseBuilder.success(%{operation: "channel_info_updated"}), socket}
+
+          {:error, reason} ->
+            Logger.warning("Failed to update channel information",
+              error: reason,
+              correlation_id: socket.assigns.correlation_id
+            )
+
+            {:reply, ResponseBuilder.error("api_error", reason), socket}
+        end
+
+      {:error, reason} ->
+        Logger.warning("Invalid channel info update payload",
+          payload: inspect(payload),
+          error: reason,
+          correlation_id: socket.assigns.correlation_id
+        )
+
+        {:reply, ResponseBuilder.error("validation_failed", reason), socket}
+    end
+  end
+
+  @impl true
+  def handle_in("get_channel_info", _payload, socket) do
+    Logger.info("Channel info requested",
+      correlation_id: socket.assigns.correlation_id
+    )
+
+    case Server.Services.Twitch.ApiClient.get_channel_information() do
+      {:ok, channel_info} ->
+        {:reply, ResponseBuilder.success(channel_info), socket}
+
+      {:error, reason} ->
+        Logger.warning("Failed to get channel information",
+          error: reason,
+          correlation_id: socket.assigns.correlation_id
+        )
+
+        {:reply, ResponseBuilder.error("api_error", reason), socket}
+    end
+  end
+
+  @impl true
+  def handle_in("search_categories", %{"query" => query}, socket) do
+    Logger.info("Category search requested",
+      query: query,
+      correlation_id: socket.assigns.correlation_id
+    )
+
+    case Server.Services.Twitch.ApiClient.search_categories(query) do
+      {:ok, categories} ->
+        {:reply, ResponseBuilder.success(categories), socket}
+
+      {:error, reason} ->
+        Logger.warning("Failed to search categories",
+          query: query,
+          error: reason,
+          correlation_id: socket.assigns.correlation_id
+        )
+
+        {:reply, ResponseBuilder.error("api_error", reason), socket}
+    end
+  end
+
   # Catch-all for unhandled messages
   @impl true
   def handle_in(event, payload, socket) do
@@ -425,4 +501,33 @@ defmodule ServerWeb.StreamChannel do
   end
 
   defp validate_queue_item_removal(_), do: {:error, "Missing required field: id"}
+
+  defp validate_channel_info_update(payload) when is_map(payload) do
+    valid_fields = [:game_id, :broadcaster_language, :title, :delay, :tags, :branded_content]
+
+    # Convert string keys to atoms and filter valid fields
+    channel_data =
+      payload
+      |> Enum.reduce([], fn {key, value}, acc ->
+        atom_key = if is_binary(key), do: String.to_existing_atom(key), else: key
+
+        if atom_key in valid_fields and not is_nil(value) do
+          [{atom_key, value} | acc]
+        else
+          acc
+        end
+      end)
+      |> Enum.reverse()
+
+    if Enum.empty?(channel_data) do
+      {:error, "At least one valid field must be provided: #{Enum.join(valid_fields, ", ")}"}
+    else
+      {:ok, channel_data}
+    end
+  rescue
+    ArgumentError ->
+      {:error, "Invalid field names provided"}
+  end
+
+  defp validate_channel_info_update(_), do: {:error, "Payload must be a map"}
 end

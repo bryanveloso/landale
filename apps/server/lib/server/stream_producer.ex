@@ -620,7 +620,7 @@ defmodule Server.StreamProducer do
 
       :recent_follows ->
         safe_service_call_with_fallback(
-          fn -> 
+          fn ->
             recent_followers = Server.ContentAggregator.get_recent_followers(5)
             %{recent_followers: recent_followers}
           end,

@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/solid-router'
 import { StreamQueue } from '@/components/stream-queue'
 import { LayerStateMonitor } from '@/components/layer-state-monitor'
 import { TakeoverPanel } from '@/components/takeover-panel'
+import { StreamInformation } from '@/components/stream-information'
+import { DebugDrawer } from '@/components/debug-drawer'
 import { StatusBar } from '@/components/status-bar'
 import { ConnectionMonitor } from '@/components/error-boundary'
 
@@ -16,12 +18,14 @@ function Index() {
         <div></div>
 
         <div class="flex">
+          <StreamInformation />
           <TakeoverPanel />
           <StreamQueue />
           <LayerStateMonitor />
         </div>
 
         <StatusBar />
+        <DebugDrawer />
       </div>
     </ConnectionMonitor>
   )
