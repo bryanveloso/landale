@@ -8,7 +8,7 @@
 import { createSignal } from 'solid-js'
 import { useStreamCommands } from '@/hooks/use-stream-commands'
 import { useLayerState } from '@/hooks/use-layer-state'
-import type { EmergencyOverrideCommand } from '@/types/stream'
+import type { TakeoverCommand } from '@/types/stream'
 import { Button } from './ui/button'
 
 export function TakeoverPanel() {
@@ -17,7 +17,7 @@ export function TakeoverPanel() {
   const [takeoverText, setTakeoverText] = createSignal('')
   const [duration, setDuration] = createSignal(10)
   const [lastSent, setLastSent] = createSignal('')
-  const [takeoverType, setTakeoverType] = createSignal<EmergencyOverrideCommand['type']>('technical-difficulties')
+  const [takeoverType, setTakeoverType] = createSignal<TakeoverCommand['type']>('technical-difficulties')
 
   const sendTakeover = async () => {
     if (takeoverType() !== 'screen-cover' && !takeoverText().trim()) {
@@ -25,7 +25,7 @@ export function TakeoverPanel() {
       return
     }
 
-    const takeoverData: EmergencyOverrideCommand = {
+    const takeoverData: TakeoverCommand = {
       type: takeoverType(),
       message: takeoverText().trim(),
       duration: duration() * 1000
@@ -34,7 +34,7 @@ export function TakeoverPanel() {
     console.log('[TakeoverPanel] Sending takeover data:', takeoverData)
 
     try {
-      await commands.sendEmergencyOverride(takeoverData)
+      await commands.sendTakeover(takeoverData)
       setLastSent(new Date().toLocaleTimeString())
       setTakeoverText('')
     } catch (error) {
@@ -44,7 +44,7 @@ export function TakeoverPanel() {
 
   const clearTakeover = async () => {
     try {
-      await commands.clearEmergency()
+      await commands.clearTakeover()
     } catch (error) {
       console.error('[TakeoverPanel] Failed to clear takeover:', error)
     }
@@ -76,7 +76,7 @@ export function TakeoverPanel() {
         <select
           value={takeoverType()}
           onInput={(e) => setTakeoverType(e.target.value as any)}
-          disabled={commands.emergencyState().loading}>
+          disabled={commands.takeoverState().loading}>
           {takeoverTypes.map((type) => (
             <option value={type.value}>{type.label}</option>
           ))}
@@ -91,9 +91,9 @@ export function TakeoverPanel() {
             value={takeoverText()}
             onInput={(e) => setTakeoverText(e.target.value)}
             placeholder={takeoverType() === 'screen-cover' ? 'Optional message...' : 'Takeover message...'}
-            disabled={commands.emergencyState().loading}
+            disabled={commands.takeoverState().loading}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !commands.emergencyState().loading) {
+              if (e.key === 'Enter' && !commands.takeoverState().loading) {
                 if (takeoverType() === 'screen-cover' || takeoverText().trim()) {
                   sendTakeover()
                 }
@@ -119,13 +119,13 @@ export function TakeoverPanel() {
             onClick={sendTakeover}
             disabled={
               (takeoverType() !== 'screen-cover' && !takeoverText().trim()) ||
-              commands.emergencyState().loading ||
+              commands.takeoverState().loading ||
               !isConnected()
             }>
-            {commands.emergencyState().loading ? 'Sending...' : 'Send Takeover'}
+            {commands.takeoverState().loading ? 'Sending...' : 'Send Takeover'}
           </Button>
 
-          <Button onClick={clearTakeover} disabled={commands.emergencyState().loading || !isConnected()}>
+          <Button onClick={clearTakeover} disabled={commands.takeoverState().loading || !isConnected()}>
             Clear
           </Button>
         </div>
@@ -140,7 +140,7 @@ export function TakeoverPanel() {
               setTakeoverText(takeover.text)
               setDuration(takeover.duration)
             }}
-            disabled={commands.emergencyState().loading}>
+            disabled={commands.takeoverState().loading}>
             {takeover.type === 'screen-cover' ? 'Screen Cover' : takeover.text}
           </Button>
         ))}
@@ -148,16 +148,16 @@ export function TakeoverPanel() {
 
       {/* Status Info */}
       <div>
-        {commands.emergencyState().error && <div>Error: {commands.emergencyState().error}</div>}
+        {commands.takeoverState().error && <div>Error: {commands.takeoverState().error}</div>}
 
-        {commands.emergencyState().lastExecuted && (
-          <div>Last executed: {new Date(commands.emergencyState().lastExecuted!).toLocaleTimeString()}</div>
+        {commands.takeoverState().lastExecuted && (
+          <div>Last executed: {new Date(commands.takeoverState().lastExecuted!).toLocaleTimeString()}</div>
         )}
 
         {lastSent() && (
           <div>
             Last: {lastSent()}
-            <Button onClick={replayLastTakeover} disabled={commands.emergencyState().loading}>
+            <Button onClick={replayLastTakeover} disabled={commands.takeoverState().loading}>
               Replay
             </Button>
           </div>
@@ -167,8 +167,8 @@ export function TakeoverPanel() {
       {/* Debug info in development */}
       {import.meta.env.DEV && (
         <div>
-          <div>Takeover Loading: {commands.emergencyState().loading ? 'Yes' : 'No'}</div>
-          <div>Takeover Error: {commands.emergencyState().error || 'None'}</div>
+          <div>Takeover Loading: {commands.takeoverState().loading ? 'Yes' : 'No'}</div>
+          <div>Takeover Error: {commands.takeoverState().error || 'None'}</div>
         </div>
       )}
     </div>

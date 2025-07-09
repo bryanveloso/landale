@@ -84,7 +84,7 @@ export interface ServerQueueState {
 }
 
 // Command interfaces
-export interface EmergencyOverrideCommand {
+export interface TakeoverCommand {
   type: 'technical-difficulties' | 'screen-cover' | 'please-stand-by' | 'custom'
   message: string
   duration?: number
@@ -106,8 +106,8 @@ export interface CommandResponse<T = any> {
   timestamp: string
 }
 
-export interface EmergencyResponse {
-  status: 'emergency_sent' | 'emergency_cleared'
+export interface TakeoverResponse {
+  status: 'takeover_sent' | 'takeover_cleared'
   type?: string
 }
 
@@ -133,11 +133,11 @@ export type StreamServiceEvent =
   | { type: 'layer_state_updated'; payload: OverlayLayerState }
   | { type: 'queue_state_updated'; payload: StreamQueueState }
   | { type: 'show_changed'; payload: { show: string; game?: string; changed_at: string } }
-  | { type: 'emergency_override'; payload: any }
-  | { type: 'emergency_clear'; payload: any }
+  | { type: 'takeover'; payload: any }
+  | { type: 'takeover_clear'; payload: any }
 
 // Validation schemas (we'll use these for runtime validation)
-export const EMERGENCY_TYPES = [
+export const TAKEOVER_TYPES = [
   'technical-difficulties',
   'screen-cover', 
   'please-stand-by',
@@ -153,8 +153,8 @@ export const LAYER_PRIORITIES = ['foreground', 'midground', 'background'] as con
 export const LAYER_STATES = ['hidden', 'entering', 'active', 'interrupted', 'exiting'] as const
 
 // Type guards for runtime validation
-export function isValidEmergencyType(type: string): type is EmergencyOverrideCommand['type'] {
-  return EMERGENCY_TYPES.includes(type as any)
+export function isValidTakeoverType(type: string): type is TakeoverCommand['type'] {
+  return TAKEOVER_TYPES.includes(type as any)
 }
 
 export function isValidShowType(show: string): show is OverlayLayerState['current_show'] {
@@ -166,11 +166,11 @@ export function isValidPriorityLevel(level: string): level is OverlayLayerState[
 }
 
 // Validation functions
-export function validateEmergencyCommand(cmd: any): cmd is EmergencyOverrideCommand {
+export function validateTakeoverCommand(cmd: any): cmd is TakeoverCommand {
   return (
     typeof cmd === 'object' &&
     cmd !== null &&
-    isValidEmergencyType(cmd.type) &&
+    isValidTakeoverType(cmd.type) &&
     typeof cmd.message === 'string' &&
     (cmd.duration === undefined || typeof cmd.duration === 'number')
   )

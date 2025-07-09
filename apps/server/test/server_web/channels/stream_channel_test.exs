@@ -8,8 +8,8 @@ defmodule ServerWeb.StreamChannelTest do
 
   # Test constants
   @test_correlation_id "test-correlation-id"
-  @valid_emergency_types ["technical-difficulties", "screen-cover", "please-stand-by", "custom"]
-  @default_emergency_payload %{
+  @valid_takeover_types ["technical-difficulties", "screen-cover", "please-stand-by", "custom"]
+  @default_takeover_payload %{
     "type" => "technical-difficulties",
     "message" => "We'll be right back!",
     "duration" => 30_000
@@ -19,7 +19,7 @@ defmodule ServerWeb.StreamChannelTest do
     "data" => %{"message" => "Test override", "source" => "test"},
     "duration" => 5000
   }
-  @broadcast_emergency_payload %{
+  @broadcast_takeover_payload %{
     "type" => "please-stand-by",
     "message" => "Broadcast test",
     "duration" => 5000
@@ -50,31 +50,31 @@ defmodule ServerWeb.StreamChannelTest do
       assert is_integer(timestamp)
     end
 
-    test "emergency_override with valid payload succeeds", %{socket: socket} do
-      ref = push(socket, "emergency_override", @default_emergency_payload)
+    test "takeover with valid payload succeeds", %{socket: socket} do
+      ref = push(socket, "takeover", @default_takeover_payload)
 
       assert_reply ref, :ok, %{
         success: true,
-        data: %{operation: "emergency_sent", type: "technical-difficulties"},
+        data: %{operation: "takeover_sent", type: "technical-difficulties"},
         meta: %{timestamp: _, server_version: _}
       }
     end
 
-    test "emergency_override with invalid payload fails", %{socket: socket} do
-      ref = push(socket, "emergency_override", %{"invalid" => "payload"})
+    test "takeover with invalid payload fails", %{socket: socket} do
+      ref = push(socket, "takeover", %{"invalid" => "payload"})
 
       assert_reply ref, :error, %{
         success: false,
-        error: %{code: "invalid_payload", message: _, timestamp: _}
+        error: %{code: "validation_failed", message: _, timestamp: _}
       }
     end
 
-    test "emergency_clear succeeds", %{socket: socket} do
-      ref = push(socket, "emergency_clear", %{})
+    test "takeover_clear succeeds", %{socket: socket} do
+      ref = push(socket, "takeover_clear", %{})
 
       assert_reply ref, :ok, %{
         success: true,
-        data: %{operation: "emergency_cleared"},
+        data: %{operation: "takeover_cleared"},
         meta: %{timestamp: _, server_version: _}
       }
     end
@@ -120,24 +120,24 @@ defmodule ServerWeb.StreamChannelTest do
     end
   end
 
-  describe "emergency broadcasting" do
-    test "emergency_override broadcasts to all overlay clients" do
+  describe "takeover broadcasting" do
+    test "takeover broadcasts to all overlay clients" do
       # Connect multiple overlay clients
       socket1 = setup_overlay_socket("client_1", %{correlation_id: "test-1"})
       _socket2 = setup_overlay_socket("client_2", %{correlation_id: "test-2"})
 
-      # Send emergency from first client
-      ref = push(socket1, "emergency_override", @broadcast_emergency_payload)
+      # Send takeover from first client
+      ref = push(socket1, "takeover", @broadcast_takeover_payload)
 
       assert_reply ref, :ok, %{
         success: true,
-        data: %{operation: "emergency_sent", type: _},
+        data: %{operation: "takeover_sent", type: _},
         meta: %{timestamp: _, server_version: _}
       }
 
       # Both clients should receive the broadcast
-      assert_push "emergency_override", broadcast1
-      assert_push "emergency_override", broadcast2
+      assert_push "takeover", broadcast1
+      assert_push "takeover", broadcast2
 
       # Verify broadcast content
       assert broadcast1.message == "Broadcast test"
@@ -146,22 +146,22 @@ defmodule ServerWeb.StreamChannelTest do
       assert broadcast2.type == "please-stand-by"
     end
 
-    test "emergency_clear broadcasts to all overlay clients" do
+    test "takeover_clear broadcasts to all overlay clients" do
       # Connect multiple overlay clients
       socket1 = setup_overlay_socket("client_1", %{correlation_id: "test-1"})
       _socket2 = setup_overlay_socket("client_2", %{correlation_id: "test-2"})
 
-      ref = push(socket1, "emergency_clear", %{})
+      ref = push(socket1, "takeover_clear", %{})
 
       assert_reply ref, :ok, %{
         success: true,
-        data: %{operation: "emergency_cleared"},
+        data: %{operation: "takeover_cleared"},
         meta: %{timestamp: _, server_version: _}
       }
 
       # Both clients should receive the clear broadcast
-      assert_push "emergency_clear", _clear1
-      assert_push "emergency_clear", _clear2
+      assert_push "takeover_clear", _clear1
+      assert_push "takeover_clear", _clear2
     end
   end
 
@@ -171,31 +171,31 @@ defmodule ServerWeb.StreamChannelTest do
       %{socket: socket}
     end
 
-    test "emergency_override requires type field", %{socket: socket} do
-      ref = push(socket, "emergency_override", %{"message" => "test"})
+    test "takeover requires type field", %{socket: socket} do
+      ref = push(socket, "takeover", %{"message" => "test"})
 
       assert_reply ref, :error, %{
         success: false,
-        error: %{code: "invalid_payload", message: _, timestamp: _}
+        error: %{code: "validation_failed", message: _, timestamp: _}
       }
     end
 
-    test "emergency_override requires message field for most types", %{socket: socket} do
-      ref = push(socket, "emergency_override", %{"type" => "technical-difficulties"})
+    test "takeover requires message field for most types", %{socket: socket} do
+      ref = push(socket, "takeover", %{"type" => "technical-difficulties"})
 
       assert_reply ref, :error, %{
         success: false,
-        error: %{code: "invalid_payload", message: _, timestamp: _}
+        error: %{code: "validation_failed", message: _, timestamp: _}
       }
     end
 
-    test "emergency_override accepts all valid types", %{socket: socket} do
-      for type <- @valid_emergency_types do
-        ref = push(socket, "emergency_override", %{"type" => type, "message" => "test"})
+    test "takeover accepts all valid types", %{socket: socket} do
+      for type <- @valid_takeover_types do
+        ref = push(socket, "takeover", %{"type" => type, "message" => "test"})
 
         assert_reply ref, :ok, %{
           success: true,
-          data: %{operation: "emergency_sent", type: ^type},
+          data: %{operation: "takeover_sent", type: ^type},
           meta: %{timestamp: _, server_version: _}
         }
       end
@@ -219,21 +219,21 @@ defmodule ServerWeb.StreamChannelTest do
       }
     end
 
-    test "handles emergency override with missing required fields", %{socket: socket} do
+    test "handles takeover override with missing required fields", %{socket: socket} do
       # Test completely empty payload
-      ref = push(socket, "emergency_override", %{})
+      ref = push(socket, "takeover", %{})
 
       assert_reply ref, :error, %{
         success: false,
-        error: %{code: "invalid_payload", message: _, timestamp: _}
+        error: %{code: "validation_failed", message: _, timestamp: _}
       }
 
       # Test payload with only type (missing message)
-      ref = push(socket, "emergency_override", %{"type" => "custom"})
+      ref = push(socket, "takeover", %{"type" => "custom"})
 
       assert_reply ref, :error, %{
         success: false,
-        error: %{code: "invalid_payload", message: _, timestamp: _}
+        error: %{code: "validation_failed", message: _, timestamp: _}
       }
     end
 

@@ -4,10 +4,10 @@ import { Socket, Channel } from 'phoenix'
 import { createLogger } from '@landale/logger/browser'
 
 export const Route = createFileRoute('/emergency')({
-  component: EmergencyOverlay
+  component: TakeoverOverlay
 })
 
-interface EmergencyState {
+interface TakeoverState {
   active: boolean
   type: string
   message: string
@@ -15,14 +15,14 @@ interface EmergencyState {
   activatedAt?: string
 }
 
-const DEFAULT_EMERGENCY_STATE: EmergencyState = {
+const DEFAULT_TAKEOVER_STATE: TakeoverState = {
   active: false,
   type: '',
   message: ''
 }
 
-function EmergencyOverlay() {
-  const [emergencyState, setEmergencyState] = createSignal<EmergencyState>(DEFAULT_EMERGENCY_STATE)
+function TakeoverOverlay() {
+  const [takeoverState, setTakeoverState] = createSignal<TakeoverState>(DEFAULT_TAKEOVER_STATE)
   const [socket, setSocket] = createSignal<Socket | null>(null)
   const [isConnected, setIsConnected] = createSignal(false)
   
@@ -30,11 +30,11 @@ function EmergencyOverlay() {
   let hideTimer: ReturnType<typeof setTimeout> | null = null
   
   // Initialize logger with correlation ID
-  const correlationId = `overlay-emergency-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+  const correlationId = `overlay-takeover-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
   const logger = createLogger({
     service: 'landale-overlays',
     level: 'debug'
-  }).child({ module: 'emergency', correlationId })
+  }).child({ module: 'takeover', correlationId })
 
   // Connect to WebSocket
   createEffect(() => {
@@ -85,9 +85,9 @@ function EmergencyOverlay() {
 
     channel = currentSocket.channel('stream:overlays', {})
     
-    // Handle emergency override events
-    channel.on('emergency_override', (payload: any) => {
-      logger.info('Emergency override received', {
+    // Handle takeover events
+    channel.on('takeover', (payload: any) => {
+      logger.info('Takeover received', {
         metadata: {
           type: payload.type,
           duration: payload.duration,
@@ -95,7 +95,7 @@ function EmergencyOverlay() {
         }
       })
       
-      const newState: EmergencyState = {
+      const newState: TakeoverState = {
         active: true,
         type: payload.type || 'custom',
         message: payload.message || '',
@@ -103,20 +103,20 @@ function EmergencyOverlay() {
         activatedAt: new Date().toISOString()
       }
       
-      setEmergencyState(newState)
+      setTakeoverState(newState)
       
       // Auto-hide after duration if specified
       if (payload.duration) {
         if (hideTimer) clearTimeout(hideTimer)
         hideTimer = setTimeout(() => {
-          hideEmergency()
+          hideTakeover()
         }, payload.duration)
       }
     })
 
-    // Handle emergency clear events
-    channel.on('emergency_clear', () => {
-      logger.info('Emergency clear received')
+    // Handle takeover clear events
+    channel.on('takeover_clear', () => {
+      logger.info('Takeover clear received')
       hideEmergency()
     })
 
@@ -134,8 +134,8 @@ function EmergencyOverlay() {
       })
   }
 
-  const hideEmergency = () => {
-    setEmergencyState(DEFAULT_EMERGENCY_STATE)
+  const hideTakeover = () => {
+    setTakeoverState(DEFAULT_TAKEOVER_STATE)
     if (hideTimer) {
       clearTimeout(hideTimer)
       hideTimer = null
@@ -156,35 +156,35 @@ function EmergencyOverlay() {
 
   return (
     <div 
-      data-emergency-overlay
-      data-active={emergencyState().active}
-      data-type={emergencyState().type}
+      data-takeover-overlay
+      data-active={takeoverState().active}
+      data-type={takeoverState().type}
       data-connected={isConnected()}
     >
-      <Show when={emergencyState().active}>
-        <EmergencyContent state={emergencyState()} onHide={hideEmergency} />
+      <Show when={takeoverState().active}>
+        <TakeoverContent state={takeoverState()} onHide={hideTakeover} />
       </Show>
 
       {/* Debug info in development */}
       {import.meta.env.DEV && (
-        <div data-debug-emergency>
+        <div data-debug-takeover>
           <div>Connected: {isConnected() ? '✓' : '✗'}</div>
-          <div>Active: {emergencyState().active ? 'Yes' : 'No'}</div>
-          <div>Type: {emergencyState().type}</div>
+          <div>Active: {takeoverState().active ? 'Yes' : 'No'}</div>
+          <div>Type: {takeoverState().type}</div>
         </div>
       )}
     </div>
   )
 }
 
-interface EmergencyContentProps {
-  state: EmergencyState
+interface TakeoverContentProps {
+  state: TakeoverState
   onHide: () => void
 }
 
-function EmergencyContent(props: EmergencyContentProps) {
+function TakeoverContent(props: TakeoverContentProps) {
   return (
-    <div data-emergency-content data-emergency-type={props.state.type}>
+    <div data-takeover-content data-takeover-type={props.state.type}>
       <Show when={props.state.type === 'technical-difficulties'}>
         <TechnicalDifficulties message={props.state.message} />
       </Show>
@@ -201,28 +201,28 @@ function EmergencyContent(props: EmergencyContentProps) {
         <CustomMessage message={props.state.message} />
       </Show>
 
-      {/* Emergency close button (development only) */}
+      {/* Takeover close button (development only) */}
       {import.meta.env.DEV && (
         <button 
-          data-emergency-close 
+          data-takeover-close 
           onClick={props.onHide}
         >
-          Close Emergency
+          Close Takeover
         </button>
       )}
     </div>
   )
 }
 
-// Emergency overlay components
+// Takeover overlay components
 function TechnicalDifficulties(props: { message: string }) {
   return (
-    <div data-emergency="technical-difficulties">
-      <div data-emergency-title>Technical Difficulties</div>
-      <div data-emergency-subtitle>
+    <div data-takeover="technical-difficulties">
+      <div data-takeover-title>Technical Difficulties</div>
+      <div data-takeover-subtitle>
         {props.message || 'We\'ll be right back!'}
       </div>
-      <div data-emergency-logo>
+      <div data-takeover-logo>
         {/* Logo/branding would go here */}
       </div>
     </div>
@@ -231,7 +231,7 @@ function TechnicalDifficulties(props: { message: string }) {
 
 function ScreenCover(props: { message: string }) {
   return (
-    <div data-emergency="screen-cover">
+    <div data-takeover="screen-cover">
       <div data-cover-content>
         {props.message && (
           <div data-cover-message>{props.message}</div>
@@ -243,7 +243,7 @@ function ScreenCover(props: { message: string }) {
 
 function PleaseStandBy(props: { message: string }) {
   return (
-    <div data-emergency="please-stand-by">
+    <div data-takeover="please-stand-by">
       <div data-standby-title>Please Stand By</div>
       {props.message && (
         <div data-standby-message>{props.message}</div>
@@ -254,9 +254,9 @@ function PleaseStandBy(props: { message: string }) {
 
 function CustomMessage(props: { message: string }) {
   return (
-    <div data-emergency="custom">
+    <div data-takeover="custom">
       <div data-custom-message>
-        {props.message || 'Emergency Override Active'}
+        {props.message || 'Takeover Active'}
       </div>
     </div>
   )

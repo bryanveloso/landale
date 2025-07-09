@@ -14,13 +14,13 @@ import type {
   StreamQueueState,
   ConnectionState,
   ServerStreamState,
-  EmergencyOverrideCommand,
+  TakeoverCommand,
   CommandResponse
 } from '@/types/stream'
 import {
   validateServerStreamState,
   validateServerQueueState,
-  validateEmergencyCommand
+  validateTakeoverCommand
 } from '@/types/stream'
 
 // Default states
@@ -66,8 +66,8 @@ interface StreamServiceContext {
   connectionState: () => ConnectionState
   
   // Command functions
-  sendEmergencyOverride: (command: EmergencyOverrideCommand) => Promise<CommandResponse>
-  clearEmergency: () => Promise<CommandResponse>
+  sendTakeover: (command: TakeoverCommand) => Promise<CommandResponse>
+  clearTakeover: () => Promise<CommandResponse>
   removeQueueItem: (id: string) => Promise<CommandResponse>
   
   // Utility functions
@@ -202,13 +202,13 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       setLayerState(prev => updateLayerContent(prev, payload))
     })
 
-    overlayChannel.on('emergency_override', (payload: any) => {
-      console.log('[StreamService] Emergency override broadcast:', payload)
+    overlayChannel.on('takeover', (payload: any) => {
+      console.log('[StreamService] Takeover broadcast:', payload)
       // Overlay components will handle this directly
     })
 
-    overlayChannel.on('emergency_clear', (payload: any) => {
-      console.log('[StreamService] Emergency clear broadcast:', payload)
+    overlayChannel.on('takeover_clear', (payload: any) => {
+      console.log('[StreamService] Takeover clear broadcast:', payload)
       // Overlay components will handle this directly
     })
 
@@ -341,26 +341,26 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   }
 
   // Command implementations
-  const sendEmergencyOverride = async (command: EmergencyOverrideCommand): Promise<CommandResponse> => {
+  const sendTakeover = async (command: TakeoverCommand): Promise<CommandResponse> => {
     if (!overlayChannel || !connectionState().connected) {
       throw new Error('Not connected to overlay channel')
     }
 
-    if (!validateEmergencyCommand(command)) {
-      throw new Error('Invalid emergency command')
+    if (!validateTakeoverCommand(command)) {
+      throw new Error('Invalid takeover command')
     }
 
-    console.log('[StreamService] Sending emergency override:', command)
+    console.log('[StreamService] Sending takeover:', command)
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Emergency command timeout'))
+        reject(new Error('Takeover command timeout'))
       }, 10000)
 
-      overlayChannel!.push('emergency_override', command)
+      overlayChannel!.push('takeover', command)
         .receive('ok', (resp: any) => {
           clearTimeout(timeout)
-          console.log('[StreamService] Emergency sent successfully:', resp)
+          console.log('[StreamService] Takeover sent successfully:', resp)
           resolve({
             status: 'ok',
             data: resp,
@@ -369,32 +369,32 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         })
         .receive('error', (resp: any) => {
           clearTimeout(timeout)
-          console.error('[StreamService] Emergency send error:', resp)
-          reject(new Error(`Emergency failed: ${resp?.error?.message || resp?.reason || 'unknown'}`))
+          console.error('[StreamService] Takeover send error:', resp)
+          reject(new Error(`Takeover failed: ${resp?.error?.message || resp?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
           clearTimeout(timeout)
-          reject(new Error('Emergency command timeout'))
+          reject(new Error('Takeover command timeout'))
         })
     })
   }
 
-  const clearEmergency = async (): Promise<CommandResponse> => {
+  const clearTakeover = async (): Promise<CommandResponse> => {
     if (!overlayChannel || !connectionState().connected) {
       throw new Error('Not connected to overlay channel')
     }
 
-    console.log('[StreamService] Clearing emergency')
+    console.log('[StreamService] Clearing takeover')
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Clear emergency timeout'))
+        reject(new Error('Clear takeover timeout'))
       }, 5000)
 
-      overlayChannel!.push('emergency_clear', {})
+      overlayChannel!.push('takeover_clear', {})
         .receive('ok', (resp: any) => {
           clearTimeout(timeout)
-          console.log('[StreamService] Emergency cleared successfully:', resp)
+          console.log('[StreamService] Takeover cleared successfully:', resp)
           resolve({
             status: 'ok',
             data: resp,
@@ -403,12 +403,12 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         })
         .receive('error', (resp: any) => {
           clearTimeout(timeout)
-          console.error('[StreamService] Clear emergency error:', resp)
+          console.error('[StreamService] Clear takeover error:', resp)
           reject(new Error(`Clear failed: ${resp?.error?.message || resp?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
           clearTimeout(timeout)
-          reject(new Error('Clear emergency timeout'))
+          reject(new Error('Clear takeover timeout'))
         })
     })
   }
@@ -572,8 +572,8 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     layerState,
     queueState,
     connectionState,
-    sendEmergencyOverride,
-    clearEmergency,
+    sendTakeover,
+    clearTakeover,
     removeQueueItem,
     requestState,
     requestQueueState,

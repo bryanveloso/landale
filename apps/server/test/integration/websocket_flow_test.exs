@@ -1,6 +1,6 @@
 defmodule Integration.WebSocketFlowTest do
   @moduledoc """
-  Simple integration tests for WebSocket emergency flows.
+  Simple integration tests for WebSocket takeover flows.
   Validates dashboard → server → overlay communication works for streaming.
   """
 
@@ -11,7 +11,7 @@ defmodule Integration.WebSocketFlowTest do
   @moduletag :integration
 
   # Test constants
-  @emergency_payload %{
+  @takeover_payload %{
     "type" => "technical-difficulties",
     "message" => "We're experiencing technical difficulties. Please stand by.",
     "duration" => 30_000
@@ -31,8 +31,8 @@ defmodule Integration.WebSocketFlowTest do
     :ok
   end
 
-  describe "Emergency Override Flow" do
-    test "dashboard can send emergency to overlays" do
+  describe "Takeover Flow" do
+    test "dashboard can send takeover to overlays" do
       # Connect dashboard client
       dashboard_socket = socket(ServerWeb.UserSocket, "dashboard", %{correlation_id: "test-dashboard"})
       {:ok, _, dashboard} = subscribe_and_join(dashboard_socket, ServerWeb.StreamChannel, "stream:overlays")
@@ -41,26 +41,26 @@ defmodule Integration.WebSocketFlowTest do
       overlay_socket = socket(ServerWeb.UserSocket, "overlay", %{correlation_id: "test-overlay"})
       {:ok, _, _overlay} = subscribe_and_join(overlay_socket, ServerWeb.StreamChannel, "stream:overlays")
 
-      # Send emergency from dashboard
-      ref = push(dashboard, "emergency_override", @emergency_payload)
+      # Send takeover from dashboard
+      ref = push(dashboard, "takeover", @takeover_payload)
 
       # Verify dashboard gets acknowledgment
       assert_reply ref, :ok, %{
         success: true,
-        data: %{operation: "emergency_sent", type: _},
+        data: %{operation: "takeover_sent", type: _},
         meta: %{timestamp: _, server_version: _}
       }
 
-      # Verify overlay receives emergency push
-      assert_push "emergency_override", broadcast_message
+      # Verify overlay receives takeover push
+      assert_push "takeover", broadcast_message
 
-      # Validate emergency content
+      # Validate takeover content
       assert broadcast_message.type == "technical-difficulties"
-      assert broadcast_message.message == @emergency_payload["message"]
-      assert broadcast_message.duration == @emergency_payload["duration"]
+      assert broadcast_message.message == @takeover_payload["message"]
+      assert broadcast_message.duration == @takeover_payload["duration"]
     end
 
-    test "emergency clear works correctly" do
+    test "takeover clear works correctly" do
       # Connect clients
       dashboard_socket = socket(ServerWeb.UserSocket, "dashboard", %{correlation_id: "test-dashboard"})
       {:ok, _, dashboard} = subscribe_and_join(dashboard_socket, ServerWeb.StreamChannel, "stream:overlays")
@@ -68,26 +68,26 @@ defmodule Integration.WebSocketFlowTest do
       overlay_socket = socket(ServerWeb.UserSocket, "overlay", %{correlation_id: "test-overlay"})
       {:ok, _, _overlay} = subscribe_and_join(overlay_socket, ServerWeb.StreamChannel, "stream:overlays")
 
-      # Send emergency first
-      push(dashboard, "emergency_override", @emergency_payload)
-      assert_push "emergency_override", _emergency_msg
+      # Send takeover first
+      push(dashboard, "takeover", @takeover_payload)
+      assert_push "takeover", _takeover_msg
 
-      # Clear emergency
-      ref = push(dashboard, "emergency_clear", %{})
+      # Clear takeover
+      ref = push(dashboard, "takeover_clear", %{})
 
       # Verify dashboard gets acknowledgment
       assert_reply ref, :ok, %{
         success: true,
-        data: %{operation: "emergency_cleared"},
+        data: %{operation: "takeover_cleared"},
         meta: %{timestamp: _, server_version: _}
       }
 
       # Verify overlay receives clear push
-      assert_push "emergency_clear", clear_message
+      assert_push "takeover_clear", clear_message
       assert Map.has_key?(clear_message, :timestamp)
     end
 
-    test "queue client does not receive overlay emergencies" do
+    test "queue client does not receive overlay takeovers" do
       # Connect dashboard and queue clients
       dashboard_socket = socket(ServerWeb.UserSocket, "dashboard", %{correlation_id: "test-dashboard"})
       {:ok, _, dashboard} = subscribe_and_join(dashboard_socket, ServerWeb.StreamChannel, "stream:overlays")
@@ -95,22 +95,22 @@ defmodule Integration.WebSocketFlowTest do
       queue_socket = socket(ServerWeb.UserSocket, "queue", %{correlation_id: "test-queue"})
       {:ok, _, _queue} = subscribe_and_join(queue_socket, ServerWeb.StreamChannel, "stream:queue")
 
-      # Send emergency from dashboard
-      ref = push(dashboard, "emergency_override", @emergency_payload)
+      # Send takeover from dashboard
+      ref = push(dashboard, "takeover", @takeover_payload)
 
       assert_reply ref, :ok, %{
         success: true,
-        data: %{operation: "emergency_sent", type: _},
+        data: %{operation: "takeover_sent", type: _},
         meta: %{timestamp: _, server_version: _}
       }
 
-      # Verify queue does NOT receive emergency
-      refute_push "emergency_override", 100
+      # Verify queue does NOT receive takeover
+      refute_push "takeover", 100
     end
   end
 
   describe "Multi-Client Connection" do
-    test "multiple overlays can connect and receive emergencies" do
+    test "multiple overlays can connect and receive takeovers" do
       # Connect dashboard
       dashboard_socket = socket(ServerWeb.UserSocket, "dashboard", %{correlation_id: "test-dashboard"})
       {:ok, _, dashboard} = subscribe_and_join(dashboard_socket, ServerWeb.StreamChannel, "stream:overlays")
@@ -122,18 +122,18 @@ defmodule Integration.WebSocketFlowTest do
       overlay2_socket = socket(ServerWeb.UserSocket, "overlay2", %{correlation_id: "test-overlay-2"})
       {:ok, _, _overlay2} = subscribe_and_join(overlay2_socket, ServerWeb.StreamChannel, "stream:overlays")
 
-      # Send emergency
-      ref = push(dashboard, "emergency_override", @emergency_payload)
+      # Send takeover
+      ref = push(dashboard, "takeover", @takeover_payload)
 
       assert_reply ref, :ok, %{
         success: true,
-        data: %{operation: "emergency_sent", type: _},
+        data: %{operation: "takeover_sent", type: _},
         meta: %{timestamp: _, server_version: _}
       }
 
-      # Both overlays should receive emergency
-      assert_push "emergency_override", msg1
-      assert_push "emergency_override", msg2
+      # Both overlays should receive takeover
+      assert_push "takeover", msg1
+      assert_push "takeover", msg2
 
       # Validate both messages
       assert msg1.type == "technical-difficulties"

@@ -65,88 +65,101 @@ defmodule ServerWeb.StreamChannel do
   end
 
   @impl true
-  def handle_in("remove_queue_item", %{"id" => item_id}, socket) do
+  def handle_in("remove_queue_item", payload, socket) do
     Logger.info("Queue item removal requested",
-      item_id: item_id,
+      payload: inspect(payload),
       correlation_id: socket.assigns.correlation_id
     )
 
-    # This maps to removing an interrupt by ID
-    StreamProducer.remove_interrupt(item_id)
-    {:reply, ResponseBuilder.success(%{operation: "item_removed", id: item_id}), socket}
+    case validate_queue_item_removal(payload) do
+      {:ok, item_id} ->
+        # This maps to removing an interrupt by ID
+        StreamProducer.remove_interrupt(item_id)
+        {:reply, ResponseBuilder.success(%{operation: "item_removed", id: item_id}), socket}
+
+      {:error, reason} ->
+        Logger.warning("Invalid queue item removal payload",
+          payload: inspect(payload),
+          error: reason,
+          correlation_id: socket.assigns.correlation_id
+        )
+
+        {:reply, ResponseBuilder.error("validation_failed", reason), socket}
+    end
   end
 
   @impl true
   def handle_in("force_content", %{"type" => content_type, "data" => data, "duration" => duration}, socket) do
-    Logger.info("Emergency override requested",
+    Logger.info("Takeover requested",
       type: content_type,
       duration: duration,
       correlation_id: socket.assigns.correlation_id
     )
 
-    # Send emergency override to StreamProducer
+    # Send takeover to StreamProducer
     StreamProducer.force_content(content_type, data, duration)
     {:reply, ResponseBuilder.success(%{operation: "override_sent", type: content_type}), socket}
   end
 
   @impl true
-  def handle_in("emergency_override", payload, socket) do
-    Logger.info("Emergency override handler called",
+  def handle_in("takeover", payload, socket) do
+    Logger.info("Takeover handler called",
       payload: inspect(payload),
       correlation_id: socket.assigns.correlation_id
     )
 
-    case payload do
-      %{"type" => emergency_type, "message" => message} = payload_data ->
-        duration = Map.get(payload_data, "duration")
+    case validate_takeover(payload) do
+      {:ok, validated_payload} ->
+        %{type: takeover_type, message: message, duration: duration} = validated_payload
 
-        Logger.info("Emergency full-screen override requested",
-          type: emergency_type,
+        Logger.info("Takeover full-screen requested",
+          type: takeover_type,
           message: message,
           duration: duration,
           correlation_id: socket.assigns.correlation_id
         )
 
-        # Broadcast emergency override to all overlay clients
+        # Broadcast takeover to all overlay clients
         Phoenix.PubSub.broadcast(
           Server.PubSub,
           "stream:updates",
-          {:emergency_override,
+          {:takeover,
            %{
-             type: emergency_type,
+             type: takeover_type,
              message: message,
              duration: duration,
              timestamp: DateTime.utc_now()
            }}
         )
 
-        {:reply, ResponseBuilder.success(%{operation: "emergency_sent", type: emergency_type}), socket}
+        {:reply, ResponseBuilder.success(%{operation: "takeover_sent", type: takeover_type}), socket}
 
-      _ ->
-        Logger.warning("Invalid emergency override payload",
+      {:error, reason} ->
+        Logger.warning("Invalid takeover payload",
           payload: inspect(payload),
+          error: reason,
           correlation_id: socket.assigns.correlation_id
         )
 
-        {:reply, ResponseBuilder.error("invalid_payload", "Missing required fields: type and message"), socket}
+        {:reply, ResponseBuilder.error("validation_failed", reason), socket}
     end
   end
 
   @impl true
-  def handle_in("emergency_clear", payload, socket) do
-    Logger.info("Emergency clear handler called",
+  def handle_in("takeover_clear", payload, socket) do
+    Logger.info("Takeover clear handler called",
       payload: inspect(payload),
       correlation_id: socket.assigns.correlation_id
     )
 
-    # Broadcast emergency clear to all overlay clients
+    # Broadcast takeover clear to all overlay clients
     Phoenix.PubSub.broadcast(
       Server.PubSub,
       "stream:updates",
-      {:emergency_clear, %{timestamp: DateTime.utc_now()}}
+      {:takeover_clear, %{timestamp: DateTime.utc_now()}}
     )
 
-    {:reply, ResponseBuilder.success(%{operation: "emergency_cleared"}), socket}
+    {:reply, ResponseBuilder.success(%{operation: "takeover_cleared"}), socket}
   end
 
   # Catch-all for unhandled messages
@@ -269,22 +282,22 @@ defmodule ServerWeb.StreamChannel do
     {:noreply, socket}
   end
 
-  # Handle emergency overlay events
+  # Handle takeover overlay events
   @impl true
-  def handle_info({:emergency_override, emergency_data}, socket) do
-    push(socket, "emergency_override", %{
-      type: emergency_data.type,
-      message: emergency_data.message,
-      duration: emergency_data.duration,
-      timestamp: emergency_data.timestamp
+  def handle_info({:takeover, takeover_data}, socket) do
+    push(socket, "takeover", %{
+      type: takeover_data.type,
+      message: takeover_data.message,
+      duration: takeover_data.duration,
+      timestamp: takeover_data.timestamp
     })
 
     {:noreply, socket}
   end
 
   @impl true
-  def handle_info({:emergency_clear, clear_data}, socket) do
-    push(socket, "emergency_clear", %{
+  def handle_info({:takeover_clear, clear_data}, socket) do
+    push(socket, "takeover_clear", %{
       timestamp: clear_data.timestamp
     })
 
@@ -406,4 +419,29 @@ defmodule ServerWeb.StreamChannel do
       div(total_wait_time, length(interrupt_stack))
     end
   end
+
+  # Simple validation - just ensure required fields exist
+  defp validate_takeover(%{"type" => type, "message" => message} = payload)
+       when is_binary(type) and is_binary(message) do
+    duration = Map.get(payload, "duration", 10_000)
+    {:ok, %{type: type, message: message, duration: duration}}
+  end
+
+  defp validate_takeover(%{"type" => type} = payload) when is_binary(type) do
+    # screen-cover doesn't require message
+    if type == "screen-cover" do
+      duration = Map.get(payload, "duration", 10_000)
+      {:ok, %{type: type, message: "", duration: duration}}
+    else
+      {:error, "Missing required field: message"}
+    end
+  end
+
+  defp validate_takeover(_), do: {:error, "Missing required field: type"}
+
+  defp validate_queue_item_removal(%{"id" => id}) when is_binary(id) and id != "" do
+    {:ok, id}
+  end
+
+  defp validate_queue_item_removal(_), do: {:error, "Missing required field: id"}
 end

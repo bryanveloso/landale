@@ -7,7 +7,7 @@
 
 import { createSignal } from 'solid-js'
 import { useStreamService } from '@/services/stream-service'
-import type { EmergencyOverrideCommand } from '@/types/stream'
+import type { TakeoverCommand } from '@/types/stream'
 
 interface CommandState {
   loading: boolean
@@ -19,7 +19,7 @@ export function useStreamCommands() {
   const streamService = useStreamService()
   
   // Command state tracking
-  const [emergencyState, setEmergencyState] = createSignal<CommandState>({
+  const [takeoverState, setTakeoverState] = createSignal<CommandState>({
     loading: false,
     error: null,
     lastExecuted: null
@@ -31,17 +31,17 @@ export function useStreamCommands() {
     lastExecuted: null
   })
 
-  // Emergency commands
-  const sendEmergencyOverride = async (command: EmergencyOverrideCommand) => {
-    setEmergencyState({
+  // Takeover commands
+  const sendTakeover = async (command: TakeoverCommand) => {
+    setTakeoverState({
       loading: true,
       error: null,
       lastExecuted: null
     })
 
     try {
-      const response = await streamService.sendEmergencyOverride(command)
-      setEmergencyState({
+      const response = await streamService.sendTakeover(command)
+      setTakeoverState({
         loading: false,
         error: null,
         lastExecuted: new Date().toISOString()
@@ -49,7 +49,7 @@ export function useStreamCommands() {
       return response
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      setEmergencyState({
+      setTakeoverState({
         loading: false,
         error: errorMessage,
         lastExecuted: null
@@ -58,16 +58,16 @@ export function useStreamCommands() {
     }
   }
 
-  const clearEmergency = async () => {
-    setEmergencyState({
+  const clearTakeover = async () => {
+    setTakeoverState({
       loading: true,
       error: null,
       lastExecuted: null
     })
 
     try {
-      const response = await streamService.clearEmergency()
-      setEmergencyState({
+      const response = await streamService.clearTakeover()
+      setTakeoverState({
         loading: false,
         error: null,
         lastExecuted: new Date().toISOString()
@@ -75,7 +75,7 @@ export function useStreamCommands() {
       return response
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      setEmergencyState({
+      setTakeoverState({
         loading: false,
         error: errorMessage,
         lastExecuted: null
@@ -173,10 +173,10 @@ export function useStreamCommands() {
   }
 
   return {
-    // Emergency commands
-    sendEmergencyOverride,
-    clearEmergency,
-    emergencyState,
+    // Takeover commands
+    sendTakeover,
+    clearTakeover,
+    takeoverState,
     
     // Queue commands
     removeQueueItem,
