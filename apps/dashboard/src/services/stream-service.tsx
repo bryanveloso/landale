@@ -5,12 +5,10 @@
  * Eliminates channel conflicts and provides clean command/query separation.
  */
 
-import { createContext, useContext, createSignal, onCleanup, onMount, createEffect } from 'solid-js'
+import { createContext, useContext, createSignal, onCleanup, onMount } from 'solid-js'
 import type { Component, JSX } from 'solid-js'
 import { Socket, Channel } from 'phoenix'
 import type {
-  StreamServiceState,
-  StreamServiceEvent,
   OverlayLayerState,
   LayerState,
   StreamQueueState,
@@ -75,6 +73,7 @@ interface StreamServiceContext {
   // Utility functions
   requestState: () => void
   requestQueueState: () => void
+  forceReconnect: () => void
 }
 
 const StreamServiceContext = createContext<StreamServiceContext>()
@@ -103,7 +102,6 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   let overlayChannel: Channel | null = null
   let queueChannel: Channel | null = null
   let reconnectTimer: number | null = null
-  let reconnectAttempts = 0
   
   const getServerUrl = () => {
     if (props.serverUrl) return props.serverUrl
@@ -118,7 +116,6 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     
     socket = new Socket(getServerUrl(), {
       reconnectAfterMs: (tries: number) => {
-        reconnectAttempts = tries
         setConnectionState(prev => ({ ...prev, reconnectAttempts: tries }))
         return Math.min(1000 * Math.pow(2, tries), 30000)
       },
@@ -130,7 +127,6 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     // Socket event handlers
     socket.onOpen(() => {
       console.log('[StreamService] Connected to server')
-      reconnectAttempts = 0
       setConnectionState({
         connected: true,
         reconnectAttempts: 0,
@@ -145,7 +141,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       setConnectionState(prev => ({
         ...prev,
         connected: false,
-        error: error?.message || 'Connection error'
+        error: error?.message || error?.reason || 'Connection error'
       }))
     })
 
@@ -215,6 +211,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       console.log('[StreamService] Emergency clear broadcast:', payload)
       // Overlay components will handle this directly
     })
+
 
     // Join with error handling
     overlayChannel.join()
@@ -455,12 +452,24 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   const requestState = () => {
     if (overlayChannel) {
       overlayChannel.push('request_state', {})
+    } else if (socket && socket.connectionState() === 'open') {
+      // Try to rejoin channels if socket is open but channel is missing
+      joinOverlayChannel()
     }
+  }
+
+  const forceReconnect = () => {
+    console.log('[StreamService] Force reconnecting...')
+    disconnect()
+    setTimeout(() => connect(), 1000)
   }
 
   const requestQueueState = () => {
     if (queueChannel) {
       queueChannel.push('request_queue_state', {})
+    } else if (socket && socket.connectionState() === 'open') {
+      // Try to rejoin channels if socket is open but channel is missing
+      joinQueueChannel()
     }
   }
 
@@ -567,7 +576,8 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     clearEmergency,
     removeQueueItem,
     requestState,
-    requestQueueState
+    requestQueueState,
+    forceReconnect
   }
 
   return (

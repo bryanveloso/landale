@@ -3,6 +3,7 @@ import { StreamQueue } from '@/components/stream-queue'
 import { LayerStateMonitor } from '@/components/layer-state-monitor'
 import { TakeoverPanel } from '@/components/takeover-panel'
 import { StatusBar } from '@/components/status-bar'
+import { ConnectionMonitor } from '@/components/error-boundary'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -10,16 +11,18 @@ export const Route = createFileRoute('/')({
 
 function Index() {
   return (
-    <div class="grid h-full grid-rows-[auto_1fr_auto]" data-dashboard-layout>
-      <div></div>
+    <ConnectionMonitor>
+      <div class="grid h-full grid-rows-[auto_1fr_auto]" data-dashboard-layout>
+        <div></div>
 
-      <div class="flex">
-        <TakeoverPanel />
-        <StreamQueue />
-        <LayerStateMonitor />
+        <div class="flex">
+          <TakeoverPanel />
+          <StreamQueue />
+          <LayerStateMonitor />
+        </div>
+
+        <StatusBar />
       </div>
-
-      <StatusBar />
-    </div>
+    </ConnectionMonitor>
   )
 }
