@@ -191,85 +191,9 @@ export function createLogger(config: Partial<LoggerConfig> & { service: string }
   return wrapLogger(pinoLogger, fullConfig)
 }
 
-// Create logger with Seq transport
-export function createLoggerWithSeq(
-  config: Partial<LoggerConfig> & { service: string },
-  seqUrl: string,
-  seqApiKey?: string
-): Logger {
-  const fullConfig = getLoggerConfig(config)
-  
-  // Create Pino options without formatters (not allowed with transport targets)
-  const pinoOptions = createPinoOptions(fullConfig)
-  const { formatters, ...optionsWithoutFormatters } = pinoOptions
-  
-  // Create Pino logger with Seq transport
-  const pinoLogger = pino({
-    ...optionsWithoutFormatters,
-    transport: {
-      targets: [
-        {
-          target: 'pino/file',
-          options: { destination: 1 } // stdout
-        },
-        {
-          target: new URL('./seq-transport.ts', import.meta.url).href,
-          options: {
-            serverUrl: seqUrl,
-            apiKey: seqApiKey,
-            batchSize: 100,
-            flushInterval: 1000
-          }
-        }
-      ]
-    }
-  })
-  
-  return wrapLogger(pinoLogger, fullConfig)
-}
-
-// Helper to extract pino options from createPinoLogger
-function createPinoOptions(config: LoggerConfig): pino.LoggerOptions {
-  const redactPaths = config.redact.map((field) => `*.${field}`)
-  
-  return {
-    level: config.level,
-    base: {
-      service: config.service,
-      version: config.version,
-      env: config.environment,
-      pid: process.pid,
-      hostname: undefined,
-      ...config.defaultMeta
-    },
-    timestamp: config.timestamp ? pino.stdTimeFunctions.isoTime : false,
-    formatters: {
-      level: (label) => ({ level: label }),
-      bindings: (bindings) => ({
-        ...bindings,
-        hostname: undefined
-      })
-    },
-    serializers: {
-      error: serializeError,
-      err: serializeError
-    },
-    redact: {
-      paths: redactPaths,
-      censor: '[REDACTED]'
-    }
-  }
-}
 
 // Correlation ID generator
 export function generateCorrelationId(): string {
   return `${Date.now().toString()}-${Math.random().toString(36).substring(2, 11)}`
 }
 
-// Request context helper
-export function createRequestContext(): LogContext {
-  return {
-    correlationId: generateCorrelationId(),
-    requestId: generateCorrelationId()
-  }
-}

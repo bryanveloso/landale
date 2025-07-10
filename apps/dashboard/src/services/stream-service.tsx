@@ -73,6 +73,8 @@ interface StreamServiceContext {
   sendTakeover: (command: TakeoverCommand) => Promise<CommandResponse>
   clearTakeover: () => Promise<CommandResponse>
   removeQueueItem: (id: string) => Promise<CommandResponse>
+  clearQueue: () => Promise<CommandResponse>
+  reorderQueue: (id: string, position: number) => Promise<CommandResponse>
 
   // Utility functions
   requestState: () => void
@@ -590,6 +592,76 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     disconnect()
   })
 
+  const clearQueue = async (): Promise<CommandResponse> => {
+    if (!queueChannel || !connectionState().connected) {
+      throw new Error('Not connected to queue channel')
+    }
+
+    logger.info('Clearing queue')
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Clear queue timeout'))
+      }, 5000)
+
+      queueChannel!
+        .push('clear_queue', {})
+        .receive('ok', (resp: any) => {
+          clearTimeout(timeout)
+          logger.info('Queue cleared successfully', { metadata: { response: resp } })
+          resolve({
+            status: 'ok',
+            data: resp,
+            timestamp: new Date().toISOString()
+          })
+        })
+        .receive('error', (resp: any) => {
+          clearTimeout(timeout)
+          logger.error('Clear queue error', { metadata: { response: resp } })
+          reject(new Error(`Clear queue failed: ${resp?.reason || 'unknown'}`))
+        })
+        .receive('timeout', () => {
+          clearTimeout(timeout)
+          reject(new Error('Clear queue timeout'))
+        })
+    })
+  }
+
+  const reorderQueue = async (id: string, position: number): Promise<CommandResponse> => {
+    if (!queueChannel || !connectionState().connected) {
+      throw new Error('Not connected to queue channel')
+    }
+
+    logger.info('Reordering queue item', { metadata: { id, position } })
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Reorder queue timeout'))
+      }, 5000)
+
+      queueChannel!
+        .push('reorder_queue_item', { id, position })
+        .receive('ok', (resp: any) => {
+          clearTimeout(timeout)
+          logger.info('Queue item reordered successfully', { metadata: { response: resp } })
+          resolve({
+            status: 'ok',
+            data: resp,
+            timestamp: new Date().toISOString()
+          })
+        })
+        .receive('error', (resp: any) => {
+          clearTimeout(timeout)
+          logger.error('Reorder queue error', { metadata: { response: resp } })
+          reject(new Error(`Reorder failed: ${resp?.reason || 'unknown'}`))
+        })
+        .receive('timeout', () => {
+          clearTimeout(timeout)
+          reject(new Error('Reorder queue timeout'))
+        })
+    })
+  }
+
   // Context value
   const contextValue: StreamServiceContext = {
     layerState,
@@ -598,6 +670,8 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     sendTakeover,
     clearTakeover,
     removeQueueItem,
+    clearQueue,
+    reorderQueue,
     requestState,
     requestQueueState,
     forceReconnect
