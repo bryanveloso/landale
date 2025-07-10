@@ -177,4 +177,72 @@ defmodule Server.Services.Twitch.EventHandlerTest do
       assert result.raw_data == event_data
     end
   end
+
+  describe "process_event/2" do
+    test "processes valid channel.chat.message event" do
+      event_type = "channel.chat.message"
+
+      event_data = %{
+        "id" => "msg_123",
+        "broadcaster_user_id" => "user_123",
+        "broadcaster_user_login" => "testuser",
+        "broadcaster_user_name" => "TestUser",
+        "chatter_user_id" => "chatter_123",
+        "chatter_user_login" => "chatter",
+        "chatter_user_name" => "Chatter",
+        "message_id" => "msg_123",
+        "message" => %{
+          "text" => "Hello world!",
+          "fragments" => [%{"type" => "text", "text" => "Hello world!"}]
+        },
+        "color" => "#FF0000",
+        "badges" => [],
+        "message_type" => "text",
+        "cheer" => nil,
+        "reply" => nil,
+        "channel_points_custom_reward_id" => nil
+      }
+
+      assert :ok = EventHandler.process_event(event_type, event_data)
+    end
+
+    test "processes valid channel.follow event" do
+      event_type = "channel.follow"
+
+      event_data = %{
+        "id" => "follow_123",
+        "user_id" => "follower_123",
+        "user_login" => "newfollower",
+        "user_name" => "NewFollower",
+        "broadcaster_user_id" => "user_123",
+        "broadcaster_user_login" => "testuser",
+        "broadcaster_user_name" => "TestUser",
+        "followed_at" => "2023-01-01T12:00:00Z"
+      }
+
+      assert :ok = EventHandler.process_event(event_type, event_data)
+    end
+
+    test "returns error for invalid event data" do
+      event_type = "channel.chat.message"
+
+      event_data = %{
+        # Missing required broadcaster_user_id
+        "id" => "msg_123"
+      }
+
+      assert {:error, _reason} = EventHandler.process_event(event_type, event_data)
+    end
+
+    test "returns error for invalid event type" do
+      event_type = ""
+
+      event_data = %{
+        "id" => "msg_123",
+        "broadcaster_user_id" => "user_123"
+      }
+
+      assert {:error, _reason} = EventHandler.process_event(event_type, event_data)
+    end
+  end
 end
