@@ -3,8 +3,9 @@
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"], // Add DOM for React
-    "jsx": "react-jsx", // Enable JSX
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     "baseUrl": "."
   },
   "include": ["src/**/*"],

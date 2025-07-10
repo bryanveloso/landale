@@ -1,9 +1,9 @@
 import { createRootRoute, Outlet } from '@tanstack/solid-router'
-import { SocketProvider } from '../providers/socket-provider'
+import { SocketProvider } from '@landale/shared'
 
 export const Route = createRootRoute({
   component: () => (
-    <SocketProvider>
+    <SocketProvider serviceName="overlays">
       <Outlet />
     </SocketProvider>
   )

@@ -8,6 +8,8 @@
 import { createContext, useContext, createSignal, onCleanup, onMount } from 'solid-js'
 import type { Component, JSX } from 'solid-js'
 import { Socket, Channel } from 'phoenix'
+import { createLogger } from '@landale/logger/browser'
+import { DEFAULT_SERVER_URLS } from '@landale/shared'
 import type {
   OverlayLayerState,
   LayerState,
@@ -18,6 +20,12 @@ import type {
   CommandResponse
 } from '@/types/stream'
 import { validateServerStreamState, validateServerQueueState, validateTakeoverCommand } from '@/types/stream'
+
+const logger = createLogger({
+  service: 'dashboard-stream-service',
+  level: 'info',
+  enableConsole: true
+})
 
 // Default states
 const DEFAULT_LAYER_STATE: OverlayLayerState = {
@@ -101,14 +109,16 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
 
   const getServerUrl = () => {
     if (props.serverUrl) return props.serverUrl
-    return window.location.hostname === 'localhost' ? 'ws://localhost:7175/socket' : 'ws://zelan:7175/socket'
+    return DEFAULT_SERVER_URLS.getWebSocketUrl()
   }
 
   // Connection management
   const connect = () => {
     if (socket) return // Already connecting/connected
 
-    console.log('[StreamService] Connecting to server...')
+    logger.info('Connecting to server', { 
+      metadata: { serverUrl: getServerUrl() } 
+    })
 
     socket = new Socket(getServerUrl(), {
       reconnectAfterMs: (tries: number) => {
@@ -116,13 +126,15 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         return Math.min(1000 * Math.pow(2, tries), 30000)
       },
       logger: (kind: string, msg: string, data: any) => {
-        console.log(`[StreamService Phoenix ${kind}] ${msg}`, data)
+        logger.debug('Phoenix WebSocket event', {
+          metadata: { kind, message: msg, data }
+        })
       }
     })
 
     // Socket event handlers
     socket.onOpen(() => {
-      console.log('[StreamService] Connected to server')
+      logger.info('Connected to server')
       setConnectionState({
         connected: true,
         reconnectAttempts: 0,
@@ -133,7 +145,9 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     })
 
     socket.onError((error: any) => {
-      console.error('[StreamService] Socket error:', error)
+      logger.error('Socket error', { 
+        metadata: { error: error?.message || error?.reason || 'Connection error' } 
+      })
       setConnectionState((prev) => ({
         ...prev,
         connected: false,
@@ -142,7 +156,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     })
 
     socket.onClose(() => {
-      console.log('[StreamService] Socket closed')
+      logger.info('Socket closed')
       setConnectionState((prev) => ({
         ...prev,
         connected: false
@@ -163,18 +177,18 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   const joinOverlayChannel = () => {
     if (!socket || overlayChannel) return
 
-    console.log('[StreamService] Joining overlay channel...')
+    logger.info('Joining overlay channel')
     overlayChannel = socket.channel('stream:overlays', {})
 
     // Handle overlay events
     overlayChannel.on('stream_state', (payload: any) => {
-      console.log('[StreamService] Received stream state:', payload)
+      logger.debug('Received stream state', { metadata: { payload } })
 
       if (validateServerStreamState(payload)) {
         const transformed = transformServerState(payload)
         setLayerState(transformed)
       } else {
-        console.warn('[StreamService] Invalid stream state payload, using fallback:', payload)
+        logger.warn('Invalid stream state payload, using fallback', { metadata: { payload } })
         // Use fallback state when payload is invalid
         setLayerState((prev) => ({
           ...prev,
@@ -185,7 +199,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     })
 
     overlayChannel.on('show_changed', (payload: any) => {
-      console.log('[StreamService] Show changed:', payload)
+      logger.info('Show changed', { metadata: { show: payload.show, changedAt: payload.changed_at } })
       setLayerState((prev) => ({
         ...prev,
         current_show: payload.show,
@@ -194,23 +208,23 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     })
 
     overlayChannel.on('interrupt', (payload: any) => {
-      console.log('[StreamService] Priority interrupt:', payload)
+      logger.info('Priority interrupt', { metadata: { payload } })
       // Stream state update will handle the actual changes
     })
 
     overlayChannel.on('content_update', (payload: any) => {
-      console.log('[StreamService] Content update:', payload)
+      logger.debug('Content update', { metadata: { payload } })
       // Handle real-time content updates
       setLayerState((prev) => updateLayerContent(prev, payload))
     })
 
     overlayChannel.on('takeover', (payload: any) => {
-      console.log('[StreamService] Takeover broadcast:', payload)
+      logger.info('Takeover broadcast', { metadata: { payload } })
       // Overlay components will handle this directly
     })
 
     overlayChannel.on('takeover_clear', (payload: any) => {
-      console.log('[StreamService] Takeover clear broadcast:', payload)
+      logger.info('Takeover clear broadcast', { metadata: { payload } })
       // Overlay components will handle this directly
     })
 
@@ -218,18 +232,18 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     overlayChannel
       .join()
       .receive('ok', () => {
-        console.log('[StreamService] Successfully joined overlay channel')
+        logger.info('Successfully joined overlay channel')
         requestState()
       })
       .receive('error', (resp: any) => {
-        console.error('[StreamService] Failed to join overlay channel:', resp)
+        logger.error('Failed to join overlay channel', { metadata: { response: resp } })
         setConnectionState((prev) => ({
           ...prev,
           error: `Failed to join overlay channel: ${resp?.error?.message || resp?.reason || 'unknown'}`
         }))
       })
       .receive('timeout', () => {
-        console.error('[StreamService] Overlay channel join timeout')
+        logger.error('Overlay channel join timeout')
         setConnectionState((prev) => ({
           ...prev,
           error: 'Overlay channel join timeout'
@@ -240,22 +254,22 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   const joinQueueChannel = () => {
     if (!socket || queueChannel) return
 
-    console.log('[StreamService] Joining queue channel...')
+    logger.info('Joining queue channel')
     queueChannel = socket.channel('stream:queue', {})
 
     // Handle queue events
     queueChannel.on('queue_state', (payload: any) => {
-      console.log('[StreamService] Received queue state:', payload)
+      logger.debug('Received queue state', { metadata: { payload } })
 
       if (validateServerQueueState(payload)) {
         setQueueState(payload)
       } else {
-        console.warn('[StreamService] Invalid queue state payload:', payload)
+        logger.warn('Invalid queue state payload', { metadata: { payload } })
       }
     })
 
     queueChannel.on('queue_item_added', (payload: any) => {
-      console.log('[StreamService] Queue item added:', payload)
+      logger.info('Queue item added', { metadata: { item: payload.item } })
       if (payload.queue) {
         setQueueState((prev) => ({
           ...prev,
@@ -270,7 +284,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     })
 
     queueChannel.on('queue_item_processed', (payload: any) => {
-      console.log('[StreamService] Queue item processed:', payload)
+      logger.info('Queue item processed', { metadata: { item: payload.item } })
       if (payload.queue) {
         setQueueState((prev) => ({
           ...prev,
@@ -287,7 +301,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     })
 
     queueChannel.on('queue_item_expired', (payload: any) => {
-      console.log('[StreamService] Queue item expired:', payload)
+      logger.info('Queue item expired', { metadata: { item: payload.item } })
       if (payload.queue) {
         setQueueState((prev) => ({
           ...prev,
@@ -301,18 +315,18 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     queueChannel
       .join()
       .receive('ok', () => {
-        console.log('[StreamService] Successfully joined queue channel')
+        logger.info('Successfully joined queue channel')
         requestQueueState()
       })
       .receive('error', (resp: any) => {
-        console.error('[StreamService] Failed to join queue channel:', resp)
+        logger.error('Failed to join queue channel', { metadata: { response: resp } })
         setConnectionState((prev) => ({
           ...prev,
           error: `Failed to join queue channel: ${resp?.error?.message || resp?.reason || 'unknown'}`
         }))
       })
       .receive('timeout', () => {
-        console.error('[StreamService] Queue channel join timeout')
+        logger.error('Queue channel join timeout')
         setConnectionState((prev) => ({
           ...prev,
           error: 'Queue channel join timeout'
@@ -353,7 +367,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       throw new Error('Invalid takeover command')
     }
 
-    console.log('[StreamService] Sending takeover:', command)
+    logger.info('Sending takeover', { metadata: { command } })
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -364,7 +378,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         .push('takeover', command)
         .receive('ok', (resp: any) => {
           clearTimeout(timeout)
-          console.log('[StreamService] Takeover sent successfully:', resp)
+          logger.info('Takeover sent successfully', { metadata: { response: resp } })
           resolve({
             status: 'ok',
             data: resp,
@@ -373,7 +387,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         })
         .receive('error', (resp: any) => {
           clearTimeout(timeout)
-          console.error('[StreamService] Takeover send error:', resp)
+          logger.error('Takeover send error', { metadata: { response: resp } })
           reject(new Error(`Takeover failed: ${resp?.error?.message || resp?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
@@ -388,7 +402,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       throw new Error('Not connected to overlay channel')
     }
 
-    console.log('[StreamService] Clearing takeover')
+    logger.info('Clearing takeover')
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -399,7 +413,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         .push('takeover_clear', {})
         .receive('ok', (resp: any) => {
           clearTimeout(timeout)
-          console.log('[StreamService] Takeover cleared successfully:', resp)
+          logger.info('Takeover cleared successfully', { metadata: { response: resp } })
           resolve({
             status: 'ok',
             data: resp,
@@ -408,7 +422,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         })
         .receive('error', (resp: any) => {
           clearTimeout(timeout)
-          console.error('[StreamService] Clear takeover error:', resp)
+          logger.error('Clear takeover error', { metadata: { response: resp } })
           reject(new Error(`Clear failed: ${resp?.error?.message || resp?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
@@ -423,7 +437,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       throw new Error('Not connected to queue channel')
     }
 
-    console.log('[StreamService] Removing queue item:', id)
+    logger.info('Removing queue item', { metadata: { id } })
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -434,7 +448,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         .push('remove_queue_item', { id })
         .receive('ok', (resp: any) => {
           clearTimeout(timeout)
-          console.log('[StreamService] Item removed successfully:', resp)
+          logger.info('Item removed successfully', { metadata: { response: resp } })
           resolve({
             status: 'ok',
             data: resp,
@@ -443,7 +457,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         })
         .receive('error', (resp: any) => {
           clearTimeout(timeout)
-          console.error('[StreamService] Remove item error:', resp)
+          logger.error('Remove item error', { metadata: { response: resp } })
           reject(new Error(`Remove failed: ${resp?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
@@ -464,7 +478,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   }
 
   const forceReconnect = () => {
-    console.log('[StreamService] Force reconnecting...')
+    logger.info('Force reconnecting')
     disconnect()
     setTimeout(() => connect(), 1000)
   }

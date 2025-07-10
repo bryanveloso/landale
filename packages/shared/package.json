@@ -11,8 +11,16 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@landale/logger": "workspace:*"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.0",
+    "phoenix": "^1.7.0"
+  },
   "devDependencies": {
     "@types/node": "^22.15.34",
+    "@types/phoenix": "^1.6.6",
     "typescript": "^5.8.3"
   }
 }

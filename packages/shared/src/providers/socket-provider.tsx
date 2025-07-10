@@ -2,6 +2,7 @@ import { createContext, useContext, createSignal, onCleanup, onMount } from 'sol
 import type { Component, JSX } from 'solid-js'
 import { Socket } from 'phoenix'
 import { createLogger } from '@landale/logger/browser'
+import { DEFAULT_SERVER_URLS } from '../config'
 
 interface SocketContextType {
   socket: () => Socket | null
@@ -22,42 +23,61 @@ export const useSocket = () => {
 interface SocketProviderProps {
   children: JSX.Element
   serverUrl?: string
+  serviceName?: string
 }
 
-export const SocketProvider: Component<SocketProviderProps> = (props) => {
+// Extend window type for development debugging
+declare global {
+  interface Window {
+    phoenixSocket?: Socket
+  }
+}
+
+/**
+ * Shared socket provider for Phoenix WebSocket connections.
+ * Handles connection management, reconnection logic, and logging.
+ */
+export const SocketProvider: Component<SocketProviderProps> = (props): JSX.Element => {
   const [socket, setSocket] = createSignal<Socket | null>(null)
   const [isConnected, setIsConnected] = createSignal(false)
   const [reconnectAttempts, setReconnectAttempts] = createSignal(0)
   
-  // Initialize logger
-  const correlationId = `overlay-socket-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+  // Initialize logger with service-specific context
+  const correlationId = `${props.serviceName || 'socket'}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
   const logger = createLogger({
-    service: 'landale-overlays',
-    level: 'debug'
+    service: props.serviceName || 'landale-socket',
+    level: 'info'
   }).child({ module: 'socket-provider', correlationId })
 
   const getServerUrl = () => {
     if (props.serverUrl) return props.serverUrl
     
     // Auto-detect based on environment
-    return window.location.hostname === 'localhost' 
-      ? '/socket' 
-      : 'ws://zelan:7175/socket'
+    // Dashboard uses full WS URLs, overlays use relative paths in development
+    const isLocalhost = window.location.hostname === 'localhost'
+    
+    if (isLocalhost) {
+      // For overlays in development, use relative path for Vite proxy
+      return props.serviceName === 'overlays' ? '/socket' : DEFAULT_SERVER_URLS.getWebSocketUrl()
+    }
+    
+    return DEFAULT_SERVER_URLS.getWebSocketUrl()
   }
 
   onMount(() => {
     const serverUrl = getServerUrl()
     logger.info('Initializing socket provider', {
-      metadata: { serverUrl }
+      metadata: { serverUrl, serviceName: props.serviceName }
     })
     
     const phoenixSocket = new Socket(serverUrl, {
       reconnectAfterMs: (tries: number) => {
         setReconnectAttempts(tries)
+        const delay = Math.min(1000 * Math.pow(2, tries), 30000)
         logger.info('WebSocket reconnection attempt', {
-          metadata: { attempt: tries, delay: Math.min(1000 * Math.pow(2, tries), 30000) }
+          metadata: { attempt: tries, delay }
         })
-        return Math.min(1000 * Math.pow(2, tries), 30000)
+        return delay
       },
       logger: (kind: string, msg: string, data: any) => {
         logger.debug('Phoenix WebSocket event', {
@@ -75,7 +95,10 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
 
     phoenixSocket.onError((error: any) => {
       logger.error('Socket connection error', {
-        error: { message: error?.message || 'Unknown socket error', type: 'SocketError' },
+        error: { 
+          message: error?.message || 'Unknown socket error', 
+          type: 'SocketError' 
+        },
         metadata: { reconnectAttempts: reconnectAttempts() }
       })
       setIsConnected(false)
@@ -88,6 +111,11 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
       setIsConnected(false)
     })
 
+    // Expose socket for debugging in development
+    if (import.meta.env.DEV) {
+      window.phoenixSocket = phoenixSocket
+    }
+
     // Connect and store
     phoenixSocket.connect()
     setSocket(phoenixSocket)
@@ -96,16 +124,19 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
   onCleanup(() => {
     const currentSocket = socket()
     if (currentSocket) {
+      logger.info('Disconnecting socket on cleanup')
       currentSocket.disconnect()
     }
   })
 
+  const contextValue = {
+    socket,
+    isConnected,
+    reconnectAttempts
+  }
+
   return (
-    <SocketContext.Provider value={{
-      socket,
-      isConnected,
-      reconnectAttempts
-    }}>
+    <SocketContext.Provider value={contextValue}>
       {props.children}
     </SocketContext.Provider>
   )
