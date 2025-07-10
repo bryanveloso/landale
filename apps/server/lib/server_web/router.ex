@@ -99,5 +99,9 @@ defmodule ServerWeb.Router do
     get "/contexts", ContextController, :index
     get "/contexts/search", ContextController, :search
     get "/contexts/stats", ContextController, :stats
+
+    # Activity Log events and analytics
+    get "/activity/events", ActivityLogController, :events
+    get "/activity/stats", ActivityLogController, :stats
   end
 end
