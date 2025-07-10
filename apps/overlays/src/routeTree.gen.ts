@@ -9,19 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TakeoverRouteImport } from './routes/takeover'
 import { Route as OmnibarRouteImport } from './routes/omnibar'
-import { Route as EmergencyRouteImport } from './routes/emergency'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShowsIronmonFullRouteImport } from './routes/shows/ironmon/full'
 
+const TakeoverRoute = TakeoverRouteImport.update({
+  id: '/takeover',
+  path: '/takeover',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OmnibarRoute = OmnibarRouteImport.update({
   id: '/omnibar',
   path: '/omnibar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EmergencyRoute = EmergencyRouteImport.update({
-  id: '/emergency',
-  path: '/emergency',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -37,52 +37,52 @@ const ShowsIronmonFullRoute = ShowsIronmonFullRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/emergency': typeof EmergencyRoute
   '/omnibar': typeof OmnibarRoute
+  '/takeover': typeof TakeoverRoute
   '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/emergency': typeof EmergencyRoute
   '/omnibar': typeof OmnibarRoute
+  '/takeover': typeof TakeoverRoute
   '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/emergency': typeof EmergencyRoute
   '/omnibar': typeof OmnibarRoute
+  '/takeover': typeof TakeoverRoute
   '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/emergency' | '/omnibar' | '/shows/ironmon/full'
+  fullPaths: '/' | '/omnibar' | '/takeover' | '/shows/ironmon/full'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/emergency' | '/omnibar' | '/shows/ironmon/full'
-  id: '__root__' | '/' | '/emergency' | '/omnibar' | '/shows/ironmon/full'
+  to: '/' | '/omnibar' | '/takeover' | '/shows/ironmon/full'
+  id: '__root__' | '/' | '/omnibar' | '/takeover' | '/shows/ironmon/full'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  EmergencyRoute: typeof EmergencyRoute
   OmnibarRoute: typeof OmnibarRoute
+  TakeoverRoute: typeof TakeoverRoute
   ShowsIronmonFullRoute: typeof ShowsIronmonFullRoute
 }
 
 declare module '@tanstack/solid-router' {
   interface FileRoutesByPath {
+    '/takeover': {
+      id: '/takeover'
+      path: '/takeover'
+      fullPath: '/takeover'
+      preLoaderRoute: typeof TakeoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/omnibar': {
       id: '/omnibar'
       path: '/omnibar'
       fullPath: '/omnibar'
       preLoaderRoute: typeof OmnibarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/emergency': {
-      id: '/emergency'
-      path: '/emergency'
-      fullPath: '/emergency'
-      preLoaderRoute: typeof EmergencyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -104,8 +104,8 @@ declare module '@tanstack/solid-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  EmergencyRoute: EmergencyRoute,
   OmnibarRoute: OmnibarRoute,
+  TakeoverRoute: TakeoverRoute,
   ShowsIronmonFullRoute: ShowsIronmonFullRoute,
 }
 export const routeTree = rootRouteImport

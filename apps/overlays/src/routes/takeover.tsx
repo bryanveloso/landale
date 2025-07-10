@@ -3,7 +3,7 @@ import { createSignal, createEffect, onCleanup, Show } from 'solid-js'
 import { Socket, Channel } from 'phoenix'
 import { createLogger } from '@landale/logger/browser'
 
-export const Route = createFileRoute('/emergency')({
+export const Route = createFileRoute('/takeover')({
   component: TakeoverOverlay
 })
 
@@ -117,7 +117,7 @@ function TakeoverOverlay() {
     // Handle takeover clear events
     channel.on('takeover_clear', () => {
       logger.info('Takeover clear received')
-      hideEmergency()
+      hideTakeover()
     })
 
     channel.join()
