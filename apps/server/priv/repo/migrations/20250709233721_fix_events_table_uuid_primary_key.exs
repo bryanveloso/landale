@@ -6,9 +6,9 @@ defmodule Server.Repo.Migrations.FixEventsTableUuidPrimaryKey do
     # This is safe since we haven't deployed yet and have no production data
     drop table(:events)
 
-    # Recreate events table with UUID primary key (consistent with other tables)
+    # Recreate events table with UUID and composite primary key for TimescaleDB
     create table(:events, primary_key: false) do
-      add :id, :binary_id, primary_key: true
+      add :id, :binary_id, null: false
       add :timestamp, :utc_datetime_usec, null: false
       add :event_type, :text, null: false
       add :user_id, :text
@@ -20,20 +20,26 @@ defmodule Server.Repo.Migrations.FixEventsTableUuidPrimaryKey do
       timestamps(type: :utc_datetime_usec)
     end
 
+    # Create composite primary key (id, timestamp) required by TimescaleDB
+    execute "ALTER TABLE events ADD PRIMARY KEY (id, timestamp);"
+    
     # Create indexes for common queries
     create index(:events, [:timestamp])
     create index(:events, [:event_type])
     create index(:events, [:user_id])
     create index(:events, [:correlation_id])
 
-    # Only enable TimescaleDB and advanced features in production
-    if Mix.env() == :prod do
-      # Create hypertable (time-series optimization)
+    # Enable TimescaleDB hypertable if extension is available
+    try do
       execute "SELECT create_hypertable('events', 'timestamp');"
-
-      # Create GIN index for JSONB data search
-      create index(:events, [:data], using: :gin)
+    rescue
+      Postgrex.Error ->
+        # TimescaleDB not available, continue without hypertable
+        :ok
     end
+
+    # Create GIN index for JSONB data search
+    create index(:events, [:data], using: :gin)
   end
 
   def down do
@@ -58,9 +64,13 @@ defmodule Server.Repo.Migrations.FixEventsTableUuidPrimaryKey do
     create index(:events, [:user_id])
     create index(:events, [:correlation_id])
 
-    if Mix.env() == :prod do
+    try do
       execute "SELECT create_hypertable('events', 'timestamp');"
-      create index(:events, [:data], using: :gin)
+    rescue
+      Postgrex.Error ->
+        :ok
     end
+
+    create index(:events, [:data], using: :gin)
   end
 end

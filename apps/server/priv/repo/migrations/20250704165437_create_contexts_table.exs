@@ -25,13 +25,22 @@ defmodule Server.Repo.Migrations.CreateContextsTable do
     create index(:contexts, [:sentiment])
     create index(:contexts, [:topics], using: :gin)
 
-    # Only enable TimescaleDB in production
-    if Mix.env() == :prod do
-      # Create hypertable (time-series optimization)
+    # Enable TimescaleDB hypertable if available
+    try do
       execute "SELECT create_hypertable('contexts', 'started');"
+    rescue
+      Postgrex.Error ->
+        # TimescaleDB not available, continue without hypertable
+        :ok
+    end
 
-      # Create GIN index for text search in transcripts
-      create index(:contexts, [:transcript], using: :gin, prefix: :gin_trgm_ops)
+    # Create GIN index for text search in transcripts if pg_trgm available
+    try do
+      execute "CREATE INDEX contexts_transcript_gin_idx ON contexts USING gin (transcript gin_trgm_ops);"
+    rescue
+      Postgrex.Error ->
+        # pg_trgm not available, continue without text search index
+        :ok
     end
   end
 
