@@ -5,8 +5,10 @@
  * integrate with real-time events via StreamService
  */
 
-import { createSignal, createEffect, createMemo } from 'solid-js'
+import { createSignal, createEffect, createMemo, onCleanup } from 'solid-js'
+import { Channel } from 'phoenix'
 import { createLogger } from '@landale/logger/browser'
+import { useSocket } from '@/providers/socket-provider'
 import type { 
   ActivityEvent, 
   ActivityLogState, 
@@ -14,6 +16,7 @@ import type {
   ActivityEventsResponse,
   ActivityStatsResponse 
 } from '@/types/activity-log'
+import { EVENT_TYPES } from '@/types/activity-log'
 
 const logger = createLogger({
   service: 'dashboard-activity-log',
@@ -32,7 +35,9 @@ const DEFAULT_ACTIVITY_STATE: ActivityLogState = {
 }
 
 export function useActivityLog() {
+  const { socket, isConnected } = useSocket()
   const [state, setState] = createSignal<ActivityLogState>(DEFAULT_ACTIVITY_STATE)
+  const [eventsChannel, setEventsChannel] = createSignal<Channel | null>(null)
 
   // Fetch historical events from API
   const fetchEvents = async (filters?: ActivityLogFilters) => {
@@ -149,12 +154,21 @@ export function useActivityLog() {
     })
   }
 
-  // Add a new event in real-time (for future WebSocket integration)
+  // Add a new event in real-time from EventsChannel
   const addEvent = (event: ActivityEvent) => {
-    setState(prev => ({
-      ...prev,
-      events: [event, ...prev.events]
-    }))
+    setState(prev => {
+      // Check for duplicates by ID to prevent double-adding
+      const existingIds = new Set(prev.events.map(e => e.id))
+      if (existingIds.has(event.id)) {
+        return prev
+      }
+
+      // Add to front of list for chronological order
+      return {
+        ...prev,
+        events: [event, ...prev.events]
+      }
+    })
   }
 
   // Create memoized accessors
@@ -164,9 +178,170 @@ export function useActivityLog() {
   const memoizedHasMore = createMemo(() => state().hasMore)
   const memoizedFilters = createMemo(() => state().filters)
 
+  // Transform EventsChannel messages to ActivityEvent format
+  const transformEventMessage = (eventType: string, payload: any): ActivityEvent | null => {
+    try {
+      switch (eventType) {
+        case 'chat_message':
+          return {
+            id: payload.data?.id || crypto.randomUUID(),
+            timestamp: payload.timestamp || new Date().toISOString(),
+            event_type: EVENT_TYPES.CHAT_MESSAGE,
+            user_id: payload.data?.user_id || null,
+            user_login: payload.data?.user_login || null,
+            user_name: payload.data?.user_name || null,
+            data: {
+              message: payload.data?.message || '',
+              badges: payload.data?.badges || [],
+              emotes: payload.data?.emotes || []
+            },
+            correlation_id: payload.data?.correlation_id || null
+          }
+
+        case 'follower':
+          return {
+            id: payload.data?.id || crypto.randomUUID(),
+            timestamp: payload.timestamp || new Date().toISOString(),
+            event_type: EVENT_TYPES.FOLLOW,
+            user_id: payload.data?.user_id || null,
+            user_login: payload.data?.user_login || null,
+            user_name: payload.data?.user_name || null,
+            data: payload.data || {},
+            correlation_id: null
+          }
+
+        case 'subscription':
+          return {
+            id: payload.data?.id || crypto.randomUUID(),
+            timestamp: payload.timestamp || new Date().toISOString(),
+            event_type: EVENT_TYPES.SUBSCRIBE,
+            user_id: payload.data?.user_id || null,
+            user_login: payload.data?.user_login || null,
+            user_name: payload.data?.user_name || null,
+            data: {
+              tier: payload.data?.tier || 1,
+              months: payload.data?.months || 1,
+              message: payload.data?.message || null
+            },
+            correlation_id: null
+          }
+
+        case 'cheer':
+          return {
+            id: payload.data?.id || crypto.randomUUID(),
+            timestamp: payload.timestamp || new Date().toISOString(),
+            event_type: EVENT_TYPES.CHEER,
+            user_id: payload.data?.user_id || null,
+            user_login: payload.data?.user_login || null,
+            user_name: payload.data?.user_name || null,
+            data: {
+              bits: payload.data?.bits || 0,
+              message: payload.data?.message || null
+            },
+            correlation_id: null
+          }
+
+        default:
+          logger.warn('Unknown event type received from EventsChannel', {
+            eventType,
+            payload
+          })
+          return null
+      }
+    } catch (error) {
+      logger.error('Failed to transform event message', {
+        error: {
+          message: error instanceof Error ? error.message : String(error),
+          type: error instanceof Error ? error.constructor.name : typeof error
+        },
+        context: { eventType, payload }
+      })
+      return null
+    }
+  }
+
+  // Setup EventsChannel connection for real-time events
+  const setupEventsChannel = () => {
+    const currentSocket = socket()
+    if (!currentSocket || !isConnected() || eventsChannel()) return
+
+    logger.info('Setting up EventsChannel for real-time activity events')
+
+    const channel = currentSocket.channel('events:all', {})
+
+    // Handle different event types
+    channel.on('chat_message', (payload) => {
+      const event = transformEventMessage('chat_message', payload)
+      if (event) addEvent(event)
+    })
+
+    channel.on('follower', (payload) => {
+      const event = transformEventMessage('follower', payload)
+      if (event) addEvent(event)
+    })
+
+    channel.on('subscription', (payload) => {
+      const event = transformEventMessage('subscription', payload)
+      if (event) addEvent(event)
+    })
+
+    channel.on('gift_subscription', (payload) => {
+      const event = transformEventMessage('subscription', payload)
+      if (event) addEvent(event)
+    })
+
+    channel.on('cheer', (payload) => {
+      const event = transformEventMessage('cheer', payload)
+      if (event) addEvent(event)
+    })
+
+    // Join channel
+    channel
+      .join()
+      .receive('ok', () => {
+        logger.info('Successfully joined EventsChannel for activity events')
+        setEventsChannel(channel)
+      })
+      .receive('error', (resp) => {
+        logger.error('Failed to join EventsChannel', {
+          error: { message: resp?.error?.message || resp?.reason || 'unknown' },
+          context: { operation: 'join_events_channel' }
+        })
+      })
+      .receive('timeout', () => {
+        logger.error('EventsChannel join timeout', {
+          context: { operation: 'join_events_channel' }
+        })
+      })
+  }
+
+  // Cleanup EventsChannel connection
+  const cleanupEventsChannel = () => {
+    const channel = eventsChannel()
+    if (channel) {
+      logger.info('Cleaning up EventsChannel connection')
+      channel.leave()
+      setEventsChannel(null)
+    }
+  }
+
+  // Setup channel when socket connects
+  createEffect(() => {
+    if (isConnected()) {
+      setupEventsChannel()
+    } else {
+      cleanupEventsChannel()
+    }
+  })
+
   // Initialize with data fetch
   createEffect(() => {
     fetchEvents()
+  })
+
+  // Cleanup on unmount
+  onCleanup(() => {
+    cleanupEventsChannel()
   })
 
   return {
