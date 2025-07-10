@@ -23,7 +23,7 @@ defmodule Server.ActivityLog.Event do
            ]}
 
   @type t :: %__MODULE__{
-          id: integer(),
+          id: String.t(),
           timestamp: DateTime.t(),
           event_type: String.t(),
           user_id: String.t() | nil,
@@ -35,7 +35,7 @@ defmodule Server.ActivityLog.Event do
           updated_at: DateTime.t()
         }
 
-  @primary_key {:id, :id, autogenerate: true}
+  @primary_key {:id, :binary_id, autogenerate: true}
 
   schema "events" do
     field :timestamp, :utc_datetime_usec

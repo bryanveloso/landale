@@ -71,7 +71,9 @@ defmodule Server.ActivityLog.User do
     |> validate_length(:nickname, max: 50)
     |> validate_length(:pronouns, max: 20)
     |> validate_length(:notes, max: 500)
-    |> validate_format(:login, ~r/^[a-zA-Z0-9_]+$/, message: "must contain only alphanumeric characters and underscores")
+    |> validate_format(:login, ~r/^[a-zA-Z0-9_]+$/,
+      message: "must contain only alphanumeric characters and underscores"
+    )
     |> unique_constraint(:login)
     |> unique_constraint(:twitch_id, name: :users_pkey)
   end

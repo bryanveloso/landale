@@ -417,27 +417,7 @@ defmodule Server.Services.Twitch.EventHandler do
       }
 
       # Store the event asynchronously to avoid blocking the event pipeline
-      Task.start(fn ->
-        case ActivityLog.store_event(event_attrs) do
-          {:ok, _event} ->
-            Logger.debug("Event stored in ActivityLog",
-              event_type: event_type,
-              event_id: normalized_event.id
-            )
-
-            # Also upsert user information if we have user data
-            if normalized_event[:user_id] do
-              upsert_user_from_event(normalized_event)
-            end
-
-          {:error, changeset} ->
-            Logger.warning("Failed to store event in ActivityLog",
-              event_type: event_type,
-              event_id: normalized_event.id,
-              errors: inspect(changeset.errors)
-            )
-        end
-      end)
+      Task.start(fn -> store_event_async(event_attrs, event_type, normalized_event) end)
     end
 
     :ok
@@ -484,6 +464,29 @@ defmodule Server.Services.Twitch.EventHandler do
             errors: inspect(changeset.errors)
           )
       end
+    end
+  end
+
+  # Async storage of event with user upsert
+  defp store_event_async(event_attrs, event_type, normalized_event) do
+    case ActivityLog.store_event(event_attrs) do
+      {:ok, _event} ->
+        Logger.debug("Event stored in ActivityLog",
+          event_type: event_type,
+          event_id: normalized_event.id
+        )
+
+        # Also upsert user information if we have user data
+        if normalized_event[:user_id] do
+          upsert_user_from_event(normalized_event)
+        end
+
+      {:error, changeset} ->
+        Logger.warning("Failed to store event in ActivityLog",
+          event_type: event_type,
+          event_id: normalized_event.id,
+          errors: inspect(changeset.errors)
+        )
     end
   end
 
