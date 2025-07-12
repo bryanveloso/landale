@@ -6,7 +6,7 @@
  * Changes trigger EventSub events that automatically update show context.
  */
 
-import { createSignal, createResource, For, Show, onMount, createEffect, onCleanup } from 'solid-js'
+import { createSignal, createResource, For, Show, onMount, createEffect, onCleanup, untrack } from 'solid-js'
 import { useStreamService } from '@/services/stream-service'
 import { useStreamCommands } from '@/hooks/use-stream-commands'
 import { useLayerState } from '@/hooks/use-layer-state'
@@ -103,11 +103,13 @@ export function StreamInformation() {
   createEffect(() => {
     const query = categorySearch()
 
-    // Clear existing timeout
-    const existingTimeout = searchTimeout()
-    if (existingTimeout) {
-      clearTimeout(existingTimeout)
-    }
+    // Clear existing timeout (use untrack to avoid reactivity loop)
+    untrack(() => {
+      const existingTimeout = searchTimeout()
+      if (existingTimeout) {
+        clearTimeout(existingTimeout)
+      }
+    })
 
     // Set new timeout for debouncing
     const timeoutId = setTimeout(() => {

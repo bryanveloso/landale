@@ -5,10 +5,7 @@ import './styles.css'
 
 // Set up a Router instance
 const router = createRouter({
-  routeTree,
-  defaultPreload: 'intent',
-  defaultStaleTime: 5000,
-  scrollRestoration: true
+  routeTree
 })
 
 // Register things for typesafety

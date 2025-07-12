@@ -1,14 +1,11 @@
 import { createRootRoute, Outlet } from '@tanstack/solid-router'
 import { StreamServiceProvider } from '@/services/stream-service'
-import { SocketProvider } from '@/providers/socket-provider'
 
 export const Route = createRootRoute({
   component: () => (
-    <SocketProvider>
-      <StreamServiceProvider>
-        <Outlet />
-      </StreamServiceProvider>
-    </SocketProvider>
+    <StreamServiceProvider>
+      <Outlet />
+    </StreamServiceProvider>
   ),
   errorComponent: ({ error }) => (
     <div class="p-4 text-red-500">
