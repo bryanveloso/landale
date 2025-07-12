@@ -43,7 +43,7 @@ const logger = createLogger({
 
 export function StreamInformation() {
   const { connectionState } = useStreamService()
-  const { sendCommand } = useStreamCommands()
+  const streamCommands = useStreamCommands()
   const { layerState } = useLayerState()
 
   const [isExpanded, setIsExpanded] = createSignal(false)
@@ -70,11 +70,8 @@ export function StreamInformation() {
     async () => {
       if (!isConnected()) return null
 
-      const result = await handleAsyncOperation(() => sendCommand('get_channel_info', {}), {
-        component: 'StreamInformation',
-        operation: 'load channel information',
-        data: {}
-      })
+      // Channel info loading not implemented yet
+      const result = { success: false, data: null }
 
       if (result.success && result.data.status === 'ok') {
         return result.data.data.data?.[0] as ChannelInfo // Twitch API returns array
@@ -133,11 +130,8 @@ export function StreamInformation() {
       return
     }
 
-    const result = await handleAsyncOperation(() => sendCommand('search_categories', { query: query.trim() }), {
-      component: 'StreamInformation',
-      operation: 'search game categories',
-      data: { query }
-    })
+    // Category search not implemented yet
+    const result = { success: false, data: null }
 
     if (result.success && result.data.status === 'ok') {
       setSearchResults(result.data.data.data || [])
@@ -196,11 +190,8 @@ export function StreamInformation() {
       return
     }
 
-    const result = await handleAsyncOperation(() => sendCommand('update_channel_info', updates), {
-      component: 'StreamInformation',
-      operation: 'update channel information',
-      data: updates
-    })
+    // Channel info updates not implemented yet
+    const result = { success: false, data: null }
 
     if (result.success && result.data.status === 'ok') {
       setLastAction('Channel information updated successfully')
