@@ -133,7 +133,7 @@ defmodule Server.Performance do
 
     # This is a simplified test - in a real scenario you'd use a WebSocket client library
     tasks =
-      for i <- 1..concurrent_connections do
+      for i <- 1..concurrent_connections//1 do
         Task.async(fn ->
           simulate_websocket_client(i)
         end)
@@ -271,7 +271,7 @@ defmodule Server.Performance do
       Server.Events.publish_twitch_event(event_type, event_data)
 
       # Events arrive irregularly, simulate with random intervals
-      Process.sleep(Enum.random(1_000..10_000))
+      Process.sleep(Enum.random(1_000..10_000//1))
       simulate_twitch_loop(end_time, count + 1)
     else
       Logger.debug("Twitch simulation: #{count} events")
@@ -313,10 +313,10 @@ defmodule Server.Performance do
     Logger.debug("Simulating WebSocket client #{client_id}")
 
     # Simulate connection time
-    Process.sleep(Enum.random(100..500))
+    Process.sleep(Enum.random(100..500//1))
 
     # Simulate periodic status requests
-    for _i <- 1..10 do
+    for _i <- 1..10//1 do
       # 1 second intervals
       Process.sleep(1000)
       # Simulate status request processing
@@ -395,7 +395,7 @@ defmodule Server.Performance do
   end
 
   defp benchmark_bulk_cache_operations do
-    entries = Enum.map(1..10, fn i -> {"key_#{i}", "value_#{i}"} end)
+    entries = Enum.map(1..10//1, fn i -> {"key_#{i}", "value_#{i}"} end)
     Server.Cache.bulk_set(:bulk_benchmark, entries, ttl_seconds: 60)
   end
 
@@ -436,7 +436,7 @@ defmodule Server.Performance do
   defp benchmark_concurrent_cache_access do
     # Spawn multiple processes to test concurrent access
     tasks =
-      Enum.map(1..5, fn _i ->
+      Enum.map(1..5//1, fn _i ->
         Task.async(fn ->
           Server.Cache.get(:obs_service, :benchmark_status)
         end)

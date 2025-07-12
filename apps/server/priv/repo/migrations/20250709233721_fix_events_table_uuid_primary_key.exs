@@ -22,7 +22,7 @@ defmodule Server.Repo.Migrations.FixEventsTableUuidPrimaryKey do
 
     # Create composite primary key (id, timestamp) required by TimescaleDB
     execute "ALTER TABLE events ADD PRIMARY KEY (id, timestamp);"
-    
+
     # Create indexes for common queries
     create index(:events, [:timestamp])
     create index(:events, [:event_type])
