@@ -17,6 +17,7 @@
     "@tanstack/solid-router-devtools": "^1.125.2",
     "@tauri-apps/plugin-positioner": "^2.3.0",
     "@tauri-apps/plugin-window-state": "^2.3.0",
+    "phoenix": "^1.7.17",
     "radix-ui": "^1.4.2",
     "solid-js": "^1.9.7",
     "tailwindcss": "^4.1.11"
