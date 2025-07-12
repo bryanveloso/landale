@@ -22,20 +22,24 @@ defmodule Server.Repo.Migrations.FixEventsTableUuidPrimaryKey do
 
     # Create composite primary key (id, timestamp) required by TimescaleDB
     execute "ALTER TABLE events ADD PRIMARY KEY (id, timestamp);"
-    
+
     # Create indexes for common queries
     create index(:events, [:timestamp])
     create index(:events, [:event_type])
     create index(:events, [:user_id])
     create index(:events, [:correlation_id])
 
-    # Enable TimescaleDB hypertable if extension is available
-    try do
-      execute "SELECT create_hypertable('events', 'timestamp');"
-    rescue
-      Postgrex.Error ->
-        # TimescaleDB not available, continue without hypertable
-        :ok
+    # Skip TimescaleDB features in test environment
+    # These features are only needed in production
+    if System.get_env("MIX_ENV") != "test" do
+      # Enable TimescaleDB hypertable if extension is available
+      try do
+        execute "SELECT create_hypertable('events', 'timestamp');"
+      rescue
+        Postgrex.Error ->
+          # TimescaleDB not available, continue without hypertable
+          :ok
+      end
     end
 
     # Create GIN index for JSONB data search
@@ -64,11 +68,14 @@ defmodule Server.Repo.Migrations.FixEventsTableUuidPrimaryKey do
     create index(:events, [:user_id])
     create index(:events, [:correlation_id])
 
-    try do
-      execute "SELECT create_hypertable('events', 'timestamp');"
-    rescue
-      Postgrex.Error ->
-        :ok
+    # Skip TimescaleDB features in test environment
+    if System.get_env("MIX_ENV") != "test" do
+      try do
+        execute "SELECT create_hypertable('events', 'timestamp');"
+      rescue
+        Postgrex.Error ->
+          :ok
+      end
     end
 
     create index(:events, [:data], using: :gin)

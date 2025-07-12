@@ -103,7 +103,7 @@ defmodule Server.CorrelationIdPool do
   end
 
   defp add_ids_to_pool(count) when count > 0 do
-    ids = for _ <- 1..count, do: {:pool, Server.CorrelationId.generate()}
+    ids = for _ <- 1..count//1, do: {:pool, Server.CorrelationId.generate()}
     :ets.insert(@pool_table_name, ids)
   end
 

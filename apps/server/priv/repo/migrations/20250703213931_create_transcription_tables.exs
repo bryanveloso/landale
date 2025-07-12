@@ -24,24 +24,26 @@ defmodule Server.Repo.Migrations.CreateTranscriptionTables do
     create index(:transcriptions, [:stream_session_id])
     create index(:transcriptions, [:source_id])
 
-    # Enable TimescaleDB and pg_trgm extensions if available
-    try do
-      execute "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"
-      execute "SELECT create_hypertable('transcriptions', 'timestamp');"
-    rescue
-      Postgrex.Error ->
-        # TimescaleDB not available, continue without hypertable
-        :ok
-    end
+    # Skip TimescaleDB and pg_trgm features in test environment
+    # These features are only needed in production
+    if System.get_env("MIX_ENV") != "test" do
+      # Enable TimescaleDB hypertable if extension is available
+      try do
+        execute "SELECT create_hypertable('transcriptions', 'timestamp');"
+      rescue
+        Postgrex.Error ->
+          # TimescaleDB not available, continue without hypertable
+          :ok
+      end
 
-    try do
-      execute "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
-
-      execute "CREATE INDEX transcriptions_text_gin_idx ON transcriptions USING gin (text gin_trgm_ops);"
-    rescue
-      Postgrex.Error ->
-        # pg_trgm not available, continue without text search index
-        :ok
+      # Enable pg_trgm text search if extension is available
+      try do
+        execute "CREATE INDEX transcriptions_text_gin_idx ON transcriptions USING gin (text gin_trgm_ops);"
+      rescue
+        Postgrex.Error ->
+          # pg_trgm not available, continue without text search index
+          :ok
+      end
     end
   end
 
