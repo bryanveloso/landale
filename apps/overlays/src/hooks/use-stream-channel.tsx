@@ -1,6 +1,6 @@
 import { createSignal, createEffect, onCleanup } from 'solid-js'
 import { Channel } from 'phoenix'
-import { useSocket } from '../providers/socket-provider'
+import { useSocket } from '@landale/shared'
 import { createLogger } from '@landale/logger/browser'
 
 // Phoenix types for better TypeScript support

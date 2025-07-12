@@ -1,10 +1,11 @@
-import { createEffect, Show } from 'solid-js'
+import { createEffect, createMemo, Show } from 'solid-js'
 import { useStreamChannel } from '../hooks/use-stream-channel'
 import { useLayerOrchestrator } from '../hooks/use-layer-orchestrator'
 import { AnimatedLayer } from './animated-layer'
 import { LayerRenderer } from './layer-renderer'
-import { getLayerForContent, shouldDisplayOnLayer } from '../config/layer-mappings'
-import type { ShowType } from '../config/layer-mappings'
+import { LayerResolver, PerformanceMonitor, type ShowType, type StreamContent } from '@landale/shared'
+import { OverlayErrorBoundary } from './error-boundary'
+import { ConnectionErrorBoundary } from './connection-error-boundary'
 
 export function Omnibar() {
   const { streamState, isConnected } = useStreamChannel()
@@ -20,129 +21,125 @@ export function Omnibar() {
     orchestrator.registerLayer(priority, element)
   }
   
-  // React to stream state changes and orchestrate layer visibility
+  // React to memoized layer distribution changes
   createEffect(() => {
-    const state = streamState()
-    const currentShow = state.current_show as ShowType
+    PerformanceMonitor.trackRenderCycle()
+    const distribution = layerDistribution()
     
-    // Process all content in interrupt stack + active content
-    const allContent = [
-      ...(state.interrupt_stack || []),
-      ...(state.active_content ? [state.active_content] : [])
-    ]
-    
-    // Group content by layer priority
-    const layerContent: Record<'foreground' | 'midground' | 'background', any> = {
-      foreground: null,
-      midground: null,
-      background: null
-    }
-    
-    // Assign content to appropriate layers
-    allContent.forEach(content => {
-      if (content && content.type) {
-        const targetLayer = getLayerForContent(content.type, currentShow)
-        
-        // Only assign if this layer doesn't already have higher priority content
-        if (!layerContent[targetLayer] || content.priority > layerContent[targetLayer].priority) {
-          layerContent[targetLayer] = content
-        }
-      }
-    })
-    
-    // Show/hide layers based on content
-    Object.keys(layerContent).forEach(layer => {
+    // Show/hide layers based on distributed content
+    Object.entries(distribution).forEach(([layer, layerState]) => {
       const priority = layer as 'foreground' | 'midground' | 'background'
-      const content = layerContent[priority]
       
-      if (content) {
-        orchestrator.showLayer(priority, content)
+      if (layerState.content) {
+        orchestrator.showLayer(priority, layerState.content)
       } else {
         orchestrator.hideLayer(priority)
       }
     })
   })
   
-  // Get content for specific layer
-  const getLayerContent = (layer: 'foreground' | 'midground' | 'background') => {
+  // Memoized content preparation to avoid repeated computation
+  const allContent = createMemo((): StreamContent[] => {
     const state = streamState()
-    const currentShow = state.current_show as ShowType
-    
-    // Find the highest priority content that should display on this layer
-    const allContent = [
+    const rawContent = [
       ...(state.interrupt_stack || []),
       ...(state.active_content ? [state.active_content] : [])
-    ]
+    ].filter(item => 
+      item != null && 
+      typeof item === 'object' && 
+      'type' in item && 
+      typeof item.priority === 'number'
+    )
     
-    return allContent
-      .filter(content => content && shouldDisplayOnLayer(content.type, layer, currentShow))
-      .sort((a, b) => (b.priority || 0) - (a.priority || 0))[0] || null
+    // Convert to StreamContent interface
+    return rawContent as StreamContent[]
+  })
+
+  const currentShow = createMemo(() => {
+    return (streamState().current_show as ShowType) || 'variety'
+  })
+
+  // Memoized layer distribution to avoid recalculating on every access
+  const layerDistribution = createMemo(() => {
+    return LayerResolver.distributeContent(allContent(), currentShow())
+  })
+
+  // Get content for specific layer using memoized distribution
+  const getLayerContent = (layer: 'foreground' | 'midground' | 'background') => {
+    return layerDistribution()[layer].content
   }
   
-  const isVisible = () => {
+  const isVisible = createMemo(() => {
     const state = streamState()
     return state.active_content !== null || (state.interrupt_stack && state.interrupt_stack.length > 0)
-  }
+  })
   
   return (
-    <Show when={isVisible()}>
-      <div
-        class="w-canvas"
-        data-omnibar
-        data-show={streamState().current_show}
-        data-priority={streamState().priority_level}
-        data-connected={isConnected()}
-      >
-        {/* Foreground Layer - Highest priority alerts */}
-        <AnimatedLayer
-          priority="foreground"
-          content={getLayerContent('foreground')}
-          contentType={getLayerContent('foreground')?.type}
-          show={streamState().current_show}
-          onRegister={handleLayerRegister}
+    <ConnectionErrorBoundary>
+      <Show when={isVisible()}>
+        <div
+          class="w-canvas"
+          data-omnibar
+          data-show={streamState().current_show}
+          data-priority={streamState().priority_level}
+          data-connected={isConnected()}
         >
-          <Show when={getLayerContent('foreground')}>
-            <LayerRenderer
-              content={getLayerContent('foreground')}
-              contentType={getLayerContent('foreground')?.type || ''}
-              show={streamState().current_show}
-            />
-          </Show>
-        </AnimatedLayer>
+        {/* Foreground Layer - Highest priority alerts */}
+        <OverlayErrorBoundary layerName="foreground">
+          <AnimatedLayer
+            priority="foreground"
+            content={getLayerContent('foreground')}
+            contentType={getLayerContent('foreground')?.type}
+            show={streamState().current_show}
+            onRegister={handleLayerRegister}
+          >
+            <Show when={getLayerContent('foreground')}>
+              <LayerRenderer
+                content={getLayerContent('foreground')}
+                contentType={getLayerContent('foreground')?.type || ''}
+                show={streamState().current_show}
+              />
+            </Show>
+          </AnimatedLayer>
+        </OverlayErrorBoundary>
         
         {/* Midground Layer - Sub trains, celebrations */}
-        <AnimatedLayer
-          priority="midground"
-          content={getLayerContent('midground')}
-          contentType={getLayerContent('midground')?.type}
-          show={streamState().current_show}
-          onRegister={handleLayerRegister}
-        >
-          <Show when={getLayerContent('midground')}>
-            <LayerRenderer
-              content={getLayerContent('midground')}
-              contentType={getLayerContent('midground')?.type || ''}
-              show={streamState().current_show}
-            />
-          </Show>
-        </AnimatedLayer>
+        <OverlayErrorBoundary layerName="midground">
+          <AnimatedLayer
+            priority="midground"
+            content={getLayerContent('midground')}
+            contentType={getLayerContent('midground')?.type}
+            show={streamState().current_show}
+            onRegister={handleLayerRegister}
+          >
+            <Show when={getLayerContent('midground')}>
+              <LayerRenderer
+                content={getLayerContent('midground')}
+                contentType={getLayerContent('midground')?.type || ''}
+                show={streamState().current_show}
+              />
+            </Show>
+          </AnimatedLayer>
+        </OverlayErrorBoundary>
         
         {/* Background Layer - Ticker content, stats */}
-        <AnimatedLayer
-          priority="background"
-          content={getLayerContent('background')}
-          contentType={getLayerContent('background')?.type}
-          show={streamState().current_show}
-          onRegister={handleLayerRegister}
-        >
-          <Show when={getLayerContent('background')}>
-            <LayerRenderer
-              content={getLayerContent('background')}
-              contentType={getLayerContent('background')?.type || ''}
-              show={streamState().current_show}
-            />
-          </Show>
-        </AnimatedLayer>
+        <OverlayErrorBoundary layerName="background">
+          <AnimatedLayer
+            priority="background"
+            content={getLayerContent('background')}
+            contentType={getLayerContent('background')?.type}
+            show={streamState().current_show}
+            onRegister={handleLayerRegister}
+          >
+            <Show when={getLayerContent('background')}>
+              <LayerRenderer
+                content={getLayerContent('background')}
+                contentType={getLayerContent('background')?.type || ''}
+                show={streamState().current_show}
+              />
+            </Show>
+          </AnimatedLayer>
+        </OverlayErrorBoundary>
         
         {/* Debug info - only in development */}
         {import.meta.env.DEV && (
@@ -164,5 +161,6 @@ export function Omnibar() {
         ></div>
       </div>
     </Show>
+    </ConnectionErrorBoundary>
   )
 }

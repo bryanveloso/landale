@@ -7,6 +7,7 @@ import { DebugDrawer } from '@/components/debug-drawer'
 import { StatusBar } from '@/components/status-bar'
 import { ConnectionMonitor } from '@/components/error-boundary'
 import { ActivityLogPanel } from '@/components/activity-log-panel'
+import { DashboardErrorBoundary } from '@/components/dashboard-error-boundary'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -19,15 +20,23 @@ function Index() {
         <div></div>
 
         <div class="flex">
-          <StreamInformation />
-          <TakeoverPanel />
-          <StreamQueue />
-          <ActivityLogPanel />
-          <LayerStateMonitor />
+          <DashboardErrorBoundary componentName="StreamControls">
+            <StreamInformation />
+            <TakeoverPanel />
+          </DashboardErrorBoundary>
+          <DashboardErrorBoundary componentName="QueueManagement">
+            <StreamQueue />
+            <ActivityLogPanel />
+          </DashboardErrorBoundary>
+          <DashboardErrorBoundary componentName="SystemMonitoring">
+            <LayerStateMonitor />
+          </DashboardErrorBoundary>
         </div>
 
-        <StatusBar />
-        <DebugDrawer />
+        <DashboardErrorBoundary componentName="SystemInterface">
+          <StatusBar />
+          <DebugDrawer />
+        </DashboardErrorBoundary>
       </div>
     </ConnectionMonitor>
   )

@@ -9,7 +9,7 @@ import { createContext, useContext, createSignal, onCleanup, onMount } from 'sol
 import type { Component, JSX } from 'solid-js'
 import { Socket, Channel } from 'phoenix'
 import { createLogger } from '@landale/logger/browser'
-import { DEFAULT_SERVER_URLS } from '@landale/shared'
+import { DEFAULT_SERVER_URLS, LayerResolver, type ShowType, type StreamContent } from '@landale/shared'
 import type {
   OverlayLayerState,
   LayerState,
@@ -496,10 +496,15 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
 
   // Data transformation functions
   const transformServerState = (serverState: ServerStreamState): OverlayLayerState => {
-    const allContent = [
+    const allContent: StreamContent[] = [
       ...(serverState.interrupt_stack || []),
       ...(serverState.active_content ? [serverState.active_content] : [])
-    ]
+    ].filter((item): item is StreamContent => 
+      item != null && 
+      typeof item === 'object' && 
+      'type' in item && 
+      'priority' in item
+    )
 
     // Distribute content across layers based on type and show
     const layers = {
@@ -509,65 +514,24 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     }
 
     return {
-      current_show: (serverState.current_show as any) || 'variety',
+      current_show: (serverState.current_show as ShowType) || 'variety',
       layers,
       active_content: serverState.active_content,
       interrupt_stack: serverState.interrupt_stack || [],
-      priority_level: (serverState.priority_level as any) || 'ticker',
+      priority_level: (serverState.priority_level as 'alert' | 'sub_train' | 'ticker') || 'ticker',
       version: serverState.metadata?.state_version || 0,
       last_updated: serverState.metadata?.last_updated || new Date().toISOString()
     }
   }
 
   const extractLayerContent = (
-    allContent: any[],
+    allContent: StreamContent[],
     targetLayer: 'foreground' | 'midground' | 'background',
     show: string
   ) => {
-    // Layer assignment logic (same as overlay system)
-    const layerMapping: Record<string, Record<string, string>> = {
-      ironmon: {
-        alert: 'foreground',
-        death_alert: 'foreground',
-        elite_four_alert: 'foreground',
-        shiny_encounter: 'foreground',
-        sub_train: 'midground',
-        level_up: 'midground',
-        gym_badge: 'midground',
-        ironmon_run_stats: 'background',
-        recent_follows: 'background',
-        emote_stats: 'background'
-      },
-      variety: {
-        alert: 'foreground',
-        raid_alert: 'foreground',
-        host_alert: 'foreground',
-        sub_train: 'midground',
-        cheer_celebration: 'midground',
-        emote_stats: 'background',
-        recent_follows: 'background',
-        stream_goals: 'background',
-        daily_stats: 'background'
-      },
-      coding: {
-        alert: 'foreground',
-        build_failure: 'foreground',
-        deployment_alert: 'foreground',
-        sub_train: 'midground',
-        commit_celebration: 'midground',
-        commit_stats: 'background',
-        build_status: 'background',
-        recent_follows: 'background'
-      }
-    }
-
-    // Find highest priority content for this layer
-    const layerContent = allContent
-      .filter((content) => {
-        const mapping = layerMapping[show] || layerMapping.variety
-        return mapping[content.type] === targetLayer
-      })
-      .sort((a, b) => (b.priority || 0) - (a.priority || 0))[0]
+    // Use shared layer resolver
+    const showType = (show as ShowType) || 'variety'
+    const layerContent = LayerResolver.getContentForLayer(allContent, targetLayer, showType)
 
     return {
       priority: targetLayer,
@@ -576,7 +540,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     } as LayerState
   }
 
-  const updateLayerContent = (currentState: OverlayLayerState, _update: any): OverlayLayerState => {
+  const updateLayerContent = (currentState: OverlayLayerState, _update: Record<string, unknown>): OverlayLayerState => {
     // Handle real-time updates like emote increments
     // For now, just return current state - full implementation would
     // update specific content data without disrupting layer states
