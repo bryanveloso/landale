@@ -27,7 +27,7 @@ interface LogEntry {
 export class BrowserLogger implements Logger {
   private config: Required<BrowserLoggerConfig>
   private buffer: LogEntry[] = []
-  private flushTimer?: number
+  private flushTimer?: number | undefined
   private levels: Record<LogLevel, number> = {
     fatal: 60,
     error: 50,
@@ -80,7 +80,7 @@ export class BrowserLogger implements Logger {
       level,
       service: this.config.service,
       message,
-      context,
+      context: context || {},
       url: window.location.href,
       userAgent: navigator.userAgent
     }
@@ -200,11 +200,12 @@ export class BrowserLogger implements Logger {
       return result
     } catch (error) {
       const duration = performance.now() - start
+      const errorDetails = serializeError(error)
       this.error(`Operation failed: ${label}`, {
         operation: label,
         duration,
         status: 'failure',
-        error: serializeError(error)
+        error: errorDetails || { message: 'Unknown error', stack: '', type: 'Error', code: '' }
       })
       throw error
     }
@@ -223,11 +224,12 @@ export class BrowserLogger implements Logger {
       return result
     } catch (error) {
       const duration = performance.now() - start
+      const errorDetails = serializeError(error)
       this.error(`Operation failed: ${label}`, {
         operation: label,
         duration,
         status: 'failure',
-        error: serializeError(error)
+        error: errorDetails || { message: 'Unknown error', stack: '', type: 'Error', code: '' }
       })
       throw error
     }
@@ -295,9 +297,9 @@ export function trackPerformance(logger: Logger): void {
     logger.error('Uncaught error', {
       error: {
         message: event.message,
-        stack: errorObj?.stack,
+        stack: errorObj?.stack || '',
         type: errorObj?.constructor.name || 'Error',
-        code: undefined
+        code: ''
       },
       metadata: {
         filename: event.filename,
@@ -309,8 +311,9 @@ export function trackPerformance(logger: Logger): void {
 
   // Track unhandled promise rejections
   window.addEventListener('unhandledrejection', (event) => {
+    const errorDetails = serializeError(event.reason)
     logger.error('Unhandled promise rejection', {
-      error: serializeError(event.reason)
+      error: errorDetails || { message: 'Unknown error', stack: '', type: 'UnhandledRejection', code: '' }
     })
   })
 }

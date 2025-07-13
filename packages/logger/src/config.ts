@@ -102,9 +102,9 @@ export function serializeError(error: unknown): LogContext['error'] {
     const errorWithCode = error as Error & { code?: string; cause?: unknown }
     return {
       message: error.message,
-      stack: error.stack,
+      stack: error.stack || '',
       type: error.constructor.name,
-      code: errorWithCode.code,
+      code: errorWithCode.code || '',
       cause: errorWithCode.cause
     }
   }
