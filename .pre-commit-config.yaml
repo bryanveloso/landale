@@ -29,19 +29,19 @@ repos:
     hooks:
       - id: eslint
         name: eslint
-        entry: sh -c 'if command -v bun >/dev/null 2>&1; then bunx eslint --fix --cache; else echo "Skipping ESLint - Bun not available"; fi'
+        entry: sh -c 'if command -v bun >/dev/null 2>&1; then bun run lint:fix; else echo "Skipping ESLint - Bun not available"; fi'
         language: system
         files: '\.(js|jsx|ts|tsx)$'
         exclude: '^(node_modules|dist|build|coverage|\.turbo)/.*$'
-        pass_filenames: true
+        pass_filenames: false
 
       - id: prettier
         name: prettier
-        entry: sh -c 'if command -v bun >/dev/null 2>&1; then bunx prettier --write --cache; else echo "Skipping Prettier - Bun not available"; fi'
+        entry: sh -c 'if command -v bun >/dev/null 2>&1; then bun run format; else echo "Skipping Prettier - Bun not available"; fi'
         language: system
         files: '\.(js|jsx|ts|tsx|json|css|scss|md|yml|yaml)$'
         exclude: '^(node_modules|dist|build|coverage|\.turbo)/.*$'
-        pass_filenames: true
+        pass_filenames: false
 
       - id: typescript-check
         name: typescript-check
@@ -77,7 +77,7 @@ repos:
 
   # Python hooks
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.7
+    rev: v0.9.9
     hooks:
       - id: ruff
         name: ruff lint
