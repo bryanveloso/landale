@@ -43,7 +43,7 @@ const mockTimeline = {
   kill: () => mockTimeline
 }
 
-// @ts-ignore - Mock GSAP globally
+// @ts-expect-error - Mock GSAP globally
 globalThis.gsap = {
   set: () => {},
   to: () => mockTimeline,
