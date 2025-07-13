@@ -165,7 +165,7 @@ export function DebugDrawer() {
 
   if (!shouldShow()) {
     return (
-      <div data-debug-toggle>
+      <div class="debug-toggle">
         <Button size="sm" variant="outline" onClick={handleToggleDebug} title="Enable debug tools">
           🐛
         </Button>
@@ -174,23 +174,23 @@ export function DebugDrawer() {
   }
 
   return (
-    <div data-debug-drawer>
-      <header data-debug-header>
+    <div class="debug-drawer">
+      <header class="debug-header">
         <Button onClick={() => setIsExpanded(!isExpanded())} variant="outline" size="sm" disabled={!isConnected()}>
           🐛 Debug Tools {isExpanded() ? '▼' : '▶'}
         </Button>
-        <div data-connection-status>{isConnected() ? '🟢 Connected' : '🔴 Disconnected'}</div>
+        <div class="connection-status">{isConnected() ? '🟢 Connected' : '🔴 Disconnected'}</div>
         <Button size="sm" variant="outline" onClick={handleToggleDebug} title="Disable debug tools">
           ✕
         </Button>
       </header>
 
       <Show when={isExpanded()}>
-        <main data-debug-content>
+        <main class="debug-content">
           {/* Manual Alert Testing */}
-          <section data-debug-section>
+          <section class="debug-section">
             <h4>Manual Alerts</h4>
-            <div data-alert-input>
+            <div class="alert-input">
               <input
                 type="text"
                 placeholder="Alert message..."
@@ -198,7 +198,7 @@ export function DebugDrawer() {
                 onInput={(e) => setAlertMessage(e.target.value)}
                 disabled={!isConnected() || isSubmitting()}
               />
-              <div data-duration-input>
+              <div class="duration-input">
                 <label>Duration (ms):</label>
                 <input
                   type="number"
@@ -211,7 +211,7 @@ export function DebugDrawer() {
                 />
               </div>
             </div>
-            <div data-alert-buttons>
+            <div class="alert-buttons">
               <For each={alertTypes}>
                 {(alertType) => (
                   <Button
@@ -228,9 +228,9 @@ export function DebugDrawer() {
           </section>
 
           {/* Quick Test Actions */}
-          <section data-debug-section>
+          <section class="debug-section">
             <h4>Quick Actions</h4>
-            <div data-quick-actions>
+            <div class="quick-actions">
               <Button
                 onClick={handleManualSubTrain}
                 disabled={!isConnected() || isSubmitting()}
@@ -260,21 +260,21 @@ export function DebugDrawer() {
 
           {/* Status Display */}
           <Show when={lastAction()}>
-            <div data-debug-status>
-              <div data-status-label>Last Action:</div>
-              <div data-status-message>{lastAction()}</div>
+            <div class="debug-status">
+              <div class="status-label">Last Action:</div>
+              <div class="status-message">{lastAction()}</div>
             </div>
           </Show>
 
           <Show when={isSubmitting()}>
-            <div data-submitting-indicator>Processing...</div>
+            <div class="submitting-indicator">Processing...</div>
           </Show>
 
           {/* System Info */}
           <Show when={isDevelopment()}>
-            <section data-debug-section>
+            <section class="debug-section">
               <h4>System Info</h4>
-              <div data-system-info>
+              <div class="system-info">
                 <div>Environment: {import.meta.env.MODE}</div>
                 <div>Current Show: {layerState().current_show}</div>
                 <div>Active Content: {layerState().active_content?.type || 'None'}</div>

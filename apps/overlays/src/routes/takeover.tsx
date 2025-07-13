@@ -156,7 +156,7 @@ function TakeoverOverlay() {
 
   return (
     <div 
-      data-takeover-overlay
+      class="takeover-overlay"
       data-active={takeoverState().active}
       data-type={takeoverState().type}
       data-connected={isConnected()}
@@ -167,7 +167,7 @@ function TakeoverOverlay() {
 
       {/* Debug info in development */}
       {import.meta.env.DEV && (
-        <div data-debug-takeover>
+        <div class="debug-takeover">
           <div>Connected: {isConnected() ? '✓' : '✗'}</div>
           <div>Active: {takeoverState().active ? 'Yes' : 'No'}</div>
           <div>Type: {takeoverState().type}</div>
@@ -184,7 +184,7 @@ interface TakeoverContentProps {
 
 function TakeoverContent(props: TakeoverContentProps) {
   return (
-    <div data-takeover-content data-takeover-type={props.state.type}>
+    <div class={`takeover-content takeover-${props.state.type}`} data-type={props.state.type}>
       <Show when={props.state.type === 'technical-difficulties'}>
         <TechnicalDifficulties message={props.state.message} />
       </Show>
@@ -204,7 +204,7 @@ function TakeoverContent(props: TakeoverContentProps) {
       {/* Takeover close button (development only) */}
       {import.meta.env.DEV && (
         <button 
-          data-takeover-close 
+          class="takeover-close" 
           onClick={props.onHide}
         >
           Close Takeover
@@ -217,12 +217,12 @@ function TakeoverContent(props: TakeoverContentProps) {
 // Takeover overlay components
 function TechnicalDifficulties(props: { message: string }) {
   return (
-    <div data-takeover="technical-difficulties">
-      <div data-takeover-title>Technical Difficulties</div>
-      <div data-takeover-subtitle>
+    <div class="takeover technical-difficulties">
+      <div class="takeover-title">Technical Difficulties</div>
+      <div class="takeover-subtitle">
         {props.message || 'We\'ll be right back!'}
       </div>
-      <div data-takeover-logo>
+      <div class="takeover-logo">
         {/* Logo/branding would go here */}
       </div>
     </div>
@@ -231,10 +231,10 @@ function TechnicalDifficulties(props: { message: string }) {
 
 function ScreenCover(props: { message: string }) {
   return (
-    <div data-takeover="screen-cover">
-      <div data-cover-content>
+    <div class="takeover screen-cover">
+      <div class="cover-content">
         {props.message && (
-          <div data-cover-message>{props.message}</div>
+          <div class="cover-message">{props.message}</div>
         )}
       </div>
     </div>
@@ -243,10 +243,10 @@ function ScreenCover(props: { message: string }) {
 
 function PleaseStandBy(props: { message: string }) {
   return (
-    <div data-takeover="please-stand-by">
-      <div data-standby-title>Please Stand By</div>
+    <div class="takeover please-stand-by">
+      <div class="standby-title">Please Stand By</div>
       {props.message && (
-        <div data-standby-message>{props.message}</div>
+        <div class="standby-message">{props.message}</div>
       )}
     </div>
   )
@@ -254,8 +254,8 @@ function PleaseStandBy(props: { message: string }) {
 
 function CustomMessage(props: { message: string }) {
   return (
-    <div data-takeover="custom">
-      <div data-custom-message>
+    <div class="takeover custom">
+      <div class="custom-message">
         {props.message || 'Takeover Active'}
       </div>
     </div>

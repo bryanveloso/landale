@@ -36,7 +36,7 @@ export function Omnibar() {
     <Show when={isVisible()}>
       <div
         class="w-canvas"
-        data-omnibar
+        class="omnibar"
         data-show={streamState().current_show}
         data-priority={streamState().priority_level}
         data-connected={isConnected()}>
@@ -44,7 +44,7 @@ export function Omnibar() {
 
         {/* Debug info - you can style or remove this */}
         {import.meta.env.DEV && (
-          <div data-omnibar-debug>
+          <div class="omnibar-debug">
             <div>Show: {streamState().current_show}</div>
             <div>Priority: {streamState().priority_level}</div>
             <div>Content: {streamState().active_content?.type || 'none'}</div>
@@ -61,15 +61,15 @@ export function Omnibar() {
 
 function EmoteStatsContent(props: { data: any }) {
   return (
-    <div data-content="emote-stats">
-      <div data-content-type>Emote Stats</div>
-      <div data-emote-list>
+    <div class="content-emote-stats">
+      <div class="content-type">Emote Stats</div>
+      <div class="emote-list">
         {Object.entries(props.data.emotes || {})
           .slice(0, 3)
           .map(([emote, count]) => (
-            <div data-emote>
-              <span data-emote-name>{emote}</span>
-              <span data-emote-count>{count as number}</span>
+            <div class="emote">
+              <span class="emote-name">{emote}</span>
+              <span class="emote-count">{count as number}</span>
             </div>
           ))}
       </div>
@@ -79,41 +79,41 @@ function EmoteStatsContent(props: { data: any }) {
 
 function SubTrainContent(props: { data: any }) {
   return (
-    <div data-content="sub-train">
-      <div data-content-type>Sub Train</div>
-      <div data-train-count>{props.data.count || 1}</div>
-      <div data-train-latest>{props.data.latest_subscriber || props.data.subscriber}</div>
+    <div class="content-sub-train">
+      <div class="content-type">Sub Train</div>
+      <div class="train-count">{props.data.count || 1}</div>
+      <div class="train-latest">{props.data.latest_subscriber || props.data.subscriber}</div>
     </div>
   )
 }
 
 function AlertContent(props: { data: any }) {
   return (
-    <div data-content="alert">
-      <div data-content-type>Alert</div>
-      <div data-alert-message>{props.data.message || 'Breaking News'}</div>
+    <div class="content-alert">
+      <div class="content-type">Alert</div>
+      <div class="alert-message">{props.data.message || 'Breaking News'}</div>
     </div>
   )
 }
 
 function IronmonStatsContent(props: { data: any }) {
   return (
-    <div data-content="ironmon">
-      <div data-content-type>IronMON</div>
-      <div data-ironmon-run>Run #{props.data.run_number || '?'}</div>
-      <div data-ironmon-deaths>Deaths: {props.data.deaths || 0}</div>
-      <div data-ironmon-location>{props.data.location || 'Unknown'}</div>
+    <div class="content-ironmon">
+      <div class="content-type">IronMON</div>
+      <div class="ironmon-run">Run #{props.data.run_number || '?'}</div>
+      <div class="ironmon-deaths">Deaths: {props.data.deaths || 0}</div>
+      <div class="ironmon-location">{props.data.location || 'Unknown'}</div>
     </div>
   )
 }
 
 function FollowsContent(props: { data: any }) {
   return (
-    <div data-content="follows">
-      <div data-content-type>Recent Follows</div>
-      <div data-follow-list>
+    <div class="content-follows">
+      <div class="content-type">Recent Follows</div>
+      <div class="follow-list">
         {(props.data.recent_followers || []).slice(0, 3).map((follower: string) => (
-          <div data-follower>{follower}</div>
+          <div class="follower">{follower}</div>
         ))}
       </div>
     </div>
@@ -122,9 +122,9 @@ function FollowsContent(props: { data: any }) {
 
 function DefaultContent(props: { type: string; data: any }) {
   return (
-    <div data-content="default">
-      <div data-content-type>{props.type.replace(/_/g, ' ')}</div>
-      <pre data-content-data>{JSON.stringify(props.data, null, 2)}</pre>
+    <div class="content-default">
+      <div class="content-type">{props.type.replace(/_/g, ' ')}</div>
+      <pre class="content-data">{JSON.stringify(props.data, null, 2)}</pre>
     </div>
   )
 }

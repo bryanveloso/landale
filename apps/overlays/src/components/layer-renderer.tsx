@@ -10,6 +10,7 @@ export function LayerRenderer(props: LayerRendererProps) {
   return (
     <Show when={props.content}>
       <div 
+        class="content-renderer"
         data-content={props.contentType}
         data-show-context={props.show}
       >
@@ -61,18 +62,18 @@ function ContentComponent(props: { type: string; data: any; show?: string }) {
 // Content Components - minimal markup with data attributes for styling
 function AlertContent(props: { data: any; show?: string }) {
   return (
-    <div data-content-component="alert">
-      <div data-alert-message>{props.data?.message || 'Breaking News'}</div>
+    <div class="content-alert">
+      <div class="alert-message">{props.data?.message || 'Breaking News'}</div>
     </div>
   )
 }
 
 function SubTrainContent(props: { data: any; show?: string }) {
   return (
-    <div data-content-component="sub-train">
-      <div data-train-count>{props.data?.count || 1}</div>
-      <div data-train-subscriber>{props.data?.latest_subscriber || props.data?.subscriber || 'Unknown'}</div>
-      <div data-train-tier>{props.data?.latest_tier || props.data?.tier || '1000'}</div>
+    <div class="content-sub-train">
+      <div class="train-count">{props.data?.count || 1}</div>
+      <div class="train-subscriber">{props.data?.latest_subscriber || props.data?.subscriber || 'Unknown'}</div>
+      <div class="train-tier">{props.data?.latest_tier || props.data?.tier || '1000'}</div>
     </div>
   )
 }
@@ -82,12 +83,12 @@ function EmoteStatsContent(props: { data: any; show?: string }) {
   const topEmotes = () => Object.entries(emotes()).slice(0, 3)
   
   return (
-    <div data-content-component="emote-stats">
-      <div data-emote-list>
+    <div class="content-emote-stats">
+      <div class="emote-list">
         {topEmotes().map(([emote, count]) => (
-          <div data-emote>
-            <span data-emote-name>{emote}</span>
-            <span data-emote-count>{count as number}</span>
+          <div class="emote">
+            <span class="emote-name">{emote}</span>
+            <span class="emote-count">{count as number}</span>
           </div>
         ))}
       </div>
@@ -99,10 +100,10 @@ function FollowsContent(props: { data: any; show?: string }) {
   const followers = () => props.data?.recent_followers || []
   
   return (
-    <div data-content-component="follows">
-      <div data-follow-list>
+    <div class="content-follows">
+      <div class="follow-list">
         {followers().slice(0, 3).map((follower: string) => (
-          <div data-follower>{follower}</div>
+          <div class="follower">{follower}</div>
         ))}
       </div>
     </div>
@@ -111,40 +112,40 @@ function FollowsContent(props: { data: any; show?: string }) {
 
 function IronmonStatsContent(props: { data: any; show?: string }) {
   return (
-    <div data-content-component="ironmon">
-      <div data-ironmon-run>Run #{props.data?.run_number || '?'}</div>
-      <div data-ironmon-deaths>Deaths: {props.data?.deaths || 0}</div>
-      <div data-ironmon-location>{props.data?.location || 'Unknown'}</div>
-      <div data-ironmon-gym-progress>Gyms: {props.data?.gym_progress || 0}</div>
+    <div class="content-ironmon">
+      <div class="ironmon-run">Run #{props.data?.run_number || '?'}</div>
+      <div class="ironmon-deaths">Deaths: {props.data?.deaths || 0}</div>
+      <div class="ironmon-location">{props.data?.location || 'Unknown'}</div>
+      <div class="ironmon-gym-progress">Gyms: {props.data?.gym_progress || 0}</div>
     </div>
   )
 }
 
 function DailyStatsContent(props: { data: any; show?: string }) {
   return (
-    <div data-content-component="daily-stats">
-      <div data-stat-messages>Messages: {props.data?.total_messages || 0}</div>
-      <div data-stat-follows>Follows: {props.data?.total_follows || 0}</div>
+    <div class="content-daily-stats">
+      <div class="stat-messages">Messages: {props.data?.total_messages || 0}</div>
+      <div class="stat-follows">Follows: {props.data?.total_follows || 0}</div>
     </div>
   )
 }
 
 function CommitStatsContent(props: { data: any; show?: string }) {
   return (
-    <div data-content-component="commit-stats">
-      <div data-commits-today>Commits: {props.data?.commits_today || 0}</div>
-      <div data-lines-added>+{props.data?.lines_added || 0}</div>
-      <div data-lines-removed>-{props.data?.lines_removed || 0}</div>
+    <div class="content-commit-stats">
+      <div class="commits-today">Commits: {props.data?.commits_today || 0}</div>
+      <div class="lines-added">+{props.data?.lines_added || 0}</div>
+      <div class="lines-removed">-{props.data?.lines_removed || 0}</div>
     </div>
   )
 }
 
 function BuildStatusContent(props: { data: any; show?: string }) {
   return (
-    <div data-content-component="build-status">
-      <div data-build-status>{props.data?.status || 'unknown'}</div>
-      <div data-build-time>{props.data?.last_build || 'never'}</div>
-      <div data-build-coverage>{props.data?.coverage || '0%'}</div>
+    <div class="content-build-status">
+      <div class="build-status">{props.data?.status || 'unknown'}</div>
+      <div class="build-time">{props.data?.last_build || 'never'}</div>
+      <div class="build-coverage">{props.data?.coverage || '0%'}</div>
     </div>
   )
 }
@@ -154,16 +155,16 @@ function StreamGoalsContent(props: { data: any; show?: string }) {
   const subGoal = () => props.data?.sub_goal || { current: 0, target: 0 }
   
   return (
-    <div data-content-component="stream-goals">
-      <div data-goal="followers">
-        <span data-goal-current>{followerGoal().current}</span>
-        <span data-goal-separator>/</span>
-        <span data-goal-target>{followerGoal().target}</span>
+    <div class="content-stream-goals">
+      <div class="goal-followers">
+        <span class="goal-current">{followerGoal().current}</span>
+        <span class="goal-separator">/</span>
+        <span class="goal-target">{followerGoal().target}</span>
       </div>
-      <div data-goal="subs">
-        <span data-goal-current>{subGoal().current}</span>
-        <span data-goal-separator>/</span>
-        <span data-goal-target>{subGoal().target}</span>
+      <div class="goal-subs">
+        <span class="goal-current">{subGoal().current}</span>
+        <span class="goal-separator">/</span>
+        <span class="goal-target">{subGoal().target}</span>
       </div>
     </div>
   )
@@ -171,9 +172,9 @@ function StreamGoalsContent(props: { data: any; show?: string }) {
 
 function DefaultContent(props: { type: string; data: any; show?: string }) {
   return (
-    <div data-content-component="default">
-      <div data-content-type>{props.type.replace(/_/g, ' ')}</div>
-      <div data-content-data>{JSON.stringify(props.data, null, 2)}</div>
+    <div class="content-default">
+      <div class="content-type">{props.type.replace(/_/g, ' ')}</div>
+      <div class="content-data">{JSON.stringify(props.data, null, 2)}</div>
     </div>
   )
 }

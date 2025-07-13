@@ -88,7 +88,7 @@ export function Omnibar() {
     <Show when={isVisible()}>
       <div
         class="w-canvas"
-        data-omnibar
+        class="omnibar"
         data-show={streamState().current_show}
         data-priority={streamState().priority_level}
         data-connected={isConnected()}
@@ -146,7 +146,7 @@ export function Omnibar() {
         
         {/* Debug info - only in development */}
         {import.meta.env.DEV && (
-          <div data-omnibar-debug>
+          <div class="omnibar-debug">
             <div>Show: {streamState().current_show}</div>
             <div>Priority: {streamState().priority_level}</div>
             <div>Foreground: {orchestrator.getLayerState('foreground')}</div>
@@ -159,7 +159,7 @@ export function Omnibar() {
         
         {/* Connection status indicator */}
         <div 
-          data-connection-status
+          class="connection-status"
           data-connected={isConnected()}
         ></div>
       </div>

@@ -1,3 +1,5 @@
 export function Button(props: any) {
-  return <button data-button data-variant={props.variant || 'default'} data-size={props.size || 'default'} {...props} />
+  const { variant = 'default', size = 'default', class: className, ...rest } = props
+  const classes = `button button-${variant} button-${size} ${className || ''}`.trim()
+  return <button class={classes} {...rest} />
 }

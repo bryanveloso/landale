@@ -234,38 +234,38 @@ export function StreamInformation() {
   ]
 
   return (
-    <section data-stream-information>
-      <header data-info-header>
+    <section class="stream-information">
+      <header class="info-header">
         <Button onClick={() => setIsExpanded(!isExpanded())} variant="outline" size="sm" disabled={!isConnected()}>
           📺 Stream Info {isExpanded() ? '▼' : '▶'}
         </Button>
-        <div data-current-show>Show: {currentShow()}</div>
+        <div class="current-show">Show: {currentShow()}</div>
       </header>
 
       <Show when={isExpanded()}>
-        <main data-info-content>
+        <main class="info-content">
           <Show when={channelInfo.loading}>
-            <div data-loading>Loading channel information...</div>
+            <div class="loading">Loading channel information...</div>
           </Show>
 
           <Show when={channelInfo() && !channelInfo.loading}>
-            <div data-channel-info>
+            <div class="channel-info">
               {!isEditing() ? (
                 // Display mode
-                <div data-info-display>
-                  <div data-info-field>
+                <div class="info-display">
+                  <div class="info-field">
                     <label>Title:</label>
-                    <span data-field-value>{channelInfo()?.title || 'No title set'}</span>
+                    <span class="field-value">{channelInfo()?.title || 'No title set'}</span>
                   </div>
-                  <div data-info-field>
+                  <div class="info-field">
                     <label>Game:</label>
-                    <span data-field-value>{channelInfo()?.game_name || 'No game set'}</span>
+                    <span class="field-value">{channelInfo()?.game_name || 'No game set'}</span>
                   </div>
-                  <div data-info-field>
+                  <div class="info-field">
                     <label>Language:</label>
-                    <span data-field-value>{channelInfo()?.broadcaster_language || 'en'}</span>
+                    <span class="field-value">{channelInfo()?.broadcaster_language || 'en'}</span>
                   </div>
-                  <div data-info-actions>
+                  <div class="info-actions">
                     <Button onClick={() => setIsEditing(true)} disabled={!isConnected() || isSubmitting()} size="sm">
                       Edit
                     </Button>
@@ -280,8 +280,8 @@ export function StreamInformation() {
                 </div>
               ) : (
                 // Edit mode
-                <form data-info-edit>
-                  <div data-form-field>
+                <form class="info-edit">
+                  <div class="form-field">
                     <label>Stream Title:</label>
                     <input
                       type="text"
@@ -293,9 +293,9 @@ export function StreamInformation() {
                     />
                   </div>
 
-                  <div data-form-field>
+                  <div class="form-field">
                     <label>Game Category:</label>
-                    <div data-game-selector>
+                    <div class="game-selector">
                       <input
                         type="text"
                         value={showSearch() ? categorySearch() : gameName()}
@@ -353,7 +353,7 @@ export function StreamInformation() {
                     </Show>
                   </div>
 
-                  <div data-form-field>
+                  <div class="form-field">
                     <label>Language:</label>
                     <select value={language()} onInput={(e) => setLanguage(e.target.value)} disabled={isSubmitting()}>
                       <option value="en">English</option>
@@ -369,7 +369,7 @@ export function StreamInformation() {
                     </select>
                   </div>
 
-                  <div data-form-actions>
+                  <div class="form-actions">
                     <Button onClick={handleSubmit} disabled={isSubmitting() || !isConnected()} size="sm">
                       {isSubmitting() ? 'Saving...' : 'Save Changes'}
                     </Button>
@@ -383,13 +383,13 @@ export function StreamInformation() {
           </Show>
 
           <Show when={lastAction()}>
-            <div data-action-status>
-              <div data-status-message>{lastAction()}</div>
+            <div class="action-status">
+              <div class="status-message">{lastAction()}</div>
             </div>
           </Show>
 
           <Show when={!isConnected()}>
-            <div data-disconnected-warning>
+            <div class="disconnected-warning">
               <span>⚠️ Not connected to server</span>
             </div>
           </Show>
