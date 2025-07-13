@@ -7,6 +7,14 @@ import { describe, test, expect, beforeEach } from 'bun:test'
 import { useLayerOrchestrator } from './use-layer-orchestrator'
 import type { LayerPriority } from './use-layer-orchestrator'
 
+// Type declaration for global testUtils (defined in test/setup.ts)
+declare global {
+  var testUtils: {
+    createMockElement: () => HTMLElement
+    waitFor: (callback: () => boolean, timeout?: number) => Promise<void>
+  }
+}
+
 describe('Layer Orchestrator', () => {
   let orchestrator: ReturnType<typeof useLayerOrchestrator>
   let mockElement: HTMLElement
