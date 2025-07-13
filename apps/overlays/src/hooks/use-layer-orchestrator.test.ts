@@ -189,13 +189,22 @@ describe('Layer Orchestrator', () => {
       
       expect(orchestrator.getLayerState('background')).toBe('interrupted')
       
-      // Hide foreground
+      // Hide foreground - this should start the exit process
       orchestrator.hideLayer('foreground')
+      
+      // The foreground should be exiting (restoration happens immediately)
+      expect(orchestrator.getLayerState('foreground')).toBe('exiting')
+      
+      // Background should restore to active (restoration called immediately in animateExit)
+      expect(orchestrator.getLayerState('background')).toBe('active')
+      
+      // Wait for foreground to complete its exit animation
       await testUtils.waitFor(() => {
         return orchestrator.getLayerState('foreground') === 'hidden'
-      })
+      }, 500)
       
-      // Background should restore to active
+      // Final state verification
+      expect(orchestrator.getLayerState('foreground')).toBe('hidden')
       expect(orchestrator.getLayerState('background')).toBe('active')
     })
   })
