@@ -266,7 +266,10 @@ class DatasetExporter:
     def _get_features_schema(self, dataset_type: str) -> dict[str, dict[str, str]]:
         """Get Hugging Face features schema for dataset type."""
         schemas = {
-            "conversation": {"input": {"dtype": "string", "_type": "Value"}, "context": {"dtype": "string", "_type": "Value"}},
+            "conversation": {
+                "input": {"dtype": "string", "_type": "Value"},
+                "context": {"dtype": "string", "_type": "Value"},
+            },
             "pattern": {
                 "input": {"dtype": "string", "_type": "Value"},
                 "patterns": {"dtype": "string", "_type": "Value"},
@@ -278,7 +281,10 @@ class DatasetExporter:
                 "patterns": {"dtype": "string", "_type": "Value"},
             },
         }
-        return schemas.get(dataset_type, {"sequence": {"dtype": "string", "_type": "Value"}, "session": {"dtype": "string", "_type": "Value"}})
+        return schemas.get(
+            dataset_type,
+            {"sequence": {"dtype": "string", "_type": "Value"}, "session": {"dtype": "string", "_type": "Value"}},
+        )
 
     def _generate_assistant_response(self, data: dict[str, Any]) -> str:
         """Generate assistant response for OpenAI format."""
