@@ -111,7 +111,6 @@ defmodule ServerWeb.DashboardChannel do
     correlation_id = socket.assigns.correlation_id
 
     CorrelationId.with_context(correlation_id, fn ->
-
       # Forward request to OBS service
       case Server.Services.OBS.get_status() do
         {:ok, status} ->
@@ -192,7 +191,6 @@ defmodule ServerWeb.DashboardChannel do
     correlation_id = socket.assigns.correlation_id
 
     CorrelationId.with_context(correlation_id, fn ->
-
       case Server.Services.Rainwave.get_status() do
         {:ok, status} ->
           {:reply, ResponseBuilder.success(status), socket}
