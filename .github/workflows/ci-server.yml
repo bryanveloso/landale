@@ -1,19 +1,21 @@
-name: Elixir CI
+name: Server CI
 
 on:
   push:
     branches: [ main, feature/* ]
-    paths: [ 'apps/server/**' ]
+    paths:
+      - 'apps/server/**'
   pull_request:
     branches: [ main ]
-    paths: [ 'apps/server/**' ]
+    paths:
+      - 'apps/server/**'
 
 env:
   MIX_ENV: test
 
 jobs:
   test:
-    name: Test and Lint Elixir Server
+    name: Test and Lint Server
     runs-on: ubuntu-latest
     
     env:

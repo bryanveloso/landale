@@ -1,9 +1,6 @@
 """SEED - Stream Event Evaluation and Dynamics intelligence service."""
 
-from .training_pipeline import TrainingDataPipeline
 from .dataset_exporter import DatasetExporter
+from .training_pipeline import TrainingDataPipeline
 
-__all__ = [
-    'TrainingDataPipeline',
-    'DatasetExporter'
-]
+__all__ = ["TrainingDataPipeline", "DatasetExporter"]

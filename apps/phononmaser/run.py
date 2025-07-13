@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run phononmaser locally for development."""
-import asyncio
+
 import subprocess
 import sys
 

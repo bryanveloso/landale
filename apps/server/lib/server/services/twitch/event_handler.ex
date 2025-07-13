@@ -44,7 +44,6 @@ defmodule Server.Services.Twitch.EventHandler do
   """
   @spec process_event(binary(), map(), keyword()) :: :ok | {:error, term()}
   def process_event(event_type, event_data, _opts \\ []) do
-
     # Validate input parameters
     with :ok <- validate_event_type(event_type),
          :ok <- validate_event_data(event_data) do

@@ -1,39 +1,40 @@
 """LM Studio client for AI analysis."""
+
 import json
 import logging
-from typing import Optional
+
 import aiohttp
 
-from .events import FlexiblePatterns, StreamDynamics, AnalysisResult, RichContextData
+from .events import AnalysisResult, FlexiblePatterns, StreamDynamics
 
 logger = logging.getLogger(__name__)
 
 
 class LMSClient:
     """Client for LM Studio API."""
-    
+
     def __init__(self, api_url: str = "http://zelan:1234/v1", model: str = "dolphin-2.9.3-llama-3-8b"):
         self.api_url = api_url
         self.model = model
-        self.session: Optional[aiohttp.ClientSession] = None
-        
+        self.session: aiohttp.ClientSession | None = None
+
     async def __aenter__(self):
         """Async context manager entry."""
         self.session = aiohttp.ClientSession()
         return self
-        
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         if self.session:
             await self.session.close()
-            
-    async def analyze(self, transcription_context: str, chat_context: Optional[str] = None) -> Optional[AnalysisResult]:
+
+    async def analyze(self, transcription_context: str, chat_context: str | None = None) -> AnalysisResult | None:
         """Analyze stream context and return insights."""
         if not self.session:
             raise RuntimeError("LMSClient must be used as async context manager")
-            
+
         prompt = self._build_prompt(transcription_context, chat_context)
-        
+
         try:
             async with self.session.post(
                 f"{self.api_url}/chat/completions",
@@ -42,44 +43,41 @@ class LMSClient:
                     "messages": [
                         {
                             "role": "system",
-                            "content": "You are analyzing a live stream. Provide insights on patterns, dynamics, and sentiment. Always respond with valid JSON."
+                            "content": "You are analyzing a live stream. Provide insights on patterns, dynamics, and sentiment. Always respond with valid JSON.",
                         },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
+                        {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.7,
-                    "max_tokens": 800
-                }
+                    "max_tokens": 800,
+                },
             ) as response:
                 if response.status != 200:
                     logger.error(f"LMS API error: {response.status}")
                     return None
-                    
+
                 data = await response.json()
-                
+
                 # Validate response structure
                 if "choices" not in data or not data["choices"]:
                     logger.error("Invalid LMS response: missing choices")
                     return None
-                    
+
                 content = data["choices"][0]["message"]["content"]
-                
+
                 # Parse JSON response with proper error handling
                 try:
                     result_data = json.loads(content)
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse LMS JSON response: {e}")
                     return None
-                
+
                 # Validate required fields
                 required_fields = ["patterns", "sentiment", "context"]
                 for field in required_fields:
                     if field not in result_data:
                         logger.error(f"Missing required field in LMS response: {field}")
                         return None
-                
+
                 # Convert to AnalysisResult with error handling
                 try:
                     return AnalysisResult(
@@ -93,23 +91,23 @@ class LMSClient:
                         suggested_actions=result_data.get("suggestedActions", []),
                         stream_momentum=result_data.get("streamMomentum"),
                         transcription_context=transcription_context,
-                        chat_context=chat_context
+                        chat_context=chat_context,
                     )
                 except (KeyError, TypeError, ValueError) as e:
                     logger.error(f"Failed to create AnalysisResult: {e}")
                     return None
-                
+
         except Exception as e:
             logger.error(f"Failed to analyze with LMS: {e}")
             return None
-            
-    def _build_prompt(self, transcription_context: str, chat_context: Optional[str] = None) -> str:
+
+    def _build_prompt(self, transcription_context: str, chat_context: str | None = None) -> str:
         """Build analysis prompt with available context."""
         base_prompt = f"""You are analyzing a streamer's content to build training data. This represents the last 2 minutes.
 
 Streamer's speech: "{transcription_context}"
 """
-        
+
         if chat_context:
             base_prompt += f"""
 Chat reactions: "{chat_context}"
@@ -119,7 +117,7 @@ Analyze BOTH the streamer's words AND how chat is reacting. Consider:
 - What emotions or reactions is chat showing?
 - Are there any disconnects between streamer mood and chat mood?
 """
-        
+
         base_prompt += """
 Provide flexible analysis for training data collection:
 1. Energy level and engagement depth
@@ -155,5 +153,5 @@ Respond with JSON in this exact format:
     "direction": "ramping_up|winding_down|steady_state|chaotic"
   }
 }"""
-        
+
         return base_prompt

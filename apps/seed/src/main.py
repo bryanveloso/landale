@@ -1,75 +1,71 @@
 """Main entry point for the SEED intelligence service."""
+
 import asyncio
 import logging
 import os
 import signal
-from datetime import datetime
-from typing import Optional
 
 from dotenv import load_dotenv
 
-from .websocket_client import PhononmaserClient, ServerClient
-from .transcription_client import TranscriptionWebSocketClient
-from .lms_client import LMSClient
-from .correlator import StreamCorrelator
 from .context_client import ContextClient
-from .events import TranscriptionEvent, ChatMessage, EmoteEvent, ViewerInteractionEvent, AnalysisResult
+from .correlator import StreamCorrelator
+from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from .health import create_health_app
-from .service_config import get_phononmaser_url, get_server_events_url, get_lms_api_url
+from .lms_client import LMSClient
+from .service_config import get_lms_api_url, get_server_events_url
+from .transcription_client import TranscriptionWebSocketClient
+from .websocket_client import ServerClient
 
 # Load environment variables
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 class SeedService:
     """Main SEED intelligence service that coordinates all components."""
-    
+
     def __init__(self):
         # Configuration from environment with service-config defaults
         self.server_events_url = os.getenv("SERVER_URL", get_server_events_url())
         self.server_ws_url = os.getenv("SERVER_WS_URL", "ws://localhost:7175")
         self.lms_url = os.getenv("LMS_API_URL", get_lms_api_url())
         self.lms_model = os.getenv("LMS_MODEL", "dolphin-2.9.3-llama-3-8b")
-        
+
         # Components
         self.transcription_client = TranscriptionWebSocketClient(self.server_ws_url)
         self.server_client = ServerClient(self.server_events_url)
         self.lms_client = LMSClient(self.lms_url, self.lms_model)
-        self.context_client = ContextClient(self.server_events_url.replace('ws://', 'http://').replace('/events', ''))
-        self.correlator: Optional[StreamCorrelator] = None
-        
+        self.context_client = ContextClient(self.server_events_url.replace("ws://", "http://").replace("/events", ""))
+        self.correlator: StreamCorrelator | None = None
+
         # State
         self.running = False
         self.tasks = []
         self.health_runner = None
-        
+
     async def start(self):
         """Start the SEED intelligence service."""
         logger.info("Starting SEED intelligence service...")
-        
+
         # Initialize LMS client
         await self.lms_client.__aenter__()
-        
+
         # Initialize context client
         await self.context_client.__aenter__()
-        
+
         # Initialize correlator with context client
         self.correlator = StreamCorrelator(self.lms_client, self.context_client)
-        
+
         # Register event handlers
         self.transcription_client.on_transcription(self._handle_transcription)
         self.server_client.on_chat_message(self._handle_chat_message)
         self.server_client.on_emote(self._handle_emote)
         self.server_client.on_viewer_interaction(self._handle_viewer_interaction)
         self.correlator.on_analysis(self._handle_analysis_result)
-        
+
         # Connect to services
         try:
             await self.transcription_client.connect()
@@ -77,88 +73,89 @@ class SeedService:
         except Exception as e:
             logger.error(f"Failed to connect to transcription service: {e}")
             raise
-            
+
         # Try to connect to server, but don't fail if it's not available
         try:
             await self.server_client.connect()
             logger.info("Connected to server")
         except Exception as e:
             logger.warning(f"Could not connect to server (will work without chat events): {e}")
-            
+
         self.running = True
-        
+
         # Start health check endpoint
-        from .service_config import ServiceConfig, SERVICES
-        health_port = SERVICES.get('seed', {}).get('ports', {}).get('health', 8891)
+        from .service_config import SERVICES
+
+        health_port = SERVICES.get("seed", {}).get("ports", {}).get("health", 8891)
         self.health_runner = await create_health_app(port=health_port)
-        
+
         # Start listening tasks
         self.tasks = [
             asyncio.create_task(self.transcription_client.listen()),
             asyncio.create_task(self.server_client.listen()),
             asyncio.create_task(self.correlator.periodic_analysis_loop()),
-            asyncio.create_task(self._health_check_loop())
+            asyncio.create_task(self._health_check_loop()),
         ]
-        
+
         logger.info("SEED intelligence service started successfully")
-        
+
     async def stop(self):
         """Stop the SEED intelligence service."""
         logger.info("Stopping SEED intelligence service...")
         self.running = False
-        
+
         # Cancel tasks
         for task in self.tasks:
             task.cancel()
-            
+
         # Wait for tasks to complete
         await asyncio.gather(*self.tasks, return_exceptions=True)
-        
+
         # Disconnect clients
         await self.transcription_client.disconnect()
         await self.server_client.disconnect()
         await self.lms_client.__aexit__(None, None, None)
         await self.context_client.__aexit__(None, None, None)
-        
+
         # Cleanup health endpoint
         if self.health_runner:
             await self.health_runner.cleanup()
-        
+
         logger.info("SEED intelligence service stopped")
-        
+
     async def _handle_transcription(self, event: TranscriptionEvent):
         """Handle transcription events from Phoenix server."""
         logger.debug(f"Transcription: {event.text}")
-        
+
         # Add to correlator for analysis
         if self.correlator:
             await self.correlator.add_transcription(event)
-            
+
     async def _handle_chat_message(self, event: ChatMessage):
         """Handle chat message events from server."""
         logger.debug(f"Chat: {event.username}: {event.message}")
-        
+
         if self.correlator:
             await self.correlator.add_chat_message(event)
-            
+
     async def _handle_emote(self, event: EmoteEvent):
         """Handle emote events from server."""
         logger.debug(f"Emote: {event.username} used {event.emote_name}")
-        
+
         if self.correlator:
             await self.correlator.add_emote(event)
-            
+
     async def _handle_viewer_interaction(self, event: ViewerInteractionEvent):
         """Handle viewer interaction events from server."""
         logger.debug(f"Viewer interaction: {event.interaction_type} from {event.username}")
-        
+
         if self.correlator:
             await self.correlator.add_viewer_interaction(event)
-            
+
     async def _handle_analysis_result(self, result: AnalysisResult):
         """Handle analysis results from correlator."""
         logger.info(f"Analysis result: {result.sentiment} sentiment")
-        
+
         # Log detailed results with new flexible patterns
         logger.info(f"Topics: {result.topics}")
         if result.patterns:
@@ -171,44 +168,44 @@ class SeedService:
             logger.info(f"Chat velocity: {result.chat_velocity:.1f} msg/min")
         if result.emote_frequency:
             logger.info(f"Top emotes: {list(result.emote_frequency.keys())[:5]}")
-            
+
         # Future enhancements for training data pipeline
         # - Export rich context data for training datasets
         # - Build personalized pattern detection from accumulated data
         # - Train specialized models on your streaming patterns
-            
+
     async def _health_check_loop(self):
         """Periodic health check."""
         while self.running:
             await asyncio.sleep(60)  # Every minute
             logger.info("Health check: Service is running")
-            
+
 
 async def main():
     """Main entry point."""
     service = SeedService()
-    
+
     # Handle shutdown signals
     loop = asyncio.get_event_loop()
-    
+
     def handle_shutdown():
         logger.info("Received shutdown signal")
         asyncio.create_task(service.stop())
-        
+
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, handle_shutdown)
-        
+
     try:
         await service.start()
-        
+
         # Keep running until stopped
         while service.running:
             await asyncio.sleep(1)
-            
+
     except Exception as e:
         logger.error(f"Service error: {e}")
         await service.stop()
-        
+
 
 if __name__ == "__main__":
     asyncio.run(main())

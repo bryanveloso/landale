@@ -1,0 +1,16 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "src/**/*.{ts,tsx}",
+        "test/**/*.{ts,tsx}",
+        "**/*.test.{ts,tsx}",
+        "package.json",
+        "bunfig.toml",
+        "tsconfig*.json",
+        "vite.config.ts"
+      ]
+    }
+  }
+}
