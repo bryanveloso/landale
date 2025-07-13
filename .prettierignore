@@ -1,1 +1,48 @@
+# Build outputs and generated files
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+coverage/
+**/coverage/
+.turbo/
+**/.turbo/
+
+# Target directories (Rust/Tauri)
+**/target/
+apps/*/target/
+
+# Elixir build artifacts
+apps/server/deps/
+apps/server/priv/
+apps/server/_build/
+apps/dashboard/src-tauri/target/
+apps/nurvus/_build/
+apps/nurvus/deps/
+apps/nurvus/burrito_out/
+
+# Generated TypeScript files
+**/*.gen.ts
+**/routeTree.gen.ts
+**/phoenix.js
+
+# Python virtual environments and packages
+apps/**/.venv/
+apps/**/venv/
+**/site-packages/
+
+# TypeScript configuration and Tauri
 tsconfig.json
+apps/dashboard/src-tauri
+
+# OS and editor files
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Package manager files
+pnpm-lock.yaml
+yarn.lock
