@@ -1,0 +1,12 @@
+[test]
+# Preload test setup for DOM simulation and mocks
+preload = ["./test/setup.ts"]
+
+# Use happy-dom for DOM simulation in tests
+env = ["NODE_ENV=test"]
+
+# Test file patterns
+pattern = ["**/*.test.ts", "**/*.test.tsx"]
+
+# Timeout for async tests (5 seconds)
+timeout = 5000

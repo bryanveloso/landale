@@ -42,6 +42,13 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
     background: null
   }
   
+  // Queue for pending state changes before registration
+  const pendingStateChanges: Record<LayerPriority, { state: LayerState; content: any } | null> = {
+    foreground: null,
+    midground: null,
+    background: null
+  }
+  
   // Register a layer element for animation
   const registerLayer = (priority: LayerPriority, element: HTMLElement) => {
     layerElements[priority] = element
@@ -52,17 +59,28 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
       y: 20,
       scale: 0.95
     })
+    
+    // Process any pending state changes for this layer
+    const pending = pendingStateChanges[priority]
+    if (pending) {
+      pendingStateChanges[priority] = null
+      updateLayerState(priority, pending.state)
+    }
   }
   
   // Update layer state and trigger appropriate animation
-  const updateLayerState = (priority: LayerPriority, newState: LayerState) => {
+  const updateLayerState = (priority: LayerPriority, newState: LayerState, content?: any) => {
     setLayerStates(prev => ({
       ...prev,
       [priority]: newState
     }))
     
     const element = layerElements[priority]
-    if (!element) return
+    if (!element) {
+      // Queue state change for when layer gets registered
+      pendingStateChanges[priority] = { state: newState, content }
+      return
+    }
     
     // Update data attribute for CSS styling hooks
     element.setAttribute('data-state', newState)
@@ -195,14 +213,14 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
   }
   
   // Public API for showing/hiding layers
-  const showLayer = (priority: LayerPriority, _content: any) => {
+  const showLayer = (priority: LayerPriority, content: any) => {
     const currentState = layerStates()[priority]
     
     if (currentState === 'hidden') {
-      updateLayerState(priority, 'entering')
+      updateLayerState(priority, 'entering', content)
     } else if (currentState === 'interrupted') {
       // If layer was interrupted and now should be active
-      updateLayerState(priority, 'active')
+      updateLayerState(priority, 'active', content)
     }
   }
   
