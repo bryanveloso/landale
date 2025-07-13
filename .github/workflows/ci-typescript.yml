@@ -22,7 +22,7 @@ on:
 
 jobs:
   test:
-    name: Test and Lint TypeScript Apps
+    name: Test and Lint TypeScript
     runs-on: ubuntu-latest
     
     steps:

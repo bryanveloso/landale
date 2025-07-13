@@ -1,12 +1,14 @@
-name: Build Nurvus Single Executables
+name: Nurvus CI
 
 on:
   push:
-    branches: [main]
-    paths: ['apps/nurvus/**']
+    branches: [ main, feature/* ]
+    paths:
+      - 'apps/nurvus/**'
   pull_request:
-    branches: [main]
-    paths: ['apps/nurvus/**']
+    branches: [ main ]
+    paths:
+      - 'apps/nurvus/**'
   workflow_dispatch:
 
 env:
