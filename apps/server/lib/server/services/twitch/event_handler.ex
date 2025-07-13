@@ -44,11 +44,6 @@ defmodule Server.Services.Twitch.EventHandler do
   """
   @spec process_event(binary(), map(), keyword()) :: :ok | {:error, term()}
   def process_event(event_type, event_data, _opts \\ []) do
-    Logger.debug("Event processing started",
-      event_type: event_type,
-      event_id: event_data["id"],
-      broadcaster_id: event_data["broadcaster_user_id"]
-    )
 
     # Validate input parameters
     with :ok <- validate_event_type(event_type),
@@ -256,11 +251,6 @@ defmodule Server.Services.Twitch.EventHandler do
         # For other events, just use the general topic
         :ok
     end
-
-    Logger.debug("Event published to PubSub",
-      event_type: event_type,
-      event_id: normalized_event.id
-    )
 
     :ok
   end

@@ -713,10 +713,6 @@ defmodule Server.Services.OBS do
           pending_requests = Map.put(updated_state.pending_requests, request_id, {from, timeout_ref})
           new_state = %{updated_state | pending_requests: pending_requests}
 
-          Logger.debug("Request queued during authentication",
-            request_type: request_type,
-            request_id: request_id
-          )
 
           {:noreply, new_state}
 
@@ -878,26 +874,18 @@ defmodule Server.Services.OBS do
           current_incoming = state.websocket_incoming_messages || 0
           updated_state = %{state | websocket_incoming_messages: current_incoming + 1}
 
-          Logger.debug("OBS WebSocket message received",
-            message_count: current_incoming + 1,
-            message_preview: String.slice(message, 0, 100)
-          )
 
           state = handle_obs_message(updated_state, message)
           {:noreply, state}
 
-        {:binary, data} ->
-          Logger.debug("OBS WebSocket binary frame received", size: byte_size(data))
+        {:binary, _data} ->
           {:noreply, state}
 
         {:ping, payload} ->
-          # Respond to ping frames to maintain connection
           :gun.ws_send(gun_pid, stream_ref, {:pong, payload})
-          Logger.debug("OBS WebSocket ping received, pong sent")
           {:noreply, state}
 
         {:pong, _payload} ->
-          Logger.debug("OBS WebSocket pong received")
           {:noreply, state}
 
         {:close, code, reason} ->
@@ -1168,22 +1156,10 @@ defmodule Server.Services.OBS do
         timeout_ms = Server.NetworkConfig.websocket_timeout_ms()
 
         case :gun.await_up(conn_pid, timeout_ms) do
-          {:ok, protocol} ->
-            Logger.debug("Gun connection established",
-              conn_pid: inspect(conn_pid),
-              protocol: protocol,
-              host: state.uri.host,
-              port: port
-            )
+          {:ok, _protocol} ->
 
             # Upgrade to WebSocket without custom headers
             stream_ref = :gun.ws_upgrade(conn_pid, path)
-
-            Logger.debug("WebSocket upgrade initiated",
-              conn_pid: inspect(conn_pid),
-              stream_ref: inspect(stream_ref),
-              path: path
-            )
 
             # Track connection with ConnectionManager
             final_connection_manager =
@@ -1241,7 +1217,6 @@ defmodule Server.Services.OBS do
 
   # OBS WebSocket protocol handlers
   defp handle_obs_message(state, message_json) do
-    Logger.debug("Raw OBS message received", message: String.slice(message_json, 0, 200))
 
     case JSON.decode(message_json) do
       {:ok, %{"op" => op} = message} ->
@@ -1259,12 +1234,6 @@ defmodule Server.Services.OBS do
             _ -> "Op#{op}"
           end
 
-        Logger.debug("OBS protocol message received",
-          opcode: op,
-          message_type: message_type,
-          connection_state: state.connection_state,
-          authenticated: state.authenticated
-        )
 
         # Validate connection state according to OBS WebSocket v5 specification
         case validate_connection_state(state, op, message_type) do
@@ -1418,11 +1387,7 @@ defmodule Server.Services.OBS do
         nil ->
           state
 
-        new_subscriptions ->
-          Logger.debug("Updating event subscriptions",
-            old: @event_subscription_all,
-            new: new_subscriptions
-          )
+        _new_subscriptions ->
 
           # Note: In a full implementation, we would update our subscription mask
           # For now, just log the change
@@ -1439,7 +1404,6 @@ defmodule Server.Services.OBS do
 
     case send_message_now(updated_state, identified_response) do
       :ok ->
-        Logger.debug("Reidentify successful")
         updated_state
 
       {:error, reason} ->
@@ -1454,20 +1418,11 @@ defmodule Server.Services.OBS do
     # Event message - extract eventData (optional field)
     event_data = Map.get(event_message, "eventData", %{})
 
-    Logger.debug("OBS Event received",
-      event_type: event_type,
-      event_intent: event_intent,
-      has_data: map_size(event_data) > 0
-    )
 
     # Verify client is subscribed to this event intent
     if event_subscribed?(event_intent) do
       handle_obs_event(state, event_type, event_data, event_intent)
     else
-      Logger.debug("Event filtered - not subscribed to intent",
-        event_type: event_type,
-        event_intent: event_intent
-      )
 
       state
     end
@@ -1477,13 +1432,8 @@ defmodule Server.Services.OBS do
     # Request (OpCode 6) - client making a request to obs-websocket
     request_type = request_data["requestType"]
     request_id = request_data["requestId"]
-    request_data_payload = Map.get(request_data, "requestData", %{})
+    _request_data_payload = Map.get(request_data, "requestData", %{})
 
-    Logger.info("OBS Request received",
-      request_type: request_type,
-      request_id: request_id,
-      has_data: map_size(request_data_payload) > 0
-    )
 
     # Validate request format according to OBS WebSocket v5 spec
     case validate_request(request_data) do
@@ -1535,11 +1485,6 @@ defmodule Server.Services.OBS do
           stats_last_updated: DateTime.utc_now()
       }
 
-      Logger.debug("Stats response received and stored",
-        request_id: request_id,
-        fps: updated_state.active_fps,
-        cpu_usage: updated_state.cpu_usage
-      )
 
       updated_state
     else
@@ -1618,9 +1563,7 @@ defmodule Server.Services.OBS do
     }
 
     case send_message_now(state, batch_response) do
-      :ok ->
-        Logger.debug("RequestBatch response sent", request_id: request_id, result_count: length(results))
-
+      :ok -> :ok
       {:error, reason} ->
         Logger.error("Failed to send RequestBatch response", error: reason, request_id: request_id)
     end
@@ -1643,7 +1586,6 @@ defmodule Server.Services.OBS do
     # Send Identify directly without authentication checks
     case send_message_now(state, identify_message) do
       :ok ->
-        Logger.debug("Identify message sent, waiting for Identified response")
         state
 
       {:error, reason} ->
@@ -1723,16 +1665,10 @@ defmodule Server.Services.OBS do
     cond do
       # Always allow protocol handshake messages (Hello=0, Identify=1, Identified=2)
       (message["op"] in [0, 1, 2] and state.conn_pid) && state.stream_ref ->
-        Logger.debug("Sending protocol handshake message", message_type: get_message_type(message))
         send_message_now(state, message)
 
       # Queue requests until we receive Identified (op: 2) from OBS
       state.connection_state != "authenticated" and message["op"] not in [0, 1, 2] ->
-        Logger.debug("Queuing request until authenticated",
-          message_type: get_message_type(message),
-          queue_size: length(state.pending_messages),
-          connection_state: state.connection_state
-        )
 
         updated_state = %{state | pending_messages: state.pending_messages ++ [message]}
         {:queued, updated_state}
@@ -1761,11 +1697,6 @@ defmodule Server.Services.OBS do
         _ -> "Unknown"
       end
 
-    Logger.debug("OBS WebSocket message sending",
-      message_count: current_outgoing + 1,
-      message_type: message_type,
-      message_preview: String.slice(json_message, 0, 150)
-    )
 
     # Send via Gun WebSocket
     case :gun.ws_send(state.conn_pid, state.stream_ref, {:text, json_message}) do
@@ -1927,7 +1858,6 @@ defmodule Server.Services.OBS do
     }
 
     # Don't add stats requests to pending map since we don't wait for response
-    Logger.debug("Requesting OBS stats", request_id: request_id)
     send_websocket_message(state, message)
   end
 
@@ -2017,14 +1947,11 @@ defmodule Server.Services.OBS do
 
   # Message queuing during authentication
   defp process_pending_messages(state) do
-    Logger.debug("Processing pending messages", count: length(state.pending_messages))
 
     # Send all queued messages now that we're authenticated
     Enum.each(state.pending_messages, fn message ->
       case send_websocket_message_direct(state, message) do
-        :ok ->
-          Logger.debug("Sent queued message", message_type: get_message_type(message))
-
+        :ok -> :ok
         {:error, reason} ->
           Logger.error("Failed to send queued message",
             message_type: get_message_type(message),
@@ -2150,9 +2077,7 @@ defmodule Server.Services.OBS do
     response_message = %{op: 7, d: response_data}
 
     case send_message_now(state, response_message) do
-      :ok ->
-        Logger.debug("Request response sent", request_id: response_data["requestId"])
-
+      :ok -> :ok
       {:error, reason} ->
         Logger.error("Failed to send request response",
           request_id: response_data["requestId"],
@@ -2447,14 +2372,12 @@ defmodule Server.Services.OBS do
   # Process requests serially synchronized with graphics frame (experimental)
   defp process_serial_frame_batch(state, requests, halt_on_failure) do
     # For now, treat same as serial realtime since frame sync is complex
-    Logger.debug("Using serial frame execution (treating as realtime for now)")
     process_serial_realtime_batch(state, requests, halt_on_failure)
   end
 
   # Process requests in parallel (experimental)
   defp process_parallel_batch(state, requests, halt_on_failure) do
     # For safety, process serially for now since parallel execution could cause race conditions
-    Logger.debug("Using parallel execution (treating as serial for safety)")
     process_serial_realtime_batch(state, requests, halt_on_failure)
   end
 
@@ -2467,11 +2390,6 @@ defmodule Server.Services.OBS do
       else
         Map.put(request, "requestId", CorrelationId.generate())
       end
-
-    Logger.debug("Processing batch request",
-      request_type: request_with_id["requestType"],
-      request_id: request_with_id["requestId"]
-    )
 
     # Use the same validation and processing as OpCode 6 Request messages
     case validate_request(request_with_id) do

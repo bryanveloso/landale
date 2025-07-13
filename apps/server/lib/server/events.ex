@@ -49,7 +49,6 @@ defmodule Server.Events do
       Server.Events.BatchPublisher.publish(@obs_events, {:obs_event, event}, priority: priority)
     else
       # Direct publish for immediate delivery
-      Logger.debug("Publishing OBS event", event: event)
       Phoenix.PubSub.broadcast(@pubsub, @obs_events, {:obs_event, event})
     end
 
@@ -85,7 +84,6 @@ defmodule Server.Events do
       Server.Events.BatchPublisher.publish(@twitch_events, {:twitch_event, event}, priority: priority)
     else
       # Direct publish for immediate delivery
-      Logger.debug("Publishing Twitch event", event: event)
       Phoenix.PubSub.broadcast(@pubsub, @twitch_events, {:twitch_event, event})
     end
 
@@ -121,7 +119,6 @@ defmodule Server.Events do
       Server.Events.BatchPublisher.publish(@ironmon_events, {:ironmon_event, event}, priority: priority)
     else
       # Direct publish for immediate delivery
-      Logger.debug("Publishing IronMON event", event: event)
       Phoenix.PubSub.broadcast(@pubsub, @ironmon_events, {:ironmon_event, event})
     end
 
@@ -181,7 +178,6 @@ defmodule Server.Events do
       Server.Events.BatchPublisher.publish(@rainwave_events, {:rainwave_event, event}, priority: priority)
     else
       # Direct publish for immediate delivery
-      Logger.debug("Publishing Rainwave event", event: event)
       Phoenix.PubSub.broadcast(@pubsub, @rainwave_events, {:rainwave_event, event})
     end
 
@@ -217,7 +213,6 @@ defmodule Server.Events do
       Server.Events.BatchPublisher.publish(@system_events, {:system_event, event}, priority: priority)
     else
       # Direct publish for immediate delivery
-      Logger.debug("Publishing system event", event: event)
       Phoenix.PubSub.broadcast(@pubsub, @system_events, {:system_event, event})
     end
 

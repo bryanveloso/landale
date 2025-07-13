@@ -144,33 +144,11 @@ defmodule Server.ExternalCall do
     result
   end
 
-  defp measure_external_call(service_name, call_type, request_fn) do
-    start_time = System.monotonic_time(:millisecond)
-
+  defp measure_external_call(_service_name, _call_type, request_fn) do
     try do
-      result = request_fn.()
-      duration_ms = System.monotonic_time(:millisecond) - start_time
-
-      # Log successful external call
-      Logger.debug("External call succeeded", %{
-        service: service_name,
-        type: call_type,
-        duration_ms: duration_ms
-      })
-
-      result
+      request_fn.()
     rescue
       error ->
-        duration_ms = System.monotonic_time(:millisecond) - start_time
-
-        # Log failed external call
-        Logger.warning("External call failed", %{
-          service: service_name,
-          type: call_type,
-          duration_ms: duration_ms,
-          error: inspect(error)
-        })
-
         reraise error, __STACKTRACE__
     end
   end

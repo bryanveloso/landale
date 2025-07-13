@@ -1207,20 +1207,10 @@ defmodule Server.Services.Twitch do
 
   defp handle_eventsub_message(state, message_json) do
     # DEBUG: Log all incoming EventSub messages
-    Logger.debug("EventSub message received",
-      message_size: byte_size(message_json),
-      message_preview: String.slice(message_json, 0, 100)
-    )
 
     case JSON.decode(message_json) do
       {:ok, message} ->
         # DEBUG: Log the decoded message structure
-        Logger.debug("EventSub message decoded",
-          message_type: get_in(message, ["metadata", "message_type"]),
-          subscription_type: get_in(message, ["metadata", "subscription_type"]),
-          has_payload: Map.has_key?(message, "payload"),
-          metadata_keys: Map.keys(message["metadata"] || %{})
-        )
 
         handle_eventsub_protocol_message(state, message)
 
@@ -1318,7 +1308,6 @@ defmodule Server.Services.Twitch do
   defp handle_eventsub_protocol_message(state, %{
          "metadata" => %{"message_type" => "session_keepalive"}
        }) do
-    Logger.debug("EventSub keepalive received")
     state
   end
 
