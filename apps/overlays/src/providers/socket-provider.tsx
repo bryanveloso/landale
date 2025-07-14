@@ -41,7 +41,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
     
     // Auto-detect based on environment
     return window.location.hostname === 'localhost' 
-      ? '/socket' 
+      ? 'ws://localhost:7175/socket' 
       : 'ws://zelan:7175/socket'
   }
 
