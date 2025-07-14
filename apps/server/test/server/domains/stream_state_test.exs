@@ -1,7 +1,7 @@
 defmodule Server.Domains.StreamStateTest do
   @moduledoc """
   TDD tests for pure stream state domain logic.
-  
+
   These tests drive the implementation of pure functions for stream state management.
   """
 
@@ -19,11 +19,11 @@ defmodule Server.Domains.StreamStateTest do
         %{type: :alert, priority: 100, data: %{message: "Breaking"}},
         %{type: :alert, priority: 100, data: %{message: "Latest"}}
       ]
-      
+
       ticker_rotation = [:emote_stats, :recent_follows]
-      
+
       active_content = StreamState.determine_active_content(interrupt_stack, ticker_rotation)
-      
+
       # Should pick first alert (highest priority, first in list)
       assert active_content.type == :alert
       assert active_content.priority == 100
@@ -33,9 +33,9 @@ defmodule Server.Domains.StreamStateTest do
     test "falls back to ticker content when no interrupts" do
       interrupt_stack = []
       ticker_rotation = [:emote_stats, :recent_follows, :stream_goals]
-      
+
       active_content = StreamState.determine_active_content(interrupt_stack, ticker_rotation)
-      
+
       # Should return first ticker item
       assert active_content.type == :emote_stats
       assert active_content.priority == 10
@@ -44,9 +44,9 @@ defmodule Server.Domains.StreamStateTest do
     test "returns nil when no interrupts and empty ticker rotation" do
       interrupt_stack = []
       ticker_rotation = []
-      
+
       active_content = StreamState.determine_active_content(interrupt_stack, ticker_rotation)
-      
+
       assert active_content == nil
     end
 
@@ -57,11 +57,11 @@ defmodule Server.Domains.StreamStateTest do
         %{type: :sub_train, priority: 50, data: %{count: 2}},
         %{type: :alert, priority: 100, data: %{message: "Second alert"}}
       ]
-      
+
       ticker_rotation = [:emote_stats]
-      
+
       active_content = StreamState.determine_active_content(interrupt_stack, ticker_rotation)
-      
+
       # Should pick first alert (highest priority, first among alerts)
       assert active_content.type == :alert
       assert active_content.data.message == "First alert"
@@ -77,21 +77,21 @@ defmodule Server.Domains.StreamStateTest do
         version: 0,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       interrupt_data = %{message: "New alert"}
       options = [id: "new-alert"]
-      
+
       new_state = StreamState.add_interrupt(state, :alert, interrupt_data, options)
-      
+
       assert length(new_state.interrupt_stack) == 2
-      
+
       # New alert should be first (higher priority)
       [first, second] = new_state.interrupt_stack
       assert first.id == "new-alert"
       assert first.type == :alert
       assert first.priority == 100
       assert first.data.message == "New alert"
-      
+
       assert second.id == "existing"
       assert second.type == :sub_train
     end
@@ -99,9 +99,9 @@ defmodule Server.Domains.StreamStateTest do
     test "generates unique ID when not provided" do
       state = %{interrupt_stack: [], version: 0, last_updated: "2024-01-01T00:00:00Z"}
       interrupt_data = %{message: "Test"}
-      
+
       new_state = StreamState.add_interrupt(state, :alert, interrupt_data, [])
-      
+
       assert length(new_state.interrupt_stack) == 1
       interrupt = List.first(new_state.interrupt_stack)
       assert is_binary(interrupt.id)
@@ -112,9 +112,9 @@ defmodule Server.Domains.StreamStateTest do
       state = %{interrupt_stack: [], version: 0, last_updated: "2024-01-01T00:00:00Z"}
       interrupt_data = %{message: "Test"}
       options = [duration: 5000]
-      
+
       new_state = StreamState.add_interrupt(state, :alert, interrupt_data, options)
-      
+
       interrupt = List.first(new_state.interrupt_stack)
       assert interrupt.duration == 5000
     end
@@ -122,9 +122,9 @@ defmodule Server.Domains.StreamStateTest do
     test "uses default duration for interrupt type when not specified" do
       state = %{interrupt_stack: [], version: 0, last_updated: "2024-01-01T00:00:00Z"}
       interrupt_data = %{message: "Test"}
-      
+
       new_state = StreamState.add_interrupt(state, :alert, interrupt_data, [])
-      
+
       interrupt = List.first(new_state.interrupt_stack)
       # Alert default duration should be set
       assert interrupt.duration == 10_000
@@ -133,14 +133,14 @@ defmodule Server.Domains.StreamStateTest do
     test "includes started_at timestamp" do
       state = %{interrupt_stack: [], version: 0, last_updated: "2024-01-01T00:00:00Z"}
       interrupt_data = %{message: "Test"}
-      
+
       before_time = DateTime.utc_now()
       new_state = StreamState.add_interrupt(state, :alert, interrupt_data, [])
       after_time = DateTime.utc_now()
-      
+
       interrupt = List.first(new_state.interrupt_stack)
       assert is_binary(interrupt.started_at)
-      
+
       {:ok, started_at, _} = DateTime.from_iso8601(interrupt.started_at)
       assert DateTime.compare(started_at, before_time) in [:eq, :gt]
       assert DateTime.compare(started_at, after_time) in [:eq, :lt]
@@ -155,9 +155,9 @@ defmodule Server.Domains.StreamStateTest do
         version: 0,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       new_state = StreamState.update_show_context(state, :ironmon)
-      
+
       assert new_state.current_show == :ironmon
       # IronMON should have different ticker content
       assert :ironmon_run_stats in new_state.ticker_rotation
@@ -172,9 +172,9 @@ defmodule Server.Domains.StreamStateTest do
         version: 0,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       new_state = StreamState.update_show_context(state, :coding)
-      
+
       assert new_state.current_show == :coding
       # Coding should have build-related content
       assert :build_status in new_state.ticker_rotation
@@ -189,9 +189,9 @@ defmodule Server.Domains.StreamStateTest do
         version: 5,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       new_state = StreamState.update_show_context(state, :ironmon)
-      
+
       assert new_state.version == 6
     end
 
@@ -202,9 +202,9 @@ defmodule Server.Domains.StreamStateTest do
         version: 0,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       new_state = StreamState.update_show_context(state, :ironmon)
-      
+
       assert new_state.last_updated != "2024-01-01T00:00:00Z"
       # Should be valid ISO8601 timestamp
       assert {:ok, _, _} = DateTime.from_iso8601(new_state.last_updated)
@@ -217,7 +217,7 @@ defmodule Server.Domains.StreamStateTest do
       past_time = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.to_iso8601()
       # One hour from now  
       future_time = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
-      
+
       state = %{
         interrupt_stack: [
           %{id: "expired", type: :alert, duration: 1000, started_at: past_time},
@@ -226,10 +226,10 @@ defmodule Server.Domains.StreamStateTest do
         version: 0,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       current_time = DateTime.utc_now()
       new_state = StreamState.expire_content(state, current_time)
-      
+
       # Should only keep the non-expired interrupt
       assert length(new_state.interrupt_stack) == 1
       remaining = List.first(new_state.interrupt_stack)
@@ -238,7 +238,7 @@ defmodule Server.Domains.StreamStateTest do
 
     test "keeps all content when nothing is expired" do
       future_time = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
-      
+
       state = %{
         interrupt_stack: [
           %{id: "1", type: :alert, duration: 7200_000, started_at: future_time},
@@ -247,17 +247,17 @@ defmodule Server.Domains.StreamStateTest do
         version: 0,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       current_time = DateTime.utc_now()
       new_state = StreamState.expire_content(state, current_time)
-      
+
       # Should keep all interrupts
       assert length(new_state.interrupt_stack) == 2
     end
 
     test "removes all content when everything is expired" do
       past_time = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.to_iso8601()
-      
+
       state = %{
         interrupt_stack: [
           %{id: "1", type: :alert, duration: 1000, started_at: past_time},
@@ -266,17 +266,17 @@ defmodule Server.Domains.StreamStateTest do
         version: 0,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       current_time = DateTime.utc_now()
       new_state = StreamState.expire_content(state, current_time)
-      
+
       # Should remove all expired interrupts
       assert new_state.interrupt_stack == []
     end
 
     test "increments version when changes are made" do
       past_time = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.to_iso8601()
-      
+
       state = %{
         interrupt_stack: [
           %{id: "expired", type: :alert, duration: 1000, started_at: past_time}
@@ -284,16 +284,16 @@ defmodule Server.Domains.StreamStateTest do
         version: 10,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       current_time = DateTime.utc_now()
       new_state = StreamState.expire_content(state, current_time)
-      
+
       assert new_state.version == 11
     end
 
     test "does not change version when no content expires" do
       future_time = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
-      
+
       state = %{
         interrupt_stack: [
           %{id: "active", type: :alert, duration: 7200_000, started_at: future_time}
@@ -301,10 +301,10 @@ defmodule Server.Domains.StreamStateTest do
         version: 10,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       current_time = DateTime.utc_now()
       new_state = StreamState.expire_content(state, current_time)
-      
+
       assert new_state.version == 10
     end
   end
@@ -320,9 +320,9 @@ defmodule Server.Domains.StreamStateTest do
         version: 0,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       new_state = StreamState.remove_interrupt(state, "remove")
-      
+
       assert length(new_state.interrupt_stack) == 2
       ids = Enum.map(new_state.interrupt_stack, & &1.id)
       assert ids == ["keep-1", "keep-2"]
@@ -336,9 +336,9 @@ defmodule Server.Domains.StreamStateTest do
         version: 5,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       new_state = StreamState.remove_interrupt(state, "nonexistent")
-      
+
       # Should be unchanged
       assert new_state == state
     end
@@ -351,9 +351,9 @@ defmodule Server.Domains.StreamStateTest do
         version: 3,
         last_updated: "2024-01-01T00:00:00Z"
       }
-      
+
       new_state = StreamState.remove_interrupt(state, "remove-me")
-      
+
       assert new_state.version == 4
       assert new_state.interrupt_stack == []
     end

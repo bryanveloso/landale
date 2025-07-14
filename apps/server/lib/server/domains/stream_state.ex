@@ -1,9 +1,9 @@
 defmodule Server.Domains.StreamState do
   @moduledoc """
   Pure functional core for stream state management.
-  
+
   Contains no side effects - all functions are pure and deterministic.
-  
+
   Business rules:
   - Interrupts are prioritized by numeric priority (higher = more important)
   - Within same priority, earlier items win (FIFO)
@@ -23,7 +23,7 @@ defmodule Server.Domains.StreamState do
 
   @doc """
   Determines which content should be actively displayed.
-  
+
   Algorithm:
   1. Return highest priority interrupt if available
   2. Among same priority, return first item (FIFO)
@@ -39,7 +39,7 @@ defmodule Server.Domains.StreamState do
 
   @doc """
   Adds an interrupt to the stack with proper priority and sorting.
-  
+
   Options:
   - id: Custom ID (generates UUID if not provided)
   - duration: Custom duration in milliseconds
@@ -54,13 +54,15 @@ defmodule Server.Domains.StreamState do
       started_at: DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
-    new_stack = [interrupt | state.interrupt_stack]
-                |> Enum.sort_by(fn item -> -item.priority end)
+    new_stack =
+      [interrupt | state.interrupt_stack]
+      |> Enum.sort_by(fn item -> -item.priority end)
 
-    %{state | 
-      interrupt_stack: new_stack,
-      version: state.version + 1,
-      last_updated: DateTime.utc_now() |> DateTime.to_iso8601()
+    %{
+      state
+      | interrupt_stack: new_stack,
+        version: state.version + 1,
+        last_updated: DateTime.utc_now() |> DateTime.to_iso8601()
     }
   end
 
@@ -70,11 +72,12 @@ defmodule Server.Domains.StreamState do
   def update_show_context(state, new_show) do
     new_ticker_rotation = get_ticker_rotation_for_show(new_show)
 
-    %{state |
-      current_show: new_show,
-      ticker_rotation: new_ticker_rotation,
-      version: state.version + 1,
-      last_updated: DateTime.utc_now() |> DateTime.to_iso8601()
+    %{
+      state
+      | current_show: new_show,
+        ticker_rotation: new_ticker_rotation,
+        version: state.version + 1,
+        last_updated: DateTime.utc_now() |> DateTime.to_iso8601()
     }
   end
 
@@ -83,18 +86,20 @@ defmodule Server.Domains.StreamState do
   """
   def expire_content(state, current_time) do
     initial_count = length(state.interrupt_stack)
-    
-    new_stack = state.interrupt_stack
-                |> Enum.filter(&content_active?(&1, current_time))
+
+    new_stack =
+      state.interrupt_stack
+      |> Enum.filter(&content_active?(&1, current_time))
 
     new_count = length(new_stack)
-    
+
     if new_count < initial_count do
       # Something was removed, increment version
-      %{state |
-        interrupt_stack: new_stack,
-        version: state.version + 1,
-        last_updated: DateTime.utc_now() |> DateTime.to_iso8601()
+      %{
+        state
+        | interrupt_stack: new_stack,
+          version: state.version + 1,
+          last_updated: DateTime.utc_now() |> DateTime.to_iso8601()
       }
     else
       # Nothing changed
@@ -107,18 +112,20 @@ defmodule Server.Domains.StreamState do
   """
   def remove_interrupt(state, interrupt_id) do
     initial_count = length(state.interrupt_stack)
-    
-    new_stack = state.interrupt_stack
-                |> Enum.reject(&(&1.id == interrupt_id))
+
+    new_stack =
+      state.interrupt_stack
+      |> Enum.reject(&(&1.id == interrupt_id))
 
     new_count = length(new_stack)
 
     if new_count < initial_count do
       # Something was removed, increment version
-      %{state |
-        interrupt_stack: new_stack,
-        version: state.version + 1,
-        last_updated: DateTime.utc_now() |> DateTime.to_iso8601()
+      %{
+        state
+        | interrupt_stack: new_stack,
+          version: state.version + 1,
+          last_updated: DateTime.utc_now() |> DateTime.to_iso8601()
       }
     else
       # Nothing found/changed
@@ -129,6 +136,7 @@ defmodule Server.Domains.StreamState do
   # Private helper functions
 
   defp get_highest_priority_interrupt([]), do: nil
+
   defp get_highest_priority_interrupt(interrupt_stack) do
     # Sort by priority descending, then by original order (FIFO within same priority)
     interrupt_stack
@@ -139,6 +147,7 @@ defmodule Server.Domains.StreamState do
   end
 
   defp get_ticker_content([]), do: nil
+
   defp get_ticker_content(ticker_rotation) do
     %{
       type: List.first(ticker_rotation),
@@ -176,7 +185,7 @@ defmodule Server.Domains.StreamState do
       {:ok, started_at, _} ->
         expires_at = DateTime.add(started_at, interrupt.duration, :millisecond)
         DateTime.compare(current_time, expires_at) == :lt
-      
+
       {:error, _} ->
         # If we can't parse the timestamp, assume it's expired for safety
         false

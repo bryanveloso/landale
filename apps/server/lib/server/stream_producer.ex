@@ -13,16 +13,14 @@ defmodule Server.StreamProducer do
 
   use GenServer
   require Logger
-  
-  alias Server.Domains.StreamState
 
+  alias Server.Domains.StreamState
 
   # Default timing configuration - can be overridden via Application config
   defp ticker_interval, do: Application.get_env(:server, :ticker_interval, 15_000)
   defp sub_train_duration, do: Application.get_env(:server, :sub_train_duration, 300_000)
   defp cleanup_interval, do: Application.get_env(:server, :cleanup_interval, 600_000)
   defp max_timers, do: Application.get_env(:server, :max_timers, 100)
-
 
   # Cleanup configuration
   @cleanup_config Application.compile_env(:server, :cleanup_settings, %{
@@ -168,12 +166,12 @@ defmodule Server.StreamProducer do
   @impl true
   def handle_cast({:add_interrupt, type, data, opts}, state) do
     new_state = StreamState.add_interrupt(state, type, data, opts)
-    
+
     interrupt = List.first(new_state.interrupt_stack)
     duration = interrupt.duration
-    
+
     {_timer_ref, new_timers} = register_timer_atomically(state.timers, interrupt.id, duration)
-    
+
     final_state = %{new_state | timers: new_timers}
     final_state = update_active_content_with_domain(final_state)
 
@@ -318,14 +316,14 @@ defmodule Server.StreamProducer do
         count: 1,
         total_months: Map.get(event, :cumulative_months, 0)
       }
-      
+
       interrupt_id = generate_interrupt_id()
       options = [id: interrupt_id, duration: sub_train_duration()]
-      
+
       new_state = StreamState.add_interrupt(state, :sub_train, sub_data, options)
-      
+
       {_timer_ref, new_timers} = register_timer_atomically(state.timers, interrupt_id, sub_train_duration())
-      
+
       final_state = %{new_state | timers: new_timers}
       final_state = update_active_content_with_domain(final_state)
 
@@ -384,7 +382,6 @@ defmodule Server.StreamProducer do
     end
   end
 
-
   defp generate_interrupt_id do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
   end
@@ -403,23 +400,35 @@ defmodule Server.StreamProducer do
   end
 
   defp update_active_content_with_domain(state) do
-    ticker_content = if Enum.empty?(state.ticker_rotation) do
-      []
-    else
-      [Enum.at(state.ticker_rotation, state.ticker_index)]
-    end
-    
+    ticker_content =
+      if Enum.empty?(state.ticker_rotation) do
+        []
+      else
+        [Enum.at(state.ticker_rotation, state.ticker_index)]
+      end
+
     active_content = StreamState.determine_active_content(state.interrupt_stack, ticker_content)
-    
-    final_active = case active_content do
-      %{type: ticker_type} when ticker_type in [:emote_stats, :recent_follows, :daily_stats, :ironmon_run_stats, :commit_stats, :build_status, :stream_goals] ->
-        %{active_content | data: get_content_data(ticker_type)}
-      other -> other
-    end
-    
+
+    final_active =
+      case active_content do
+        %{type: ticker_type}
+        when ticker_type in [
+               :emote_stats,
+               :recent_follows,
+               :daily_stats,
+               :ironmon_run_stats,
+               :commit_stats,
+               :build_status,
+               :stream_goals
+             ] ->
+          %{active_content | data: get_content_data(ticker_type)}
+
+        other ->
+          other
+      end
+
     %{state | active_content: final_active}
   end
-
 
   defp advance_ticker(state) do
     if Enum.empty?(state.ticker_rotation) do
