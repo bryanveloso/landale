@@ -3,6 +3,65 @@
  * Matches backend ActivityLog Event and User schemas
  */
 
+// Event data structures for different event types
+export interface ChatMessageData {
+  message: string
+  fragments?: Array<{
+    type: 'text' | 'emote'
+    text: string
+    cheermote?: unknown
+    emote?: unknown
+  }>
+  color?: string
+  badges?: Array<{
+    set_id: string
+    id: string
+    info: string
+  }>
+}
+
+export interface FollowData {
+  followed_at: string
+}
+
+export interface SubscriptionData {
+  tier: string
+  is_gift: boolean
+  cumulative_months?: number
+  streak_months?: number
+  duration_months?: number
+  message?: {
+    text: string
+    emotes?: unknown[]
+  }
+}
+
+export interface CheerData {
+  bits: number
+  message: string
+}
+
+export interface ChannelUpdateData {
+  title?: string
+  category_name?: string
+  category_id?: string
+  language?: string
+}
+
+export interface StreamStatusData {
+  type: string
+  started_at?: string
+}
+
+export type ActivityEventData = 
+  | ChatMessageData
+  | FollowData  
+  | SubscriptionData
+  | CheerData
+  | ChannelUpdateData
+  | StreamStatusData
+  | Record<string, unknown>
+
 // Core activity event interface (matches backend Event schema)
 export interface ActivityEvent {
   id: string
@@ -11,7 +70,7 @@ export interface ActivityEvent {
   user_id: string | null
   user_login: string | null
   user_name: string | null
-  data: Record<string, any>
+  data: ActivityEventData
   correlation_id: string | null
 }
 
@@ -108,13 +167,13 @@ export function isValidEventType(type: string): type is EventType {
   return Object.values(EVENT_TYPES).includes(type as EventType)
 }
 
-export function isActivityEvent(obj: any): obj is ActivityEvent {
+export function isActivityEvent(obj: unknown): obj is ActivityEvent {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    typeof obj.id === 'string' &&
-    typeof obj.timestamp === 'string' &&
-    typeof obj.event_type === 'string' &&
-    typeof obj.data === 'object'
+    typeof (obj as Record<string, unknown>).id === 'string' &&
+    typeof (obj as Record<string, unknown>).timestamp === 'string' &&
+    typeof (obj as Record<string, unknown>).event_type === 'string' &&
+    typeof (obj as Record<string, unknown>).data === 'object'
   )
 }

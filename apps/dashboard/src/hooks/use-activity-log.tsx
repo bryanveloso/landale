@@ -70,7 +70,7 @@ export function useActivityLog() {
   createEffect(() => {
     const connectionState = streamService.connectionState()
     if (connectionState.connected && !eventsChannel()) {
-      const socket = (streamService as any).socket
+      const socket = streamService.getSocket()
       if (socket) {
         const channel = socket.channel('events:all', {})
         
@@ -113,7 +113,7 @@ export function useActivityLog() {
     error,
     hasMore,
     filters,
-    applyFilters: (newFilters: any) => setFilters(newFilters),
+    applyFilters: (newFilters: Partial<ActivityLogFilters>) => setFilters(prev => ({ ...prev, ...newFilters })),
     clearFilters: () => setFilters({ limit: 50 }),
     loadMore: () => {}
   }

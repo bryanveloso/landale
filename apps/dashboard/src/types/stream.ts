@@ -4,9 +4,20 @@
  */
 
 // Core stream content interfaces
+export interface StreamContentData {
+  message?: string
+  user?: string
+  amount?: number
+  tier?: string
+  emote?: string
+  title?: string
+  category?: string
+  [key: string]: unknown
+}
+
 export interface StreamContent {
   type: string
-  data: Record<string, any>
+  data: StreamContentData
   priority: number
   duration?: number
   started_at: string
@@ -41,7 +52,7 @@ export interface QueueItem {
   type: 'ticker' | 'alert' | 'sub_train' | 'manual_override'
   priority: number
   content_type: string
-  data: Record<string, any>
+  data: StreamContentData
   duration?: number
   started_at?: string
   status: 'pending' | 'active' | 'expired'
@@ -99,7 +110,7 @@ export interface QueueCommand {
 }
 
 // Response interfaces
-export interface CommandResponse<T = any> {
+export interface CommandResponse<T = unknown> {
   status: 'ok' | 'error'
   data?: T
   error?: string
@@ -128,13 +139,25 @@ export interface StreamServiceState {
 }
 
 // Event types for the service
+export interface TakeoverPayload {
+  type: TakeoverCommand['type']
+  message: string
+  duration?: number
+  timestamp: string
+}
+
+export interface TakeoverClearPayload {
+  cleared_at: string
+  reason?: string
+}
+
 export type StreamServiceEvent =
   | { type: 'connection_changed'; payload: ConnectionState }
   | { type: 'layer_state_updated'; payload: OverlayLayerState }
   | { type: 'queue_state_updated'; payload: StreamQueueState }
   | { type: 'show_changed'; payload: { show: string; game?: string; changed_at: string } }
-  | { type: 'takeover'; payload: any }
-  | { type: 'takeover_clear'; payload: any }
+  | { type: 'takeover'; payload: TakeoverPayload }
+  | { type: 'takeover_clear'; payload: TakeoverClearPayload }
 
 // Validation schemas (we'll use these for runtime validation)
 export const TAKEOVER_TYPES = ['technical-difficulties', 'screen-cover', 'please-stand-by', 'custom'] as const
@@ -149,48 +172,48 @@ export const LAYER_STATES = ['hidden', 'entering', 'active', 'interrupted', 'exi
 
 // Type guards for runtime validation
 export function isValidTakeoverType(type: string): type is TakeoverCommand['type'] {
-  return TAKEOVER_TYPES.includes(type as any)
+  return TAKEOVER_TYPES.includes(type as TakeoverCommand['type'])
 }
 
 export function isValidShowType(show: string): show is OverlayLayerState['current_show'] {
-  return SHOW_TYPES.includes(show as any)
+  return SHOW_TYPES.includes(show as OverlayLayerState['current_show'])
 }
 
 export function isValidPriorityLevel(level: string): level is OverlayLayerState['priority_level'] {
-  return PRIORITY_LEVELS.includes(level as any)
+  return PRIORITY_LEVELS.includes(level as OverlayLayerState['priority_level'])
 }
 
 // Validation functions
-export function validateTakeoverCommand(cmd: any): cmd is TakeoverCommand {
+export function validateTakeoverCommand(cmd: unknown): cmd is TakeoverCommand {
   return (
     typeof cmd === 'object' &&
     cmd !== null &&
-    isValidTakeoverType(cmd.type) &&
-    typeof cmd.message === 'string' &&
-    (cmd.duration === undefined || typeof cmd.duration === 'number')
+    isValidTakeoverType((cmd as Record<string, unknown>).type as string) &&
+    typeof (cmd as Record<string, unknown>).message === 'string' &&
+    ((cmd as Record<string, unknown>).duration === undefined || typeof (cmd as Record<string, unknown>).duration === 'number')
   )
 }
 
-export function validateServerStreamState(state: any): state is ServerStreamState {
+export function validateServerStreamState(state: unknown): state is ServerStreamState {
   return (
     typeof state === 'object' &&
     state !== null &&
-    typeof state.current_show === 'string' &&
-    Array.isArray(state.interrupt_stack) &&
-    Array.isArray(state.ticker_rotation) &&
-    state.metadata &&
-    typeof state.metadata.last_updated === 'string' &&
-    typeof state.metadata.state_version === 'number'
+    typeof (state as Record<string, unknown>).current_show === 'string' &&
+    Array.isArray((state as Record<string, unknown>).interrupt_stack) &&
+    Array.isArray((state as Record<string, unknown>).ticker_rotation) &&
+    (state as Record<string, unknown>).metadata &&
+    typeof ((state as Record<string, unknown>).metadata as Record<string, unknown>).last_updated === 'string' &&
+    typeof ((state as Record<string, unknown>).metadata as Record<string, unknown>).state_version === 'number'
   )
 }
 
-export function validateServerQueueState(state: any): state is ServerQueueState {
+export function validateServerQueueState(state: unknown): state is ServerQueueState {
   return (
     typeof state === 'object' &&
     state !== null &&
-    Array.isArray(state.queue) &&
-    typeof state.is_processing === 'boolean' &&
-    state.metrics &&
-    typeof state.metrics.total_items === 'number'
+    Array.isArray((state as Record<string, unknown>).queue) &&
+    typeof (state as Record<string, unknown>).is_processing === 'boolean' &&
+    (state as Record<string, unknown>).metrics &&
+    typeof ((state as Record<string, unknown>).metrics as Record<string, unknown>).total_items === 'number'
   )
 }

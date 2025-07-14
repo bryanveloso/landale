@@ -1,10 +1,10 @@
-import { createSignal, createEffect, Show, For } from 'solid-js'
+import { createSignal, Show, For } from 'solid-js'
 import { useStreamQueue } from '@/hooks/use-stream-queue'
 import { Button } from './ui/button'
 
 export function StreamQueue() {
-  const { queueState, isConnected, clearQueue, removeQueueItem, reorderQueue } = useStreamQueue()
-  const [isVisible, setIsVisible] = createSignal(true)
+  const { queueState, clearQueue, removeQueueItem } = useStreamQueue()
+  const [isVisible] = createSignal(true)
 
   return (
     <Show when={isVisible()}>
@@ -42,7 +42,7 @@ export function StreamQueue() {
         {/* Queue items list */}
         <div>
           <For each={queueState().queue}>
-            {(item, index) => (
+            {(item, _index) => (
               <div>
                 <div>
                   <div>{item.type}</div>

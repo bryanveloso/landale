@@ -8,11 +8,8 @@
 
 import { createSignal, createResource, For, Show, onMount, createEffect, onCleanup, untrack } from 'solid-js'
 import { useStreamService } from '@/services/stream-service'
-import { useStreamCommands } from '@/hooks/use-stream-commands'
 import { useLayerState } from '@/hooks/use-layer-state'
 import { Button } from './ui/button'
-import { createLogger } from '@landale/logger/browser'
-import { handleError, handleAsyncOperation } from '@/services/error-handler'
 import { StreamValidationRules, validateForm, sanitizeFormData } from '@/services/form-validation'
 
 interface ChannelInfo {
@@ -35,15 +32,8 @@ interface GameCategory {
   igdb_id: string
 }
 
-const logger = createLogger({
-  service: 'dashboard',
-  level: 'info',
-  enableConsole: true
-})
-
 export function StreamInformation() {
   const { connectionState } = useStreamService()
-  const streamCommands = useStreamCommands()
   const { layerState } = useLayerState()
 
   const [isExpanded, setIsExpanded] = createSignal(false)
@@ -173,7 +163,11 @@ export function StreamInformation() {
       return
     }
 
-    const updates: any = {}
+    const updates: Partial<{
+      title: string
+      game_id: string
+      broadcaster_language: string
+    }> = {}
 
     const currentInfo = channelInfo()
     if (currentInfo) {

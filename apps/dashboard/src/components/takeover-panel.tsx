@@ -10,14 +10,9 @@ import { useStreamCommands } from '@/hooks/use-stream-commands'
 import { useLayerState } from '@/hooks/use-layer-state'
 import type { TakeoverCommand } from '@/types/stream'
 import { Button } from './ui/button'
-import { createLogger } from '@landale/logger/browser'
-import { handleError, handleAsyncOperation } from '@/services/error-handler'
+import { createLogger } from '@landale/logger'
 
-const logger = createLogger({
-  service: 'dashboard',
-  level: 'info',
-  enableConsole: true
-})
+const logger = createLogger({ service: 'dashboard', module: 'TakeoverPanel' })
 
 export function TakeoverPanel() {
   const commands = useStreamCommands()
@@ -49,24 +44,21 @@ export function TakeoverPanel() {
       }
     })
 
-    const result = await handleAsyncOperation(() => commands.sendTakeover(takeoverData), {
-      component: 'TakeoverPanel',
-      operation: 'send takeover',
-      data: { takeoverType: takeoverData.type, duration: takeoverData.duration }
-    })
-
-    if (result.success) {
+    try {
+      await commands.sendTakeover(takeoverData)
       setLastSent(new Date().toLocaleTimeString())
       setTakeoverText('')
+    } catch (error) {
+      logger.error('Failed to send takeover', { error })
     }
   }
 
   const clearTakeover = async () => {
-    await handleAsyncOperation(() => commands.clearTakeover(), {
-      component: 'TakeoverPanel',
-      operation: 'clear takeover',
-      data: {}
-    })
+    try {
+      await commands.clearTakeover()
+    } catch (error) {
+      logger.error('Failed to clear takeover', { error })
+    }
   }
 
   const replayLastTakeover = () => {
@@ -94,7 +86,7 @@ export function TakeoverPanel() {
       <div>
         <select
           value={takeoverType()}
-          onInput={(e) => setTakeoverType(e.target.value as any)}
+          onInput={(e) => setTakeoverType(e.target.value as TakeoverCommand['type'])}
           disabled={commands.takeoverState().loading}>
           {takeoverTypes.map((type) => (
             <option value={type.value}>{type.label}</option>
@@ -155,7 +147,7 @@ export function TakeoverPanel() {
         {quickTakeovers.map((takeover) => (
           <Button
             onClick={() => {
-              setTakeoverType(takeover.type as any)
+              setTakeoverType(takeover.type as TakeoverCommand['type'])
               setTakeoverText(takeover.text)
               setDuration(takeover.duration)
             }}

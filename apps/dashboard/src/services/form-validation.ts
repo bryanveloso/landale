@@ -39,15 +39,15 @@ export function validateField<T>(value: T, rules: ValidationRule<T>[]): FieldVal
 /**
  * Validates an entire form object
  */
-export function validateForm<T extends Record<string, any>>(
+export function validateForm<T extends Record<string, unknown>>(
   data: T,
-  rules: Partial<Record<keyof T, ValidationRule<any>[]>>
+  rules: Partial<Record<keyof T, ValidationRule<unknown>[]>>
 ): ValidationResult {
   const errors: string[] = []
 
   for (const [field, fieldRules] of Object.entries(rules)) {
     const fieldValue = data[field]
-    const result = validateField(fieldValue, fieldRules as ValidationRule<any>[])
+    const result = validateField(fieldValue, fieldRules as ValidationRule<unknown>[])
 
     if (!result.isValid && result.error) {
       errors.push(`${field}: ${result.error}`)
@@ -82,7 +82,7 @@ export const ValidationRules = {
     message
   }),
 
-  numeric: (message = 'Must be a number'): ValidationRule<any> => ({
+  numeric: (message = 'Must be a number'): ValidationRule<unknown> => ({
     validate: (value) => !isNaN(Number(value)),
     message
   }),
@@ -149,8 +149,8 @@ export const StreamValidationRules = {
 /**
  * Creates a validation function for a specific form
  */
-export function createFormValidator<T extends Record<string, any>>(
-  rules: Partial<Record<keyof T, ValidationRule<any>[]>>
+export function createFormValidator<T extends Record<string, unknown>>(
+  rules: Partial<Record<keyof T, ValidationRule<unknown>[]>>
 ) {
   return (data: T): ValidationResult => validateForm(data, rules)
 }
@@ -158,8 +158,8 @@ export function createFormValidator<T extends Record<string, any>>(
 /**
  * Sanitizes form input by trimming whitespace and normalizing values
  */
-export function sanitizeFormData<T extends Record<string, any>>(data: T): T {
-  const sanitized: any = {}
+export function sanitizeFormData<T extends Record<string, unknown>>(data: T): T {
+  const sanitized: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(data)) {
     if (typeof value === 'string') {
@@ -169,7 +169,7 @@ export function sanitizeFormData<T extends Record<string, any>>(data: T): T {
     }
   }
 
-  return sanitized
+  return sanitized as T
 }
 
 /**

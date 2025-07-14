@@ -7,8 +7,14 @@
 
 import { Show } from 'solid-js'
 
+interface FallbackContent {
+  fallback_mode?: boolean
+  fallback?: boolean
+  message?: string
+}
+
 interface FallbackIndicatorProps {
-  content?: any
+  content?: FallbackContent | null
   type?: 'content' | 'system' | 'connection'
   message?: string
 }
