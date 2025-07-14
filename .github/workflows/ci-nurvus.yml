@@ -250,6 +250,28 @@ jobs:
             apps/nurvus/artifacts/nurvus*
           retention-days: 30
 
+      - name: Create rolling release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nurvus-latest
+          name: "Nurvus Latest Build"
+          body: |
+            ## 🌯 Nurvus Process Management Tool - Latest Build
+            
+            **Note: These are development builds. Assets are automatically created and replaced on every new commit.**
+            
+            ### 📦 Machine-Specific Packages:
+            - **nurvus-zelan.tar.gz** - Mac Studio (executable + config + systemd service)
+            - **nurvus-saya.tar.gz** - Mac Mini (executable + config + systemd service)  
+            - **nurvus-demi.tar.gz** - Windows Streaming PC (executable + config)
+            - **nurvus-alys.tar.gz** - Windows Gaming PC (executable + config)
+            
+            Built from commit: ${{ github.sha }}
+          files: |
+            apps/nurvus/artifacts/*.tar.gz
+          prerelease: true
+          make_latest: false
+
       - name: Create release summary
         run: |
           cd apps/nurvus
@@ -261,6 +283,8 @@ jobs:
           echo "- **nurvus-demi.tar.gz** - Windows PC (executable + config)" >> $GITHUB_STEP_SUMMARY
           echo "- **nurvus-alys.tar.gz** - Windows VM (executable + config)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Download Link:" >> $GITHUB_STEP_SUMMARY
+          echo "- [📥 Latest Release](https://github.com/bryanveloso/landale/releases/tag/nurvus-latest)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📏 Package Sizes:" >> $GITHUB_STEP_SUMMARY
           for file in artifacts/*.tar.gz; do
