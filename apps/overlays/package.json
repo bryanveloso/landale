@@ -12,20 +12,20 @@
   "dependencies": {
     "@landale/logger": "workspace:*",
     "@tailwindcss/vite": "^4.1.11",
-    "@tanstack/solid-router": "^1.125.0",
-    "@tanstack/solid-router-devtools": "^1.125.0",
+    "@tanstack/solid-router": "^1.127.3",
+    "@tanstack/solid-router-devtools": "^1.127.3",
     "gsap": "^3.13.0",
     "phoenix": "^1.7.21",
     "solid-js": "^1.9.7",
     "tailwindcss": "^4.1.11"
   },
   "devDependencies": {
-    "@tanstack/router-plugin": "^1.125.0",
+    "@tanstack/router-plugin": "^1.127.5",
     "@types/bun": "latest",
     "@types/phoenix": "^1.6.6",
     "happy-dom": "^18.0.1",
     "typescript": "~5.8.3",
-    "vite": "^7.0.2",
+    "vite": "^7.0.4",
     "vite-plugin-solid": "^2.11.7",
     "vite-tsconfig-paths": "^5.1.4"
   }

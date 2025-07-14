@@ -2,7 +2,7 @@
   "name": "landale",
   "version": "2025.7.0",
   "module": "index.ts",
-  "packageManager": "bun@1.2.17",
+  "packageManager": "bun@1.2.18",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
@@ -42,10 +42,10 @@
   ],
   "devDependencies": {
     "prettier": "^3.6.2",
-    "prettier-plugin-tailwindcss": "^0.6.13",
-    "turbo": "^2.3.4",
+    "prettier-plugin-tailwindcss": "^0.6.14",
+    "turbo": "^2.5.4",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.35.1"
+    "typescript-eslint": "^8.36.0"
   },
   "engines": {
     "bun": ">=1.2.0",
