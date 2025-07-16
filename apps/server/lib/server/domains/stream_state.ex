@@ -166,19 +166,19 @@ defmodule Server.Domains.StreamState do
   defp get_default_duration(:manual_override), do: @default_manual_override_duration
   defp get_default_duration(_), do: @default_alert_duration
 
-  defp get_ticker_rotation_for_show(:ironmon) do
+  def get_ticker_rotation_for_show(:ironmon) do
     [:ironmon_run_stats, :recent_follows, :emote_stats]
   end
 
-  defp get_ticker_rotation_for_show(:coding) do
+  def get_ticker_rotation_for_show(:coding) do
     [:build_status, :commit_stats, :recent_follows, :emote_stats]
   end
 
-  defp get_ticker_rotation_for_show(:variety) do
+  def get_ticker_rotation_for_show(:variety) do
     [:emote_stats, :recent_follows, :stream_goals, :daily_stats]
   end
 
-  defp get_ticker_rotation_for_show(_), do: get_ticker_rotation_for_show(:variety)
+  def get_ticker_rotation_for_show(_), do: get_ticker_rotation_for_show(:variety)
 
   defp content_active?(interrupt, current_time) do
     case DateTime.from_iso8601(interrupt.started_at) do

@@ -39,6 +39,7 @@ defmodule Server.StreamProducer do
             ticker_index: 0,
             timers: %{},
             version: 0,
+            last_updated: nil,
             metadata: %{last_updated: nil, state_version: 0}
 
   ## Client API
