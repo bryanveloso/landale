@@ -300,9 +300,13 @@ defmodule Server.StreamProducer do
 
     existing_sub_train =
       Enum.find(state.interrupt_stack, fn interrupt ->
-        interrupt.type == :sub_train and
-          Map.has_key?(state.timers, interrupt.id) and
-          DateTime.diff(now, interrupt.started_at, :millisecond) < (interrupt.duration || sub_train_duration())
+        with {:ok, started_at} <- DateTime.from_iso8601(interrupt.started_at) do
+          interrupt.type == :sub_train and
+            Map.has_key?(state.timers, interrupt.id) and
+            DateTime.diff(now, started_at, :millisecond) < (interrupt.duration || sub_train_duration())
+        else
+          _ -> false
+        end
       end)
 
     if existing_sub_train do
