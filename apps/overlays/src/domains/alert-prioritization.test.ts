@@ -11,8 +11,7 @@ import {
   createAlert,
   getPriorityLevel,
   type Alert,
-  type AlertType,
-  type PriorityLevel
+  type AlertType
 } from './alert-prioritization'
 
 describe('Alert Prioritization Domain - Client Side', () => {
