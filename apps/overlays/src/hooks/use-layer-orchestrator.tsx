@@ -8,7 +8,7 @@ export interface LayerConfig {
   priority: LayerPriority
   element: HTMLElement | null
   state: LayerState
-  content: any
+  content: unknown
 }
 
 export interface AnimationConfig {
@@ -43,7 +43,7 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
   }
   
   // Queue for pending state changes before registration
-  const pendingStateChanges: Record<LayerPriority, { state: LayerState; content: any } | null> = {
+  const pendingStateChanges: Record<LayerPriority, { state: LayerState; content: unknown } | null> = {
     foreground: null,
     midground: null,
     background: null
@@ -69,7 +69,7 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
   }
   
   // Update layer state and trigger appropriate animation
-  const updateLayerState = (priority: LayerPriority, newState: LayerState, content?: any) => {
+  const updateLayerState = (priority: LayerPriority, newState: LayerState, content?: unknown) => {
     setLayerStates(prev => ({
       ...prev,
       [priority]: newState
@@ -213,7 +213,7 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
   }
   
   // Public API for showing/hiding layers
-  const showLayer = (priority: LayerPriority, content: any) => {
+  const showLayer = (priority: LayerPriority, content: unknown) => {
     const currentState = layerStates()[priority]
     
     if (currentState === 'hidden') {

@@ -59,7 +59,7 @@ export function Omnibar() {
 
 // Content Components - minimal markup, you style these
 
-function EmoteStatsContent(props: { data: any }) {
+function EmoteStatsContent(props: { data: unknown }) {
   return (
     <div class="content-emote-stats">
       <div class="content-type">Emote Stats</div>
@@ -77,7 +77,7 @@ function EmoteStatsContent(props: { data: any }) {
   )
 }
 
-function SubTrainContent(props: { data: any }) {
+function SubTrainContent(props: { data: unknown }) {
   return (
     <div class="content-sub-train">
       <div class="content-type">Sub Train</div>
@@ -87,7 +87,7 @@ function SubTrainContent(props: { data: any }) {
   )
 }
 
-function AlertContent(props: { data: any }) {
+function AlertContent(props: { data: unknown }) {
   return (
     <div class="content-alert">
       <div class="content-type">Alert</div>
@@ -96,7 +96,7 @@ function AlertContent(props: { data: any }) {
   )
 }
 
-function IronmonStatsContent(props: { data: any }) {
+function IronmonStatsContent(props: { data: unknown }) {
   return (
     <div class="content-ironmon">
       <div class="content-type">IronMON</div>
@@ -107,7 +107,7 @@ function IronmonStatsContent(props: { data: any }) {
   )
 }
 
-function FollowsContent(props: { data: any }) {
+function FollowsContent(props: { data: unknown }) {
   return (
     <div class="content-follows">
       <div class="content-type">Recent Follows</div>
@@ -120,7 +120,7 @@ function FollowsContent(props: { data: any }) {
   )
 }
 
-function DefaultContent(props: { type: string; data: any }) {
+function DefaultContent(props: { type: string; data: unknown }) {
   return (
     <div class="content-default">
       <div class="content-type">{props.type.replace(/_/g, ' ')}</div>

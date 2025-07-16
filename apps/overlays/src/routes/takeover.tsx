@@ -49,7 +49,7 @@ function TakeoverOverlay() {
     })
     
     const phoenixSocket = new Socket(serverUrl, {
-      logger: (kind: string, msg: string, data: any) => {
+      logger: (kind: string, msg: string, data: unknown) => {
         logger.debug('Phoenix WebSocket event', {
           metadata: { kind, message: msg, data }
         })
@@ -62,7 +62,7 @@ function TakeoverOverlay() {
       joinChannel()
     })
 
-    phoenixSocket.onError((error: any) => {
+    phoenixSocket.onError((error: unknown) => {
       logger.error('WebSocket connection error', {
         error: { message: error?.message || 'Unknown socket error', type: 'WebSocketError' },
         metadata: { serverUrl }
@@ -86,7 +86,7 @@ function TakeoverOverlay() {
     channel = currentSocket.channel('stream:overlays', {})
     
     // Handle takeover events
-    channel.on('takeover', (payload: any) => {
+    channel.on('takeover', (payload: unknown) => {
       logger.info('Takeover received', {
         metadata: {
           type: payload.type,
@@ -126,7 +126,7 @@ function TakeoverOverlay() {
           metadata: { channel: 'stream:overlays' }
         })
       })
-      .receive('error', (resp: any) => {
+      .receive('error', (resp: unknown) => {
         logger.error('Channel join failed', {
           error: { message: resp?.reason || 'Unknown join error', type: 'ChannelJoinError' },
           metadata: { channel: 'stream:overlays', response: resp }

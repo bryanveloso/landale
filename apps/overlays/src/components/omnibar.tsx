@@ -32,7 +32,7 @@ export function Omnibar() {
     ]
     
     // Group content by layer priority
-    const layerContent: Record<'foreground' | 'midground' | 'background', any> = {
+    const layerContent: Record<'foreground' | 'midground' | 'background', unknown> = {
       foreground: null,
       midground: null,
       background: null

@@ -59,7 +59,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
         })
         return Math.min(1000 * Math.pow(2, tries), 30000)
       },
-      logger: (kind: string, msg: string, data: any) => {
+      logger: (kind: string, msg: string, data: unknown) => {
         logger.debug('Phoenix WebSocket event', {
           metadata: { kind, message: msg, data }
         })
@@ -73,7 +73,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
       setReconnectAttempts(0)
     })
 
-    phoenixSocket.onError((error: any) => {
+    phoenixSocket.onError((error: unknown) => {
       logger.error('Socket connection error', {
         error: { message: error?.message || 'Unknown socket error', type: 'SocketError' },
         metadata: { reconnectAttempts: reconnectAttempts() }

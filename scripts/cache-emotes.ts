@@ -17,6 +17,12 @@ interface EmoteManifest {
   >
 }
 
+interface TwitchEmote {
+  id: string
+  name: string
+  format: string[]
+}
+
 // Twitch CDN URL patterns
 const TWITCH_CDN = 'https://static-cdn.jtvnw.net/emoticons/v2'
 const SIZES = ['1.0', '2.0', '3.0'] // 28px, 56px, 112px
@@ -103,7 +109,7 @@ async function cacheChannelEmotes() {
 
   // Download all emotes in parallel
   await Promise.all(
-    data.data.map(async (emote: any) => {
+    data.data.map(async (emote: TwitchEmote) => {
       await downloadEmote(emote.id, emote.name)
       manifest.emotes[emote.id] = {
         id: emote.id,

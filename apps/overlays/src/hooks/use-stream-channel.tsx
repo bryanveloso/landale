@@ -4,13 +4,13 @@ import { useSocket } from '../providers/socket-provider'
 import { createLogger } from '@landale/logger/browser'
 
 // Phoenix types for better TypeScript support
-type PhoenixResponse = { [key: string]: any }
+type PhoenixResponse = { [key: string]: unknown }
 
 export interface StreamState {
   current_show: 'ironmon' | 'variety' | 'coding'
   active_content: {
     type: string
-    data: any
+    data: unknown
     priority: number
     duration?: number
     started_at: string
@@ -41,7 +41,7 @@ export interface ShowChange {
 
 export interface ContentUpdate {
   type: string
-  data: any
+  data: unknown
   timestamp: number
 }
 
@@ -100,7 +100,7 @@ export function useStreamChannel() {
       // Handle show changes for theme switching
     })
     
-    channel.on('interrupt', (payload: any) => {
+    channel.on('interrupt', (payload: unknown) => {
       logger.info('Priority interrupt received', {
         metadata: {
           type: payload.type,
@@ -154,7 +154,7 @@ export function useStreamChannel() {
     }
   }
   
-  const sendMessage = (event: string, payload: any = {}) => {
+  const sendMessage = (event: string, payload: unknown = {}) => {
     if (channel && isConnected()) {
       channel.push(event, payload)
         .receive('ok', (resp: PhoenixResponse) => {
