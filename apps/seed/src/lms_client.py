@@ -5,7 +5,7 @@ import logging
 
 import aiohttp
 
-from .events import AnalysisResult, FlexiblePatterns, StreamDynamics
+from events import AnalysisResult, FlexiblePatterns, StreamDynamics
 
 logger = logging.getLogger(__name__)
 

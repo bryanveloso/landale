@@ -6,9 +6,9 @@ import logging
 import sys
 from pathlib import Path
 
-from .context_client import ContextClient
-from .dataset_exporter import DatasetExporter
-from .training_pipeline import TrainingDataPipeline
+from context_client import ContextClient
+from dataset_exporter import DatasetExporter
+from training_pipeline import TrainingDataPipeline
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

@@ -7,8 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .context_client import ContextClient
-from .training_pipeline import TrainingDataPipeline
+from context_client import ContextClient
+from training_pipeline import TrainingDataPipeline
 
 logger = logging.getLogger(__name__)
 
