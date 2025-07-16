@@ -215,13 +215,13 @@ defmodule Server.Domains.StreamStateTest do
     test "removes expired interrupts from stack" do
       # One hour ago
       past_time = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.to_iso8601()
-      # One hour from now  
+      # One hour from now
       future_time = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601()
 
       state = %{
         interrupt_stack: [
           %{id: "expired", type: :alert, duration: 1000, started_at: past_time},
-          %{id: "active", type: :sub_train, duration: 7200_000, started_at: future_time}
+          %{id: "active", type: :sub_train, duration: 7_200_000, started_at: future_time}
         ],
         version: 0,
         last_updated: "2024-01-01T00:00:00Z"
@@ -241,8 +241,8 @@ defmodule Server.Domains.StreamStateTest do
 
       state = %{
         interrupt_stack: [
-          %{id: "1", type: :alert, duration: 7200_000, started_at: future_time},
-          %{id: "2", type: :sub_train, duration: 7200_000, started_at: future_time}
+          %{id: "1", type: :alert, duration: 7_200_000, started_at: future_time},
+          %{id: "2", type: :sub_train, duration: 7_200_000, started_at: future_time}
         ],
         version: 0,
         last_updated: "2024-01-01T00:00:00Z"
@@ -296,7 +296,7 @@ defmodule Server.Domains.StreamStateTest do
 
       state = %{
         interrupt_stack: [
-          %{id: "active", type: :alert, duration: 7200_000, started_at: future_time}
+          %{id: "active", type: :alert, duration: 7_200_000, started_at: future_time}
         ],
         version: 10,
         last_updated: "2024-01-01T00:00:00Z"

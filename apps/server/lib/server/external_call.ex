@@ -133,7 +133,7 @@ defmodule Server.ExternalCall do
         emit_call_telemetry(service_name, call_type, :circuit_open, duration_ms)
 
       {:error, _reason} ->
-        # Call failed - update circuit breaker  
+        # Call failed - update circuit breaker
         updated_circuit = handle_circuit_failure(circuit_breaker)
         CircuitBreakerRegistry.update(updated_circuit)
 

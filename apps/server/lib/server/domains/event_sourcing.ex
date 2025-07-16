@@ -102,7 +102,7 @@ defmodule Server.Domains.EventSourcing do
       not is_binary(event.timestamp) ->
         {:error, :invalid_timestamp}
 
-      not is_valid_iso8601?(event.timestamp) ->
+      not valid_iso8601?(event.timestamp) ->
         {:error, :invalid_timestamp}
 
       not is_map(event.data) ->
@@ -129,14 +129,14 @@ defmodule Server.Domains.EventSourcing do
 
   # Private helper functions
 
-  defp is_valid_iso8601?(timestamp) when is_binary(timestamp) do
+  defp valid_iso8601?(timestamp) when is_binary(timestamp) do
     case DateTime.from_iso8601(timestamp) do
       {:ok, _dt, _offset} -> true
       {:error, _reason} -> false
     end
   end
 
-  defp is_valid_iso8601?(_), do: false
+  defp valid_iso8601?(_), do: false
 
   defp generate_id do
     # Simple UUID-like ID generation

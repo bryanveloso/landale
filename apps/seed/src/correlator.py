@@ -6,12 +6,20 @@ from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any
 
+from context_client import ContextClient
 from domains.correlation_analysis import (
     ChatMessage as DomainChatMessage,
-    CorrelationState,
+)
+from domains.correlation_analysis import (
     EmoteEvent as DomainEmoteEvent,
+)
+from domains.correlation_analysis import (
     TranscriptionEvent as DomainTranscriptionEvent,
+)
+from domains.correlation_analysis import (
     ViewerInteractionEvent as DomainViewerInteractionEvent,
+)
+from domains.correlation_analysis import (
     add_chat_message,
     add_emote_event,
     add_interaction_event,
@@ -29,7 +37,6 @@ from domains.correlation_analysis import (
     should_complete_context_window,
     update_analysis_time,
 )
-from context_client import ContextClient
 from events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from lms_client import LMSClient
 

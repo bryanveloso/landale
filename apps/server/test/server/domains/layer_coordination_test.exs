@@ -253,7 +253,7 @@ defmodule Server.Domains.LayerCoordinationTest do
           data: %{message: "Test"},
           id: "alert-123",
           started_at: "2024-01-01T00:00:00Z",
-          duration: 10000
+          duration: 10_000
         }
       ]
 
@@ -262,7 +262,7 @@ defmodule Server.Domains.LayerCoordinationTest do
       alert = assignments[:foreground]
       assert alert.id == "alert-123"
       assert alert.started_at == "2024-01-01T00:00:00Z"
-      assert alert.duration == 10000
+      assert alert.duration == 10_000
       assert alert.priority == 100
       assert alert.data.message == "Test"
     end

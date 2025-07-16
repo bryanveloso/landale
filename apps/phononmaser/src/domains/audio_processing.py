@@ -11,8 +11,6 @@ Business rules:
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
-import time
 
 
 @dataclass
@@ -38,7 +36,7 @@ class AudioChunk:
 class AudioBuffer:
     """Buffer containing multiple audio chunks."""
 
-    chunks: List[AudioChunk]
+    chunks: list[AudioChunk]
     start_timestamp: int
     end_timestamp: int
     total_size: int
@@ -108,10 +106,7 @@ def should_flush_buffer(
     buffer_duration_us = current_time_us - buffer_state.current_buffer.start_timestamp
     buffer_duration_ms = buffer_duration_us / 1000
 
-    if buffer_duration_ms >= max_duration_ms:
-        return True
-
-    return False
+    return buffer_duration_ms >= max_duration_ms
 
 
 def can_add_chunk_to_buffer(buffer_state: BufferState, chunk: AudioChunk, max_buffer_size: int) -> bool:
@@ -138,10 +133,7 @@ def can_add_chunk_to_buffer(buffer_state: BufferState, chunk: AudioChunk, max_bu
 
     # Check format compatibility
     first_chunk = buffer_state.current_buffer.chunks[0]
-    if chunk.format != first_chunk.format:
-        return False
-
-    return True
+    return chunk.format == first_chunk.format
 
 
 def add_chunk_to_buffer(buffer_state: BufferState, chunk: AudioChunk) -> BufferState:
@@ -181,7 +173,7 @@ def add_chunk_to_buffer(buffer_state: BufferState, chunk: AudioChunk) -> BufferS
     )
 
 
-def create_transcription_request(buffer_state: BufferState) -> Optional[TranscriptionRequest]:
+def create_transcription_request(buffer_state: BufferState) -> TranscriptionRequest | None:
     """
     Creates a transcription request from the current buffer.
 
@@ -237,7 +229,7 @@ def flush_buffer(buffer_state: BufferState, flush_time_us: int) -> BufferState:
 # Transcription Processing Domain Logic
 
 
-def calculate_transcription_confidence(raw_confidence: Optional[float]) -> float:
+def calculate_transcription_confidence(raw_confidence: float | None) -> float:
     """
     Normalizes transcription confidence score to 0-1 range.
 
@@ -296,15 +288,12 @@ def should_emit_transcription(result: TranscriptionResult, min_confidence: float
     if result.word_count < min_words:
         return False
 
-    if not result.text or not result.text.strip():
-        return False
-
-    return True
+    return not (not result.text or not result.text.strip())
 
 
 def format_transcription_result(
     raw_text: str,
-    raw_confidence: Optional[float],
+    raw_confidence: float | None,
     request: TranscriptionRequest,
     processing_start_time_ms: int,
     processing_end_time_ms: int,
@@ -383,7 +372,7 @@ def formats_are_compatible(format1: AudioFormat, format2: AudioFormat) -> bool:
     )
 
 
-def calculate_buffer_duration_ms(buffer: AudioBuffer, sample_rate: int) -> float:
+def calculate_buffer_duration_ms(buffer: AudioBuffer, _sample_rate: int) -> float:
     """
     Calculates the duration of an audio buffer in milliseconds.
 

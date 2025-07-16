@@ -14,7 +14,7 @@ Business rules:
 from collections import Counter, deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -24,7 +24,7 @@ class TranscriptionEvent:
     timestamp: float
     text: str
     duration: float
-    confidence: Optional[float] = None
+    confidence: float | None = None
 
 
 @dataclass
@@ -34,8 +34,8 @@ class ChatMessage:
     timestamp: float
     username: str
     message: str
-    emotes: List[str]
-    native_emotes: List[str]
+    emotes: list[str]
+    native_emotes: list[str]
     is_subscriber: bool = False
     is_moderator: bool = False
 
@@ -58,7 +58,7 @@ class ViewerInteractionEvent:
     interaction_type: str
     username: str
     user_id: str
-    details: Dict[str, Any]
+    details: dict[str, Any]
 
 
 @dataclass
@@ -69,8 +69,8 @@ class CorrelationState:
     chat_buffer: deque[ChatMessage]
     emote_buffer: deque[EmoteEvent]
     interaction_buffer: deque[ViewerInteractionEvent]
-    context_start_time: Optional[datetime]
-    current_session_id: Optional[str]
+    context_start_time: datetime | None
+    current_session_id: str | None
     last_analysis_time: float
 
 
@@ -79,8 +79,8 @@ class CorrelationMetrics:
     """Metrics calculated from correlation analysis."""
 
     chat_velocity: float
-    emote_frequency: Dict[str, int]
-    native_emote_frequency: Dict[str, int]
+    emote_frequency: dict[str, int]
+    native_emote_frequency: dict[str, int]
     total_messages: int
     unique_participants: int
 
@@ -89,17 +89,17 @@ class CorrelationMetrics:
 class ContextData:
     """Rich context data for memory storage."""
 
-    temporal_data: Dict[str, Any]
-    content_data: Dict[str, Any]
-    community_data: Dict[str, Any]
-    correlation_data: Dict[str, Any]
-    ai_analysis: Optional[Dict[str, Any]]
+    temporal_data: dict[str, Any]
+    content_data: dict[str, Any]
+    community_data: dict[str, Any]
+    correlation_data: dict[str, Any]
+    ai_analysis: dict[str, Any] | None
 
 
 # Buffer Management Domain Logic
 
 
-def create_initial_correlation_state(context_window_seconds: int = 120) -> CorrelationState:
+def create_initial_correlation_state(_context_window_seconds: int = 120) -> CorrelationState:
     """
     Creates initial empty correlation state.
 
@@ -122,7 +122,7 @@ def create_initial_correlation_state(context_window_seconds: int = 120) -> Corre
     )
 
 
-def should_start_context_window(state: CorrelationState, event_timestamp: float) -> bool:
+def should_start_context_window(state: CorrelationState, _event_timestamp: float) -> bool:
     """
     Determines if a new context window should be started.
 
@@ -384,7 +384,7 @@ def build_correlated_chat_context(state: CorrelationState, correlation_window_se
     return " | ".join(context_parts) if context_parts else summarize_all_recent_chat(state)
 
 
-def summarize_chat_messages(messages: List[ChatMessage]) -> str:
+def summarize_chat_messages(messages: list[ChatMessage]) -> str:
     """
     Summarizes a list of chat messages.
 
@@ -463,7 +463,7 @@ def calculate_chat_velocity(state: CorrelationState) -> float:
     return len(chat_list) / time_span_minutes
 
 
-def calculate_emote_frequency(state: CorrelationState) -> Dict[str, int]:
+def calculate_emote_frequency(state: CorrelationState) -> dict[str, int]:
     """
     Calculates emote usage frequency.
 
@@ -489,7 +489,7 @@ def calculate_emote_frequency(state: CorrelationState) -> Dict[str, int]:
     return dict(emote_counts.most_common(10))
 
 
-def calculate_native_emote_frequency(state: CorrelationState) -> Dict[str, int]:
+def calculate_native_emote_frequency(state: CorrelationState) -> dict[str, int]:
     """
     Calculates native avalon-prefixed emote usage frequency.
 
@@ -587,7 +587,7 @@ def generate_session_id(start_time: datetime) -> str:
     return f"stream_{start_time.year}_{start_time.month:02d}_{start_time.day:02d}"
 
 
-def build_temporal_data(state: CorrelationState, duration: float, context_window_seconds: int) -> Dict[str, Any]:
+def build_temporal_data(state: CorrelationState, duration: float, context_window_seconds: int) -> dict[str, Any]:
     """
     Builds temporal information for context.
 
@@ -612,7 +612,7 @@ def build_temporal_data(state: CorrelationState, duration: float, context_window
     }
 
 
-def build_content_data(state: CorrelationState, transcript: str) -> Dict[str, Any]:
+def build_content_data(state: CorrelationState, transcript: str) -> dict[str, Any]:
     """
     Builds content analysis data.
 
@@ -637,7 +637,7 @@ def build_content_data(state: CorrelationState, transcript: str) -> Dict[str, An
     }
 
 
-def calculate_content_metrics(transcript: str, state: CorrelationState) -> Dict[str, float]:
+def calculate_content_metrics(transcript: str, state: CorrelationState) -> dict[str, float]:
     """
     Calculates content-related metrics.
 
@@ -661,7 +661,7 @@ def calculate_content_metrics(transcript: str, state: CorrelationState) -> Dict[
     }
 
 
-def analyze_speaking_patterns(state: CorrelationState) -> Dict[str, Any]:
+def analyze_speaking_patterns(state: CorrelationState) -> dict[str, Any]:
     """
     Analyzes speaking patterns from transcription data.
 

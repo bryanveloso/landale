@@ -14,9 +14,6 @@ import numpy as np
 from domains.audio_processing import (
     AudioChunk,
     AudioFormat,
-    BufferState,
-    TranscriptionRequest,
-    TranscriptionResult,
     add_chunk_to_buffer,
     calculate_buffer_duration_ms,
     can_add_chunk_to_buffer,
@@ -107,7 +104,7 @@ class AudioProcessor:
 
         # Check if chunk can be added using domain logic
         if not can_add_chunk_to_buffer(self.buffer_state, chunk, self.max_buffer_size):
-            logger.warning(f"Cannot add chunk: incompatible format or would exceed size limit")
+            logger.warning("Cannot add chunk: incompatible format or would exceed size limit")
             return
 
         # Add chunk using domain logic
