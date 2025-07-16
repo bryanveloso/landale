@@ -406,7 +406,12 @@ defmodule Server.Services.Twitch.EventHandler do
       }
 
       # Store the event asynchronously to avoid blocking the event pipeline
-      Task.start(fn -> store_event_async(event_attrs, event_type, normalized_event) end)
+      {:ok, task_pid} = Task.start(fn -> store_event_async(event_attrs, event_type, normalized_event) end)
+      
+      # Allow the task to access the database connection in test mode
+      if Mix.env() == :test do
+        Ecto.Adapters.SQL.Sandbox.allow(Server.Repo, self(), task_pid)
+      end
     end
 
     :ok
