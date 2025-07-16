@@ -172,7 +172,6 @@ describe("AvalonstarEmoteRepository", () => {
       
       // Should contain appropriate intensity emotes
       const highEmoteMappings = highIntensityEmotes.map(name => repository.getEmoteMapping(name)).filter(Boolean)
-      const lowEmoteMappings = lowIntensityEmotes.map(name => repository.getEmoteMapping(name)).filter(Boolean)
       
       // High intensity selection should include high-intensity emotes
       expect(highEmoteMappings.some(mapping => mapping!.intensity >= 2)).toBe(true)

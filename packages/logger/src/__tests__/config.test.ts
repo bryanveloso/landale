@@ -164,10 +164,10 @@ describe("Logger Configuration", () => {
     test("validates config during merge", () => {
       const invalidConfig = {
         service: "test",
-        level: "invalid-level" as any
+        level: "invalid-level" as unknown
       }
       
-      expect(() => getLoggerConfig(invalidConfig)).toThrow()
+      expect(() => getLoggerConfig(invalidConfig as Parameters<typeof getLoggerConfig>[0])).toThrow()
     })
   })
 
@@ -211,11 +211,11 @@ describe("Logger Configuration", () => {
     })
 
     test("handles undefined and null errors gracefully", () => {
-      expect(serializeError(undefined as any)).toEqual({
+      expect(serializeError(undefined as unknown)).toEqual({
         message: "undefined",
         type: "undefined"
       })
-      expect(serializeError(null as any)).toEqual({
+      expect(serializeError(null as unknown)).toEqual({
         message: "null",
         type: "object"
       })
@@ -223,7 +223,7 @@ describe("Logger Configuration", () => {
 
     test("handles non-Error objects", () => {
       const nonError = { message: "Not an error", data: "test" }
-      const serialized = serializeError(nonError as any)
+      const serialized = serializeError(nonError as unknown)
       
       expect(serialized.message).toBe("[object Object]")
       expect(serialized.type).toBe("object")
@@ -231,9 +231,9 @@ describe("Logger Configuration", () => {
 
     test("handles circular references in error objects", () => {
       const error = new Error("Circular error")
-      const circular: any = { error }
+      const circular: Record<string, unknown> = { error }
       circular.self = circular
-      ;(error as any).circular = circular
+      ;(error as Error & { circular?: unknown }).circular = circular
       
       // Should not throw even with circular references
       expect(() => serializeError(error)).not.toThrow()

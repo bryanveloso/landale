@@ -5,7 +5,6 @@
 
 import { describe, test, expect, beforeEach } from 'bun:test'
 import { useLayerOrchestrator } from './use-layer-orchestrator'
-import type { LayerPriority } from './use-layer-orchestrator'
 
 // Simple mock element for registration
 const createMockElement = (): HTMLElement => {
