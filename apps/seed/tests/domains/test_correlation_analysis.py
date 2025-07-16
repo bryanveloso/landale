@@ -12,11 +12,8 @@ from pathlib import Path
 # Add the src directory to Python path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-import pytest
 from domains.correlation_analysis import (
     ChatMessage,
-    CorrelationMetrics,
-    CorrelationState,
     EmoteEvent,
     TranscriptionEvent,
     ViewerInteractionEvent,
@@ -42,7 +39,6 @@ from domains.correlation_analysis import (
     should_analyze,
     should_complete_context_window,
     should_start_context_window,
-    summarize_all_recent_chat,
     summarize_chat_messages,
     update_analysis_time,
 )

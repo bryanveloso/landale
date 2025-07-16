@@ -11,26 +11,25 @@ from pathlib import Path
 # Add the src directory to Python path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-import pytest
 from domains.audio_processing import (
-    AudioFormat,
-    AudioChunk,
     AudioBuffer,
+    AudioChunk,
+    AudioFormat,
     BufferState,
     TranscriptionRequest,
     TranscriptionResult,
-    should_flush_buffer,
-    can_add_chunk_to_buffer,
     add_chunk_to_buffer,
-    create_transcription_request,
-    flush_buffer,
+    calculate_buffer_duration_ms,
     calculate_transcription_confidence,
     calculate_word_count,
-    should_emit_transcription,
-    format_transcription_result,
+    can_add_chunk_to_buffer,
     create_initial_buffer_state,
+    create_transcription_request,
+    flush_buffer,
+    format_transcription_result,
     formats_are_compatible,
-    calculate_buffer_duration_ms,
+    should_emit_transcription,
+    should_flush_buffer,
 )
 
 
@@ -45,8 +44,8 @@ class TestBufferManagement:
 
     def test_should_flush_buffer_size_limit(self):
         """Buffer should be flushed when size limit is exceeded."""
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
-        chunk = AudioChunk(timestamp=1000, format=format, data=b"x" * 2000, source_id="test")
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        chunk = AudioChunk(timestamp=1000, format=audio_format, data=b"x" * 2000, source_id="test")
 
         buffer = AudioBuffer(chunks=[chunk], start_timestamp=1000, end_timestamp=1000, total_size=2000)
         buffer_state = BufferState(current_buffer=buffer, last_flush_time=0, total_chunks_processed=0)
@@ -56,8 +55,8 @@ class TestBufferManagement:
 
     def test_should_flush_buffer_time_limit(self):
         """Buffer should be flushed when time limit is exceeded."""
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
-        chunk = AudioChunk(timestamp=1000000, format=format, data=b"x" * 100, source_id="test")
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        chunk = AudioChunk(timestamp=1000000, format=audio_format, data=b"x" * 100, source_id="test")
 
         buffer = AudioBuffer(chunks=[chunk], start_timestamp=1000000, end_timestamp=1000000, total_size=100)
         buffer_state = BufferState(current_buffer=buffer, last_flush_time=0, total_chunks_processed=0)
@@ -69,8 +68,8 @@ class TestBufferManagement:
 
     def test_should_flush_buffer_within_limits(self):
         """Buffer should not be flushed when within limits."""
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
-        chunk = AudioChunk(timestamp=1000000, format=format, data=b"x" * 100, source_id="test")
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        chunk = AudioChunk(timestamp=1000000, format=audio_format, data=b"x" * 100, source_id="test")
 
         buffer = AudioBuffer(chunks=[chunk], start_timestamp=1000000, end_timestamp=1000000, total_size=100)
         buffer_state = BufferState(current_buffer=buffer, last_flush_time=0, total_chunks_processed=0)
@@ -83,43 +82,43 @@ class TestBufferManagement:
     def test_can_add_chunk_to_empty_buffer(self):
         """First chunk can always be added to empty buffer."""
         buffer_state = create_initial_buffer_state()
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
-        chunk = AudioChunk(timestamp=1000, format=format, data=b"test", source_id="test")
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        chunk = AudioChunk(timestamp=1000, format=audio_format, data=b"test", source_id="test")
 
         result = can_add_chunk_to_buffer(buffer_state, chunk, 1000)
         assert result is True
 
     def test_can_add_chunk_size_limit(self):
         """Chunk should not be added if it exceeds size limit."""
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
-        existing_chunk = AudioChunk(timestamp=1000, format=format, data=b"x" * 500, source_id="test")
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        existing_chunk = AudioChunk(timestamp=1000, format=audio_format, data=b"x" * 500, source_id="test")
 
         buffer = AudioBuffer(chunks=[existing_chunk], start_timestamp=1000, end_timestamp=1000, total_size=500)
         buffer_state = BufferState(current_buffer=buffer, last_flush_time=0, total_chunks_processed=0)
 
-        new_chunk = AudioChunk(timestamp=2000, format=format, data=b"x" * 600, source_id="test")
+        new_chunk = AudioChunk(timestamp=2000, format=audio_format, data=b"x" * 600, source_id="test")
         result = can_add_chunk_to_buffer(buffer_state, new_chunk, 1000)
         assert result is False
 
     def test_can_add_chunk_format_mismatch(self):
         """Chunk should not be added if format doesn't match."""
-        format1 = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
-        format2 = AudioFormat(sample_rate=44100, channels=2, bit_depth=16)
+        audio_format1 = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        audio_format2 = AudioFormat(sample_rate=44100, channels=2, bit_depth=16)
 
-        existing_chunk = AudioChunk(timestamp=1000, format=format1, data=b"test", source_id="test")
+        existing_chunk = AudioChunk(timestamp=1000, format=audio_format1, data=b"test", source_id="test")
 
         buffer = AudioBuffer(chunks=[existing_chunk], start_timestamp=1000, end_timestamp=1000, total_size=4)
         buffer_state = BufferState(current_buffer=buffer, last_flush_time=0, total_chunks_processed=0)
 
-        new_chunk = AudioChunk(timestamp=2000, format=format2, data=b"test", source_id="test")
+        new_chunk = AudioChunk(timestamp=2000, format=audio_format2, data=b"test", source_id="test")
         result = can_add_chunk_to_buffer(buffer_state, new_chunk, 1000)
         assert result is False
 
     def test_add_chunk_to_buffer(self):
         """Adding chunk should update buffer state correctly."""
         buffer_state = create_initial_buffer_state()
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
-        chunk = AudioChunk(timestamp=1000, format=format, data=b"test", source_id="test")
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        chunk = AudioChunk(timestamp=1000, format=audio_format, data=b"test", source_id="test")
 
         new_state = add_chunk_to_buffer(buffer_state, chunk)
 
@@ -133,10 +132,10 @@ class TestBufferManagement:
     def test_add_multiple_chunks_to_buffer(self):
         """Adding multiple chunks should update timestamps and size correctly."""
         buffer_state = create_initial_buffer_state()
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
 
-        chunk1 = AudioChunk(timestamp=1000, format=format, data=b"aaaa", source_id="test")
-        chunk2 = AudioChunk(timestamp=2000, format=format, data=b"bbbb", source_id="test")
+        chunk1 = AudioChunk(timestamp=1000, format=audio_format, data=b"aaaa", source_id="test")
+        chunk2 = AudioChunk(timestamp=2000, format=audio_format, data=b"bbbb", source_id="test")
 
         state1 = add_chunk_to_buffer(buffer_state, chunk1)
         state2 = add_chunk_to_buffer(state1, chunk2)
@@ -154,9 +153,9 @@ class TestBufferManagement:
 
     def test_create_transcription_request_with_chunks(self):
         """Buffer with chunks should create valid transcription request."""
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
-        chunk1 = AudioChunk(timestamp=1000, format=format, data=b"aaaa", source_id="test")
-        chunk2 = AudioChunk(timestamp=2000, format=format, data=b"bbbb", source_id="test")
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        chunk1 = AudioChunk(timestamp=1000, format=audio_format, data=b"aaaa", source_id="test")
+        chunk2 = AudioChunk(timestamp=2000, format=audio_format, data=b"bbbb", source_id="test")
 
         buffer = AudioBuffer(chunks=[chunk1, chunk2], start_timestamp=1000, end_timestamp=2000, total_size=8)
         buffer_state = BufferState(current_buffer=buffer, last_flush_time=0, total_chunks_processed=0)
@@ -165,15 +164,15 @@ class TestBufferManagement:
 
         assert request is not None
         assert request.audio_data == b"aaaabbbb"
-        assert request.format == format
+        assert request.format == audio_format
         assert request.start_timestamp == 1000
         assert request.end_timestamp == 2000
         assert request.source_id == "test"
 
     def test_flush_buffer(self):
         """Flushing buffer should reset to empty state and update counters."""
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
-        chunk = AudioChunk(timestamp=1000, format=format, data=b"test", source_id="test")
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        chunk = AudioChunk(timestamp=1000, format=audio_format, data=b"test", source_id="test")
 
         buffer = AudioBuffer(chunks=[chunk], start_timestamp=1000, end_timestamp=1000, total_size=4)
         buffer_state = BufferState(current_buffer=buffer, last_flush_time=0, total_chunks_processed=5)
@@ -292,9 +291,9 @@ class TestTranscriptionProcessing:
 
     def test_format_transcription_result(self):
         """Transcription result should be formatted correctly."""
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
         request = TranscriptionRequest(
-            audio_data=b"test", format=format, start_timestamp=1000, end_timestamp=2000, source_id="test"
+            audio_data=b"test", format=audio_format, start_timestamp=1000, end_timestamp=2000, source_id="test"
         )
 
         result = format_transcription_result(
@@ -315,9 +314,9 @@ class TestTranscriptionProcessing:
 
     def test_format_transcription_result_none_confidence(self):
         """None confidence should be handled in formatting."""
-        format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
+        audio_format = AudioFormat(sample_rate=16000, channels=1, bit_depth=16)
         request = TranscriptionRequest(
-            audio_data=b"test", format=format, start_timestamp=1000, end_timestamp=2000, source_id="test"
+            audio_data=b"test", format=audio_format, start_timestamp=1000, end_timestamp=2000, source_id="test"
         )
 
         result = format_transcription_result(
