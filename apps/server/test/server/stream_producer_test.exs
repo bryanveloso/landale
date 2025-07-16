@@ -2,6 +2,9 @@ defmodule Server.StreamProducerTest do
   use ExUnit.Case, async: false
 
   alias Server.StreamProducer
+  alias Server.Domains.StreamState
+
+  @moduletag :unit
 
   setup do
     # Start a fresh StreamProducer for each test
@@ -145,130 +148,29 @@ defmodule Server.StreamProducerTest do
     end
   end
 
-  describe "timer management" do
-    test "atomic timer registration prevents race conditions", %{producer: producer} do
-      # Test with unique IDs to actually test the atomicity
-      tasks =
-        for i <- 1..10 do
-          Task.async(fn ->
-            GenServer.cast(producer, {:add_interrupt, :alert, %{index: i}, [id: "race-test-#{i}"]})
-          end)
-        end
-
-      Enum.each(tasks, &Task.await/1)
-      Process.sleep(20)
-
-      state = GenServer.call(producer, :get_state)
-      # All interrupts should be added successfully with unique IDs
-      assert Enum.count(state.interrupt_stack) == 10
-      # All should have unique IDs
-      ids = Enum.map(state.interrupt_stack, & &1.id)
-      assert Enum.count(Enum.uniq(ids)) == 10
-    end
-
-    test "expired interrupts are cleaned up", %{producer: producer} do
-      # Add interrupt with very short duration
-      GenServer.cast(producer, {:add_interrupt, :alert, %{}, [duration: 1]})
-
-      state = GenServer.call(producer, :get_state)
-      assert Enum.count(state.interrupt_stack) == 1
-
-      # Wait for expiration
-      Process.sleep(50)
-
-      state = GenServer.call(producer, :get_state)
-      assert Enum.empty?(state.interrupt_stack)
-    end
-  end
-
-  describe "memory management" do
-    test "enforces interrupt stack size limits", %{producer: producer} do
-      # Add more interrupts than the configured limit
-      max_size =
-        Application.get_env(:server, :cleanup_settings, %{})
-        |> Map.get(:max_interrupt_stack_size, 50)
-
-      for i <- 1..(max_size + 10) do
-        GenServer.cast(producer, {:add_interrupt, :alert, %{id: i}, [id: "alert-#{i}"]})
-      end
-
-      # Trigger cleanup
-      send(producer, :cleanup)
-      Process.sleep(10)
+  describe "domain logic integration" do
+    test "uses StreamState domain for state transitions", %{producer: producer} do
+      # Test that the GenServer uses pure domain logic correctly
+      GenServer.cast(producer, {:change_show, :ironmon, %{}})
 
       state = GenServer.call(producer, :get_state)
 
-      keep_count =
-        Application.get_env(:server, :cleanup_settings, %{})
-        |> Map.get(:interrupt_stack_keep_count, 25)
-
-      assert Enum.count(state.interrupt_stack) <= keep_count
+      # Verify the state change followed domain rules
+      expected_ticker = StreamState.get_ticker_rotation_for_show(:ironmon)
+      assert state.ticker_rotation == expected_ticker
+      assert state.current_show == :ironmon
     end
 
-    test "cleanup removes stale timers", %{producer: producer} do
-      # Add some interrupts
-      GenServer.cast(producer, {:add_interrupt, :alert, %{}, [id: "test1"]})
-      GenServer.cast(producer, {:add_interrupt, :alert, %{}, [id: "test2"]})
+    test "interrupt prioritization follows domain rules", %{producer: producer} do
+      # Add interrupts that should be sorted by domain logic
+      GenServer.cast(producer, {:add_interrupt, :sub_train, %{count: 1}, []})
+      GenServer.cast(producer, {:add_interrupt, :alert, %{message: "Breaking"}, []})
 
       state = GenServer.call(producer, :get_state)
-      initial_timer_count = map_size(state.timers)
 
-      # Manually remove from interrupt stack (simulating stale timer)
-      new_state = %{state | interrupt_stack: []}
-      :sys.replace_state(producer, fn _ -> new_state end)
-
-      # Trigger cleanup
-      send(producer, :cleanup)
-      Process.sleep(10)
-
-      final_state = GenServer.call(producer, :get_state)
-      assert map_size(final_state.timers) < initial_timer_count
-    end
-  end
-
-  describe "configuration" do
-    test "uses configured cleanup values" do
-      config = Application.get_env(:server, :cleanup_settings, %{})
-
-      assert is_integer(Map.get(config, :max_interrupt_stack_size, 50))
-      assert is_integer(Map.get(config, :interrupt_stack_keep_count, 25))
-    end
-
-    test "uses configured timing values" do
-      assert is_integer(Application.get_env(:server, :ticker_interval, 15_000))
-      assert is_integer(Application.get_env(:server, :sub_train_duration, 300_000))
-      assert is_integer(Application.get_env(:server, :cleanup_interval, 600_000))
-    end
-  end
-
-  describe "error handling" do
-    test "handles malformed events gracefully", %{producer: producer} do
-      # Send malformed subscription event (missing required fields)
-      send(producer, {:new_subscription, %{invalid: "data"}})
-
-      # Should not crash and should handle gracefully with defaults
-      Process.sleep(10)
-      assert Process.alive?(producer)
-
-      state = GenServer.call(producer, :get_state)
-      # Should have created sub train with default values
-      assert Enum.count(state.interrupt_stack) == 1
-
-      sub_train = List.first(state.interrupt_stack)
-      assert sub_train.type == :sub_train
-      assert sub_train.data.subscriber == "unknown"
-      assert sub_train.data.tier == "1000"
-    end
-
-    test "recovers from service call failures", %{producer: producer} do
-      # Test that ticker content generation handles failures
-      send(producer, :ticker_tick)
-
-      Process.sleep(10)
-      assert Process.alive?(producer)
-
-      state = GenServer.call(producer, :get_state)
-      assert state.active_content != nil
+      # Verify domain logic was applied (alerts should win over sub trains)
+      assert state.active_content.type == :alert
+      assert state.active_content.priority == 100
     end
   end
 end

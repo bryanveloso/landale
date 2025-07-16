@@ -13,6 +13,7 @@ defmodule ServerWeb.StreamChannel do
   require Logger
 
   alias Server.StreamProducer
+  alias Server.Domains.LayerCoordination
   alias ServerWeb.ResponseBuilder
 
   @impl true
@@ -364,12 +365,17 @@ defmodule ServerWeb.StreamChannel do
   # Private helper functions
 
   defp format_state_for_client(state) do
+    # Calculate layer assignments using domain logic
+    all_content = build_content_list_for_assignments(state)
+    layer_assignments = LayerCoordination.assign_content_to_layers(all_content, state.current_show)
+
     %{
       current_show: state.current_show,
       active_content: format_active_content(state.active_content),
       priority_level: get_priority_level(state),
       interrupt_stack: format_interrupt_stack(state.interrupt_stack),
       ticker_rotation: state.ticker_rotation,
+      layer_assignments: layer_assignments,
       metadata: Map.get(state, :metadata, %{last_updated: DateTime.utc_now(), state_version: state.version})
     }
   end
@@ -530,4 +536,11 @@ defmodule ServerWeb.StreamChannel do
   end
 
   defp validate_channel_info_update(_), do: {:error, "Payload must be a map"}
+
+  # Layer coordination helper functions
+
+  defp build_content_list_for_assignments(state) do
+    # Combine active content and interrupt stack into a single list for layer assignment
+    state.interrupt_stack ++ if state.active_content, do: [state.active_content], else: []
+  end
 end

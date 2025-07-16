@@ -8,42 +8,25 @@ import tempfile
 import time
 import wave
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 
 import numpy as np
 
-from .events import TranscriptionEvent
+from domains.audio_processing import (
+    AudioChunk,
+    AudioFormat,
+    add_chunk_to_buffer,
+    calculate_buffer_duration_ms,
+    can_add_chunk_to_buffer,
+    create_initial_buffer_state,
+    create_transcription_request,
+    flush_buffer,
+    format_transcription_result,
+    should_emit_transcription,
+    should_flush_buffer,
+)
+from events import TranscriptionEvent
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class AudioFormat:
-    """Audio format specification."""
-
-    sample_rate: int
-    channels: int
-    bit_depth: int
-
-
-@dataclass
-class AudioChunk:
-    """Individual audio chunk with metadata."""
-
-    timestamp: int  # microseconds
-    format: AudioFormat
-    data: bytes
-    source_id: str
-
-
-@dataclass
-class AudioBuffer:
-    """Buffer containing multiple audio chunks."""
-
-    chunks: list[AudioChunk]
-    start_timestamp: int
-    end_timestamp: int
-    total_size: int
 
 
 class AudioProcessor:
@@ -56,12 +39,16 @@ class AudioProcessor:
         whisper_language: str = "en",
         buffer_duration_ms: int = 1500,
         max_buffer_size: int = 10 * 1024 * 1024,  # 10MB
+        min_confidence: float = 0.5,
+        min_words: int = 1,
     ):
         self.buffer_duration_ms = buffer_duration_ms
         self.max_buffer_size = max_buffer_size
+        self.min_confidence = min_confidence
+        self.min_words = min_words
 
-        # Initialize buffer
-        self.buffer = AudioBuffer(chunks=[], start_timestamp=0, end_timestamp=0, total_size=0)
+        # Initialize buffer state using domain
+        self.buffer_state = create_initial_buffer_state()
 
         # State
         self.is_running = False
@@ -115,22 +102,17 @@ class AudioProcessor:
             logger.warning("Audio processor not running, dropping chunk")
             return
 
-        # Initialize buffer timestamp if empty
-        if not self.buffer.chunks:
-            self.buffer.start_timestamp = chunk.timestamp
+        # Check if chunk can be added using domain logic
+        if not can_add_chunk_to_buffer(self.buffer_state, chunk, self.max_buffer_size):
+            logger.warning("Cannot add chunk: incompatible format or would exceed size limit")
+            return
+
+        # Add chunk using domain logic
+        self.buffer_state = add_chunk_to_buffer(self.buffer_state, chunk)
+
+        # Initialize logging if first chunk
+        if len(self.buffer_state.current_buffer.chunks) == 1:
             logger.debug("Starting new audio buffer")
-
-        # Add chunk to buffer
-        self.buffer.chunks.append(chunk)
-        self.buffer.end_timestamp = chunk.timestamp
-        self.buffer.total_size += len(chunk.data)
-
-        # Prevent buffer overflow
-        if self.buffer.total_size > self.max_buffer_size:
-            logger.warning("Audio buffer overflow, dropping oldest chunks")
-            while self.buffer.total_size > self.max_buffer_size and self.buffer.chunks:
-                removed = self.buffer.chunks.pop(0)
-                self.buffer.total_size -= len(removed.data)
 
         # Log buffer status at meaningful intervals
         duration = self.get_buffer_duration()
@@ -138,54 +120,45 @@ class AudioProcessor:
         last_second = int(self.last_logged_duration)
 
         if current_second > last_second:
-            logger.info(f"Buffer: {duration:.1f}s of audio ({self.buffer.total_size / 1024 / 1024:.1f}MB)")
+            total_size_mb = self.buffer_state.current_buffer.total_size / 1024 / 1024
+            logger.info(f"Buffer: {duration:.1f}s of audio ({total_size_mb:.1f}MB)")
             self.last_logged_duration = duration
 
     def get_buffer_duration(self) -> float:
         """Get buffer duration in seconds."""
-        if not self.buffer.chunks:
-            return 0.0
-        return (self.buffer.end_timestamp - self.buffer.start_timestamp) / 1_000_000
+        duration_ms = calculate_buffer_duration_ms(self.buffer_state.current_buffer, 16000)
+        return duration_ms / 1000.0
 
     async def _processing_loop(self) -> None:
         """Main processing loop."""
         while self.is_running:
-            if self._should_process_buffer():
+            current_time_us = int(time.time() * 1_000_000)
+
+            if should_flush_buffer(self.buffer_state, self.buffer_duration_ms, self.max_buffer_size, current_time_us):
                 logger.info(f"Processing buffer with {self.get_buffer_duration():.1f}s of audio")
-                event = await self._process_buffer()
+                event = await self._process_buffer(current_time_us)
                 if event and self.transcription_callback:
                     await self.transcription_callback(event)
             await asyncio.sleep(0.1)  # Check every 100ms
 
-    def _should_process_buffer(self) -> bool:
-        """Check if buffer should be processed."""
-        if not self.buffer.chunks:
-            return False
-        if self.is_transcribing:
-            return False
-
-        duration_us = self.buffer.end_timestamp - self.buffer.start_timestamp
-        return duration_us >= self.buffer_duration_ms * 1000
-
-    async def _process_buffer(self) -> TranscriptionEvent | None:
+    async def _process_buffer(self, flush_time_us: int) -> TranscriptionEvent | None:
         """Process the current buffer."""
-        if not self.buffer.chunks:
+        # Create transcription request using domain logic
+        transcription_request = create_transcription_request(self.buffer_state)
+        if not transcription_request:
             return None
 
         self.is_transcribing = True
 
-        # Swap buffers
-        processing_buffer = self.buffer
-        self.buffer = AudioBuffer(chunks=[], start_timestamp=0, end_timestamp=0, total_size=0)
+        # Flush buffer using domain logic
+        self.buffer_state = flush_buffer(self.buffer_state, flush_time_us)
         self.last_logged_duration = 0.0
 
         try:
-            # Combine chunks into single PCM buffer
-            pcm_data = self._combine_chunks(processing_buffer.chunks)
-
-            # Get format from first chunk
-            audio_format = processing_buffer.chunks[0].format
-            duration_seconds = (processing_buffer.end_timestamp - processing_buffer.start_timestamp) / 1_000_000
+            # Use transcription request data
+            pcm_data = transcription_request.audio_data
+            audio_format = transcription_request.format
+            duration_seconds = (transcription_request.end_timestamp - transcription_request.start_timestamp) / 1_000_000
 
             logger.debug(
                 f"Processing {duration_seconds:.1f}s of audio "
@@ -211,7 +184,7 @@ class AudioProcessor:
                     wav.writeframes(audio_int16.tobytes())
 
                 # Transcribe using whisper-cli
-                start_time = time.time()
+                processing_start_time_ms = int(time.time() * 1000)
                 logger.info(f"Starting transcription of {len(audio_float) / 16000:.1f}s audio")
 
                 cmd = [
@@ -232,7 +205,7 @@ class AudioProcessor:
 
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
-                transcription_time = time.time() - start_time
+                processing_end_time_ms = int(time.time() * 1000)
 
                 if result.returncode != 0:
                     logger.error(f"Whisper failed with code {result.returncode}: {result.stderr}")
@@ -257,12 +230,30 @@ class AudioProcessor:
 
                     if text_parts:
                         full_text = " ".join(text_parts)
-                        logger.info(f'Transcription ({transcription_time:.2f}s): "{full_text}"')
+                        processing_time = (processing_end_time_ms - processing_start_time_ms) / 1000
+                        logger.info(f'Transcription ({processing_time:.2f}s): "{full_text}"')
 
-                        # Return transcription event
-                        return TranscriptionEvent(
-                            timestamp=processing_buffer.start_timestamp, duration=duration_seconds, text=full_text
+                        # Format result using domain logic
+                        transcription_result = format_transcription_result(
+                            raw_text=full_text,
+                            raw_confidence=None,  # whisper-cli doesn't provide confidence
+                            request=transcription_request,
+                            processing_start_time_ms=processing_start_time_ms,
+                            processing_end_time_ms=processing_end_time_ms,
                         )
+
+                        # Check if should emit using domain logic
+                        if should_emit_transcription(transcription_result, self.min_confidence, self.min_words):
+                            # Convert to legacy event format
+                            return TranscriptionEvent(
+                                timestamp=transcription_result.start_timestamp,
+                                duration=duration_seconds,
+                                text=transcription_result.text,
+                            )
+                        else:
+                            logger.debug(
+                                f"Transcription filtered: confidence={transcription_result.confidence}, words={transcription_result.word_count}"
+                            )
                     else:
                         logger.debug("No speech detected in buffer")
 
@@ -280,14 +271,6 @@ class AudioProcessor:
             return None
         finally:
             self.is_transcribing = False
-
-    def _combine_chunks(self, chunks: list[AudioChunk]) -> bytes:
-        """Combine multiple chunks into single buffer."""
-        if not chunks:
-            return b""
-
-        # Simply concatenate all chunk data
-        return b"".join(chunk.data for chunk in chunks)
 
     def _pcm_to_float32(self, pcm_data: bytes, audio_format: AudioFormat) -> np.ndarray:
         """Convert PCM data to float32 numpy array for Whisper."""

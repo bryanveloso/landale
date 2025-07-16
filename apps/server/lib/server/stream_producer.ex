@@ -14,20 +14,13 @@ defmodule Server.StreamProducer do
   use GenServer
   require Logger
 
-  # Priority levels
-  @priority_alert 100
-  @priority_sub_train 50
-  @priority_ticker 10
+  alias Server.Domains.StreamState
 
   # Default timing configuration - can be overridden via Application config
   defp ticker_interval, do: Application.get_env(:server, :ticker_interval, 15_000)
   defp sub_train_duration, do: Application.get_env(:server, :sub_train_duration, 300_000)
   defp cleanup_interval, do: Application.get_env(:server, :cleanup_interval, 600_000)
   defp max_timers, do: Application.get_env(:server, :max_timers, 100)
-
-  # Alert and manual override durations
-  defp alert_duration, do: Application.get_env(:server, :alert_duration, 10_000)
-  defp manual_override_duration, do: Application.get_env(:server, :manual_override_duration, 30_000)
 
   # Cleanup configuration
   @cleanup_config Application.compile_env(:server, :cleanup_settings, %{
@@ -46,6 +39,7 @@ defmodule Server.StreamProducer do
             ticker_index: 0,
             timers: %{},
             version: 0,
+            last_updated: nil,
             metadata: %{last_updated: nil, state_version: 0}
 
   ## Client API
@@ -152,16 +146,9 @@ defmodule Server.StreamProducer do
   def handle_cast({:change_show, show, metadata}, state) do
     Logger.info("Show changed", show: show, metadata: metadata)
 
-    new_state =
-      %{
-        state
-        | current_show: show,
-          ticker_rotation: default_ticker_content(show),
-          ticker_index: 0
-      }
-      |> update_metadata()
+    new_state = StreamState.update_show_context(state, show)
+    new_state = %{new_state | ticker_index: 0}
 
-    # Broadcast show change
     Phoenix.PubSub.broadcast(
       Server.PubSub,
       "stream:updates",
@@ -179,55 +166,31 @@ defmodule Server.StreamProducer do
 
   @impl true
   def handle_cast({:add_interrupt, type, data, opts}, state) do
-    priority = get_priority_for_type(type)
-    duration = Keyword.get(opts, :duration, get_default_duration(type))
-    interrupt_id = Keyword.get(opts, :id, generate_interrupt_id())
+    new_state = StreamState.add_interrupt(state, type, data, opts)
 
-    interrupt = %{
-      id: interrupt_id,
-      type: type,
-      priority: priority,
-      data: data,
-      duration: duration,
-      started_at: DateTime.utc_now()
-    }
+    interrupt = List.first(new_state.interrupt_stack)
+    duration = interrupt.duration
 
-    # Add to interrupt stack and sort by priority
-    new_stack =
-      [interrupt | state.interrupt_stack]
-      |> Enum.sort_by(& &1.priority, :desc)
+    {_timer_ref, new_timers} = register_timer_atomically(state.timers, interrupt.id, duration)
 
-    # Set timer for interrupt expiration using atomic registration
-    {_timer_ref, new_timers} = register_timer_atomically(state.timers, interrupt_id, duration)
+    final_state = %{new_state | timers: new_timers}
+    final_state = update_active_content_with_domain(final_state)
 
-    new_state =
-      %{state | interrupt_stack: new_stack, timers: new_timers}
-      |> update_metadata()
-
-    # Update active content if this interrupt has higher priority
-    new_state = update_active_content(new_state)
-
-    broadcast_state_update(new_state)
-    {:noreply, new_state}
+    broadcast_state_update(final_state)
+    {:noreply, final_state}
   end
 
   @impl true
   def handle_cast({:remove_interrupt, interrupt_id}, state) do
-    # Cancel timer atomically if exists
     {timer_ref, new_timers} = Map.pop(state.timers, interrupt_id)
 
     if timer_ref do
       Process.cancel_timer(timer_ref)
     end
 
-    new_stack = Enum.reject(state.interrupt_stack, &(&1.id == interrupt_id))
-
-    new_state =
-      %{state | interrupt_stack: new_stack, timers: new_timers}
-      |> update_metadata()
-
-    # Update active content after removal
-    new_state = update_active_content(new_state)
+    new_state = StreamState.remove_interrupt(state, interrupt_id)
+    new_state = %{new_state | timers: new_timers}
+    new_state = update_active_content_with_domain(new_state)
 
     broadcast_state_update(new_state)
     {:noreply, new_state}
@@ -337,9 +300,13 @@ defmodule Server.StreamProducer do
 
     existing_sub_train =
       Enum.find(state.interrupt_stack, fn interrupt ->
-        interrupt.type == :sub_train and
-          Map.has_key?(state.timers, interrupt.id) and
-          DateTime.diff(now, interrupt.started_at, :millisecond) < (interrupt.duration || sub_train_duration())
+        with {:ok, started_at} <- DateTime.from_iso8601(interrupt.started_at) do
+          interrupt.type == :sub_train and
+            Map.has_key?(state.timers, interrupt.id) and
+            DateTime.diff(now, started_at, :millisecond) < (interrupt.duration || sub_train_duration())
+        else
+          _ -> false
+        end
       end)
 
     if existing_sub_train do
@@ -348,42 +315,25 @@ defmodule Server.StreamProducer do
       broadcast_state_update(new_state)
       {:noreply, new_state}
     else
-      # Start new sub train synchronously
-      priority = get_priority_for_type(:sub_train)
-      duration = sub_train_duration()
-      interrupt_id = generate_interrupt_id()
-
-      interrupt = %{
-        id: interrupt_id,
-        type: :sub_train,
-        priority: priority,
-        data: %{
-          subscriber: Map.get(event, :user_name, "unknown"),
-          tier: Map.get(event, :tier, "1000"),
-          count: 1,
-          total_months: Map.get(event, :cumulative_months, 0)
-        },
-        duration: duration,
-        started_at: DateTime.utc_now()
+      sub_data = %{
+        subscriber: Map.get(event, :user_name, "unknown"),
+        tier: Map.get(event, :tier, "1000"),
+        count: 1,
+        total_months: Map.get(event, :cumulative_months, 0)
       }
 
-      # Add to interrupt stack and sort by priority
-      new_stack =
-        [interrupt | state.interrupt_stack]
-        |> Enum.sort_by(& &1.priority, :desc)
+      interrupt_id = generate_interrupt_id()
+      options = [id: interrupt_id, duration: sub_train_duration()]
 
-      # Set timer for interrupt expiration using atomic registration
-      {_timer_ref, new_timers} = register_timer_atomically(state.timers, interrupt_id, duration)
+      new_state = StreamState.add_interrupt(state, :sub_train, sub_data, options)
 
-      new_state =
-        %{state | interrupt_stack: new_stack, timers: new_timers}
-        |> update_metadata()
+      {_timer_ref, new_timers} = register_timer_atomically(state.timers, interrupt_id, sub_train_duration())
 
-      # Update active content if this interrupt has higher priority
-      new_state = update_active_content(new_state)
+      final_state = %{new_state | timers: new_timers}
+      final_state = update_active_content_with_domain(final_state)
 
-      broadcast_state_update(new_state)
-      {:noreply, new_state}
+      broadcast_state_update(final_state)
+      {:noreply, final_state}
     end
   end
 
@@ -437,16 +387,6 @@ defmodule Server.StreamProducer do
     end
   end
 
-  defp get_priority_for_type(:alert), do: @priority_alert
-  defp get_priority_for_type(:sub_train), do: @priority_sub_train
-  defp get_priority_for_type(:manual_override), do: @priority_alert
-  defp get_priority_for_type(_), do: @priority_ticker
-
-  defp get_default_duration(:alert), do: alert_duration()
-  defp get_default_duration(:sub_train), do: sub_train_duration()
-  defp get_default_duration(:manual_override), do: manual_override_duration()
-  defp get_default_duration(_), do: ticker_interval()
-
   defp generate_interrupt_id do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
   end
@@ -464,46 +404,35 @@ defmodule Server.StreamProducer do
     end
   end
 
-  defp update_active_content(state) do
-    new_active =
-      cond do
-        # Highest priority interrupt wins
-        not Enum.empty?(state.interrupt_stack) ->
-          # For sub trains, pick the one with the highest count
-          # For other interrupts, pick the highest priority
-          state.interrupt_stack
-          |> Enum.sort_by(
-            fn interrupt ->
-              case interrupt.type do
-                :sub_train ->
-                  count = Map.get(interrupt.data, :count, 0)
-                  {interrupt.priority, -count}
-
-                _ ->
-                  {interrupt.priority, 0}
-              end
-            end,
-            :desc
-          )
-          |> List.first()
-
-        # Fall back to ticker content
-        not Enum.empty?(state.ticker_rotation) ->
-          ticker_content = Enum.at(state.ticker_rotation, state.ticker_index)
-
-          %{
-            type: ticker_content,
-            priority: @priority_ticker,
-            data: get_content_data(ticker_content),
-            started_at: DateTime.utc_now()
-          }
-
-        # Nothing to show
-        true ->
-          nil
+  defp update_active_content_with_domain(state) do
+    ticker_content =
+      if Enum.empty?(state.ticker_rotation) do
+        []
+      else
+        [Enum.at(state.ticker_rotation, state.ticker_index)]
       end
 
-    %{state | active_content: new_active}
+    active_content = StreamState.determine_active_content(state.interrupt_stack, ticker_content)
+
+    final_active =
+      case active_content do
+        %{type: ticker_type}
+        when ticker_type in [
+               :emote_stats,
+               :recent_follows,
+               :daily_stats,
+               :ironmon_run_stats,
+               :commit_stats,
+               :build_status,
+               :stream_goals
+             ] ->
+          %{active_content | data: get_content_data(ticker_type)}
+
+        other ->
+          other
+      end
+
+    %{state | active_content: final_active}
   end
 
   defp advance_ticker(state) do
@@ -518,7 +447,7 @@ defmodule Server.StreamProducer do
 
       # Only update if no interrupts are active
       if Enum.empty?(state.interrupt_stack) do
-        new_state = update_active_content(new_state)
+        new_state = update_active_content_with_domain(new_state)
         broadcast_state_update(new_state)
         new_state
       else
@@ -535,7 +464,7 @@ defmodule Server.StreamProducer do
       %{state | interrupt_stack: new_stack, timers: new_timers}
       |> update_metadata()
 
-    update_active_content(new_state)
+    update_active_content_with_domain(new_state)
   end
 
   defp extend_sub_train(state, sub_train_id, event) do
@@ -572,7 +501,7 @@ defmodule Server.StreamProducer do
     new_state = %{state | interrupt_stack: new_stack, timers: final_timers, version: state.version + 1}
 
     # Update active content to reflect the new count
-    update_active_content(new_state)
+    update_active_content_with_domain(new_state)
   end
 
   defp active_content_type(state) do
@@ -774,7 +703,7 @@ defmodule Server.StreamProducer do
       new_timers = Map.drop(state.timers, MapSet.to_list(oldest_ids))
 
       new_state = %{state | interrupt_stack: new_interrupt_stack, timers: new_timers, version: state.version + 1}
-      update_active_content(new_state)
+      update_active_content_with_domain(new_state)
     else
       state
     end

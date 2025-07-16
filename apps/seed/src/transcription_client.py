@@ -8,7 +8,7 @@ from collections.abc import Callable
 import websockets
 from websockets.client import WebSocketClientProtocol
 
-from .events import TranscriptionEvent
+from events import TranscriptionEvent
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 import { Show } from 'solid-js'
 
 export interface LayerRendererProps {
-  content: any
+  content: unknown
   contentType: string
   show?: string
 }
@@ -25,7 +25,7 @@ export function LayerRenderer(props: LayerRendererProps) {
 }
 
 // Dynamic content component router
-function ContentComponent(props: { type: string; data: any; show?: string }) {
+function ContentComponent(props: { type: string; data: unknown; show?: string }) {
   switch (props.type) {
     case 'alert':
       return <AlertContent data={props.data} show={props.show} />
@@ -60,7 +60,7 @@ function ContentComponent(props: { type: string; data: any; show?: string }) {
 }
 
 // Content Components - minimal markup with data attributes for styling
-function AlertContent(props: { data: any; show?: string }) {
+function AlertContent(props: { data: unknown; show?: string }) {
   return (
     <div class="content-alert">
       <div class="alert-message">{props.data?.message || 'Breaking News'}</div>
@@ -68,7 +68,7 @@ function AlertContent(props: { data: any; show?: string }) {
   )
 }
 
-function SubTrainContent(props: { data: any; show?: string }) {
+function SubTrainContent(props: { data: unknown; show?: string }) {
   return (
     <div class="content-sub-train">
       <div class="train-count">{props.data?.count || 1}</div>
@@ -78,7 +78,7 @@ function SubTrainContent(props: { data: any; show?: string }) {
   )
 }
 
-function EmoteStatsContent(props: { data: any; show?: string }) {
+function EmoteStatsContent(props: { data: unknown; show?: string }) {
   const emotes = () => props.data?.regular_emotes || props.data?.emotes || {}
   const topEmotes = () => Object.entries(emotes()).slice(0, 3)
   
@@ -96,7 +96,7 @@ function EmoteStatsContent(props: { data: any; show?: string }) {
   )
 }
 
-function FollowsContent(props: { data: any; show?: string }) {
+function FollowsContent(props: { data: unknown; show?: string }) {
   const followers = () => props.data?.recent_followers || []
   
   return (
@@ -110,7 +110,7 @@ function FollowsContent(props: { data: any; show?: string }) {
   )
 }
 
-function IronmonStatsContent(props: { data: any; show?: string }) {
+function IronmonStatsContent(props: { data: unknown; show?: string }) {
   return (
     <div class="content-ironmon">
       <div class="ironmon-run">Run #{props.data?.run_number || '?'}</div>
@@ -121,7 +121,7 @@ function IronmonStatsContent(props: { data: any; show?: string }) {
   )
 }
 
-function DailyStatsContent(props: { data: any; show?: string }) {
+function DailyStatsContent(props: { data: unknown; show?: string }) {
   return (
     <div class="content-daily-stats">
       <div class="stat-messages">Messages: {props.data?.total_messages || 0}</div>
@@ -130,7 +130,7 @@ function DailyStatsContent(props: { data: any; show?: string }) {
   )
 }
 
-function CommitStatsContent(props: { data: any; show?: string }) {
+function CommitStatsContent(props: { data: unknown; show?: string }) {
   return (
     <div class="content-commit-stats">
       <div class="commits-today">Commits: {props.data?.commits_today || 0}</div>
@@ -140,7 +140,7 @@ function CommitStatsContent(props: { data: any; show?: string }) {
   )
 }
 
-function BuildStatusContent(props: { data: any; show?: string }) {
+function BuildStatusContent(props: { data: unknown; show?: string }) {
   return (
     <div class="content-build-status">
       <div class="build-status">{props.data?.status || 'unknown'}</div>
@@ -150,7 +150,7 @@ function BuildStatusContent(props: { data: any; show?: string }) {
   )
 }
 
-function StreamGoalsContent(props: { data: any; show?: string }) {
+function StreamGoalsContent(props: { data: unknown; show?: string }) {
   const followerGoal = () => props.data?.follower_goal || { current: 0, target: 0 }
   const subGoal = () => props.data?.sub_goal || { current: 0, target: 0 }
   
@@ -170,7 +170,7 @@ function StreamGoalsContent(props: { data: any; show?: string }) {
   )
 }
 
-function DefaultContent(props: { type: string; data: any; show?: string }) {
+function DefaultContent(props: { type: string; data: unknown; show?: string }) {
   return (
     <div class="content-default">
       <div class="content-type">{props.type.replace(/_/g, ' ')}</div>

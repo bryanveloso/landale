@@ -6,7 +6,7 @@ from typing import Any
 
 import aiohttp
 
-from .service_config import ServiceConfig
+from service_config import ServiceConfig
 
 logger = logging.getLogger(__name__)
 

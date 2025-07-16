@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from .context_client import ContextClient
+from context_client import ContextClient
 
 logger = logging.getLogger(__name__)
 

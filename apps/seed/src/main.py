@@ -7,14 +7,14 @@ import signal
 
 from dotenv import load_dotenv
 
-from .context_client import ContextClient
-from .correlator import StreamCorrelator
-from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
-from .health import create_health_app
-from .lms_client import LMSClient
-from .service_config import get_lms_api_url, get_server_events_url
-from .transcription_client import TranscriptionWebSocketClient
-from .websocket_client import ServerClient
+from context_client import ContextClient
+from correlator import StreamCorrelator
+from events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
+from health import create_health_app
+from lms_client import LMSClient
+from service_config import get_lms_api_url, get_server_events_url
+from transcription_client import TranscriptionWebSocketClient
+from websocket_client import ServerClient
 
 # Load environment variables
 load_dotenv()
@@ -84,7 +84,7 @@ class SeedService:
         self.running = True
 
         # Start health check endpoint
-        from .service_config import SERVICES
+        from service_config import SERVICES
 
         health_port = SERVICES.get("seed", {}).get("ports", {}).get("health", 8891)
         self.health_runner = await create_health_app(port=health_port)

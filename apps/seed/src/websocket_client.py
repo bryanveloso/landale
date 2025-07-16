@@ -8,7 +8,7 @@ from collections.abc import Callable
 import websockets
 from websockets.client import WebSocketClientProtocol
 
-from .events import ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
+from events import ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 
 logger = logging.getLogger(__name__)
 

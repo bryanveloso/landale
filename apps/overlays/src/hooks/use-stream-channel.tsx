@@ -24,6 +24,32 @@ export interface StreamState {
     duration?: number
   }>
   ticker_rotation: string[]
+  layer_assignments: {
+    foreground: {
+      type: string
+      priority: number
+      data: any
+      id?: string
+      started_at?: string
+      duration?: number
+    } | null
+    midground: {
+      type: string
+      priority: number
+      data: any
+      id?: string
+      started_at?: string
+      duration?: number
+    } | null
+    background: {
+      type: string
+      priority: number
+      data: any
+      id?: string
+      started_at?: string
+      duration?: number
+    } | null
+  }
   metadata: {
     last_updated: string
     state_version: number
@@ -51,6 +77,11 @@ const DEFAULT_STATE: StreamState = {
   priority_level: 'ticker',
   interrupt_stack: [],
   ticker_rotation: [],
+  layer_assignments: {
+    foreground: null,
+    midground: null,
+    background: null
+  },
   metadata: {
     last_updated: new Date().toISOString(),
     state_version: 0

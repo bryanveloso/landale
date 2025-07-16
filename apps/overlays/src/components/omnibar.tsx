@@ -3,8 +3,6 @@ import { useStreamChannel } from '../hooks/use-stream-channel'
 import { useLayerOrchestrator } from '../hooks/use-layer-orchestrator'
 import { AnimatedLayer } from './animated-layer'
 import { LayerRenderer } from './layer-renderer'
-import { getLayerForContent, shouldDisplayOnLayer } from '../config/layer-mappings'
-import type { ShowType } from '../config/layer-mappings'
 
 export function Omnibar() {
   const { streamState, isConnected } = useStreamChannel()
@@ -23,60 +21,32 @@ export function Omnibar() {
   // React to stream state changes and orchestrate layer visibility
   createEffect(() => {
     const state = streamState()
-    const currentShow = state.current_show as ShowType
+    const layerAssignments = state.layer_assignments
     
-    // Process all content in interrupt stack + active content
-    const allContent = [
-      ...(state.interrupt_stack || []),
-      ...(state.active_content ? [state.active_content] : [])
-    ]
-    
-    // Group content by layer priority
-    const layerContent: Record<'foreground' | 'midground' | 'background', any> = {
-      foreground: null,
-      midground: null,
-      background: null
+    // Show/hide layers based on server assignments
+    if (layerAssignments?.foreground) {
+      orchestrator.showLayer('foreground', layerAssignments.foreground)
+    } else {
+      orchestrator.hideLayer('foreground')
     }
     
-    // Assign content to appropriate layers
-    allContent.forEach(content => {
-      if (content && content.type) {
-        const targetLayer = getLayerForContent(content.type, currentShow)
-        
-        // Only assign if this layer doesn't already have higher priority content
-        if (!layerContent[targetLayer] || content.priority > layerContent[targetLayer].priority) {
-          layerContent[targetLayer] = content
-        }
-      }
-    })
+    if (layerAssignments?.midground) {
+      orchestrator.showLayer('midground', layerAssignments.midground)
+    } else {
+      orchestrator.hideLayer('midground')
+    }
     
-    // Show/hide layers based on content
-    Object.keys(layerContent).forEach(layer => {
-      const priority = layer as 'foreground' | 'midground' | 'background'
-      const content = layerContent[priority]
-      
-      if (content) {
-        orchestrator.showLayer(priority, content)
-      } else {
-        orchestrator.hideLayer(priority)
-      }
-    })
+    if (layerAssignments?.background) {
+      orchestrator.showLayer('background', layerAssignments.background)
+    } else {
+      orchestrator.hideLayer('background')
+    }
   })
   
-  // Get content for specific layer
+  // Get content for specific layer from server assignments
   const getLayerContent = (layer: 'foreground' | 'midground' | 'background') => {
     const state = streamState()
-    const currentShow = state.current_show as ShowType
-    
-    // Find the highest priority content that should display on this layer
-    const allContent = [
-      ...(state.interrupt_stack || []),
-      ...(state.active_content ? [state.active_content] : [])
-    ]
-    
-    return allContent
-      .filter(content => content && shouldDisplayOnLayer(content.type, layer, currentShow))
-      .sort((a, b) => (b.priority || 0) - (a.priority || 0))[0] || null
+    return state.layer_assignments?.[layer] || null
   }
   
   const isVisible = () => {
@@ -87,8 +57,7 @@ export function Omnibar() {
   return (
     <Show when={isVisible()}>
       <div
-        class="w-canvas"
-        class="omnibar"
+        class="w-canvas omnibar"
         data-show={streamState().current_show}
         data-priority={streamState().priority_level}
         data-connected={isConnected()}
