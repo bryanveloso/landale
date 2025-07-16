@@ -27,7 +27,7 @@ export const LoggerConfigSchema = z.object({
   pretty: z.boolean().default(false),
 
   // Service identification
-  service: z.string(),
+  service: z.string().min(1).refine(s => s.trim().length > 0, "Service name cannot be empty or whitespace"),
   version: z.string().optional(),
   environment: z.string().default('development'),
 

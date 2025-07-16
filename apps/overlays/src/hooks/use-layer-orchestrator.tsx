@@ -60,6 +60,10 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
       scale: 0.95
     })
     
+    // Sync DOM attribute with current internal state
+    const currentState = layerStates()[priority]
+    element.setAttribute('data-state', currentState)
+    
     // Process any pending state changes for this layer
     const pending = pendingStateChanges[priority]
     if (pending) {
