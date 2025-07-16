@@ -3,7 +3,7 @@ import type { LayerPriority } from '../hooks/use-layer-orchestrator'
 
 export interface AnimatedLayerProps {
   priority: LayerPriority
-  content: any
+  content: unknown
   contentType?: string
   show?: string
   onRegister?: (priority: LayerPriority, element: HTMLElement) => void

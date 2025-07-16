@@ -40,7 +40,7 @@ export interface Alert {
   id?: string
   type: AlertType
   priority: number
-  data: any
+  data: unknown
   duration?: number
   startedAt?: string
 }
@@ -137,7 +137,7 @@ export function sortAlertsByPriority(alertList: Alert[]): Alert[] {
  */
 export function createAlert(
   alertType: AlertType, 
-  alertData: any, 
+  alertData: unknown, 
   options: AlertCreationOptions = {}
 ): Alert {
   return {
