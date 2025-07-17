@@ -38,7 +38,7 @@ jobs:
           path: |
             apps/nurvus/deps
             apps/nurvus/_build
-          key: test-${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-${{ hashFiles('apps/nurvus/mix.lock') }}
+          key: test-${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-${{ github.sha }}-${{ hashFiles('apps/nurvus/mix.lock') }}
           restore-keys: |
             test-${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-
 
@@ -106,7 +106,7 @@ jobs:
           path: |
             apps/nurvus/deps
             apps/nurvus/_build
-          key: build-${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-zig-${{ env.ZIG_VERSION }}-${{ hashFiles('apps/nurvus/mix.lock') }}
+          key: build-${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-zig-${{ env.ZIG_VERSION }}-${{ github.sha }}-${{ hashFiles('apps/nurvus/mix.lock') }}
           restore-keys: |
             build-${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-zig-${{ env.ZIG_VERSION }}-
 
