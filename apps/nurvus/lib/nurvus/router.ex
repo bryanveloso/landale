@@ -34,11 +34,96 @@ defmodule Nurvus.Router do
     send_json_response(conn, 200, response)
   end
 
+  # System status endpoint
+  get "/api/system/status" do
+    {:ok, status_map} = Nurvus.system_status()
+
+    platform_info = %{
+      platform: Nurvus.Platform.current_platform(),
+      hostname: System.get_env("HOSTNAME") || :inet.gethostname() |> elem(1) |> to_string()
+    }
+
+    enhanced_status = Map.merge(status_map, platform_info)
+    send_json_response(conn, 200, enhanced_status)
+  end
+
   # List all processes - TDD implementation
   get "/api/processes" do
     # Get processes from Nurvus and extract from tuple
     {:ok, processes} = Nurvus.list_processes()
     send_json_response(conn, 200, %{processes: processes})
+  end
+
+  # Get specific process details
+  get "/api/processes/:id" do
+    case Nurvus.get_status(id) do
+      {:ok, status} ->
+        process_info = %{
+          id: id,
+          status: status
+        }
+
+        # Try to get metrics if available
+        metrics =
+          case Nurvus.get_metrics(id) do
+            {:ok, m} -> m
+            _ -> nil
+          end
+
+        response =
+          if metrics do
+            Map.put(process_info, :metrics, metrics)
+          else
+            process_info
+          end
+
+        send_json_response(conn, 200, response)
+
+      {:error, :not_found} ->
+        send_json_response(conn, 404, %{error: "Process not found"})
+    end
+  end
+
+  # Start process
+  post "/api/processes/:id/start" do
+    case Nurvus.start_process(id) do
+      :ok ->
+        send_json_response(conn, 200, %{status: "started", process_id: id})
+
+      {:error, :not_found} ->
+        send_json_response(conn, 404, %{error: "Process not found"})
+
+      {:error, reason} ->
+        send_json_response(conn, 500, %{error: inspect(reason)})
+    end
+  end
+
+  # Stop process
+  post "/api/processes/:id/stop" do
+    case Nurvus.stop_process(id) do
+      :ok ->
+        send_json_response(conn, 200, %{status: "stopped", process_id: id})
+
+      {:error, :not_found} ->
+        send_json_response(conn, 404, %{error: "Process not found"})
+
+      {:error, reason} ->
+        send_json_response(conn, 500, %{error: inspect(reason)})
+    end
+  end
+
+  # Restart process
+  post "/api/processes/:id/restart" do
+    case Nurvus.restart_process(id) do
+      :ok ->
+        send_json_response(conn, 200, %{status: "restarted", process_id: id})
+
+      {:error, :not_found} ->
+        send_json_response(conn, 404, %{error: "Process not found"})
+
+      {:error, reason} ->
+        send_json_response(conn, 500, %{error: inspect(reason)})
+    end
   end
 
   # Catch-all for undefined routes
