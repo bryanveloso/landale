@@ -149,8 +149,12 @@ defmodule Nurvus.ProcessRunner do
 
   @impl true
   def handle_info({port, {:data, data}}, %{port: port} = state) do
-    # Log process output
-    output = String.trim(data)
+    output =
+      case data do
+        {:eol, msg} -> String.trim(msg)
+        msg when is_binary(msg) -> String.trim(msg)
+        _ -> inspect(data)
+      end
 
     if output != "" do
       Logger.info("[#{state.config.name}] #{output}")
@@ -163,14 +167,8 @@ defmodule Nurvus.ProcessRunner do
   def handle_info({port, {:exit_status, status}}, %{port: port} = state) do
     Logger.warning("Process #{state.config.name} exited with status: #{status}")
 
-    # Close the port
-    if state.port do
-      Port.close(state.port)
-    end
-
     new_state = %{state | port: nil, os_pid: nil}
 
-    # Exit this GenServer - the ProcessManager will handle restart logic
     {:stop, {:shutdown, {:exit_status, status}}, new_state}
   end
 
@@ -192,9 +190,16 @@ defmodule Nurvus.ProcessRunner do
   def terminate(reason, state) do
     Logger.info("Terminating ProcessRunner for #{state.config.name}: #{inspect(reason)}")
 
-    # Clean up the external process
+    # Only try to close port if it hasn't already been handled by exit messages
+    # When port exits naturally, handle_info already sets port to nil
     if state.port do
-      Port.close(state.port)
+      try do
+        Port.close(state.port)
+      rescue
+        ArgumentError ->
+          # Port already closed - this is expected in normal shutdown
+          Logger.debug("Port already closed for #{state.config.name}")
+      end
     end
 
     # If we have an OS PID, try to terminate it gracefully
