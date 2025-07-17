@@ -265,8 +265,6 @@ jobs:
             Built from commit: ${{ github.sha }}
           files: |
             apps/nurvus/artifacts/*.tar.gz
-          prerelease: true
-          make_latest: false
 
       - name: Create release summary
         run: |
