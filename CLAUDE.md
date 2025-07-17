@@ -78,6 +78,10 @@ bun test:coverage                          # Coverage report
 bun build ./src/index.ts --outdir ./dist   # Build TypeScript
 bun build ./src/index.html                 # Build with HTML entry
 
+# Nurvus (Process Manager)
+cd apps/nurvus && mix increment_version    # Increment CalVer before builds
+cd apps/nurvus && mix release --overwrite # Build Burrito binary
+
 # Docker
 docker compose up                          # Run services
 ```
@@ -174,6 +178,38 @@ for shell commands (not execa)
 - Add test runners - use `bun test`
 - Forget the period in commit messages
 - Make assumptions without checking actual files first
+
+## Nurvus Version Management (CRITICAL)
+
+**⚠️ WARNING: Burrito Caching Gotcha**
+
+Burrito caches binaries based on version numbers. If you don't increment the version, it will use a stale cached binary even after code changes. This cost us 6 hours of debugging.
+
+### CalVer Strategy
+
+Nurvus uses CalVer format: `YYYY.MM.DD{letter}` (e.g., `2025.07.17a`, `2025.07.17b`)
+
+- **Project version**: `0.0.0` (static, satisfies Mix requirements)
+- **Release version**: CalVer (what Burrito uses for caching)
+
+### Before Every Burrito Build
+
+```bash
+cd apps/nurvus
+mix increment_version  # ALWAYS run this first
+mix release --overwrite
+```
+
+The Mix task automatically:
+- Detects today's date
+- Increments letter suffix if building multiple times per day
+- Updates only the release version (keeps project at 0.0.0)
+
+### CI Integration
+
+CI automatically runs `mix increment_version` before builds, so every commit gets a unique version.
+
+**Remember**: When debugging Burrito issues, ALWAYS check if you incremented the version first!
 
 # Supplimentary Documentation
 

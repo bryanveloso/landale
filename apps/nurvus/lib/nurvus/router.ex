@@ -47,9 +47,9 @@ defmodule Nurvus.Router do
     send_json_response(conn, 200, enhanced_status)
   end
 
-  # List all processes - TDD implementation
+  # List all processes - FIXED implementation
   get "/api/processes" do
-    # Get processes from Nurvus and extract from tuple
+    # Extract processes list from tuple before encoding
     {:ok, processes} = Nurvus.list_processes()
     send_json_response(conn, 200, %{processes: processes})
   end

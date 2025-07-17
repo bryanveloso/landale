@@ -6,10 +6,9 @@ defmodule Nurvus.RouterTest do
 
   @moduletag :unit
 
-  describe "TDD: /api/processes endpoint" do
-    test "returns valid JSON response with processes list" do
-      # TDD: This test defines the expected behavior
-      # The endpoint should return valid JSON without any Protocol.UndefinedError
+  describe "GET /api/processes" do
+    test "returns JSON with processes array" do
+      # INTENDED BEHAVIOR: /api/processes should return {"processes": []} JSON
       conn = conn(:get, "/api/processes")
       conn = Router.call(conn, Router.init([]))
 
@@ -22,7 +21,7 @@ defmodule Nurvus.RouterTest do
       # Should return valid JSON that can be decoded
       assert {:ok, body} = Jason.decode(conn.resp_body)
 
-      # Should have processes key with a list value
+      # Should have processes key with a list value (the INTENDED behavior)
       assert Map.has_key?(body, "processes")
       assert is_list(body["processes"])
     end

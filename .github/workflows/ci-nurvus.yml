@@ -111,6 +111,11 @@ jobs:
           cd apps/nurvus
           mix deps.get --only prod
 
+      - name: Increment version for Burrito cache
+        run: |
+          cd apps/nurvus
+          mix increment_version
+
       - name: Build ${{ matrix.target }} executable
         run: |
           cd apps/nurvus
@@ -245,6 +250,13 @@ jobs:
             apps/nurvus/artifacts/*.tar.gz
             apps/nurvus/artifacts/nurvus*
           retention-days: 30
+
+      - name: Delete existing tag and release
+        run: |
+          gh release delete nurvus-latest --yes || true
+          git push --delete origin nurvus-latest || true
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Create rolling release
         uses: softprops/action-gh-release@v2
