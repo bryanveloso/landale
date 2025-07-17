@@ -27,8 +27,8 @@
     "args": ["run", "python", "start.py"],
     "cwd": "/Users/Avalonstar/Code/bryanveloso/landale/apps/seed",
     "env": {
-      "SERVER_URL": "http://zelan:8080",
-      "SERVER_WS_URL": "ws://zelan:7175",
+      "SERVER_URL": "http://saya:7175",
+      "SERVER_WS_URL": "ws://saya:7175",
       "LMS_API_URL": "http://zelan:1234/v1",
       "LMS_MODEL": "meta/llama-3.3-70b"
     },

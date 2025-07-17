@@ -151,7 +151,8 @@ defmodule Nurvus.ProcessRunner do
   def handle_info({port, {:data, data}}, %{port: port} = state) do
     output =
       case data do
-        {:eol, msg} -> String.trim(msg)
+        {:eol, msg} when is_binary(msg) -> String.trim(msg)
+        {:eol, msg} -> inspect(msg)
         msg when is_binary(msg) -> String.trim(msg)
         _ -> inspect(data)
       end

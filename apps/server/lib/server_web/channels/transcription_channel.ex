@@ -74,12 +74,8 @@ defmodule ServerWeb.TranscriptionChannel do
     # Subscribe to live transcription events
     Phoenix.PubSub.subscribe(Server.PubSub, "transcription:live")
 
-    # Send initial connection confirmation
-    push(socket, "connection_established", %{
-      type: "transcription:live",
-      timestamp: DateTime.utc_now(),
-      status: "connected"
-    })
+    # Send initial connection confirmation after join completes
+    send(self(), :after_join_live)
 
     {:ok, socket}
   end
@@ -103,13 +99,8 @@ defmodule ServerWeb.TranscriptionChannel do
     # Subscribe to session-specific transcription events
     Phoenix.PubSub.subscribe(Server.PubSub, "transcription:session:#{session_id}")
 
-    # Send initial connection confirmation with session info
-    push(socket, "connection_established", %{
-      type: "transcription:session",
-      session_id: session_id,
-      timestamp: DateTime.utc_now(),
-      status: "connected"
-    })
+    # Send initial connection confirmation after join completes
+    send(self(), :after_join_session)
 
     {:ok, socket}
   end
@@ -194,6 +185,31 @@ defmodule ServerWeb.TranscriptionChannel do
   end
 
   # Event Handlers - Receive and forward transcription events
+
+  @impl true
+  def handle_info(:after_join_live, socket) do
+    # Send initial connection confirmation for live channel
+    push(socket, "connection_established", %{
+      type: "transcription:live",
+      timestamp: DateTime.utc_now(),
+      status: "connected"
+    })
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(:after_join_session, socket) do
+    # Send initial connection confirmation for session channel
+    push(socket, "connection_established", %{
+      type: "transcription:session",
+      session_id: socket.assigns.session_id,
+      timestamp: DateTime.utc_now(),
+      status: "connected"
+    })
+
+    {:noreply, socket}
+  end
 
   @impl true
   def handle_info({:new_transcription, transcription_data}, socket) do

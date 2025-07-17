@@ -97,17 +97,13 @@ class ServerClient:
             logger.info(f"Connected to server at {self.url}")
 
             # Join events channel for all events including viewer interactions
-            await self.ws.send(
-                json.dumps(
-                    [
-                        "1",  # Reference
-                        "1",  # Join reference
-                        "events:all",  # Topic
-                        "phx_join",  # Event
-                        {},  # Payload
-                    ]
-                )
-            )
+            join_message = {
+                "topic": "events:all",
+                "event": "phx_join", 
+                "payload": {},
+                "ref": "1"
+            }
+            await self.ws.send(json.dumps(join_message))
         except Exception as e:
             logger.error(f"Failed to connect to server: {e}")
             raise
@@ -122,8 +118,20 @@ class ServerClient:
                 try:
                     data = json.loads(message)
 
-                    # Phoenix WebSocket messages format: [join_ref, ref, topic, event, payload]
-                    if isinstance(data, list) and len(data) >= 5:
+                    # Handle Phoenix WebSocket messages (object format)
+                    if isinstance(data, dict):
+                        topic = data.get("topic")
+                        event = data.get("event")
+                        payload = data.get("payload", {})
+                        ref = data.get("ref")
+
+                        # Handle join confirmation
+                        if event == "phx_reply" and payload.get("status") == "ok":
+                            logger.info(f"Joined channel: {topic}")
+                            continue
+                    
+                    # Legacy array format handling (keep for compatibility)
+                    elif isinstance(data, list) and len(data) >= 5:
                         join_ref, ref, topic, event, payload = data[:5]
 
                         # Handle join confirmation

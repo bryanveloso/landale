@@ -6,8 +6,6 @@ from typing import Any
 
 import aiohttp
 
-from .service_config import ServiceConfig
-
 logger = logging.getLogger(__name__)
 
 
@@ -15,7 +13,7 @@ class ContextClient:
     """HTTP client for posting context data to the Phoenix server."""
 
     def __init__(self, server_url: str | None = None):
-        self.server_url = server_url or ServiceConfig.get_url("server")
+        self.server_url = server_url or "http://zelan:8080"
         self.session: aiohttp.ClientSession | None = None
 
     async def __aenter__(self):
