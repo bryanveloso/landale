@@ -7,7 +7,7 @@ import Config
 port = System.get_env("NURVUS_PORT", "4001") |> String.to_integer()
 
 # Configuration file path
-config_file = System.get_env("NURVUS_CONFIG_FILE", "config/processes.json")
+config_file = System.get_env("NURVUS_CONFIG_FILE", "processes.json")
 
 # Logging configuration
 log_level =
