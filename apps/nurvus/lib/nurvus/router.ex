@@ -47,8 +47,13 @@ defmodule Nurvus.Router do
 
   # List all processes
   get "/api/processes" do
-    {:ok, processes} = Nurvus.list_processes()
-    send_json_response(conn, 200, %{processes: processes})
+    case Nurvus.list_processes() do
+      {:ok, processes} ->
+        send_json_response(conn, 200, %{processes: processes})
+
+      {:error, reason} ->
+        send_json_response(conn, 500, %{error: inspect(reason)})
+    end
   end
 
   # Get specific process details
@@ -228,7 +233,7 @@ defmodule Nurvus.Router do
   # Load configuration for specific machine
   post "/api/config/load" do
     machine_name = Map.get(conn.body_params, "machine", "default")
-    config_file = "config/#{machine_name}.json"
+    config_file = if machine_name == "default", do: "processes.json", else: "#{machine_name}.json"
 
     case Nurvus.Config.load_config(config_file) do
       {:ok, processes} ->
@@ -258,28 +263,31 @@ defmodule Nurvus.Router do
 
   # Cross-machine health check
   get "/api/health/detailed" do
-    {:ok, system_status} = Nurvus.system_status()
-    {:ok, processes} = Nurvus.list_processes()
-
-    platform_info = %{
-      platform: Nurvus.Platform.current_platform(),
-      hostname: System.get_env("HOSTNAME") || :inet.gethostname() |> elem(1) |> to_string()
-    }
-
-    detailed_health = %{
-      service: "nurvus",
-      version: "0.1.0",
-      timestamp: DateTime.utc_now(),
-      platform: platform_info,
-      system: system_status,
-      processes: %{
-        total: length(processes),
-        running: Enum.count(processes, fn {_id, status} -> status == :running end),
-        stopped: Enum.count(processes, fn {_id, status} -> status == :stopped end)
+    with {:ok, system_status} <- Nurvus.system_status(),
+         {:ok, processes} <- Nurvus.list_processes() do
+      platform_info = %{
+        platform: Nurvus.Platform.current_platform(),
+        hostname: System.get_env("HOSTNAME") || :inet.gethostname() |> elem(1) |> to_string()
       }
-    }
 
-    send_json_response(conn, 200, detailed_health)
+      detailed_health = %{
+        service: "nurvus",
+        version: "0.1.0",
+        timestamp: DateTime.utc_now(),
+        platform: platform_info,
+        system: system_status,
+        processes: %{
+          total: length(processes),
+          running: Enum.count(processes, fn %{status: status} -> status == :running end),
+          stopped: Enum.count(processes, fn %{status: status} -> status == :stopped end)
+        }
+      }
+
+      send_json_response(conn, 200, detailed_health)
+    else
+      {:error, reason} ->
+        send_json_response(conn, 500, %{error: inspect(reason)})
+    end
   end
 
   # Catch-all for undefined routes

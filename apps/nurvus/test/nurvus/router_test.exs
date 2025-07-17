@@ -71,5 +71,40 @@ defmodule Nurvus.RouterTest do
         assert {:ok, _body} = Jason.decode(conn.resp_body)
       end
     end
+
+    test "processes endpoint should return valid JSON after config loading" do
+      # This test defines the CORRECT behavior:
+      # After loading config with processes, GET /api/processes should return valid JSON
+      # This test will FAIL until we fix the tuple encoding bug
+
+      # Simulate what happens in production:
+      # 1. Config is loaded with processes
+      # 2. GET /api/processes is called
+      # 3. Should return valid JSON with processes list
+
+      # This test will fail with Protocol.UndefinedError until we fix the bug
+      # where {:ok, processes} tuple is passed to JSON encoder instead of just processes
+
+      # Mock the scenario: assume ProcessManager has these processes loaded
+      # (This is what happens after POST /api/config/load with zelan config)
+
+      # The correct behavior is that this endpoint should return:
+      # {"processes": [{"id": "lms", ...}, {"id": "phononmaser", ...}, {"id": "seed", ...}]}
+
+      # But currently it fails because somewhere we're passing the tuple:
+      # {:ok, [{"id": "lms", ...}, {"id": "phononmaser", ...}, {"id": "seed", ...}]}
+      # to JSON.encode! instead of just the processes list
+
+      conn = conn(:get, "/api/processes")
+      conn = Router.call(conn, Router.init([]))
+
+      # This is the CORRECT behavior we want - valid JSON response
+      assert conn.status == 200
+      assert {:ok, body} = Jason.decode(conn.resp_body)
+      assert Map.has_key?(body, "processes")
+      assert is_list(body["processes"])
+
+      # This test will fail with Protocol.UndefinedError until we fix the tuple bug
+    end
   end
 end
