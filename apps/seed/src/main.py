@@ -12,7 +12,6 @@ from .correlator import StreamCorrelator
 from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from .health import create_health_app
 from .lms_client import LMSClient
-from .service_config import get_lms_api_url, get_server_events_url
 from .transcription_client import TranscriptionWebSocketClient
 from .websocket_client import ServerClient
 
@@ -28,15 +27,21 @@ class SeedService:
     """Main SEED intelligence service that coordinates all components."""
 
     def __init__(self):
-        # Configuration from environment with service-config defaults
-        self.server_events_url = os.getenv("SERVER_URL", get_server_events_url())
-        self.server_ws_url = os.getenv("SERVER_WS_URL", "ws://localhost:7175")
-        self.lms_url = os.getenv("LMS_API_URL", get_lms_api_url())
-        self.lms_model = os.getenv("LMS_MODEL", "dolphin-2.9.3-llama-3-8b")
+        # Configuration - hardcoded URLs for single-user setup with env overrides
+        self.server_events_url = os.getenv("SERVER_URL", "http://zelan:8080")
+        self.server_ws_url = os.getenv("SERVER_WS_URL", "ws://zelan:7175")
+        self.lms_url = os.getenv("LMS_API_URL", "http://zelan:1234/v1")
+        self.lms_model = os.getenv("LMS_MODEL", "meta/llama-3.3-70b")
 
         # Components
         self.transcription_client = TranscriptionWebSocketClient(self.server_ws_url)
-        self.server_client = ServerClient(self.server_events_url)
+        # Convert HTTP URL to WebSocket URL for server events
+        server_ws_events_url = (
+            self.server_ws_url.replace("/socket", "/socket/websocket")
+            if "/socket" in self.server_ws_url
+            else f"{self.server_ws_url}/socket/websocket"
+        )
+        self.server_client = ServerClient(server_ws_events_url)
         self.lms_client = LMSClient(self.lms_url, self.lms_model)
         self.context_client = ContextClient(self.server_events_url.replace("ws://", "http://").replace("/events", ""))
         self.correlator: StreamCorrelator | None = None
@@ -84,9 +89,7 @@ class SeedService:
         self.running = True
 
         # Start health check endpoint
-        from .service_config import SERVICES
-
-        health_port = SERVICES.get("seed", {}).get("ports", {}).get("health", 8891)
+        health_port = 8891  # Hardcoded health port for single-user setup
         self.health_runner = await create_health_app(port=health_port)
 
         # Start listening tasks
@@ -119,7 +122,10 @@ class SeedService:
 
         # Cleanup health endpoint
         if self.health_runner:
-            await self.health_runner.cleanup()
+            try:
+                await self.health_runner.cleanup()
+            except Exception as e:
+                logger.warning(f"Health runner cleanup error (non-critical): {e}")
 
         logger.info("SEED intelligence service stopped")
 

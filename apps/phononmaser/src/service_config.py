@@ -53,12 +53,20 @@ def get_server_url() -> str:
 
 def get_phononmaser_port() -> int:
     """Get the Phononmaser WebSocket port"""
-    return get_service_port("phononmaser", "ws")
+    # Check environment variable first, then fall back to service config
+    port = os.getenv("PORT")
+    if port:
+        return int(port)
+    return get_service_port("phononmaser", "ws") or 8889
 
 
 def get_phononmaser_health_port() -> int:
     """Get the Phononmaser health check port"""
-    return get_service_port("phononmaser", "health")
+    # Check environment variable first, then fall back to service config
+    port = os.getenv("HEALTH_PORT")
+    if port:
+        return int(port)
+    return get_service_port("phononmaser", "health") or 8890
 
 
 def get_host() -> str:
