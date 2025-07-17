@@ -52,7 +52,7 @@ jobs:
           path: |
             apps/server/deps
             apps/server/_build
-          key: ${{ runner.os }}-mix-${{ hashFiles('apps/server/mix.lock') }}
+          key: ${{ runner.os }}-mix-${{ github.sha }}-${{ hashFiles('apps/server/mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-mix-
 
