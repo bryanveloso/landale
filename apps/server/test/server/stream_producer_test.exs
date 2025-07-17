@@ -188,7 +188,7 @@ defmodule Server.StreamProducerTest do
         Application.get_env(:server, :cleanup_settings, %{})
         |> Map.get(:max_interrupt_stack_size, 50)
 
-      for i <- 1..(max_size + 10) do
+      for i <- 1..(max_size + 10)//1 do
         GenServer.cast(producer, {:add_interrupt, :alert, %{id: i}, [id: "alert-#{i}"]})
       end
 

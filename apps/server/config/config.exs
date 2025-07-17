@@ -58,11 +58,10 @@ config :server,
   default_show: :variety
 
 # StreamProducer cleanup configuration (migrated from root config)
-config :server, :cleanup_settings,
-  # Max interrupts before cleanup
+config :server, :cleanup_settings, %{
   max_interrupt_stack_size: 50,
-  # How many to keep after cleanup
   interrupt_stack_keep_count: 25
+}
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

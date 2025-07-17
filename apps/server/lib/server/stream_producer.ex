@@ -99,11 +99,18 @@ defmodule Server.StreamProducer do
     Phoenix.PubSub.subscribe(Server.PubSub, "channel:updates")
 
     # Create persistence table (public so it survives process restarts)
-    :ets.new(@state_persistence_table, [:named_table, :set, :public])
+    # Handle race condition in tests gracefully
+    try do
+      :ets.new(@state_persistence_table, [:named_table, :set, :public])
+    catch
+      :error, {:badarg, _} ->
+        # Table already exists, which is fine
+        @state_persistence_table
+    end
 
     # Try to restore previous state
     state =
-      case restore_state() do
+      case restore_state(@state_persistence_table) do
         nil ->
           Logger.info("Starting with fresh state")
 
@@ -804,9 +811,9 @@ defmodule Server.StreamProducer do
     :ets.insert(@state_persistence_table, {:current_state, persisted_state})
   end
 
-  defp restore_state do
+  defp restore_state(table_name) do
     try do
-      case :ets.lookup(@state_persistence_table, :current_state) do
+      case :ets.lookup(table_name, :current_state) do
         [{:current_state, state}] when is_map(state) ->
           # Validate state has required fields
           if Map.has_key?(state, :current_show) and Map.has_key?(state, :version) do
