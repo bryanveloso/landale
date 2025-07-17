@@ -103,7 +103,6 @@
           #
           # Manually disabled checks
           {Credo.Check.Readability.PreferImplicitTry, []}
-
         ]
       }
     }
