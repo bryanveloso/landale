@@ -14,7 +14,7 @@ defmodule Nurvus.RouterTest do
 
       assert conn.status == 200
       assert get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
-      
+
       # This will fail with Jason.Encoder protocol error if tuple is passed to JSON.encode!
       assert {:ok, body} = Jason.decode(conn.resp_body)
       assert Map.has_key?(body, "processes")
@@ -30,7 +30,7 @@ defmodule Nurvus.RouterTest do
 
       assert conn.status == 200
       assert get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
-      
+
       # This will fail with ArgumentError if length() is called on a tuple
       assert {:ok, body} = Jason.decode(conn.resp_body)
       assert Map.has_key?(body, "processes")
@@ -56,16 +56,16 @@ defmodule Nurvus.RouterTest do
     test "all endpoints handle process list tuples correctly" do
       # Test multiple endpoints that use Nurvus.list_processes() to ensure
       # none are passing {:ok, processes} tuples to the JSON encoder
-      
+
       endpoints = [
         "/api/processes",
         "/api/health/detailed"
       ]
-      
+
       for endpoint <- endpoints do
         conn = conn(:get, endpoint)
         conn = Router.call(conn, Router.init([]))
-        
+
         # Should not crash with Protocol.UndefinedError
         assert conn.status == 200
         assert {:ok, _body} = Jason.decode(conn.resp_body)
