@@ -7,7 +7,7 @@ defmodule Nurvus.Router do
 
   use Plug.Router
   require Logger
-  
+
   alias Jason
 
   plug(Plug.Logger, log: :debug)
