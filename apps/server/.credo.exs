@@ -46,7 +46,6 @@
           {Credo.Check.Readability.ParenthesesOnZeroArityDefs, []},
           {Credo.Check.Readability.PipeIntoAnonymousFunctions, []},
           {Credo.Check.Readability.PredicateFunctionNames, []},
-          {Credo.Check.Readability.PreferImplicitTry, []},
           {Credo.Check.Readability.RedundantBlankLines, []},
           {Credo.Check.Readability.Semicolons, []},
           {Credo.Check.Readability.SpaceAfterCommas, []},
@@ -99,7 +98,12 @@
           # Disabled because Phoenix generates some long pipelines
           {Credo.Check.Refactor.PipeChainStart, []},
           # Disabled because we allow some longer argument lists for GenServer calls
-          {Credo.Check.Readability.Specs, []}
+          {Credo.Check.Readability.Specs, []},
+
+          #
+          # Manually disabled checks
+          {Credo.Check.Readability.PreferImplicitTry, []}
+
         ]
       }
     }

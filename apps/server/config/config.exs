@@ -42,18 +42,27 @@ config :server, :game_show_mapping, %{
 
 # StreamProducer timing configuration (milliseconds) (migrated from root config)
 config :server,
-  ticker_interval: 15_000,        # 15 seconds - ticker rotation
-  sub_train_duration: 300_000,    # 5 minutes - sub train duration
-  cleanup_interval: 600_000,      # 10 minutes - cleanup stale data
-  max_timers: 100,                # Maximum active timers
-  alert_duration: 10_000,         # 10 seconds - alert display time
-  manual_override_duration: 30_000, # 30 seconds - manual override time
-  default_show: :variety          # Default show when game mapping fails
+  # 15 seconds - ticker rotation
+  ticker_interval: 15_000,
+  # 5 minutes - sub train duration
+  sub_train_duration: 300_000,
+  # 10 minutes - cleanup stale data
+  cleanup_interval: 600_000,
+  # Maximum active timers
+  max_timers: 100,
+  # 10 seconds - alert display time
+  alert_duration: 10_000,
+  # 30 seconds - manual override time
+  manual_override_duration: 30_000,
+  # Default show when game mapping fails
+  default_show: :variety
 
 # StreamProducer cleanup configuration (migrated from root config)
 config :server, :cleanup_settings,
-  max_interrupt_stack_size: 50,        # Max interrupts before cleanup
-  interrupt_stack_keep_count: 25       # How many to keep after cleanup
+  # Max interrupts before cleanup
+  max_interrupt_stack_size: 50,
+  # How many to keep after cleanup
+  interrupt_stack_keep_count: 25
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

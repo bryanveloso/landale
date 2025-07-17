@@ -3,8 +3,8 @@ defmodule ServerWeb.StreamChannelTest do
 
   @moduletag :web
 
-  alias ServerWeb.{StreamChannel, UserSocket}
   alias Server.StreamProducer
+  alias ServerWeb.{StreamChannel, UserSocket}
 
   # Test constants
   @test_correlation_id "test-correlation-id"

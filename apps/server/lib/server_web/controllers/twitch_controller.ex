@@ -5,7 +5,7 @@ defmodule ServerWeb.TwitchController do
   use OpenApiSpex.ControllerSpecs
   require Logger
 
-  alias ServerWeb.{Schemas, ResponseBuilder}
+  alias ServerWeb.{ResponseBuilder, Schemas}
 
   @subscription_types %{
     stream: [

@@ -9,7 +9,7 @@ defmodule ServerWeb.ContextController do
   use OpenApiSpex.ControllerSpecs
 
   alias Server.Context
-  alias ServerWeb.{Schemas, ResponseBuilder}
+  alias ServerWeb.{ResponseBuilder, Schemas}
 
   operation(:create,
     summary: "Create context",

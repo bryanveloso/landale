@@ -4,7 +4,7 @@ defmodule ServerWeb.OBSController do
   use ServerWeb, :controller
   use OpenApiSpex.ControllerSpecs
 
-  alias ServerWeb.{Schemas, ResponseBuilder}
+  alias ServerWeb.{ResponseBuilder, Schemas}
 
   operation(:status,
     summary: "Get OBS WebSocket status",
