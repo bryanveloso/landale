@@ -7,6 +7,8 @@ defmodule Nurvus.Router do
 
   use Plug.Router
   require Logger
+  
+  alias Jason
 
   plug(Plug.Logger, log: :debug)
   plug(:telemetry_start)
@@ -15,7 +17,7 @@ defmodule Nurvus.Router do
   plug(Plug.Parsers,
     parsers: [:json],
     pass: ["application/json"],
-    json_decoder: JSON
+    json_decoder: Jason
   )
 
   plug(:dispatch)
@@ -47,13 +49,8 @@ defmodule Nurvus.Router do
 
   # List all processes
   get "/api/processes" do
-    case Nurvus.list_processes() do
-      {:ok, processes} ->
-        send_json_response(conn, 200, %{processes: processes})
-
-      {:error, reason} ->
-        send_json_response(conn, 500, %{error: inspect(reason)})
-    end
+    {:ok, processes} = Nurvus.list_processes()
+    send_json_response(conn, 200, %{processes: processes})
   end
 
   # Get specific process details
@@ -320,6 +317,6 @@ defmodule Nurvus.Router do
 
     conn
     |> put_resp_content_type("application/json")
-    |> send_resp(status, JSON.encode!(data))
+    |> send_resp(status, Jason.encode!(data))
   end
 end

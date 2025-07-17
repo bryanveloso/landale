@@ -28,6 +28,7 @@ defmodule Nurvus.MixProject do
       {:req, "~> 0.4"},
       {:telemetry, "~> 1.0"},
       {:burrito, "~> 1.3"},
+      {:jason, "~> 1.4"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
