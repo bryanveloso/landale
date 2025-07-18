@@ -97,12 +97,7 @@ class ServerClient:
             logger.info(f"Connected to server at {self.url}")
 
             # Join events channel for all events including viewer interactions
-            join_message = {
-                "topic": "events:all",
-                "event": "phx_join", 
-                "payload": {},
-                "ref": "1"
-            }
+            join_message = {"topic": "events:all", "event": "phx_join", "payload": {}, "ref": "1"}
             await self.ws.send(json.dumps(join_message))
         except Exception as e:
             logger.error(f"Failed to connect to server: {e}")
@@ -129,7 +124,7 @@ class ServerClient:
                         if event == "phx_reply" and payload.get("status") == "ok":
                             logger.info(f"Joined channel: {topic}")
                             continue
-                    
+
                     # Legacy array format handling (keep for compatibility)
                     elif isinstance(data, list) and len(data) >= 5:
                         join_ref, ref, topic, event, payload = data[:5]

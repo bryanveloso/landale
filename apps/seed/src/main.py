@@ -27,7 +27,7 @@ class SeedService:
     """Main SEED intelligence service that coordinates all components."""
 
     def __init__(self):
-        # Configuration - hardcoded URLs for single-user setup with env overrides  
+        # Configuration - hardcoded URLs for single-user setup with env overrides
         self.server_events_url = os.getenv("SERVER_URL", "http://zelan:8080")
         self.server_ws_url = os.getenv("SERVER_WS_URL", "ws://zelan:7175")
         self.lms_url = os.getenv("LMS_API_URL", "http://zelan:1234/v1")
