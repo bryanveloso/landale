@@ -36,7 +36,7 @@ defmodule Nurvus.MixProject do
   defp releases do
     [
       nurvus: [
-        version: "2025.07.18b",
+        version: "2025.07.18d",
         applications: [nurvus: :permanent],
         include_executables_for: [:unix, :windows],
         steps: [:assemble, &Burrito.wrap/1],

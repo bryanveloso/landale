@@ -157,8 +157,11 @@ defmodule Nurvus.ProcessRunner do
         _ -> inspect(data)
       end
 
-    if output != "" do
-      Logger.info("[#{state.config.name}] #{output}")
+    # Only log non-empty lines, and strip any extra whitespace/newlines
+    if output != "" and String.trim(output) != "" do
+      # Remove any additional newlines that might cause formatting issues
+      clean_output = output |> String.replace(~r/\n+/, " ") |> String.trim()
+      Logger.info("[#{state.config.name}] #{clean_output}")
     end
 
     {:noreply, state}
@@ -188,6 +191,26 @@ defmodule Nurvus.ProcessRunner do
   end
 
   @impl true
+  def handle_cast(:graceful_shutdown, state) do
+    Logger.debug("Graceful shutdown requested for #{state.config.name}")
+
+    # Signal the external process to shutdown gracefully
+    if state.os_pid do
+      try do
+        Logger.debug("Sending TERM signal to #{state.config.name} (PID: #{state.os_pid})")
+        System.cmd("kill", ["-TERM", to_string(state.os_pid)])
+
+        # Give process time to shutdown gracefully
+        graceful_shutdown_wait(state.os_pid, 5000)
+      rescue
+        _ -> :ok
+      end
+    end
+
+    {:noreply, state}
+  end
+
+  @impl true
   def terminate(reason, state) do
     Logger.info("Terminating ProcessRunner for #{state.config.name}: #{inspect(reason)}")
 
@@ -207,19 +230,11 @@ defmodule Nurvus.ProcessRunner do
     if state.os_pid do
       try do
         # Send TERM signal first
+        Logger.debug("Sending TERM signal to #{state.config.name} (PID: #{state.os_pid})")
         System.cmd("kill", ["-TERM", to_string(state.os_pid)])
 
-        # Use non-blocking approach: check if process is still running
-        # If it's still alive after TERM, send KILL immediately
-        case System.cmd("kill", ["-0", to_string(state.os_pid)], stderr_to_stdout: true) do
-          {_, 0} ->
-            # Process still exists, force kill
-            System.cmd("kill", ["-KILL", to_string(state.os_pid)])
-
-          _ ->
-            # Process already terminated
-            :ok
-        end
+        # Give the process time to shut down gracefully (up to 5 seconds)
+        graceful_shutdown_wait(state.os_pid, 5000)
       rescue
         # Process might already be dead
         _ -> :ok
@@ -232,25 +247,33 @@ defmodule Nurvus.ProcessRunner do
   ## Private Functions
 
   defp start_external_process(config) do
-    # Build command options
-    opts = build_port_options(config)
+    # Check for resource conflicts before starting
+    case check_resource_availability(config) do
+      :ok ->
+        # Build command options
+        opts = build_port_options(config)
 
-    try do
-      # Start the process using a Port
-      port = Port.open({:spawn_executable, find_executable(config.command)}, opts)
+        try do
+          # Start the process using a Port
+          port = Port.open({:spawn_executable, find_executable(config.command)}, opts)
 
-      # Get the OS PID of the spawned process
-      case get_os_pid(port) do
-        {:ok, os_pid} ->
-          {:ok, port, os_pid}
+          # Get the OS PID of the spawned process
+          case get_os_pid(port) do
+            {:ok, os_pid} ->
+              {:ok, port, os_pid}
 
-        {:error, reason} ->
-          Port.close(port)
-          {:error, reason}
-      end
-    rescue
-      error ->
-        {:error, error}
+            {:error, reason} ->
+              Port.close(port)
+              {:error, reason}
+          end
+        rescue
+          error ->
+            {:error, error}
+        end
+
+      {:error, reason} ->
+        Logger.error("Resource conflict detected for #{config.name}: #{reason}")
+        {:error, reason}
     end
   end
 
@@ -300,6 +323,90 @@ defmodule Nurvus.ProcessRunner do
 
       _ ->
         {:error, :no_os_pid}
+    end
+  end
+
+  defp check_resource_availability(config) do
+    # Extract ports from environment variables
+    ports_to_check = extract_ports_from_config(config)
+
+    case check_ports_availability(ports_to_check) do
+      [] ->
+        Logger.debug("All ports available for #{config.name}: #{inspect(ports_to_check)}")
+        :ok
+
+      conflicts ->
+        conflict_msg = "Ports already in use: #{Enum.join(conflicts, ", ")}"
+        {:error, conflict_msg}
+    end
+  end
+
+  defp extract_ports_from_config(config) do
+    # Look for common port environment variables
+    port_vars = ["PORT", "HEALTH_PORT", "WEBSOCKET_PORT", "HTTP_PORT", "API_PORT"]
+
+    port_vars
+    |> Enum.map(fn var -> Map.get(config.env, var) end)
+    |> Enum.filter(fn port -> port != nil end)
+    |> Enum.map(fn port_str ->
+      case Integer.parse(port_str) do
+        {port, ""} -> port
+        _ -> nil
+      end
+    end)
+    |> Enum.filter(fn port -> port != nil end)
+  end
+
+  defp check_ports_availability(ports) do
+    ports
+    |> Enum.filter(fn port -> port_in_use?(port) end)
+  end
+
+  defp port_in_use?(port) do
+    case System.cmd("lsof", ["-i", ":#{port}"], stderr_to_stdout: true) do
+      {_output, 0} ->
+        # lsof found processes using the port
+        true
+
+      {_output, _exit_code} ->
+        # No processes found or lsof error (port is free)
+        false
+    end
+  rescue
+    # If lsof command fails, assume port is available
+    _ -> false
+  end
+
+  defp graceful_shutdown_wait(os_pid, timeout_ms) do
+    start_time = System.monotonic_time(:millisecond)
+    # Check every 100ms
+    check_interval = 100
+
+    graceful_shutdown_loop(os_pid, start_time, timeout_ms, check_interval)
+  end
+
+  defp graceful_shutdown_loop(os_pid, start_time, timeout_ms, check_interval) do
+    current_time = System.monotonic_time(:millisecond)
+    elapsed = current_time - start_time
+
+    if elapsed >= timeout_ms do
+      # Timeout reached, force kill
+      Logger.warning("Process #{os_pid} did not terminate gracefully, sending KILL signal")
+      System.cmd("kill", ["-KILL", to_string(os_pid)])
+      :ok
+    else
+      # Check if process is still running
+      case System.cmd("kill", ["-0", to_string(os_pid)], stderr_to_stdout: true) do
+        {_, 0} ->
+          # Process still exists, wait and check again
+          Process.sleep(check_interval)
+          graceful_shutdown_loop(os_pid, start_time, timeout_ms, check_interval)
+
+        _ ->
+          # Process has terminated
+          Logger.debug("Process #{os_pid} terminated gracefully")
+          :ok
+      end
     end
   end
 end

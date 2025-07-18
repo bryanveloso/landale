@@ -35,7 +35,21 @@ defmodule Nurvus.ProcessSupervisor do
 
   @spec stop_process(pid()) :: :ok
   def stop_process(pid) when is_pid(pid) do
-    DynamicSupervisor.terminate_child(__MODULE__, pid)
+    # Give ProcessRunner time to gracefully shutdown by setting a timeout
+    # The ProcessRunner will handle graceful termination in its terminate/2 callback
+    case DynamicSupervisor.terminate_child(__MODULE__, pid) do
+      :ok ->
+        Logger.debug("Successfully terminated child process: #{inspect(pid)}")
+        :ok
+
+      {:error, :not_found} ->
+        Logger.debug("Process #{inspect(pid)} was already terminated")
+        :ok
+
+      error ->
+        Logger.warning("Error terminating process #{inspect(pid)}: #{inspect(error)}")
+        error
+    end
   end
 
   @spec count_children() :: map()
@@ -59,7 +73,10 @@ defmodule Nurvus.ProcessSupervisor do
     DynamicSupervisor.init(
       strategy: strategy,
       max_restarts: max_restarts,
-      max_seconds: max_seconds
+      max_seconds: max_seconds,
+      # Give ProcessRunner children time to gracefully shutdown
+      # 10 seconds
+      shutdown: 10_000
     )
   end
 end
