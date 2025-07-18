@@ -61,7 +61,7 @@ config :server, ServerWeb.Endpoint,
 config :server, dev_routes: true
 
 # OBS WebSocket configuration
-config :server, :obs_websocket_url, "ws://demi:4455"
+config :server, :obs_websocket_url, "ws://100.106.173.14:4455"
 
 # Enhanced logging for development with metadata
 config :logger, :console,
