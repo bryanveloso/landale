@@ -6,8 +6,8 @@ import Config
 # HTTP server port
 port = System.get_env("NURVUS_PORT", "4001") |> String.to_integer()
 
-# Configuration file path
-config_file = System.get_env("NURVUS_CONFIG_FILE", "processes.json")
+# Configuration file path - use XDG Base Directory by default
+config_file = System.get_env("NURVUS_CONFIG_FILE")
 
 # Logging configuration
 log_level =
@@ -21,9 +21,16 @@ log_level =
 
 config :logger, level: log_level
 
-config :nurvus,
-  http_port: port,
-  config_file: config_file
+# Only set config_file if explicitly provided via environment variable
+# Otherwise let the application use its XDG default
+if config_file do
+  config :nurvus,
+    http_port: port,
+    config_file: config_file
+else
+  config :nurvus,
+    http_port: port
+end
 
 # Production-specific configuration
 if config_env() == :prod do

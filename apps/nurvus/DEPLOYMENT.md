@@ -28,9 +28,32 @@ Download the appropriate package for your machine from GitHub Actions artifacts:
 # Extract package
 tar -xzf nurvus-[machine].tar.gz
 
-# Run directly (config will be copied to ~/.nurvus/ on first run)
+# Run directly (config will be copied to ~/.config/nurvus/ on first run)
 ./nurvus  # or nurvus.exe on Windows
 ```
+
+#### macOS Security Setup
+
+On macOS machines (Zelan, Saya), you'll need to bypass Gatekeeper since Nurvus is unsigned:
+
+```bash
+# Remove quarantine attributes (required on macOS)
+xattr -c nurvus_macos
+
+# Make executable
+chmod +x nurvus_macos
+
+# Run
+./nurvus_macos
+```
+
+**Alternative (GUI method):**
+1. Try to run Nurvus (you'll see a security warning)
+2. Go to **System Settings** → **Privacy & Security** 
+3. Click **"Allow Anyway"** in the Security section
+4. Try running again and click **"Open"**
+
+For detailed troubleshooting, see [macOS Installation Guide](../../docs/MACOS_INSTALLATION.md).
 
 That's it! No dependencies, no build process, no configuration copying.
 

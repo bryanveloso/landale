@@ -2,17 +2,17 @@
 
 import argparse
 import asyncio
-import logging
 import sys
 from pathlib import Path
 
 from .context_client import ContextClient
 from .dataset_exporter import DatasetExporter
+from .logger import configure_json_logging, get_logger
 from .training_pipeline import TrainingDataPipeline
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+# Configure structured logging
+configure_json_logging()
+logger = get_logger(__name__)
 
 
 async def main():

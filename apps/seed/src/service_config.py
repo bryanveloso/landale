@@ -8,6 +8,10 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .logger import get_logger
+
+logger = get_logger(__name__)
+
 
 def load_services_config() -> dict[str, Any]:
     """Load the shared services configuration"""
@@ -20,7 +24,7 @@ def load_services_config() -> dict[str, Any]:
             config = json.load(f)
             return config["services"]
     except Exception as e:
-        print(f"Warning: Could not load services.json: {e}")
+        logger.warning("Could not load services.json", error=str(e))
         return {}
 
 

@@ -1,13 +1,13 @@
 """LM Studio client for AI analysis."""
 
 import json
-import logging
 
 import aiohttp
 
 from .events import AnalysisResult, FlexiblePatterns, StreamDynamics
+from .logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class LMSClient:

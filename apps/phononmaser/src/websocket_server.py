@@ -3,7 +3,6 @@
 import asyncio
 import contextlib
 import json
-import logging
 import os
 import struct
 
@@ -12,8 +11,9 @@ from websockets.server import WebSocketServerProtocol
 
 from .audio_processor import AudioChunk, AudioFormat, AudioProcessor
 from .events import TranscriptionEvent
+from .logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PhononmaserServer:

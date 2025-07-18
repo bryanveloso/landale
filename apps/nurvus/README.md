@@ -18,11 +18,34 @@ A lightweight, distributed process manager built with Elixir OTP that provides P
 
 ### Installation
 
-1. Download the appropriate package for your machine from GitHub Actions artifacts
-2. Extract: `tar -xzf nurvus-[machine].tar.gz`
-3. Run: `./nurvus` (or `nurvus.exe` on Windows)
+1. **Download** the appropriate package for your machine from [GitHub Releases](https://github.com/bryanveloso/landale/releases/tag/nurvus-latest)
+2. **Extract**: `tar -xzf nurvus-[machine].tar.gz`
+3. **Run**: `./nurvus` (or `nurvus.exe` on Windows)
 
 The HTTP API will be available at `http://localhost:4001`
+
+#### macOS Installation
+
+On macOS, you may see security warnings when running Nurvus since it's an unsigned binary. To bypass these:
+
+**Quick Fix (Terminal):**
+```bash
+# Remove quarantine attributes
+xattr -c nurvus_macos
+
+# Make executable and run
+chmod +x nurvus_macos
+./nurvus_macos
+```
+
+**GUI Method:**
+1. Try to run Nurvus (you'll see a security warning)
+2. Open **System Settings** → **Privacy & Security**  
+3. Scroll to **Security** section
+4. Click **"Allow Anyway"** next to the Nurvus warning
+5. Try running Nurvus again and click **"Open"**
+
+For detailed macOS installation instructions, see [macOS Installation Guide](../../docs/MACOS_INSTALLATION.md).
 
 ### Configuration
 
