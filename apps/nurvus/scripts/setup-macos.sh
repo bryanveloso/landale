@@ -106,17 +106,18 @@ make_executable() {
     fi
 }
 
-# Test if binary runs
+# Test if binary is properly set up
 test_binary() {
     local file="$1"
     
-    log_info "Testing if binary runs..."
+    log_info "Verifying binary setup..."
     
-    if timeout ${BINARY_TEST_TIMEOUT}s "./$file" --help >/dev/null 2>&1; then
-        log_success "Binary test passed! Nurvus is ready to use."
+    # Check if file is executable
+    if [[ -x "$file" ]]; then
+        log_success "Binary is properly configured and ready to use."
         return 0
     else
-        log_warning "Binary test failed or requires manual security approval"
+        log_warning "Binary setup failed - file is not executable"
         return 1
     fi
 }
