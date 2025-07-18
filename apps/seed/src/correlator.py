@@ -1,16 +1,16 @@
 """Correlates audio transcriptions with chat activity."""
 
 import asyncio
-import logging
 from collections import Counter, deque
 from datetime import datetime, timedelta
 from typing import Any
 
 from .context_client import ContextClient
 from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
+from .logger import get_logger
 from .lms_client import LMSClient
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class StreamCorrelator:

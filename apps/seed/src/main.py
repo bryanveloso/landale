@@ -1,7 +1,6 @@
 """Main entry point for the SEED intelligence service."""
 
 import asyncio
-import logging
 import os
 import signal
 
@@ -11,6 +10,7 @@ from .context_client import ContextClient
 from .correlator import StreamCorrelator
 from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from .health import create_health_app
+from .logger import configure_json_logging, get_logger, bind_correlation_context, clear_context
 from .lms_client import LMSClient
 from .transcription_client import TranscriptionWebSocketClient
 from .websocket_client import ServerClient
@@ -18,9 +18,9 @@ from .websocket_client import ServerClient
 # Load environment variables
 load_dotenv()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+# Configure structured JSON logging
+configure_json_logging()
+logger = get_logger(__name__)
 
 
 class SeedService:

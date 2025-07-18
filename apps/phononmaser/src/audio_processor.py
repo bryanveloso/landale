@@ -2,7 +2,6 @@
 
 import asyncio
 import contextlib
-import logging
 import subprocess
 import tempfile
 import time
@@ -13,8 +12,9 @@ from dataclasses import dataclass
 import numpy as np
 
 from .events import TranscriptionEvent
+from .logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

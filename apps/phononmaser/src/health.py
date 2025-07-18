@@ -1,12 +1,13 @@
 """Health check endpoint for phononmaser."""
 
-import logging
 import os
 import time
 
 from aiohttp import web
 
-logger = logging.getLogger(__name__)
+from .logger import get_logger
+
+logger = get_logger(__name__)
 
 
 async def health_check(request):

@@ -1,14 +1,14 @@
 """Training data preparation pipeline for AI model training."""
 
 import json
-import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from .context_client import ContextClient
+from .logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TrainingDataPipeline:

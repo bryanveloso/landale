@@ -2,15 +2,15 @@
 
 import asyncio
 import json
-import logging
 from collections.abc import Callable
 
 import websockets
 from websockets.client import WebSocketClientProtocol
 
 from .events import ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
+from .logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PhononmaserClient:

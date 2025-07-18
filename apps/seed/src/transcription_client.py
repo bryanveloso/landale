@@ -2,15 +2,15 @@
 
 import asyncio
 import json
-import logging
 from collections.abc import Callable
 
 import websockets
 from websockets.client import WebSocketClientProtocol
 
 from .events import TranscriptionEvent
+from .logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TranscriptionWebSocketClient:

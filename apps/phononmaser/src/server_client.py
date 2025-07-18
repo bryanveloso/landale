@@ -1,14 +1,14 @@
 """HTTP client for sending transcriptions to Phoenix server."""
 
-import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import aiohttp
 
 from .events import TranscriptionEvent
+from .logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ServerTranscriptionClient:
