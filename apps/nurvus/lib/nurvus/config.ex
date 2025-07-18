@@ -39,19 +39,8 @@ defmodule Nurvus.Config do
         load_from_file(file_path)
 
       false ->
-        # Try to initialize config from local processes.json on first run
-        case initialize_config_from_local(file_path) do
-          :ok ->
-            load_from_file(file_path)
-
-          :no_local_config ->
-            Logger.info("No configuration file found at #{file_path}, starting with empty config")
-            {:ok, []}
-
-          {:error, reason} ->
-            Logger.warning("Failed to copy local config: #{reason}, starting with empty config")
-            {:ok, []}
-        end
+        Logger.info("No configuration file found at #{file_path}, starting with empty config")
+        {:ok, []}
     end
   end
 
@@ -148,42 +137,63 @@ defmodule Nurvus.Config do
   end
 
   @doc """
-  Gets the default configuration file path in ~/.nurvus directory.
+  Gets the default configuration file path using XDG Base Directory specification.
+  Defaults to ~/.config/nurvus/processes.json
   """
   @spec get_default_config_path() :: String.t()
   def get_default_config_path do
-    home = System.get_env("HOME") || System.get_env("USERPROFILE") || "."
-    Path.join([home, ".nurvus", "processes.json"])
+    config_home = get_xdg_config_home()
+    Path.join([config_home, "nurvus", "processes.json"])
+  end
+
+  @doc """
+  Gets the XDG config home directory.
+  """
+  @spec get_xdg_config_home() :: String.t()
+  def get_xdg_config_home do
+    case System.get_env("XDG_CONFIG_HOME") do
+      nil ->
+        home = System.get_env("HOME") || System.get_env("USERPROFILE") || "."
+        Path.join(home, ".config")
+
+      config_home when is_binary(config_home) and config_home != "" ->
+        config_home
+
+      _ ->
+        home = System.get_env("HOME") || System.get_env("USERPROFILE") || "."
+        Path.join(home, ".config")
+    end
+  end
+
+  @doc """
+  Gets the XDG data home directory for storing application data.
+  """
+  @spec get_xdg_data_home() :: String.t()
+  def get_xdg_data_home do
+    case System.get_env("XDG_DATA_HOME") do
+      nil ->
+        home = System.get_env("HOME") || System.get_env("USERPROFILE") || "."
+        Path.join(home, ".local/share")
+
+      data_home when is_binary(data_home) and data_home != "" ->
+        data_home
+
+      _ ->
+        home = System.get_env("HOME") || System.get_env("USERPROFILE") || "."
+        Path.join(home, ".local/share")
+    end
+  end
+
+  @doc """
+  Gets the data directory path for Nurvus.
+  """
+  @spec get_data_directory() :: String.t()
+  def get_data_directory do
+    data_home = get_xdg_data_home()
+    Path.join([data_home, "nurvus"])
   end
 
   ## Private Functions
-
-  @spec initialize_config_from_local(String.t()) :: :ok | :no_local_config | {:error, term()}
-  defp initialize_config_from_local(target_path) do
-    local_config = "./processes.json"
-
-    case File.exists?(local_config) do
-      true ->
-        try do
-          # Ensure target directory exists
-          case ensure_config_directory(target_path) do
-            :ok ->
-              File.cp!(local_config, target_path)
-              Logger.info("Copied local config from #{local_config} to #{target_path}")
-              :ok
-
-            error ->
-              error
-          end
-        rescue
-          error ->
-            {:error, "Failed to copy config: #{inspect(error)}"}
-        end
-
-      false ->
-        :no_local_config
-    end
-  end
 
   defp validate_required_fields(config) do
     with {:ok, id} <- validate_required_string(config, "id"),
