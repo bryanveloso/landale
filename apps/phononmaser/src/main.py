@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from .audio_processor import AudioProcessor
 from .health import create_health_app
-from .logger import configure_json_logging, get_logger, bind_audio_context, clear_context
+from .logger import configure_json_logging, get_logger
 from .server_client import ServerTranscriptionClient
 from .websocket_server import PhononmaserServer
 

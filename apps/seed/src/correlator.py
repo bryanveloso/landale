@@ -7,8 +7,8 @@ from typing import Any
 
 from .context_client import ContextClient
 from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
-from .logger import get_logger
 from .lms_client import LMSClient
+from .logger import get_logger
 
 logger = get_logger(__name__)
 

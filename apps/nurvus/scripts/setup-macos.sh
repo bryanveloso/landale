@@ -6,6 +6,9 @@
 
 set -e
 
+# Configuration
+BINARY_TEST_TIMEOUT=5
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -109,7 +112,7 @@ test_binary() {
     
     log_info "Testing if binary runs..."
     
-    if timeout 5s "./$file" --help >/dev/null 2>&1; then
+    if timeout ${BINARY_TEST_TIMEOUT}s "./$file" --help >/dev/null 2>&1; then
         log_success "Binary test passed! Nurvus is ready to use."
         return 0
     else

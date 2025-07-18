@@ -10,8 +10,8 @@ from .context_client import ContextClient
 from .correlator import StreamCorrelator
 from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from .health import create_health_app
-from .logger import configure_json_logging, get_logger, bind_correlation_context, clear_context
 from .lms_client import LMSClient
+from .logger import configure_json_logging, get_logger
 from .transcription_client import TranscriptionWebSocketClient
 from .websocket_client import ServerClient
 

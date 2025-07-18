@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from typing import Any, Dict
+from typing import Any
 
 import structlog
 
@@ -39,7 +39,7 @@ def configure_json_logging() -> None:
     )
 
 
-def add_service_metadata(logger: Any, method_name: str, event_dict: Dict[str, Any]) -> Dict[str, Any]:
+def add_service_metadata(_logger: Any, _method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
     """Add SEED service metadata to log entries."""
     event_dict.update(
         {
@@ -51,7 +51,7 @@ def add_service_metadata(logger: Any, method_name: str, event_dict: Dict[str, An
     return event_dict
 
 
-def get_logger(name: str = None) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     """Get a structured logger instance.
 
     Args:
@@ -63,7 +63,7 @@ def get_logger(name: str = None) -> structlog.stdlib.BoundLogger:
     return structlog.get_logger(name)
 
 
-def bind_correlation_context(correlation_id: str = None, session_id: str = None) -> None:
+def bind_correlation_context(correlation_id: str | None = None, session_id: str | None = None) -> None:
     """Bind correlation context for request tracking.
 
     Args:
