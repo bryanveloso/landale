@@ -69,7 +69,7 @@ class PhononmaserServer:
 
     async def handle_connection(self, websocket: WebSocketServerProtocol) -> None:
         """Handle a new WebSocket connection."""
-        path = websocket.path
+        path = websocket.request.path
 
         if path == "/captions":
             # Handle caption client (OBS plugin)
