@@ -226,6 +226,12 @@ jobs:
               if [ -f "deployment/systemd/nurvus-$machine.service" ]; then
                 cp "deployment/systemd/nurvus-$machine.service" "artifacts/$machine/nurvus.service"
               fi
+              
+              # Copy macOS setup script for macOS machines
+              if [ "$platform" = "macos" ]; then
+                cp "scripts/setup-macos.sh" "artifacts/$machine/"
+                chmod +x "artifacts/$machine/setup-macos.sh"
+              fi
             fi
             
             # Create package
@@ -269,10 +275,18 @@ jobs:
             **Note: These are development builds. Assets are automatically created and replaced on every new commit.**
             
             ### 📦 Machine-Specific Packages:
-            - **nurvus-zelan.tar.gz** - Mac Studio (executable + config + systemd service)
-            - **nurvus-saya.tar.gz** - Mac Mini (executable + config + systemd service)  
+            - **nurvus-zelan.tar.gz** - Mac Studio (executable + config + systemd service + macOS setup script)
+            - **nurvus-saya.tar.gz** - Mac Mini (executable + config + systemd service + macOS setup script)  
             - **nurvus-demi.tar.gz** - Windows Streaming PC (executable + config)
             - **nurvus-alys.tar.gz** - Windows Gaming PC (executable + config)
+            
+            ### 🍎 macOS Installation:
+            For macOS packages (Zelan/Saya), run the included setup script to bypass Gatekeeper:
+            ```bash
+            tar -xzf nurvus-zelan.tar.gz
+            cd nurvus-zelan/
+            ./setup-macos.sh
+            ```
             
             Built from commit: ${{ github.sha }}
           files: |
