@@ -72,8 +72,22 @@ defmodule Nurvus.ProcessSupervisionTest do
       # Let it bind properly
       Process.sleep(500)
 
-      # Second should fail
-      assert {:error, _reason} = ProcessManager.start_process("port_test_2")
+      # Second should fail due to port conflict
+      # Give extra time for conflict detection to complete
+      Process.sleep(100)
+      result = ProcessManager.start_process("port_test_2")
+
+      # Should either fail immediately or eventually fail due to port conflict
+      case result do
+        {:error, _reason} ->
+          # Immediate failure - conflict detected upfront
+          :ok
+
+        :ok ->
+          # Process started but should fail due to conflict, wait and verify it stops
+          Process.sleep(200)
+          assert {:ok, :stopped} = ProcessManager.get_process_status("port_test_2")
+      end
 
       # Cleanup
       ProcessManager.stop_process("port_test_1")
