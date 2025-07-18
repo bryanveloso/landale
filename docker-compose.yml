@@ -53,6 +53,9 @@ services:
       PORT: ${PORT:-7175}
     env_file:
       - .env
+    dns:
+      - 100.100.100.100  # Tailscale MagicDNS
+      - 1.1.1.1          # Fallback for external lookups
     depends_on:
       db:
         condition: service_healthy
