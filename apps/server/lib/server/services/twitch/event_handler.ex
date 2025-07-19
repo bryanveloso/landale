@@ -44,16 +44,30 @@ defmodule Server.Services.Twitch.EventHandler do
   """
   @spec process_event(binary(), map(), keyword()) :: :ok | {:error, term()}
   def process_event(event_type, event_data, _opts \\ []) do
+    Logger.info("PROCESSING EVENT START",
+      event_type: event_type,
+      event_id: event_data["id"],
+      event_data_keys: Map.keys(event_data || %{}),
+      event_size: byte_size(:erlang.term_to_binary(event_data))
+    )
+
     # Validate input parameters
     with :ok <- validate_event_type(event_type),
          :ok <- validate_event_data(event_data) do
       try do
+        Logger.debug("Event validation passed, normalizing event", event_type: event_type)
         normalized_event = normalize_event(event_type, event_data)
+
+        Logger.debug("Event normalized, storing in activity log", event_type: event_type)
         store_event_in_activity_log(event_type, normalized_event)
+
+        Logger.debug("Event stored, publishing to PubSub", event_type: event_type)
         publish_event(event_type, normalized_event)
+
+        Logger.debug("Event published, emitting telemetry", event_type: event_type)
         emit_telemetry(event_type, normalized_event)
 
-        Logger.info("Event processing completed",
+        Logger.info("Event processing completed successfully",
           event_type: event_type,
           event_id: event_data["id"]
         )
@@ -392,6 +406,11 @@ defmodule Server.Services.Twitch.EventHandler do
   # Excludes ephemeral events that don't need long-term storage.
   @spec store_event_in_activity_log(binary(), map()) :: :ok
   defp store_event_in_activity_log(event_type, normalized_event) do
+    Logger.debug("Checking if event should be stored",
+      event_type: event_type,
+      should_store: should_store_event?(event_type)
+    )
+
     # Only store events that are valuable for the Activity Log
     if should_store_event?(event_type) do
       # Prepare event attributes for database storage
@@ -405,8 +424,19 @@ defmodule Server.Services.Twitch.EventHandler do
         correlation_id: generate_correlation_id()
       }
 
+      Logger.info("STORING EVENT IN DATABASE",
+        event_type: event_type,
+        event_id: normalized_event[:id],
+        user_id: event_attrs[:user_id],
+        user_login: event_attrs[:user_login],
+        correlation_id: event_attrs[:correlation_id],
+        timestamp: event_attrs[:timestamp]
+      )
+
       # Store the event asynchronously to avoid blocking the event pipeline
       Task.start(fn -> store_event_async(event_attrs, event_type, normalized_event) end)
+    else
+      Logger.debug("Event not stored - not in valuable_events list", event_type: event_type)
     end
 
     :ok
@@ -458,11 +488,19 @@ defmodule Server.Services.Twitch.EventHandler do
 
   # Async storage of event with user upsert
   defp store_event_async(event_attrs, event_type, normalized_event) do
+    Logger.debug("Starting async database storage",
+      event_type: event_type,
+      correlation_id: event_attrs[:correlation_id]
+    )
+
     case ActivityLog.store_event(event_attrs) do
-      {:ok, _event} ->
-        Logger.debug("Event stored in ActivityLog",
+      {:ok, event} ->
+        Logger.info("SUCCESS: Event stored in ActivityLog database",
           event_type: event_type,
-          event_id: normalized_event.id
+          event_id: normalized_event.id,
+          database_id: event.id,
+          correlation_id: event_attrs[:correlation_id],
+          timestamp: event_attrs[:timestamp]
         )
 
         # Also upsert user information if we have user data
@@ -471,10 +509,12 @@ defmodule Server.Services.Twitch.EventHandler do
         end
 
       {:error, changeset} ->
-        Logger.warning("Failed to store event in ActivityLog",
+        Logger.error("FAILED: Event storage in ActivityLog database",
           event_type: event_type,
           event_id: normalized_event.id,
-          errors: inspect(changeset.errors)
+          correlation_id: event_attrs[:correlation_id],
+          errors: inspect(changeset.errors),
+          changeset_details: inspect(changeset, limit: :infinity)
         )
     end
   end

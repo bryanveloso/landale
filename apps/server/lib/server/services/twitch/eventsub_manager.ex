@@ -391,6 +391,17 @@ defmodule Server.Services.Twitch.EventSubManager do
           {success, failed + 1}
       end
     else
+      # Log missing chat scope as error since it's critical
+      if event_type == "channel.chat.message" do
+        user_scope_list = MapSet.to_list(state.scopes || MapSet.new())
+        missing_scopes = required_scopes -- user_scope_list
+
+        Logger.error("Chat subscription skipped - missing scopes",
+          event_type: event_type,
+          missing_scopes: missing_scopes
+        )
+      end
+
       log_skipped_subscription(event_type, required_scopes, state.scopes)
       {success, failed + 1}
     end

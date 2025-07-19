@@ -571,11 +571,24 @@ defmodule Server.Services.Twitch do
     # Token validation task completed
     case result do
       {:ok, token_info, updated_manager} ->
+        scopes_list = token_info["scopes"] || []
+        has_user_read_chat = "user:read:chat" in scopes_list
+
         Logger.info("Token validation completed",
           user_id: token_info["user_id"],
           client_id: token_info["client_id"],
-          scopes: length(token_info["scopes"] || [])
+          scopes: length(scopes_list),
+          has_chat_scope: has_user_read_chat
         )
+
+        # Log missing chat scope as error since it's critical for the data loss issue
+        unless has_user_read_chat do
+          Logger.error("Missing required chat scope",
+            user_id: token_info["user_id"],
+            missing_scope: "user:read:chat",
+            available_scopes: scopes_list
+          )
+        end
 
         # Store user ID and scopes in state
         user_id = token_info["user_id"]
@@ -1318,11 +1331,33 @@ defmodule Server.Services.Twitch do
     event_type = get_in(message, ["metadata", "subscription_type"])
     event_data = message["payload"]["event"]
     subscription_id = get_in(message, ["metadata", "subscription_id"])
+    message_id = get_in(message, ["metadata", "message_id"])
+    message_timestamp = get_in(message, ["metadata", "message_timestamp"])
 
     Logger.info("EventSub notification received",
       event_type: event_type,
-      subscription_id: subscription_id
+      subscription_id: subscription_id,
+      message_id: message_id,
+      message_timestamp: message_timestamp,
+      event_data_keys: Map.keys(event_data || %{}),
+      raw_message_size: byte_size(:erlang.term_to_binary(message))
     )
+
+    # Additional debug logging for chat messages specifically
+    if event_type == "channel.chat.message" do
+      Logger.info("CHAT MESSAGE DEBUG",
+        event_type: event_type,
+        user_id: event_data["broadcaster_user_id"],
+        user_login: event_data["broadcaster_user_login"],
+        user_name: event_data["broadcaster_user_name"],
+        chatter_user_id: event_data["chatter_user_id"],
+        chatter_user_login: event_data["chatter_user_login"],
+        chatter_user_name: event_data["chatter_user_name"],
+        message_text: event_data["message"]["text"],
+        message_id: event_data["message_id"],
+        full_event_data: inspect(event_data, limit: :infinity)
+      )
+    end
 
     # Record event reception in subscription monitor
     if subscription_id do
