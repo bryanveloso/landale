@@ -9,7 +9,7 @@ config :logger, level: :info
 # Use simple JSON formatting that's more reliable
 config :logger, :console,
   format: "$time [$level] $message $metadata\n",
-  metadata: [:request_id, :correlation_id, :service, :event_type]
+  metadata: [:request_id, :correlation_id, :service, :operation, :user_id, :error, :duration_ms, :event_type]
 
 # Disable Phoenix request logging to avoid duplicate JSON logs
 config :server, ServerWeb.Endpoint, log: false

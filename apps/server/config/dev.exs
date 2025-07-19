@@ -66,7 +66,7 @@ config :server, :obs_websocket_url, "ws://100.106.173.14:4455"
 # Enhanced logging for development with metadata
 config :logger, :console,
   format: "[$time] [$level] $metadata$message\n",
-  metadata: [:service, :operation, :correlation_id, :user_id, :error, :duration_ms],
+  metadata: :all,
   level: :debug
 
 # Set a higher stacktrace during development. Avoid configuring such
