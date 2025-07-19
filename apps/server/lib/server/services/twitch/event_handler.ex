@@ -108,18 +108,28 @@ defmodule Server.Services.Twitch.EventHandler do
       "stream.online" ->
         Map.merge(base_event, %{
           stream_id: event_data["id"],
+          broadcaster_user_id: event_data["broadcaster_user_id"],
+          broadcaster_user_login: event_data["broadcaster_user_login"],
+          broadcaster_user_name: event_data["broadcaster_user_name"],
           stream_type: event_data["type"],
           started_at: parse_datetime(event_data["started_at"])
         })
 
       "stream.offline" ->
-        base_event
+        Map.merge(base_event, %{
+          broadcaster_user_id: event_data["broadcaster_user_id"],
+          broadcaster_user_login: event_data["broadcaster_user_login"],
+          broadcaster_user_name: event_data["broadcaster_user_name"]
+        })
 
       "channel.follow" ->
         Map.merge(base_event, %{
           user_id: event_data["user_id"],
           user_login: event_data["user_login"],
           user_name: event_data["user_name"],
+          broadcaster_user_id: event_data["broadcaster_user_id"],
+          broadcaster_user_login: event_data["broadcaster_user_login"],
+          broadcaster_user_name: event_data["broadcaster_user_name"],
           followed_at: parse_datetime(event_data["followed_at"])
         })
 
@@ -128,6 +138,9 @@ defmodule Server.Services.Twitch.EventHandler do
           user_id: event_data["user_id"],
           user_login: event_data["user_login"],
           user_name: event_data["user_name"],
+          broadcaster_user_id: event_data["broadcaster_user_id"],
+          broadcaster_user_login: event_data["broadcaster_user_login"],
+          broadcaster_user_name: event_data["broadcaster_user_name"],
           tier: event_data["tier"],
           is_gift: event_data["is_gift"] || false
         })
@@ -137,6 +150,9 @@ defmodule Server.Services.Twitch.EventHandler do
           user_id: event_data["user_id"],
           user_login: event_data["user_login"],
           user_name: event_data["user_name"],
+          broadcaster_user_id: event_data["broadcaster_user_id"],
+          broadcaster_user_login: event_data["broadcaster_user_login"],
+          broadcaster_user_name: event_data["broadcaster_user_name"],
           tier: event_data["tier"],
           total: event_data["total"],
           cumulative_total: event_data["cumulative_total"],
@@ -148,6 +164,9 @@ defmodule Server.Services.Twitch.EventHandler do
           user_id: event_data["user_id"],
           user_login: event_data["user_login"],
           user_name: event_data["user_name"],
+          broadcaster_user_id: event_data["broadcaster_user_id"],
+          broadcaster_user_login: event_data["broadcaster_user_login"],
+          broadcaster_user_name: event_data["broadcaster_user_name"],
           is_anonymous: event_data["is_anonymous"] || false,
           bits: event_data["bits"],
           message: event_data["message"]
@@ -155,38 +174,61 @@ defmodule Server.Services.Twitch.EventHandler do
 
       "channel.update" ->
         Map.merge(base_event, %{
+          broadcaster_user_id: event_data["broadcaster_user_id"],
+          broadcaster_user_login: event_data["broadcaster_user_login"],
+          broadcaster_user_name: event_data["broadcaster_user_name"],
           title: event_data["title"],
           language: event_data["language"],
           category_id: event_data["category_id"],
-          category_name: event_data["category_name"]
+          category_name: event_data["category_name"],
+          content_classification_labels: event_data["content_classification_labels"] || []
         })
 
       "channel.chat.message" ->
+        fragments = event_data["message"]["fragments"] || []
+        {emotes, native_emotes} = extract_emotes_from_fragments(fragments)
+
         Map.merge(base_event, %{
           message_id: event_data["message_id"],
+          broadcaster_user_id: event_data["broadcaster_user_id"],
+          broadcaster_user_login: event_data["broadcaster_user_login"],
+          broadcaster_user_name: event_data["broadcaster_user_name"],
           user_id: event_data["chatter_user_id"],
           user_login: event_data["chatter_user_login"],
           user_name: event_data["chatter_user_name"],
           message: event_data["message"]["text"],
-          fragments: event_data["message"]["fragments"] || [],
+          fragments: fragments,
+          emotes: emotes,
+          native_emotes: native_emotes,
           color: event_data["color"],
           badges: extract_badges(event_data["badges"]),
           message_type: event_data["message_type"],
           cheer: event_data["cheer"],
           reply: event_data["reply"],
-          channel_points_custom_reward_id: event_data["channel_points_custom_reward_id"]
+          channel_points_custom_reward_id: event_data["channel_points_custom_reward_id"],
+          source_broadcaster_user_id: event_data["source_broadcaster_user_id"],
+          source_broadcaster_user_login: event_data["source_broadcaster_user_login"],
+          source_broadcaster_user_name: event_data["source_broadcaster_user_name"],
+          source_message_id: event_data["source_message_id"],
+          source_badges: event_data["source_badges"]
         })
 
       "channel.chat.clear" ->
-        base_event
+        Map.merge(base_event, %{
+          broadcaster_user_id: event_data["broadcaster_user_id"],
+          broadcaster_user_login: event_data["broadcaster_user_login"],
+          broadcaster_user_name: event_data["broadcaster_user_name"]
+        })
 
       "channel.chat.message_delete" ->
         Map.merge(base_event, %{
+          broadcaster_user_id: event_data["broadcaster_user_id"],
+          broadcaster_user_login: event_data["broadcaster_user_login"],
+          broadcaster_user_name: event_data["broadcaster_user_name"],
           target_user_id: event_data["target_user_id"],
           target_user_login: event_data["target_user_login"],
           target_user_name: event_data["target_user_name"],
-          target_message_id: event_data["target_message_id"],
-          target_message_body: event_data["target_message_body"]
+          message_id: event_data["message_id"]
         })
 
       _ ->
@@ -359,6 +401,29 @@ defmodule Server.Services.Twitch.EventHandler do
   end
 
   defp extract_badges(_), do: []
+
+  @doc """
+  Extracts emotes and native emotes from Twitch message fragments.
+
+  Native emotes are those that start with "avalon" prefix.
+  Regular emotes are all other emotes.
+  """
+  defp extract_emotes_from_fragments(fragments) when is_list(fragments) do
+    emotes =
+      fragments
+      |> Enum.filter(fn fragment -> fragment["type"] == "emote" end)
+      |> Enum.map(fn fragment -> fragment["text"] end)
+      |> Enum.reject(&is_nil/1)
+
+    {regular_emotes, native_emotes} =
+      Enum.split_with(emotes, fn emote_text ->
+        not String.starts_with?(emote_text, "avalon")
+      end)
+
+    {regular_emotes, native_emotes}
+  end
+
+  defp extract_emotes_from_fragments(_), do: {[], []}
 
   # Event processing helper functions
 

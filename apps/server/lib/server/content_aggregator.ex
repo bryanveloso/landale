@@ -142,7 +142,7 @@ defmodule Server.ContentAggregator do
   @impl true
   def handle_info({:chat_message, event}, state) do
     try do
-      record_emote_usage(event.emotes, event.native_emotes, event.username)
+      record_emote_usage(event.emotes, event.native_emotes, event.user_name)
     rescue
       error ->
         Logger.error("Failed to record emote usage", error: inspect(error), event: inspect(event))
