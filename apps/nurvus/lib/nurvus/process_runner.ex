@@ -149,22 +149,27 @@ defmodule Nurvus.ProcessRunner do
 
   @impl true
   def handle_info({port, {:data, data}}, %{port: port} = state) do
-    output =
-      case data do
-        {:eol, msg} when is_binary(msg) -> String.trim(msg)
-        {:eol, msg} -> inspect(msg)
-        msg when is_binary(msg) -> String.trim(msg)
-        _ -> inspect(data)
-      end
+    output = format_process_output(data)
+    log_process_output(output, state.config.name)
+    {:noreply, state}
+  end
 
+  defp format_process_output(data) do
+    case data do
+      {:eol, msg} when is_binary(msg) -> String.trim(msg)
+      {:eol, msg} -> inspect(msg)
+      msg when is_binary(msg) -> String.trim(msg)
+      _ -> inspect(data)
+    end
+  end
+
+  defp log_process_output(output, process_name) do
     # Only log non-empty lines, and strip any extra whitespace/newlines
     if output != "" and String.trim(output) != "" do
       # Remove any additional newlines that might cause formatting issues
       clean_output = output |> String.replace(~r/\n+/, " ") |> String.trim()
-      Logger.info("[#{state.config.name}] #{clean_output}")
+      Logger.info("[#{process_name}] #{clean_output}")
     end
-
-    {:noreply, state}
   end
 
   @impl true

@@ -277,58 +277,9 @@ defmodule Nurvus.ProcessManager do
   def handle_info({:DOWN, monitor_ref, :process, _pid, reason}, state) do
     Logger.debug("Received DOWN message: #{inspect(monitor_ref)} reason: #{inspect(reason)}")
 
-    # Find which process died
     case find_process_by_monitor(state.monitors, monitor_ref) do
       {process_id, pid} ->
-        Logger.warning("Process #{process_id} (#{inspect(pid)}) exited: #{inspect(reason)}")
-
-        Logger.debug(
-          "Process exit details - ID: #{process_id}, PID: #{inspect(pid)}, Monitor: #{inspect(monitor_ref)}"
-        )
-
-        # Emit telemetry event for process crash
-        :telemetry.execute(
-          [:nurvus, :process, :crashed],
-          %{count: 1},
-          %{process_id: process_id, reason: inspect(reason)}
-        )
-
-        # Remove from monitors
-        updated_monitors = Map.delete(state.monitors, process_id)
-        new_state = %{state | monitors: updated_monitors}
-
-        Logger.debug(
-          "Removed #{process_id} from monitors. Remaining: #{inspect(Map.keys(updated_monitors))}"
-        )
-
-        # Check if auto-restart is enabled
-        case Map.get(state.processes, process_id) do
-          %{auto_restart: true} = config ->
-            Logger.info("Auto-restart enabled for #{process_id} - scheduling restart in 1000ms")
-
-            Logger.debug(
-              "Auto-restart config: #{inspect(%{max_restarts: config.max_restarts, restart_window: config.restart_window})}"
-            )
-
-            # Emit telemetry event for auto-restart
-            :telemetry.execute(
-              [:nurvus, :process, :auto_restart_scheduled],
-              %{count: 1},
-              %{process_id: process_id}
-            )
-
-            # Schedule restart after a delay
-            Process.send_after(self(), {:restart_process, process_id}, 1000)
-            {:noreply, new_state}
-
-          config when not is_nil(config) ->
-            Logger.debug("Auto-restart disabled for #{process_id} - process will remain stopped")
-            {:noreply, new_state}
-
-          nil ->
-            Logger.debug("No configuration found for #{process_id} - removing from management")
-            {:noreply, new_state}
-        end
+        handle_process_exit(process_id, pid, monitor_ref, reason, state)
 
       nil ->
         Logger.warning("Received DOWN message for unknown monitor: #{inspect(monitor_ref)}")
@@ -364,42 +315,49 @@ defmodule Nurvus.ProcessManager do
         {:error, :not_running}
 
       {pid, monitor_ref} ->
-        Logger.info("Process stop initiated: #{process_id} (#{inspect(pid)})")
-        Logger.debug("Demonitoring process: #{process_id} with ref #{inspect(monitor_ref)}")
-        Process.demonitor(monitor_ref, [:flush])
+        perform_process_stop(process_id, pid, monitor_ref)
+    end
+  end
 
-        # Signal the ProcessRunner to initiate graceful shutdown
-        Logger.debug("Requesting graceful shutdown for process: #{process_id}")
+  defp perform_process_stop(process_id, pid, monitor_ref) do
+    Logger.info("Process stop initiated: #{process_id} (#{inspect(pid)})")
+    Logger.debug("Demonitoring process: #{process_id} with ref #{inspect(monitor_ref)}")
+    Process.demonitor(monitor_ref, [:flush])
 
-        try do
-          # Send TERM signal to allow graceful shutdown before supervisor termination
-          GenServer.cast(pid, :graceful_shutdown)
+    # Signal graceful shutdown
+    Logger.debug("Requesting graceful shutdown for process: #{process_id}")
+    signal_graceful_shutdown(pid)
 
-          # Wait briefly for graceful shutdown to complete
-          Process.sleep(100)
-        catch
-          :exit, _reason ->
-            Logger.debug("ProcessRunner #{inspect(pid)} already terminated")
-        end
+    # Stop via supervisor and verify
+    Logger.debug("Requesting supervisor stop for process: #{process_id}")
+    result = ProcessSupervisor.stop_process(pid)
+    Logger.debug("Supervisor stop result: #{inspect(result)}")
 
-        # Now stop via supervisor
-        Logger.debug("Requesting supervisor stop for process: #{process_id}")
-        result = ProcessSupervisor.stop_process(pid)
-        Logger.debug("Supervisor stop result: #{inspect(result)}")
+    verify_and_report_stop(process_id, pid)
+  end
 
-        # Verify the process actually stopped
-        Logger.debug("Verifying process termination: #{process_id}")
+  defp signal_graceful_shutdown(pid) do
+    try do
+      GenServer.cast(pid, :graceful_shutdown)
+      Process.sleep(100)
+    catch
+      :exit, _reason ->
+        Logger.debug("ProcessRunner #{inspect(pid)} already terminated")
+    end
+  end
 
-        case verify_process_stopped(pid, process_id) do
-          :ok ->
-            Logger.info("Successfully stopped process: #{process_id}")
-            Logger.debug("Process #{process_id} verified as terminated")
-            :ok
+  defp verify_and_report_stop(process_id, pid) do
+    Logger.debug("Verifying process termination: #{process_id}")
 
-          {:error, reason} ->
-            Logger.error("Failed to stop process #{process_id}: #{reason}")
-            {:error, reason}
-        end
+    case verify_process_stopped(pid, process_id) do
+      :ok ->
+        Logger.info("Successfully stopped process: #{process_id}")
+        Logger.debug("Process #{process_id} verified as terminated")
+        :ok
+
+      {:error, reason} ->
+        Logger.error("Failed to stop process #{process_id}: #{reason}")
+        {:error, reason}
     end
   end
 
@@ -427,6 +385,62 @@ defmodule Nurvus.ProcessManager do
         :ok
       end
     end
+  end
+
+  defp handle_process_exit(process_id, pid, monitor_ref, reason, state) do
+    Logger.warning("Process #{process_id} (#{inspect(pid)}) exited: #{inspect(reason)}")
+
+    Logger.debug(
+      "Process exit details - ID: #{process_id}, PID: #{inspect(pid)}, Monitor: #{inspect(monitor_ref)}"
+    )
+
+    # Emit telemetry event for process crash
+    :telemetry.execute(
+      [:nurvus, :process, :crashed],
+      %{count: 1},
+      %{process_id: process_id, reason: inspect(reason)}
+    )
+
+    # Remove from monitors
+    updated_monitors = Map.delete(state.monitors, process_id)
+    new_state = %{state | monitors: updated_monitors}
+
+    Logger.debug(
+      "Removed #{process_id} from monitors. Remaining: #{inspect(Map.keys(updated_monitors))}"
+    )
+
+    # Check if auto-restart is enabled
+    case Map.get(state.processes, process_id) do
+      %{auto_restart: true} = config ->
+        handle_auto_restart(process_id, config, new_state)
+
+      config when not is_nil(config) ->
+        Logger.debug("Auto-restart disabled for #{process_id} - process will remain stopped")
+        {:noreply, new_state}
+
+      nil ->
+        Logger.debug("No configuration found for #{process_id} - removing from management")
+        {:noreply, new_state}
+    end
+  end
+
+  defp handle_auto_restart(process_id, config, state) do
+    Logger.info("Auto-restart enabled for #{process_id} - scheduling restart in 1000ms")
+
+    Logger.debug(
+      "Auto-restart config: #{inspect(%{max_restarts: config.max_restarts, restart_window: config.restart_window})}"
+    )
+
+    # Emit telemetry event for auto-restart
+    :telemetry.execute(
+      [:nurvus, :process, :auto_restart_scheduled],
+      %{count: 1},
+      %{process_id: process_id}
+    )
+
+    # Schedule restart after a delay
+    Process.send_after(self(), {:restart_process, process_id}, 1000)
+    {:noreply, state}
   end
 
   defp find_process_by_monitor(monitors, target_ref) do
