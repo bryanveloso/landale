@@ -195,7 +195,7 @@ defmodule Server.ContentAggregator do
     regular_emotes =
       :ets.foldl(
         fn
-          {{emote, :regular}, {count_today, count_alltime}}, acc ->
+          {{emote, :regular}, count_today, count_alltime}, acc ->
             Map.put(acc, emote, %{today: count_today, alltime: count_alltime, type: :regular})
 
           _, acc ->
@@ -208,7 +208,7 @@ defmodule Server.ContentAggregator do
     native_emotes =
       :ets.foldl(
         fn
-          {{emote, :native}, {count_today, count_alltime}}, acc ->
+          {{emote, :native}, count_today, count_alltime}, acc ->
             Map.put(acc, emote, %{today: count_today, alltime: count_alltime, type: :native})
 
           _, acc ->
@@ -273,7 +273,7 @@ defmodule Server.ContentAggregator do
     catch
       :error, :badarg ->
         # Key doesn't exist, insert initial value and try again
-        :ets.insert(@emote_stats_table, {key, {0, 0}})
+        :ets.insert(@emote_stats_table, {key, 0, 0})
         :ets.update_counter(@emote_stats_table, key, [{2, 1}, {3, 1}])
     end
   end
@@ -357,8 +357,8 @@ defmodule Server.ContentAggregator do
     # Reset daily emote counts but keep all-time counts
     :ets.foldl(
       fn
-        {{emote, type}, {_count_today, count_alltime}}, _acc ->
-          :ets.insert(@emote_stats_table, {{emote, type}, {0, count_alltime}})
+        {{emote, type}, _count_today, count_alltime}, _acc ->
+          :ets.insert(@emote_stats_table, {{emote, type}, 0, count_alltime})
           :ok
 
         _, acc ->
