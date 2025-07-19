@@ -408,7 +408,7 @@ defmodule Server.OAuth2Client do
         user_info = %{
           user_id: data["user_id"],
           client_id: data["client_id"],
-          scopes: data["scopes"],
+          scopes: data["scope"] || data["scopes"],
           expires_in: data["expires_in"]
         }
 

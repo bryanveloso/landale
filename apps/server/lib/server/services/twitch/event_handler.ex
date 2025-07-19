@@ -46,53 +46,40 @@ defmodule Server.Services.Twitch.EventHandler do
   def process_event(event_type, event_data, _opts \\ []) do
     Logger.info("PROCESSING EVENT START",
       event_type: event_type,
-      event_id: event_data["id"],
+      event_id: event_data["id"] || event_data["message_id"],
       event_data_keys: Map.keys(event_data || %{}),
       event_size: byte_size(:erlang.term_to_binary(event_data))
     )
 
-    # Validate input parameters
-    with :ok <- validate_event_type(event_type),
-         :ok <- validate_event_data(event_data) do
-      try do
-        Logger.debug("Event validation passed, normalizing event", event_type: event_type)
-        normalized_event = normalize_event(event_type, event_data)
+    # Process event directly - Twitch validates their own data
+    try do
+      normalized_event = normalize_event(event_type, event_data)
 
-        Logger.debug("Event normalized, storing in activity log", event_type: event_type)
-        store_event_in_activity_log(event_type, normalized_event)
+      Logger.debug("Event normalized, storing in activity log", event_type: event_type)
+      store_event_in_activity_log(event_type, normalized_event)
 
-        Logger.debug("Event stored, publishing to PubSub", event_type: event_type)
-        publish_event(event_type, normalized_event)
+      Logger.debug("Event stored, publishing to PubSub", event_type: event_type)
+      publish_event(event_type, normalized_event)
 
-        Logger.debug("Event published, emitting telemetry", event_type: event_type)
-        emit_telemetry(event_type, normalized_event)
+      Logger.debug("Event published, emitting telemetry", event_type: event_type)
+      emit_telemetry(event_type, normalized_event)
 
-        Logger.info("Event processing completed successfully",
+      Logger.info("Event processing completed successfully",
+        event_type: event_type,
+        event_id: event_data["id"] || event_data["message_id"]
+      )
+
+      :ok
+    rescue
+      error ->
+        Logger.error("Event processing failed",
+          error: inspect(error),
           event_type: event_type,
-          event_id: event_data["id"]
+          event_id: event_data["id"] || event_data["message_id"],
+          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
         )
 
-        :ok
-      rescue
-        error ->
-          Logger.error("Event processing failed",
-            error: inspect(error),
-            event_type: event_type,
-            event_id: event_data["id"],
-            stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-          )
-
-          {:error, "Processing failed: #{inspect(error)}"}
-      end
-    else
-      {:error, reason} ->
-        Logger.warning("Invalid event data rejected",
-          event_type: event_type,
-          reason: reason,
-          event_id: event_data["id"]
-        )
-
-        {:error, reason}
+        {:error, "Processing failed: #{inspect(error)}"}
     end
   end
 
@@ -373,33 +360,7 @@ defmodule Server.Services.Twitch.EventHandler do
 
   defp extract_badges(_), do: []
 
-  # Input validation functions
-
-  defp validate_event_type(event_type) when is_binary(event_type) and byte_size(event_type) > 0 do
-    :ok
-  end
-
-  defp validate_event_type(event_type) do
-    {:error, "Invalid event_type: #{inspect(event_type)} - must be non-empty string"}
-  end
-
-  defp validate_event_data(event_data) when is_map(event_data) do
-    # Ensure basic required fields exist for most events
-    cond do
-      not is_binary(event_data["id"]) or byte_size(event_data["id"]) == 0 ->
-        {:error, "Missing or invalid event id"}
-
-      not is_binary(event_data["broadcaster_user_id"]) or byte_size(event_data["broadcaster_user_id"]) == 0 ->
-        {:error, "Missing or invalid broadcaster_user_id"}
-
-      true ->
-        :ok
-    end
-  end
-
-  defp validate_event_data(event_data) do
-    {:error, "Invalid event_data: #{inspect(event_data)} - must be a map"}
-  end
+  # Event processing helper functions
 
   # Stores an event in the ActivityLog database.
   # Only stores events that are valuable for the Activity Log interface.

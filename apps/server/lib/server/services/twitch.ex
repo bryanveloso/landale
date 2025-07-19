@@ -571,12 +571,12 @@ defmodule Server.Services.Twitch do
     # Token validation task completed
     case result do
       {:ok, token_info, updated_manager} ->
-        scopes_list = token_info["scopes"] || []
+        scopes_list = token_info[:scopes] || token_info["scopes"] || []
         has_user_read_chat = "user:read:chat" in scopes_list
 
         Logger.info("Token validation completed",
-          user_id: token_info["user_id"],
-          client_id: token_info["client_id"],
+          user_id: token_info[:user_id] || token_info["user_id"],
+          client_id: token_info[:client_id] || token_info["client_id"],
           scopes: length(scopes_list),
           has_chat_scope: has_user_read_chat
         )
@@ -584,14 +584,14 @@ defmodule Server.Services.Twitch do
         # Log missing chat scope as error since it's critical for the data loss issue
         unless has_user_read_chat do
           Logger.error("Missing required chat scope",
-            user_id: token_info["user_id"],
+            user_id: token_info[:user_id] || token_info["user_id"],
             missing_scope: "user:read:chat",
             available_scopes: scopes_list
           )
         end
 
         # Store user ID and scopes in state
-        user_id = token_info["user_id"]
+        user_id = token_info[:user_id] || token_info["user_id"]
         # Get scopes from token manager instead of validation response
         # to ensure we have the complete scope set
         scopes = updated_manager.token_info.scopes || MapSet.new()
