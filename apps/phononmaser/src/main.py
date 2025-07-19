@@ -30,7 +30,7 @@ class Phononmaser:
         self.whisper_model_path = os.getenv("WHISPER_MODEL_PATH", "")
         self.whisper_threads = int(os.getenv("WHISPER_THREADS", "8"))
         self.whisper_language = os.getenv("WHISPER_LANGUAGE", "en")
-        self.server_url = os.getenv("SERVER_HTTP_URL", "http://localhost:7175")
+        self.server_url = os.getenv("SERVER_HTTP_URL", "http://saya:7175")
 
         # Validate configuration
         if not self.whisper_model_path:

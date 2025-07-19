@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 class TranscriptionWebSocketClient:
     """WebSocket client for consuming transcriptions from Phoenix server."""
 
-    def __init__(self, server_url: str = "ws://localhost:7175", channel: str = "transcription:live"):
+    def __init__(self, server_url: str = "ws://saya:7175", channel: str = "transcription:live"):
         self.server_url = server_url
         self.channel = channel
         self.ws: WebSocketClientProtocol | None = None
