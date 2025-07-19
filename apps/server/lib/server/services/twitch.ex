@@ -1345,7 +1345,7 @@ defmodule Server.Services.Twitch do
 
     # Additional debug logging for chat messages specifically
     if event_type == "channel.chat.message" do
-      Logger.info("CHAT MESSAGE DEBUG",
+      Logger.debug("Processing chat message",
         event_type: event_type,
         user_id: event_data["broadcaster_user_id"],
         user_login: event_data["broadcaster_user_login"],

@@ -44,7 +44,7 @@ defmodule Server.Services.Twitch.EventHandler do
   """
   @spec process_event(binary(), map(), keyword()) :: :ok | {:error, term()}
   def process_event(event_type, event_data, _opts \\ []) do
-    Logger.info("PROCESSING EVENT START",
+    Logger.debug("Processing EventSub event",
       event_type: event_type,
       event_id: event_data["id"] || event_data["message_id"],
       event_data_keys: Map.keys(event_data || %{}),
@@ -64,7 +64,7 @@ defmodule Server.Services.Twitch.EventHandler do
       Logger.debug("Event published, emitting telemetry", event_type: event_type)
       emit_telemetry(event_type, normalized_event)
 
-      Logger.info("Event processing completed successfully",
+      Logger.debug("EventSub event processed successfully",
         event_type: event_type,
         event_id: event_data["id"] || event_data["message_id"]
       )
@@ -450,7 +450,7 @@ defmodule Server.Services.Twitch.EventHandler do
         correlation_id: generate_correlation_id()
       }
 
-      Logger.info("STORING EVENT IN DATABASE",
+      Logger.debug("Storing event in ActivityLog database",
         event_type: event_type,
         event_id: normalized_event[:id],
         user_id: event_attrs[:user_id],
@@ -521,7 +521,7 @@ defmodule Server.Services.Twitch.EventHandler do
 
     case ActivityLog.store_event(event_attrs) do
       {:ok, event} ->
-        Logger.info("SUCCESS: Event stored in ActivityLog database",
+        Logger.debug("Event stored in ActivityLog database",
           event_type: event_type,
           event_id: normalized_event.id,
           database_id: event.id,
