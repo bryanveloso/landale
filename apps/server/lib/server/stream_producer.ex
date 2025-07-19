@@ -301,7 +301,7 @@ defmodule Server.StreamProducer do
            data: %{
              emotes: event.emotes,
              native_emotes: event.native_emotes,
-             username: event.username
+             username: event.user_name
            },
            timestamp: event.timestamp
          }}
