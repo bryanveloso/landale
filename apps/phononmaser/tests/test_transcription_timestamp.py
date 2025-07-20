@@ -8,9 +8,9 @@ This test suite validates the INTENDED behavior:
 
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -73,7 +73,7 @@ class TestTranscriptionTimestampHandling:
         timestamp_dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
 
         # Should be current time (within 10 seconds)
-        current_dt = datetime.now(timezone.utc)
+        current_dt = datetime.now(UTC)
         time_diff = abs((timestamp_dt - current_dt).total_seconds())
         assert time_diff < 10, f"Timestamp {timestamp_str} is not current time"
 
@@ -89,7 +89,7 @@ class TestTranscriptionTimestampHandling:
 
         # Convert to datetime to check year
         timestamp_seconds = event.timestamp / 1_000_000
-        dt = datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc)
+        dt = datetime.fromtimestamp(timestamp_seconds, tz=UTC)
 
         # Should be current year, not 1970
         assert dt.year >= 2025, f"Timestamp year {dt.year} suggests Unix epoch bug"
@@ -128,7 +128,7 @@ class TestTranscriptionTimestampHandling:
         timestamp_dt = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
 
         # Check that we're close to the expected time
-        expected_dt = datetime.fromtimestamp(base_time, tz=timezone.utc)
+        expected_dt = datetime.fromtimestamp(base_time, tz=UTC)
         time_diff = abs((timestamp_dt - expected_dt).total_seconds())
         assert time_diff < 1, "Microsecond precision lost in conversion"
 
@@ -141,7 +141,7 @@ class TestTranscriptionTimestampHandling:
 
         # Convert to datetime
         timestamp_seconds = event.timestamp / 1_000_000
-        dt = datetime.fromtimestamp(timestamp_seconds, tz=timezone.utc)
+        dt = datetime.fromtimestamp(timestamp_seconds, tz=UTC)
 
         # This should fail because it's the 1970 epoch bug
         # (This test should PASS when bug exists, FAIL when bug is fixed)
