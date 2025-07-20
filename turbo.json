@@ -26,7 +26,28 @@
     },
     "lint": {
       "outputs": [],
-      "cache": true
+      "cache": true,
+      "inputs": [
+        "src/**/*.{ts,tsx,js,jsx,py}",
+        "**/*.{ts,tsx,js,jsx,py}",
+        "package.json",
+        "pyproject.toml",
+        "tsconfig*.json",
+        ".eslintrc*",
+        "ruff.toml"
+      ]
+    },
+    "format": {
+      "outputs": [],
+      "cache": true,
+      "inputs": [
+        "src/**/*.{ts,tsx,js,jsx,py}",
+        "**/*.{ts,tsx,js,jsx,py}",
+        "package.json",
+        "pyproject.toml",
+        "prettier.config.*",
+        "ruff.toml"
+      ]
     },
     "typecheck": {
       "dependsOn": ["generate"],
@@ -44,11 +65,16 @@
       "outputs": [],
       "cache": true,
       "inputs": [
-        "src/**/*.{ts,tsx,js,jsx}",
+        "src/**/*.{ts,tsx,js,jsx,py}",
         "test/**/*.{ts,tsx,js,jsx}",
+        "tests/**/*.py",
         "**/*.test.{ts,tsx,js,jsx}",
+        "**/*_test.py",
+        "**/test_*.py",
         "package.json",
-        "tsconfig*.json"
+        "pyproject.toml",
+        "tsconfig*.json",
+        "pytest.ini"
       ]
     },
     "test:watch": {

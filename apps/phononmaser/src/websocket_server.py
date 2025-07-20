@@ -9,9 +9,9 @@ import struct
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-from .audio_processor import AudioChunk, AudioFormat, AudioProcessor
-from .events import TranscriptionEvent
-from .logger import get_logger
+from audio_processor import AudioChunk, AudioFormat, AudioProcessor
+from events import TranscriptionEvent
+from logger import get_logger
 
 logger = get_logger(__name__)
 

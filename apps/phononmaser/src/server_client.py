@@ -5,8 +5,9 @@ from zoneinfo import ZoneInfo
 
 import aiohttp
 
-from .events import TranscriptionEvent
-from .logger import get_logger
+from events import TranscriptionEvent
+from logger import get_logger
+from timestamp_utils import convert_timestamp_to_iso
 
 logger = get_logger(__name__)
 
@@ -50,13 +51,8 @@ class ServerTranscriptionClient:
             return False
 
         try:
-            # Convert microseconds to ISO 8601 datetime in Los Angeles timezone
-            timestamp_seconds = event.timestamp / 1_000_000
-            la_tz = ZoneInfo("America/Los_Angeles")
-            timestamp_dt = datetime.fromtimestamp(timestamp_seconds, tz=la_tz)
-
             payload = {
-                "timestamp": timestamp_dt.isoformat(),
+                "timestamp": convert_timestamp_to_iso(event.timestamp),
                 "duration": event.duration,
                 "text": event.text,
                 "source_id": "phononmaser",
