@@ -37,6 +37,7 @@ class SlidingWindowBuffer:
         silence_threshold: float = 0.01,
         vad_processor=None,  # Optional VAD processor for adaptive chunking
         speech_boundary_adjustment: bool = False,  # Enable VAD-based boundary adjustment
+        adaptive_input: bool = False,  # Enable adaptive chunk input mode
     ):
         self.window_size_ms = window_size_ms
         self.overlap_ms = overlap_ms
@@ -45,6 +46,7 @@ class SlidingWindowBuffer:
         self.silence_threshold = silence_threshold
         self.vad_processor = vad_processor
         self.speech_boundary_adjustment = speech_boundary_adjustment
+        self.adaptive_input = adaptive_input
 
         # Calculate step size (how far to advance between windows)
         self.step_size_ms = window_size_ms - overlap_ms
