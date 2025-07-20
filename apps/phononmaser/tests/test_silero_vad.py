@@ -30,7 +30,6 @@ class TestSileroVAD:
         vad = SileroVAD(
             model_path=whisper_test_config["vad_model_path"],
             sample_rate=16000,
-            threshold=0.1,  # Lower threshold for real voice characteristics
         )
 
         real_audio_context.register_processor(vad)
@@ -103,7 +102,6 @@ class TestSileroVAD:
         vad = SileroVAD(
             model_path=whisper_test_config["vad_model_path"],
             sample_rate=16000,
-            threshold=0.15,  # Even lower threshold for gap detection
         )
 
         # Load real voice sample and create speech -> silence -> speech pattern
@@ -185,7 +183,6 @@ class TestSileroVAD:
         vad = SileroVAD(
             model_path=whisper_test_config["vad_model_path"],
             sample_rate=16000,
-            threshold=0.1,  # Lower threshold for real voice characteristics
         )
 
         # Load real voice sample
@@ -335,7 +332,6 @@ class TestSileroVAD:
         vad = SileroVAD(
             model_path=whisper_test_config["vad_model_path"],
             sample_rate=16000,
-            threshold=0.1,  # Lower threshold for real voice characteristics
         )
 
         # Load real voice sample for performance testing
@@ -398,7 +394,6 @@ class TestSileroVAD:
         vad = SileroVAD(
             model_path=whisper_test_config["vad_model_path"],
             sample_rate=16000,
-            threshold=0.1,  # Lower threshold for real voice characteristics
         )
 
         # Create adaptive sliding window with VAD integration

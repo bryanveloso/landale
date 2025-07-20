@@ -36,15 +36,20 @@ class SileroVAD:
         self,
         model_path: str,
         sample_rate: int = 16000,
-        threshold: float = 0.5,
-        window_size_ms: int = 32,  # Silero VAD uses 32ms windows
-        noise_suppression: bool = False,
+        threshold: float = None,
+        window_size_ms: int = 32,
+        noise_suppression: bool = None,
     ):
+        from microphone_profiles import get_current_microphone
+
+        mic = get_current_microphone()
+        vad_config = mic.get_vad_config()
+
         self.model_path = model_path
         self.sample_rate = sample_rate
-        self.threshold = threshold
+        self.threshold = threshold if threshold is not None else vad_config["threshold"]
         self.window_size_ms = window_size_ms
-        self.noise_suppression = noise_suppression
+        self.noise_suppression = noise_suppression if noise_suppression is not None else vad_config["noise_suppression"]
 
         # Calculate window size in samples
         self.window_samples = int(window_size_ms * sample_rate / 1000)
