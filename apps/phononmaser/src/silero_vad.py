@@ -8,8 +8,11 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
+import torch
+import torchaudio
 
 from audio_processor import AudioChunk
 
@@ -49,9 +52,10 @@ class SileroVAD:
         # Processing locks
         self._vad_lock = asyncio.Lock()
 
-        # For testing - mock mode detection
-        self._test_mode = False
-        self._test_speech_segments: list[SpeechSegment] = []
+        # Silero VAD model components
+        self._model = None
+        self._model_ready = False
+        self._use_fallback = False
 
         # Performance tracking
         self._processing_times: list[float] = []
@@ -59,18 +63,53 @@ class SileroVAD:
         # Debug mode for testing with real voice
         self._debug_enabled = False
 
+        # Initialize model
+        asyncio.create_task(self._initialize_model())
+
+    async def _initialize_model(self) -> None:
+        """Initialize the Silero VAD model."""
+        try:
+            # Try to load actual Silero VAD model
+            if Path(self.model_path).exists():
+                logger.info(f"Loading Silero VAD model from {self.model_path}")
+                self._model = torch.jit.load(self.model_path, map_location="cpu")
+                self._model.eval()
+                self._model_ready = True
+                logger.info("Silero VAD model loaded successfully")
+            else:
+                # Try to download from torch hub
+                logger.info("Downloading Silero VAD model from torch hub")
+                self._model, utils = torch.hub.load(
+                    repo_or_dir="snakers4/silero-vad", model="silero_vad", force_reload=False, onnx=False
+                )
+                self._model_ready = True
+                logger.info("Silero VAD model downloaded and loaded successfully")
+        except Exception as e:
+            logger.warning(f"Failed to load Silero VAD model: {e}")
+            logger.info("Falling back to energy-based VAD for ElectroVoice RE20")
+            self._use_fallback = True
+            self._model_ready = True
+
     async def detect_speech(self, chunk: AudioChunk) -> float:
         """Detect speech in an audio chunk and return probability (0.0-1.0)."""
         async with self._vad_lock:
             start_time = time.perf_counter()
 
             try:
+                # Wait for model to be ready
+                if not self._model_ready:
+                    await asyncio.sleep(0.001)  # Brief wait
+                    if not self._model_ready:
+                        return 0.0
+
                 # Convert chunk data to float32 numpy array
                 audio_data = np.frombuffer(chunk.data, dtype=np.int16).astype(np.float32) / 32767.0
 
-                # For testing with real voice sample, use energy-based VAD
-                # In production, this would call actual Silero VAD model
-                speech_probability = await self._calculate_speech_probability(audio_data)
+                # Use actual Silero VAD model if available, otherwise fallback
+                if self._use_fallback or self._model is None:
+                    speech_probability = await self._calculate_speech_probability_fallback(audio_data)
+                else:
+                    speech_probability = await self._calculate_speech_probability_silero(audio_data)
 
                 # Apply noise suppression if enabled
                 if self.noise_suppression:
@@ -119,8 +158,32 @@ class SileroVAD:
 
         return min(1.0, confidence)
 
-    async def _calculate_speech_probability(self, audio_data: np.ndarray) -> float:
-        """Calculate speech probability using energy and spectral features optimized for real voice."""
+    async def _calculate_speech_probability_silero(self, audio_data: np.ndarray) -> float:
+        """Calculate speech probability using actual Silero VAD model."""
+        try:
+            # Ensure audio is the right length for Silero VAD (16kHz, single channel)
+            if len(audio_data) < 512:  # Minimum length for Silero
+                # Pad with zeros if too short
+                padded_audio = np.zeros(512, dtype=np.float32)
+                padded_audio[: len(audio_data)] = audio_data
+                audio_data = padded_audio
+
+            # Convert to tensor
+            audio_tensor = torch.from_numpy(audio_data).unsqueeze(0)  # Add batch dimension
+
+            # Run through Silero VAD model
+            with torch.no_grad():
+                speech_probability = self._model(audio_tensor, self.sample_rate).item()
+
+            return float(speech_probability)
+
+        except Exception as e:
+            logger.warning(f"Silero VAD model failed, falling back to energy-based: {e}")
+            # Fall back to energy-based VAD
+            return await self._calculate_speech_probability_fallback(audio_data)
+
+    async def _calculate_speech_probability_fallback(self, audio_data: np.ndarray) -> float:
+        """Calculate speech probability using energy and spectral features as fallback when Silero VAD fails."""
 
         # Energy-based detection (primary indicator) - more sensitive for real speech
         energy = np.mean(audio_data**2)
