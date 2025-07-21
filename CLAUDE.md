@@ -1,164 +1,124 @@
 # CLAUDE.md - Landale Project Assistant
 
-## Core Principles
+## Project Overview
 
-1. **Verify Before Suggesting**: Always use available tools (file reading, searching, etc.) to understand the current state before proposing changes.
-2. **Be Direct**: Skip pleasantries. Get straight to solutions.
-3. **Code First**: Show working code rather than explaining what to do.
-4. **Respect Existing Patterns**: Match the project's style and conventions exactly.
+**What**: Personal streaming overlay system for OBS - single-user setup on local network
+**Architecture**: Event-driven monorepo with real-time WebSocket communication
+**Network**: Runs on Tailscale VPN (not public internet) - brilliant security simplification
+**Scale**: Personal project - avoid enterprise over-engineering
 
-## Critical Rules
+## Tech Stack
 
-### Commit Messages
+- **Runtime**: Bun (NOT Node.js) - use Bun APIs for everything
+- **Frontend**: SolidJS with GSAP animations
+- **Backend**: Elixir Phoenix with WebSocket channels
+- **Database**: PostgreSQL with TimescaleDB
+- **Python Services**: Phononmaser (audio), Seed (AI)
+- **Build**: Turborepo for monorepo management
 
-- **ALWAYS** end the first line with a period.
-- Format: `<type>: <description>.`
-- Examples:
-  - ✅ `fix: Resolve WebSocket reconnection issue.`
-  - ❌ `fix: Resolve WebSocket reconnection issue`
+## Core Architecture
 
-### Problem Solving
-
-1. **Read First**: Check existing code/files before suggesting solutions
-2. **Test Assumptions**: Verify package versions, APIs, and configurations
-3. **No Guessing**: If unsure, say so and ask for clarification
-4. **Incremental Changes**: Small, testable modifications over large rewrites
-
-### Code Standards
-
-- Runtime: Bun (not Node.js)
-- Frontend: React 19 RC with TypeScript strict mode
-- Testing: `bun test` (not Jest/Vitest)
-- Building: `bun build` (not webpack/esbuild)
-- Package management: `bun install` (not npm/yarn/pnpm)
-- Paths: Use configured aliases (@/_, +/_, ~/\*)
-
-### Quick Reference
-
-| Task             | Use                  | Don't Use                             |
-| ---------------- | -------------------- | ------------------------------------- |
-| Run TypeScript   | `bun file.ts`        | `node file.js`, `ts-node file.ts`     |
-| Install packages | `bun install`        | `npm install`, `yarn`, `pnpm install` |
-| Run tests        | `bun test`           | `jest`, `vitest`, `mocha`             |
-| Build/Bundle     | `bun build`          | `webpack`, `esbuild`, `vite build`    |
-| HTTP server      | `Bun.serve()`        | `express`, `koa`, `fastify`           |
-| WebSockets       | Built-in `WebSocket` | `ws`, `socket.io`                     |
-| File operations  | `Bun.file()`         | `fs.readFile`, `fs.writeFile`         |
-| Shell commands   | `Bun.$\`cmd\``       | `execa`, `child_process`              |
-| SQLite           | `bun:sqlite`         | `better-sqlite3`, `sqlite3`           |
-| PostgreSQL       | `Bun.sql`            | `pg`, `postgres.js`                   |
-| Redis            | `Bun.redis`          | `ioredis`, `redis`                    |
-| Env vars         | Automatic            | `dotenv`, `process.env`               |
-
-## Project Context
-
-**What**: Personal streaming overlay system for OBS
-**Where**: Local Mac Mini server (not cloud)
-**Stack**: Bun, React 19, tRPC, PostgreSQL, Tailwind v4
-**Ports**: WebSocket (7175), TCP (8080), Phononmaser (8889)
-
-## Commands Reference
-
-```bash
-# Development
-bun dev                                    # Start all workspaces
-bun run dev:phononmaser                    # Start audio service
-bun --hot ./index.ts                       # Hot reload server
-
-# Database
-bun --cwd packages/database db:push        # Push schema changes
-bun --cwd packages/database studio         # Prisma Studio
-
-# Testing
-bun test                                   # Run all tests
-bun test:watch                             # Watch mode
-bun test:coverage                          # Coverage report
-
-# Building
-bun build ./src/index.ts --outdir ./dist   # Build TypeScript
-bun build ./src/index.html                 # Build with HTML entry
-
-# Nurvus (Process Manager)
-cd apps/nurvus && mix increment_version    # Increment CalVer before builds
-cd apps/nurvus && mix release --overwrite # Build Burrito binary
-
-# Docker
-docker compose up                          # Run services
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   Overlays  │────▶│ Phoenix      │────▶│ PostgreSQL  │
+│ (SolidJS)   │     │ Server       │     │ TimescaleDB │
+└─────────────┘     └──────────────┘     └─────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│ Phononmaser │     │     Seed     │     │   Nurvus    │
+│   (Audio)   │     │     (AI)     │     │  (Manager)  │
+└─────────────┘     └──────────────┘     └─────────────┘
 ```
 
-## Bun-First Development
+### WebSocket Channels
+- `dashboard:*` - Control interface updates
+- `events:*` - General event stream
+- `overlay:*` - Overlay animations/state
+- `stream:*` - Stream status/control
+- `transcription:*` - Live transcription
 
-**Always use Bun's built-in features:**
-
-- `Bun.serve()` for servers (not Express)
-- `Bun.test()` for testing (not Jest/Vitest)
-- `Bun.file()` for file operations (not fs)
-- `Bun.# CLAUDE.md - Landale Project Assistant
-
-## Core Principles
-
-1. **Verify Before Suggesting**: Always use available tools (file reading, searching, etc.) to understand the current state before proposing changes.
-2. **Be Direct**: Skip pleasantries. Get straight to solutions.
-3. **Code First**: Show working code rather than explaining what to do.
-4. **Respect Existing Patterns**: Match the project's style and conventions exactly.
+### Key Ports
+- WebSocket Server: 7175
+- TCP Server: 8080
+- Phononmaser: 8889
+- Health Checks: 8890
 
 ## Critical Rules
 
-### Commit Messages
+1. **Commit Messages**: ALWAYS end with a period. Format: `<description>.`
+2. **Bun First**: Use Bun APIs, never Node.js equivalents
+3. **Personal Scale**: Single-user system - avoid enterprise patterns
+4. **Real-time Focus**: Optimize for low latency over throughput
+5. **Code First**: Show working code rather than explaining
 
-- **ALWAYS** end the first line with a period.
-- Format: `<type>: <description>.`
-- Examples:
-  - ✅ `fix: Resolve WebSocket reconnection issue.`
-  - ❌ `fix: Resolve WebSocket reconnection issue`
+## Code Standards
 
-### Problem Solving
-
-1. **Read First**: Check existing code/files before suggesting solutions
-2. **Test Assumptions**: Verify package versions, APIs, and configurations
-3. **No Guessing**: If unsure, say so and ask for clarification
-4. **Incremental Changes**: Small, testable modifications over large rewrites
-
-### Code Standards
-
-- Runtime: Bun (not Node.js)
-- Frontend: React 19 RC with TypeScript strict mode
+- Frontend: SolidJS for overlays and dashboard
+- Animation: GSAP with layer orchestration pattern
 - Testing: Bun test (not Jest/Vitest)
 - Paths: Use configured aliases (@/_, +/_, ~/\*)
-- Imports: Always use Bun APIs over Node.js equivalents
+- Python: Use `uv` for ALL Python commands
 
-## Project Context
+## Architecture Patterns
 
-**What**: Personal streaming overlay system for OBS
-**Where**: Local Mac Mini server (not cloud)
-**Stack**: Bun, React 19, tRPC, PostgreSQL, Tailwind v4
-**Ports**: WebSocket (7175), TCP (8080), Phononmaser (8889)
+### Layer Orchestration
+- Three priority levels: foreground, midground, background
+- State machine: hidden → entering → active → interrupted → exiting
+- Higher priority layers interrupt lower ones
+- Use GSAP timelines for complex sequences
+
+### Event System
+- Correlation IDs track events across services
+- Phoenix PubSub for real-time broadcasting
+- Circuit breakers protect external API calls (needs GenServer refactor)
+- Batch event publishing when possible
+
+### Service Configuration
+- Environment variables for service URLs (avoid file path traversal)
+- Health checks on separate ports
+- Tailscale handles all networking security
 
 ## Commands Reference
 
 ```bash
 # Development
 bun dev                    # Start all workspaces
-bun run dev:phononmaser   # Start audio service
-
-# Database
-bun --cwd packages/database db:push     # Push schema changes
-bun --cwd packages/database studio      # Prisma Studio
+bun run dev:phononmaser    # Start audio service
 
 # Testing
-bun test                 # Run all tests
-bun test:watch          # Watch mode
-bun test:coverage       # Coverage report
+bun test                   # Run all tests
+bun test:watch             # Watch mode
+bun test:coverage          # Coverage report
 
 # Docker
-docker compose up        # Run services
+docker compose up          # Run services
 ```
 
-for shell commands (not execa)
+## Bun Development
 
+**Always use Bun's built-in features:**
+
+- `Bun.serve()` for servers (not Express)
+- `Bun.test()` for testing (not Jest/Vitest)
+- `Bun.file()` for file operations (not fs)
+- `Bun.$` for shell commands (not execa)
 - `bun:sqlite` for SQLite (not better-sqlite3)
 - WebSocket is built-in (not ws package)
 - `.env` loads automatically (not dotenv)
+
+## Python Development
+
+- Use `uv` to run ALL Python-related commands
+- Services should read config from environment variables
+- Avoid hardcoded file paths for configuration
+
+## Known Issues & Improvements
+
+1. **Circuit Breaker**: Currently stateless - needs GenServer implementation
+2. **Service Config**: Python services use brittle file traversal - migrate to env vars
+3. **Animation Hook**: Consider simplifying with GSAP master timeline
 
 ## When Helping
 
@@ -178,6 +138,7 @@ for shell commands (not execa)
 - Add test runners - use `bun test`
 - Forget the period in commit messages
 - Make assumptions without checking actual files first
+- Over-engineer for scale - this is a personal project
 
 ## Nurvus Version Management (CRITICAL)
 
@@ -210,7 +171,3 @@ The Mix task automatically:
 CI automatically runs `mix increment_version` before builds, so every commit gets a unique version.
 
 **Remember**: When debugging Burrito issues, ALWAYS check if you incremented the version first!
-
-# Supplimentary Documentation
-
-@docs
