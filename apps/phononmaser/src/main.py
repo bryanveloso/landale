@@ -99,7 +99,7 @@ class Phononmaser:
         """Handle transcription events from audio processor."""
         logger.info(f"Transcription received: {event.text[:50] if event.text else 'empty'}...")
 
-        # Send to Phoenix server for storage and WebSocket broadcasting
+        # Send to Phoenix server for storage and transcription:live channel broadcasting
         if self.transcription_client:
             try:
                 success = await self.transcription_client.send_transcription(event)
@@ -110,7 +110,7 @@ class Phononmaser:
             except Exception as e:
                 logger.error(f"Error sending transcription to server: {e}")
 
-        # Also emit to local WebSocket clients (for backward compatibility)
+        # Emit to local event stream clients for real-time dashboard updates
         if self.websocket_server:
             self.websocket_server.emit_transcription(event)
 
