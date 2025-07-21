@@ -10,6 +10,7 @@ dependencies = [
     "python-dotenv>=1.1.1",
     "websockets>=15.0.1",
     "structlog>=24.1.0",
+    "shared @ file://../../packages/shared-python",
 ]
 
 [dependency-groups]

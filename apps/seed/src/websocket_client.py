@@ -1,16 +1,15 @@
 """WebSocket clients for connecting to phononmaser and server."""
 
-import asyncio
 import json
 from collections.abc import Callable
 from datetime import datetime
 
 import websockets
+from shared.websockets import BaseWebSocketClient
 from websockets.client import WebSocketClientProtocol
 
 from .events import ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from .logger import get_logger
-from .websocket_base import BaseWebSocketClient
 
 logger = get_logger(__name__)
 
@@ -165,20 +164,20 @@ class ServerClient(BaseWebSocketClient):
                         # Parse timestamp
                         timestamp_raw = event_data.get("timestamp", 0)
                         timestamp_ms = 0
-                        
+
                         if isinstance(timestamp_raw, str):
                             try:
                                 # Handle ISO format (e.g., "2023-10-27T10:00:00Z")
-                                dt_obj = datetime.fromisoformat(timestamp_raw.replace('Z', '+00:00'))
+                                dt_obj = datetime.fromisoformat(timestamp_raw.replace("Z", "+00:00"))
                                 timestamp_ms = int(dt_obj.timestamp() * 1000)
                             except ValueError:
                                 logger.warning(f"Could not parse timestamp string: {timestamp_raw}")
                                 timestamp_ms = 0
-                        elif isinstance(timestamp_raw, (int, float)):
+                        elif isinstance(timestamp_raw, int | float):
                             timestamp_ms = int(timestamp_raw)
                         else:
                             logger.warning(f"Unexpected timestamp format: {type(timestamp_raw)}")
-                        
+
                         chat_event = ChatMessage(
                             timestamp=timestamp_ms,
                             username=event_data.get("user_name", ""),

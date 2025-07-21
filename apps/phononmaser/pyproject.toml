@@ -11,6 +11,7 @@ dependencies = [
     "structlog>=24.1.0",
     "torch>=2.0.0",
     "torchaudio>=2.0.0",
+    "shared @ file://../../packages/shared-python",
 ]
 
 [dependency-groups]

@@ -405,10 +405,7 @@ class AudioProcessor:
 
                 for line in lines:
                     if line.strip():
-                        if line.startswith("[") and "] " in line:
-                            text = line.split("] ", 1)[1].strip()
-                        else:
-                            text = line.strip()
+                        text = line.split("] ", 1)[1].strip() if line.startswith("[") and "] " in line else line.strip()
 
                         if text and text not in ["[BLANK_AUDIO]", "Thank you."]:
                             text_parts.append(text)

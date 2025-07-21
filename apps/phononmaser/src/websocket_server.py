@@ -3,7 +3,6 @@
 import asyncio
 import contextlib
 import json
-import os
 import struct
 import weakref
 
@@ -13,6 +12,7 @@ from websockets.server import WebSocketServerProtocol
 from audio_processor import AudioChunk, AudioFormat, AudioProcessor
 from events import TranscriptionEvent
 from logger import get_logger
+from service_config import _config as phononmaser_config
 
 logger = get_logger(__name__)
 
@@ -49,7 +49,7 @@ class PhononmaserServer:
         self.broadcast_task = asyncio.create_task(self._broadcast_loop())
 
         # Start WebSocket server
-        host = os.getenv("PHONONMASER_HOST", "0.0.0.0")  # Listen on all interfaces by default
+        host = phononmaser_config.bind_host  # Use the bind_host from shared configuration
         self.server = await websockets.serve(
             self.handle_connection,
             host,
@@ -351,3 +351,4 @@ class PhononmaserServer:
                 break
             except Exception as e:
                 logger.error(f"Error in broadcast loop: {e}")
+                await asyncio.sleep(0.1)  # Add a small delay to prevent busy-waiting
