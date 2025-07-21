@@ -7,7 +7,8 @@ import wave
 
 import numpy as np
 import pytest
-from fixtures.generate_test_audio import AudioTestDataGenerator
+
+from tests.fixtures.generate_test_audio import AudioTestDataGenerator
 
 
 class TestAudioTestDataGenerator:
