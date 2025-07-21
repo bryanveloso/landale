@@ -47,4 +47,4 @@ jobs:
 
       - name: Run tests
         working-directory: apps/${{ matrix.app }}
-        run: uv run pytest --tb=short || [ $? -eq 5 ]
+        run: uv run pytest --tb=short
