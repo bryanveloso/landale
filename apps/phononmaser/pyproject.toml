@@ -9,6 +9,8 @@ dependencies = [
     "aiohttp>=3.9",
     "python-dotenv>=1.0",
     "structlog>=24.1.0",
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
 ]
 
 [dependency-groups]
@@ -17,6 +19,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "pytest-cov>=6.0",
     "ruff>=0.6",
+    "psutil>=5.9",
 ]
 
 [tool.ruff]

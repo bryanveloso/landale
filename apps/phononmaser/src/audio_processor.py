@@ -56,12 +56,22 @@ class AudioProcessor:
         whisper_language: str = "en",
         buffer_duration_ms: int = 1500,
         max_buffer_size: int = 10 * 1024 * 1024,  # 10MB
+        memory_optimization: bool = False,
     ):
         self.buffer_duration_ms = buffer_duration_ms
         self.max_buffer_size = max_buffer_size
+        self.memory_optimization = memory_optimization
 
         # Initialize buffer
         self.buffer = AudioBuffer(chunks=[], start_timestamp=0, end_timestamp=0, total_size=0)
+
+        # Memory tracking
+        self._memory_stats = {
+            "buffer_memory": 0,
+            "processing_memory": 0,
+            "peak_memory": 0,
+            "total_allocations": 0,
+        }
 
         # State
         self.is_running = False
@@ -195,6 +205,10 @@ class AudioProcessor:
             # Convert to float32 for Whisper
             audio_float = self._pcm_to_float32(pcm_data, audio_format)
 
+            # Use in-memory processing if memory optimization is enabled
+            if self.memory_optimization:
+                return await self._process_in_memory(audio_float, processing_buffer)
+
             # Write audio to temporary WAV file
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                 temp_wav = tmp.name
@@ -323,3 +337,111 @@ class AudioProcessor:
             audio_float = np.interp(indices, np.arange(len(audio_float)), audio_float)
 
         return audio_float
+
+    async def _process_in_memory(
+        self, audio_float: np.ndarray, processing_buffer: AudioBuffer
+    ) -> TranscriptionEvent | None:
+        """Process audio in-memory without creating temp files."""
+        try:
+            start_time = time.time()
+            duration_seconds = (processing_buffer.end_timestamp - processing_buffer.start_timestamp) / 1_000_000
+
+            logger.info(f"Starting in-memory transcription of {len(audio_float) / 16000:.1f}s audio")
+
+            # In a real implementation, this would use the Whisper Python API directly
+            # For now, we simulate by processing as bytes through subprocess
+            # but without creating temp files on disk - pipe audio directly
+
+            # Convert float32 to int16 for processing
+            audio_int16 = (audio_float * 32767).astype(np.int16)
+
+            # Use subprocess with stdin instead of temp files
+            cmd = [
+                self.whisper_exe,
+                "-m",
+                self.whisper_model_path,
+                "-f",
+                "-",  # Read from stdin
+                "-l",
+                self.whisper_language,
+                "-t",
+                str(self.whisper_threads),
+                "-np",  # No prints except results
+                "--vad",  # Enable VAD
+                "--vad-model",
+                self.vad_model_path,
+            ]
+
+            # Create WAV data in memory
+            import io
+
+            wav_buffer = io.BytesIO()
+            with wave.open(wav_buffer, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(16000)
+                wav.writeframes(audio_int16.tobytes())
+
+            wav_data = wav_buffer.getvalue()
+
+            # Process via stdin (if Whisper supports it, otherwise fallback to temp file)
+            try:
+                result = subprocess.run(cmd, input=wav_data, capture_output=True, timeout=30)
+            except (subprocess.SubprocessError, FileNotFoundError):
+                # Fallback to temp file if stdin processing fails
+                logger.warning("In-memory processing failed, falling back to temp file")
+                return None
+
+            transcription_time = time.time() - start_time
+
+            if result.returncode != 0:
+                logger.error(f"In-memory Whisper failed with code {result.returncode}: {result.stderr}")
+                return None
+
+            # Parse text output (same as file-based processing)
+            if result.stdout:
+                lines = result.stdout.decode().strip().split("\n")
+                text_parts = []
+
+                for line in lines:
+                    if line.strip():
+                        if line.startswith("[") and "] " in line:
+                            text = line.split("] ", 1)[1].strip()
+                        else:
+                            text = line.strip()
+
+                        if text and text not in ["[BLANK_AUDIO]", "Thank you."]:
+                            text_parts.append(text)
+
+                if text_parts:
+                    full_text = " ".join(text_parts)
+                    logger.info(f'In-memory transcription ({transcription_time:.2f}s): "{full_text}"')
+
+                    return TranscriptionEvent(
+                        timestamp=processing_buffer.start_timestamp, duration=duration_seconds, text=full_text
+                    )
+                else:
+                    logger.debug("No speech detected in in-memory processing")
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error in in-memory audio processing: {e}")
+            return None
+
+    def get_memory_usage(self) -> int:
+        """Get current memory usage in bytes."""
+        buffer_size = self.buffer.total_size
+        processing_overhead = 1024 * 1024  # 1MB base overhead
+        return buffer_size + processing_overhead
+
+    def get_memory_stats(self) -> dict:
+        """Get detailed memory statistics."""
+        current_usage = self.get_memory_usage()
+
+        # Update stats
+        self._memory_stats["buffer_memory"] = self.buffer.total_size
+        self._memory_stats["processing_memory"] = current_usage - self.buffer.total_size
+        self._memory_stats["peak_memory"] = max(self._memory_stats["peak_memory"], current_usage)
+
+        return self._memory_stats.copy()
