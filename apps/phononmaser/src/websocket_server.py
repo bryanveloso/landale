@@ -5,6 +5,7 @@ import contextlib
 import json
 import os
 import struct
+import weakref
 
 import websockets
 from websockets.server import WebSocketServerProtocol
@@ -25,12 +26,25 @@ class PhononmaserServer:
         self.clients: set[WebSocketServerProtocol] = set()
         self.server: websockets.WebSocketServer | None = None
 
-        # Event queue for broadcasting
-        self.event_queue: asyncio.Queue[dict] = asyncio.Queue()
+        # Event queue for broadcasting with size limit to prevent memory exhaustion
+        # Size of 200 allows ~20 seconds of buffer at 10 events/sec
+        self.event_queue: asyncio.Queue[dict] = asyncio.Queue(maxsize=200)
         self.broadcast_task: asyncio.Task | None = None
+
+        # Metrics for monitoring queue health
+        self.dropped_events_count = 0
+
+        # Track background tasks to prevent silent failures
+        self.background_tasks: weakref.WeakSet = weakref.WeakSet()
+
+        # Store main event loop for thread-safe operations
+        self.main_loop: asyncio.AbstractEventLoop | None = None
 
     async def start(self) -> None:
         """Start the WebSocket server."""
+        # Store the main event loop for thread-safe operations
+        self.main_loop = asyncio.get_running_loop()
+
         # Start broadcast task
         self.broadcast_task = asyncio.create_task(self._broadcast_loop())
 
@@ -56,6 +70,14 @@ class PhononmaserServer:
             self.broadcast_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self.broadcast_task
+
+        # Clean up any remaining background tasks
+        if self.background_tasks:
+            tasks = list(self.background_tasks)
+            for task in tasks:
+                task.cancel()
+            # Wait for cancellation with timeout
+            await asyncio.wait(tasks, timeout=5.0)
 
         logger.info("Phononmaser WebSocket server stopped")
 
@@ -192,7 +214,7 @@ class PhononmaserServer:
             self.audio_processor.add_chunk(chunk)
 
             # Emit chunk event
-            await self.event_queue.put(
+            await self._emit_event(
                 {
                     "type": "audio:chunk",
                     "timestamp": timestamp,
@@ -224,7 +246,7 @@ class PhononmaserServer:
         self.audio_processor.add_chunk(chunk)
 
         # Emit chunk event
-        await self.event_queue.put(
+        await self._emit_event(
             {
                 "type": "audio:chunk",
                 "timestamp": data["timestamp"],
@@ -242,6 +264,8 @@ class PhononmaserServer:
             "receiving": self.audio_processor.is_running,
             "bufferSize": self.audio_processor.buffer.total_size,
             "transcribing": self.audio_processor.is_transcribing,
+            "droppedEvents": self.dropped_events_count,
+            "queueSize": self.event_queue.qsize(),
         }
         await websocket.send(json.dumps(status))
 
@@ -258,21 +282,51 @@ class PhononmaserServer:
         for client in disconnected:
             self.clients.discard(client)
 
+    async def _emit_event(self, event_dict: dict) -> bool:
+        """Emit event to queue with overflow protection.
+
+        Returns True if event was queued, False if dropped.
+        Uses drop-newest strategy for simplicity and thread safety.
+        """
+        try:
+            # Try non-blocking add
+            self.event_queue.put_nowait(event_dict)
+            return True
+        except asyncio.QueueFull:
+            # Queue is full - drop the new event
+            logger.warning(f"Event queue full, dropping new event: {event_dict.get('type', 'unknown')}")
+            self.dropped_events_count += 1
+            return False
+
     def emit_transcription(self, event: TranscriptionEvent) -> None:
         """Emit transcription event for broadcasting."""
-        try:
-            # Emit to general event stream (with duration)
-            self.event_queue.put_nowait(
-                {
-                    "type": "audio:transcription",
-                    "timestamp": event.timestamp,
-                    "duration": event.duration,
-                    "text": event.text,
-                }
-            )
+        event_dict = {
+            "type": "audio:transcription",
+            "timestamp": event.timestamp,
+            "duration": event.duration,
+            "text": event.text,
+        }
 
-        except asyncio.QueueFull:
-            logger.warning("Event queue full, dropping transcription event")
+        # Use async-safe emission (this is called from sync context)
+        try:
+            # Create and track the task
+            task = asyncio.create_task(self._emit_event(event_dict))
+            self.background_tasks.add(task)
+            # Task removes itself from the set when done
+            task.add_done_callback(self.background_tasks.discard)
+        except RuntimeError:
+            # Called from different thread - use thread-safe scheduling
+            if hasattr(self, "main_loop") and self.main_loop and self.main_loop.is_running():
+                # Schedule the event emission on the main event loop thread
+                def create_emit_task():
+                    task = asyncio.create_task(self._emit_event(event_dict))
+                    self.background_tasks.add(task)
+                    task.add_done_callback(self.background_tasks.discard)
+
+                self.main_loop.call_soon_threadsafe(create_emit_task)
+            else:
+                logger.error("No main event loop running to schedule transcription event")
+                self.dropped_events_count += 1
 
     async def _broadcast_loop(self) -> None:
         """Broadcast events to all connected clients."""
