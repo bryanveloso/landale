@@ -8,35 +8,31 @@
 - Reference: https://github.com/honeykingdom/honey-chat
 - Integration with existing overlay system
 - Channel point rewards integration
+- This lives in the dashboard, but needs to be verified that it works
+
+### Omnibar Reimplementation
+Original implementations for reference:
+- https://github.com/bryanveloso/synthform-2017/tree/master/app/channels/avalonstar
+- https://github.com/avalonstar/synthform/tree/master/src/clients/avalonstar/components
+- This already exists in the current overlay system, but needs to be reassessed and styled (Bryan to take lead on styling)
 
 ### Text-to-Speech for Messages
 - Platform: https://elevenlabs.io/
 - Channel point or tipped message triggers
 - Voice customization options
 
-### Omnibar Reimplementation
-Original implementations for reference:
-- https://github.com/bryanveloso/synthform-2017/tree/master/app/channels/avalonstar
-- https://github.com/avalonstar/synthform/tree/master/src/clients/avalonstar/components
-
 ## Medium Priority Features
 
 ### External Integrations
 - **LiveSplit integration**: Run timing and splits display
 - **VTubeStudio integration**: Avatar interaction with stream events
-- **Closed captioning**: Possibly via https://elevenlabs.io/
-
-### Configuration System
-- **Auto-generated dashboard controls** from display schemas
-- **Display presets/templates** system for quick switching
-- **Import/export** display configurations
-- **A/B testing** for display variations
 
 ## Low Priority Features
 
 ### Development Infrastructure
 - **Test coverage setup**: Comprehensive testing strategy
 - **Monitoring/metrics dashboard**: Performance and health monitoring
+  - This lives in the dashboard, but needs to be verified that it works
 - **Historical display state tracking**: Analytics for stream optimization
 
 ## Recent Accomplishments (June 2025)

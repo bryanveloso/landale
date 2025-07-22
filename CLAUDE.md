@@ -162,7 +162,7 @@ mix release --overwrite
 - **Dependencies**: Run `uv sync` from root to update all packages
 - **Run Services**: 
   - From root: `cd apps/[service] && uv run python -m src.main`
-  - Or use npm scripts: `bun run dev:phononmaser` or `bun run dev:seed`
+  - Or use bun scripts: `bun run dev:phononmaser` or `bun run dev:seed`
 - **Editable Installs**: Changes to `packages/shared-python` reflect immediately
 - Use `uv` for ALL Python commands (not pip/poetry)
 - Services read config from environment variables
@@ -192,7 +192,7 @@ mix release --overwrite
 
 ## Don't
 
-- Use `node`, `ts-node`, `npm`, `yarn`, or `pnpm` commands
+- Use `node`, `ts-node`, `npm`, `yarn`, or `pnpm` commands (use `bun` instead)
 - Import Node.js-specific packages when Bun equivalents exist
 - Create enterprise patterns (service contracts, connection pooling)
 - Use `:public` ETS tables (security risk)
