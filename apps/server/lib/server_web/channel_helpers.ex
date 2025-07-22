@@ -1,7 +1,7 @@
 defmodule ServerWeb.ChannelHelpers do
   @moduledoc """
   Helper functions for Phoenix channels.
-  
+
   Provides common functionality for channels including correlation ID setup,
   error handling, and event batching support.
   """

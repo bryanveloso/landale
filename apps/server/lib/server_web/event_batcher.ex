@@ -10,7 +10,8 @@ defmodule ServerWeb.EventBatcher do
   use GenServer
 
   @default_batch_size 50
-  @default_flush_interval 100  # milliseconds
+  # milliseconds
+  @default_flush_interval 100
 
   defstruct [:socket, :event_name, :events, :batch_size, :flush_interval, :flush_timer]
 
@@ -52,7 +53,7 @@ defmodule ServerWeb.EventBatcher do
     if length(events) >= state.batch_size do
       Process.cancel_timer(state.flush_timer)
       flush_events(state.socket, state.event_name, Enum.reverse(events))
-      
+
       new_timer = schedule_flush(state.flush_interval)
       {:noreply, %{state | events: [], flush_timer: new_timer}}
     else
@@ -64,7 +65,7 @@ defmodule ServerWeb.EventBatcher do
     if state.events != [] do
       flush_events(state.socket, state.event_name, Enum.reverse(state.events))
     end
-    
+
     Process.cancel_timer(state.flush_timer)
     new_timer = schedule_flush(state.flush_interval)
     {:noreply, %{state | events: [], flush_timer: new_timer}}
@@ -75,7 +76,7 @@ defmodule ServerWeb.EventBatcher do
     if state.events != [] do
       flush_events(state.socket, state.event_name, Enum.reverse(state.events))
     end
-    
+
     new_timer = schedule_flush(state.flush_interval)
     {:noreply, %{state | events: [], flush_timer: new_timer}}
   end

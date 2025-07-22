@@ -26,21 +26,21 @@ defmodule ServerWeb.ChannelBase do
     quote do
       use ServerWeb, :channel
       require Logger
-      
+
       import ServerWeb.ChannelHelpers
       alias Server.CorrelationId
       alias ServerWeb.{EventBatcher, ResponseBuilder}
-      
+
       # Wrapper functions that pass __MODULE__ to the helpers
-      
+
       def setup_correlation_id(socket) do
         ServerWeb.ChannelHelpers.setup_correlation_id(socket, __MODULE__)
       end
-      
+
       def log_unhandled_message(event, payload, socket) do
         ServerWeb.ChannelHelpers.log_unhandled_message(event, payload, socket, __MODULE__)
       end
-      
+
       def push_error(socket, event, error_type, message) do
         ServerWeb.ChannelHelpers.push_error(socket, event, error_type, message, __MODULE__)
       end
