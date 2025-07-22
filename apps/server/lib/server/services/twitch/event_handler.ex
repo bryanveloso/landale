@@ -51,18 +51,22 @@ defmodule Server.Services.Twitch.EventHandler do
       event_size: byte_size(:erlang.term_to_binary(event_data))
     )
 
-    # Process event directly - Twitch validates their own data
-    try do
-      normalized_event = normalize_event(event_type, event_data)
-
-      Logger.debug("Event normalized, storing in activity log", event_type: event_type)
-      store_event_in_activity_log(event_type, normalized_event)
-
-      Logger.debug("Event stored, publishing to PubSub", event_type: event_type)
-      publish_event(event_type, normalized_event)
-
-      Logger.debug("Event published, emitting telemetry", event_type: event_type)
-      emit_telemetry(event_type, normalized_event)
+    # Process event with separate handling for critical and non-critical operations
+    with normalized_event <- normalize_event(event_type, event_data),
+         :ok <- store_event_in_activity_log(event_type, normalized_event),
+         :ok <- publish_event(event_type, normalized_event) do
+      # Telemetry is important but non-critical - its failure shouldn't fail the whole event
+      try do
+        emit_telemetry(event_type, normalized_event)
+      rescue
+        error ->
+          Logger.warning("Telemetry emission failed (non-critical)",
+            error: inspect(error),
+            event_type: event_type,
+            event_id: event_data["id"] || event_data["message_id"],
+            stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          )
+      end
 
       Logger.debug("EventSub event processed successfully",
         event_type: event_type,
@@ -70,17 +74,26 @@ defmodule Server.Services.Twitch.EventHandler do
       )
 
       :ok
-    rescue
-      error ->
-        Logger.error("Event processing failed",
-          error: inspect(error),
+    else
+      {:error, reason} = error ->
+        Logger.error("Critical event processing failed",
+          reason: inspect(reason),
           event_type: event_type,
-          event_id: event_data["id"] || event_data["message_id"],
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          event_id: event_data["id"] || event_data["message_id"]
         )
 
-        {:error, "Processing failed: #{inspect(error)}"}
+        error
     end
+  rescue
+    error ->
+      Logger.error("Unexpected error in event processing",
+        error: inspect(error),
+        event_type: event_type,
+        event_id: event_data["id"] || event_data["message_id"],
+        stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+      )
+
+      {:error, "Processing failed: #{inspect(error)}"}
   end
 
   @doc """
@@ -457,7 +470,29 @@ defmodule Server.Services.Twitch.EventHandler do
       )
 
       # Store the event asynchronously to avoid blocking the event pipeline
-      Task.start(fn -> store_event_async(event_attrs, event_type, normalized_event) end)
+      # Use DynamicSupervisor to limit concurrent DB writes
+      case DynamicSupervisor.start_child(
+             Server.DBTaskSupervisor,
+             {Task,
+              fn ->
+                store_event_async(event_attrs, event_type, normalized_event)
+              end}
+           ) do
+        {:ok, _pid} ->
+          :ok
+
+        {:error, :max_children} ->
+          Logger.warning("Max concurrent DB writes reached, dropping event",
+            event_type: event_type,
+            event_id: normalized_event[:id]
+          )
+
+        {:error, reason} ->
+          Logger.error("Failed to start DB write task",
+            event_type: event_type,
+            reason: inspect(reason)
+          )
+      end
     else
       Logger.debug("Event not stored - not in valuable_events list", event_type: event_type)
     end
@@ -483,61 +518,83 @@ defmodule Server.Services.Twitch.EventHandler do
     event_type in valuable_events
   end
 
-  # Upsert user information when we encounter them in events
-  defp upsert_user_from_event(normalized_event) do
-    if normalized_event[:user_id] && normalized_event[:user_login] do
-      user_attrs = %{
-        twitch_id: normalized_event.user_id,
-        login: normalized_event.user_login,
-        display_name: normalized_event[:user_name]
-      }
-
-      case ActivityLog.upsert_user(user_attrs) do
-        {:ok, _user} ->
-          Logger.debug("User upserted in ActivityLog",
-            user_id: normalized_event.user_id,
-            login: normalized_event.user_login
-          )
-
-        {:error, changeset} ->
-          Logger.warning("Failed to upsert user in ActivityLog",
-            user_id: normalized_event.user_id,
-            login: normalized_event.user_login,
-            errors: inspect(changeset.errors)
-          )
-      end
-    end
-  end
-
-  # Async storage of event with user upsert
+  # Async storage of event with user upsert - atomic transaction
   defp store_event_async(event_attrs, event_type, normalized_event) do
     Logger.debug("Starting async database storage",
       event_type: event_type,
       correlation_id: event_attrs[:correlation_id]
     )
 
-    case ActivityLog.store_event(event_attrs) do
-      {:ok, event} ->
-        Logger.debug("Event stored in ActivityLog database",
+    # Wrap both operations in a transaction for atomicity
+    result =
+      Server.Repo.transaction(fn ->
+        # First, store the event
+        case ActivityLog.store_event(event_attrs) do
+          {:ok, event} ->
+            Logger.debug("Event stored in ActivityLog database",
+              event_type: event_type,
+              event_id: normalized_event.id,
+              database_id: event.id,
+              correlation_id: event_attrs[:correlation_id],
+              timestamp: event_attrs[:timestamp]
+            )
+
+            # Then, upsert user information if we have user data
+            if normalized_event[:user_id] && normalized_event[:user_login] do
+              user_attrs = %{
+                twitch_id: normalized_event.user_id,
+                login: normalized_event.user_login,
+                display_name: normalized_event[:user_name]
+              }
+
+              case ActivityLog.upsert_user(user_attrs) do
+                {:ok, user} ->
+                  Logger.debug("User upserted in ActivityLog",
+                    user_id: normalized_event.user_id,
+                    login: normalized_event.user_login
+                  )
+
+                  {event, user}
+
+                {:error, changeset} ->
+                  Logger.error("FAILED: User upsert in ActivityLog",
+                    user_id: normalized_event.user_id,
+                    login: normalized_event.user_login,
+                    errors: inspect(changeset.errors)
+                  )
+
+                  Server.Repo.rollback({:user_upsert_failed, changeset})
+              end
+            else
+              # No user data, just return the event
+              {event, nil}
+            end
+
+          {:error, changeset} ->
+            Logger.error("FAILED: Event storage in ActivityLog database",
+              event_type: event_type,
+              event_id: normalized_event.id,
+              correlation_id: event_attrs[:correlation_id],
+              errors: inspect(changeset.errors),
+              changeset_details: inspect(changeset, limit: :infinity)
+            )
+
+            Server.Repo.rollback({:event_storage_failed, changeset})
+        end
+      end)
+
+    case result do
+      {:ok, _} ->
+        Logger.debug("Transaction completed successfully",
           event_type: event_type,
-          event_id: normalized_event.id,
-          database_id: event.id,
-          correlation_id: event_attrs[:correlation_id],
-          timestamp: event_attrs[:timestamp]
+          correlation_id: event_attrs[:correlation_id]
         )
 
-        # Also upsert user information if we have user data
-        if normalized_event[:user_id] do
-          upsert_user_from_event(normalized_event)
-        end
-
-      {:error, changeset} ->
-        Logger.error("FAILED: Event storage in ActivityLog database",
+      {:error, reason} ->
+        Logger.error("Transaction failed",
           event_type: event_type,
-          event_id: normalized_event.id,
           correlation_id: event_attrs[:correlation_id],
-          errors: inspect(changeset.errors),
-          changeset_details: inspect(changeset, limit: :infinity)
+          reason: inspect(reason)
         )
     end
   end
