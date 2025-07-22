@@ -9,16 +9,16 @@ description = "Shared utilities for Landale Python services"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "websockets>=12.0",
-    "aiohttp>=3.9.0",
+    "websockets>=15.0,<16.0",
+    "aiohttp>=3.9.0,<4.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-asyncio>=0.21.0",
-    "black>=23.0",
-    "ruff>=0.1.0",
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=1.0,<2.0",
+    "black>=23.0,<25.0",
+    "ruff>=0.1.0,<1.0",
 ]
 
 [tool.setuptools.packages.find]
