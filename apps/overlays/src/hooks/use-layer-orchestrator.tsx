@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js'
+import { createSignal, onCleanup } from 'solid-js'
 import { gsap } from 'gsap'
 
 export type LayerPriority = 'foreground' | 'midground' | 'background'
@@ -28,6 +28,22 @@ const DEFAULT_ANIMATION_CONFIG: AnimationConfig = {
 export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
   const animConfig = { ...DEFAULT_ANIMATION_CONFIG, ...config }
   
+  // Create GSAP context for managing all animations
+  const ctx = gsap.context(() => {})
+  
+  // Clean up all animations when hook is disposed
+  onCleanup(() => {
+    // Clean up individual layer contexts first
+    Object.values(layerContexts).forEach(layerCtx => {
+      if (layerCtx) {
+        layerCtx.revert()
+      }
+    })
+    
+    // Clean up main context
+    ctx.revert()
+  })
+  
   // Track layer states
   const [layerStates, setLayerStates] = createSignal<Record<LayerPriority, LayerState>>({
     foreground: 'hidden',
@@ -37,6 +53,13 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
   
   // Track layer elements for animation
   const layerElements: Record<LayerPriority, HTMLElement | null> = {
+    foreground: null,
+    midground: null,
+    background: null
+  }
+  
+  // Track per-layer animation contexts for interruption handling
+  const layerContexts: Record<LayerPriority, gsap.Context | null> = {
     foreground: null,
     midground: null,
     background: null
@@ -53,11 +76,16 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
   const registerLayer = (priority: LayerPriority, element: HTMLElement) => {
     layerElements[priority] = element
     
+    // Create per-layer context for animation management
+    layerContexts[priority] = gsap.context(() => {}, element)
+    
     // Set initial state
-    gsap.set(element, {
-      opacity: 0,
-      y: 20,
-      scale: 0.95
+    ctx.add(() => {
+      gsap.set(element, {
+        opacity: 0,
+        y: 20,
+        scale: 0.95
+      })
     })
     
     // Sync DOM attribute with current internal state
@@ -89,6 +117,12 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
     // Update data attribute for CSS styling hooks
     element.setAttribute('data-state', newState)
     
+    // Kill any existing animations for this layer before starting new ones
+    const layerCtx = layerContexts[priority]
+    if (layerCtx) {
+      layerCtx.revert()
+    }
+    
     switch (newState) {
       case 'entering':
         animateEnter(element, priority)
@@ -107,16 +141,21 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
   
   // Animation functions using GSAP
   const animateEnter = (element: HTMLElement, priority: LayerPriority) => {
-    const timeline = gsap.timeline({
-      onComplete: () => updateLayerState(priority, 'active')
-    })
+    const layerCtx = layerContexts[priority]
+    if (!layerCtx) return
     
-    timeline.to(element, {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      duration: animConfig.enterDuration,
-      ease: "power2.out"
+    layerCtx.add(() => {
+      const timeline = gsap.timeline({
+        onComplete: () => updateLayerState(priority, 'active')
+      })
+      
+      timeline.to(element, {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        duration: animConfig.enterDuration,
+        ease: "power2.out"
+      })
     })
     
     // Handle layer stacking during enter
@@ -124,16 +163,21 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
   }
   
   const animateExit = (element: HTMLElement, priority: LayerPriority) => {
-    const timeline = gsap.timeline({
-      onComplete: () => updateLayerState(priority, 'hidden')
-    })
+    const layerCtx = layerContexts[priority]
+    if (!layerCtx) return
     
-    timeline.to(element, {
-      opacity: 0,
-      y: -20,
-      scale: 0.95,
-      duration: animConfig.exitDuration,
-      ease: "power2.in"
+    layerCtx.add(() => {
+      const timeline = gsap.timeline({
+        onComplete: () => updateLayerState(priority, 'hidden')
+      })
+      
+      timeline.to(element, {
+        opacity: 0,
+        y: -20,
+        scale: 0.95,
+        duration: animConfig.exitDuration,
+        ease: "power2.in"
+      })
     })
     
     // Restore lower priority layers after exit
@@ -141,22 +185,32 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
   }
   
   const animateInterrupt = (element: HTMLElement, priority: LayerPriority) => {
-    gsap.to(element, {
-      y: getPushDistance(priority),
-      scale: getInterruptedScale(priority),
-      opacity: getInterruptedOpacity(priority),
-      duration: animConfig.interruptDuration,
-      ease: "power2.out"
+    const layerCtx = layerContexts[priority]
+    if (!layerCtx) return
+    
+    layerCtx.add(() => {
+      gsap.to(element, {
+        y: getPushDistance(priority),
+        scale: getInterruptedScale(priority),
+        opacity: getInterruptedOpacity(priority),
+        duration: animConfig.interruptDuration,
+        ease: "power2.out"
+      })
     })
   }
   
-  const animateResume = (element: HTMLElement, _priority: LayerPriority) => {
-    gsap.to(element, {
-      y: 0,
-      scale: 1,
-      opacity: 1,
-      duration: animConfig.resumeDuration,
-      ease: "power2.out"
+  const animateResume = (element: HTMLElement, priority: LayerPriority) => {
+    const layerCtx = layerContexts[priority]
+    if (!layerCtx) return
+    
+    layerCtx.add(() => {
+      gsap.to(element, {
+        y: 0,
+        scale: 1,
+        opacity: 1,
+        duration: animConfig.resumeDuration,
+        ease: "power2.out"
+      })
     })
   }
   
@@ -245,8 +299,27 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
     return layerStates()[priority]
   }
   
+  // Unregister a layer and clean up its animations
+  const unregisterLayer = (priority: LayerPriority) => {
+    const layerCtx = layerContexts[priority]
+    if (layerCtx) {
+      layerCtx.revert()
+      layerContexts[priority] = null
+    }
+    
+    layerElements[priority] = null
+    pendingStateChanges[priority] = null
+    
+    // Reset state
+    setLayerStates(prev => ({
+      ...prev,
+      [priority]: 'hidden'
+    }))
+  }
+
   return {
     registerLayer,
+    unregisterLayer,
     showLayer,
     hideLayer,
     isLayerVisible,

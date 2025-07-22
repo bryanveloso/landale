@@ -38,9 +38,7 @@ defmodule ServerWeb.TranscriptionChannel do
       sessionChannel.join()
   """
 
-  use ServerWeb, :channel
-  require Logger
-  alias Server.CorrelationId
+  use ServerWeb.ChannelBase
 
   # Channel metadata for self-documentation
   @topic_pattern "transcription:*"
@@ -63,44 +61,36 @@ defmodule ServerWeb.TranscriptionChannel do
 
   @impl true
   def join("transcription:live", _payload, socket) do
-    # Generate correlation ID for this transcription connection
-    correlation_id = CorrelationId.from_context(assigns: socket.assigns)
-    CorrelationId.put_logger_metadata(correlation_id)
+    socket = setup_correlation_id(socket)
 
-    Logger.info("Transcription live channel joined", correlation_id: correlation_id)
-
-    socket = assign(socket, :correlation_id, correlation_id)
+    Logger.info("Transcription live channel joined", correlation_id: socket.assigns.correlation_id)
 
     # Subscribe to live transcription events
     Phoenix.PubSub.subscribe(Server.PubSub, "transcription:live")
 
     # Send initial connection confirmation after join completes
-    send(self(), :after_join_live)
+    send_after_join(socket, :after_join_live)
 
     {:ok, socket}
   end
 
   @impl true
   def join("transcription:session:" <> session_id, _payload, socket) do
-    # Generate correlation ID for this session connection
-    correlation_id = CorrelationId.from_context(assigns: socket.assigns)
-    CorrelationId.put_logger_metadata(correlation_id)
+    socket =
+      socket
+      |> setup_correlation_id()
+      |> assign(:session_id, session_id)
 
     Logger.info("Transcription session channel joined",
       session_id: session_id,
-      correlation_id: correlation_id
+      correlation_id: socket.assigns.correlation_id
     )
-
-    socket =
-      socket
-      |> assign(:correlation_id, correlation_id)
-      |> assign(:session_id, session_id)
 
     # Subscribe to session-specific transcription events
     Phoenix.PubSub.subscribe(Server.PubSub, "transcription:session:#{session_id}")
 
     # Send initial connection confirmation after join completes
-    send(self(), :after_join_session)
+    send_after_join(socket, :after_join_session)
 
     {:ok, socket}
   end
@@ -175,12 +165,7 @@ defmodule ServerWeb.TranscriptionChannel do
   # Catch-all for unhandled messages
   @impl true
   def handle_in(event, payload, socket) do
-    Logger.warning("Unhandled transcription channel message",
-      event: event,
-      payload: payload,
-      correlation_id: socket.assigns.correlation_id
-    )
-
+    log_unhandled_message(event, payload, socket)
     {:reply, {:error, %{message: "Unknown command: #{event}"}}, socket}
   end
 

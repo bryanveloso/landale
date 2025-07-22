@@ -3,15 +3,18 @@
 import asyncio
 import contextlib
 import json
-import os
+import logging
 import struct
+import weakref
 
 import websockets
+from shared import error_boundary, get_global_tracker, safe_handler
 from websockets.server import WebSocketServerProtocol
 
-from audio_processor import AudioChunk, AudioFormat, AudioProcessor
-from events import TranscriptionEvent
-from logger import get_logger
+from .audio_processor import AudioChunk, AudioFormat, AudioProcessor
+from .events import TranscriptionEvent
+from .logger import get_logger
+from .service_config import _config as phononmaser_config
 
 logger = get_logger(__name__)
 
@@ -25,17 +28,31 @@ class PhononmaserServer:
         self.clients: set[WebSocketServerProtocol] = set()
         self.server: websockets.WebSocketServer | None = None
 
-        # Event queue for broadcasting
-        self.event_queue: asyncio.Queue[dict] = asyncio.Queue()
+        # Event queue for broadcasting with size limit to prevent memory exhaustion
+        # Size of 200 allows ~20 seconds of buffer at 10 events/sec
+        self.event_queue: asyncio.Queue[dict] = asyncio.Queue(maxsize=200)
         self.broadcast_task: asyncio.Task | None = None
+
+        # Metrics for monitoring queue health
+        self.dropped_events_count = 0
+
+        # Track background tasks to prevent silent failures
+        self.background_tasks: weakref.WeakSet = weakref.WeakSet()
+
+        # Store main event loop for thread-safe operations
+        self.main_loop: asyncio.AbstractEventLoop | None = None
 
     async def start(self) -> None:
         """Start the WebSocket server."""
+        # Store the main event loop for thread-safe operations
+        self.main_loop = asyncio.get_running_loop()
+
         # Start broadcast task
-        self.broadcast_task = asyncio.create_task(self._broadcast_loop())
+        tracker = get_global_tracker()
+        self.broadcast_task = tracker.create_task(self._broadcast_loop(), name="websocket_broadcast_loop")
 
         # Start WebSocket server
-        host = os.getenv("PHONONMASER_HOST", "0.0.0.0")  # Listen on all interfaces by default
+        host = phononmaser_config.bind_host  # Use the bind_host from shared configuration
         self.server = await websockets.serve(
             self.handle_connection,
             host,
@@ -56,6 +73,14 @@ class PhononmaserServer:
             self.broadcast_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self.broadcast_task
+
+        # Clean up any remaining background tasks
+        if self.background_tasks:
+            tasks = list(self.background_tasks)
+            for task in tasks:
+                task.cancel()
+            # Wait for cancellation with timeout
+            await asyncio.wait(tasks, timeout=5.0)
 
         logger.info("Phononmaser WebSocket server stopped")
 
@@ -106,35 +131,31 @@ class PhononmaserServer:
         finally:
             self.clients.discard(websocket)
 
+    @safe_handler
     async def _handle_message(self, _websocket: WebSocketServerProtocol, message: bytes | str) -> None:
         """Handle incoming WebSocket message."""
-        try:
-            # Handle binary audio data
-            if isinstance(message, bytes):
-                await self._handle_binary_audio(message)
-                return
+        # Handle binary audio data
+        if isinstance(message, bytes):
+            await self._handle_binary_audio(message)
+            return
 
-            # Handle JSON messages
-            data = json.loads(message)
-            message_type = data.get("type")
+        # Handle JSON messages
+        data = json.loads(message)
+        message_type = data.get("type")
 
-            if message_type == "audio_data":
-                await self._handle_json_audio(data)
-            elif message_type == "start":
-                logger.info("Audio streaming started")
-                await self.audio_processor.start()
-            elif message_type == "stop":
-                logger.info("Audio streaming stopped")
-                await self.audio_processor.stop()
-            elif message_type == "heartbeat":
-                # Keep connection alive
-                pass
+        if message_type == "audio_data":
+            await self._handle_json_audio(data)
+        elif message_type == "start":
+            logger.info("Audio streaming started")
+            await self.audio_processor.start()
+        elif message_type == "stop":
+            logger.info("Audio streaming stopped")
+            await self.audio_processor.stop()
+        elif message_type == "heartbeat":
+            # Keep connection alive
+            pass
 
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON message")
-        except Exception as e:
-            logger.error(f"Error processing message: {e}")
-
+    @safe_handler
     async def _handle_binary_audio(self, data: bytes) -> None:
         """Handle binary audio data from OBS plugin."""
         # Minimum size check (header is 28 bytes)
@@ -192,7 +213,7 @@ class PhononmaserServer:
             self.audio_processor.add_chunk(chunk)
 
             # Emit chunk event
-            await self.event_queue.put(
+            await self._emit_event(
                 {
                     "type": "audio:chunk",
                     "timestamp": timestamp,
@@ -224,7 +245,7 @@ class PhononmaserServer:
         self.audio_processor.add_chunk(chunk)
 
         # Emit chunk event
-        await self.event_queue.put(
+        await self._emit_event(
             {
                 "type": "audio:chunk",
                 "timestamp": data["timestamp"],
@@ -242,6 +263,8 @@ class PhononmaserServer:
             "receiving": self.audio_processor.is_running,
             "bufferSize": self.audio_processor.buffer.total_size,
             "transcribing": self.audio_processor.is_transcribing,
+            "droppedEvents": self.dropped_events_count,
+            "queueSize": self.event_queue.qsize(),
         }
         await websocket.send(json.dumps(status))
 
@@ -258,22 +281,55 @@ class PhononmaserServer:
         for client in disconnected:
             self.clients.discard(client)
 
+    async def _emit_event(self, event_dict: dict) -> bool:
+        """Emit event to queue with overflow protection.
+
+        Returns True if event was queued, False if dropped.
+        Uses drop-newest strategy for simplicity and thread safety.
+        """
+        try:
+            # Try non-blocking add
+            self.event_queue.put_nowait(event_dict)
+            return True
+        except asyncio.QueueFull:
+            # Queue is full - drop the new event
+            logger.warning(f"Event queue full, dropping new event: {event_dict.get('type', 'unknown')}")
+            self.dropped_events_count += 1
+            return False
+
+    @error_boundary(log_level=logging.WARNING)
     def emit_transcription(self, event: TranscriptionEvent) -> None:
         """Emit transcription event for broadcasting."""
+        event_dict = {
+            "type": "audio:transcription",
+            "timestamp": event.timestamp,
+            "duration": event.duration,
+            "text": event.text,
+        }
+
+        # Use async-safe emission (this is called from sync context)
+        tracker = get_global_tracker()
         try:
-            # Emit to general event stream (with duration)
-            self.event_queue.put_nowait(
-                {
-                    "type": "audio:transcription",
-                    "timestamp": event.timestamp,
-                    "duration": event.duration,
-                    "text": event.text,
-                }
-            )
+            # Create and track the task
+            task = tracker.create_task(self._emit_event(event_dict), name="emit_transcription_event")
+            self.background_tasks.add(task)
+            # Task removes itself from the set when done
+            task.add_done_callback(self.background_tasks.discard)
+        except RuntimeError:
+            # Called from different thread - use thread-safe scheduling
+            if hasattr(self, "main_loop") and self.main_loop and self.main_loop.is_running():
+                # Schedule the event emission on the main event loop thread
+                def create_emit_task():
+                    task = tracker.create_task(self._emit_event(event_dict), name="emit_transcription_event_threadsafe")
+                    self.background_tasks.add(task)
+                    task.add_done_callback(self.background_tasks.discard)
 
-        except asyncio.QueueFull:
-            logger.warning("Event queue full, dropping transcription event")
+                self.main_loop.call_soon_threadsafe(create_emit_task)
+            else:
+                logger.error("No main event loop running to schedule transcription event")
+                self.dropped_events_count += 1
 
+    @safe_handler
     async def _broadcast_loop(self) -> None:
         """Broadcast events to all connected clients."""
         while True:
@@ -297,3 +353,4 @@ class PhononmaserServer:
                 break
             except Exception as e:
                 logger.error(f"Error in broadcast loop: {e}")
+                await asyncio.sleep(0.1)  # Add a small delay to prevent busy-waiting

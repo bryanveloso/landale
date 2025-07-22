@@ -24,7 +24,7 @@ defmodule Server.ExternalCall do
   """
 
   require Logger
-  alias Server.{CircuitBreaker, CircuitBreakerRegistry}
+  alias Server.CircuitBreakerServer
 
   @doc """
   Makes an HTTP request with circuit breaker protection.
@@ -86,16 +86,16 @@ defmodule Server.ExternalCall do
   Gets the current status of all circuit breakers.
   """
   def get_circuit_status do
-    CircuitBreakerRegistry.get_all_metrics()
+    CircuitBreakerServer.get_all_metrics()
   end
 
   @doc """
   Gets the status of a specific circuit breaker.
   """
   def get_circuit_status(service_name) do
-    case CircuitBreakerRegistry.get(service_name) do
-      {:ok, circuit_breaker} ->
-        {:ok, CircuitBreaker.get_metrics(circuit_breaker)}
+    case CircuitBreakerServer.get_state(service_name) do
+      {:ok, state} ->
+        {:ok, %{name: service_name, state: state}}
 
       {:error, :not_found} ->
         {:error, :not_found}
@@ -105,39 +105,29 @@ defmodule Server.ExternalCall do
   ## Private Implementation
 
   defp execute_with_circuit_breaker(service_name, request_fn, config, call_type) do
-    # Get or create circuit breaker for this service
-    circuit_breaker = CircuitBreakerRegistry.get_or_create(service_name, config)
-
-    # Add timing and telemetry
+    # Use new CircuitBreakerServer with timing
     start_time = System.monotonic_time(:millisecond)
 
     result =
-      CircuitBreaker.call(circuit_breaker, fn ->
-        measure_external_call(service_name, call_type, request_fn)
-      end)
+      CircuitBreakerServer.call(
+        service_name,
+        fn ->
+          measure_external_call(service_name, call_type, request_fn)
+        end,
+        config
+      )
 
     duration_ms = System.monotonic_time(:millisecond) - start_time
 
-    # Update circuit breaker state in registry
+    # Emit telemetry based on result
     case result do
       {:ok, _} ->
-        # Success - update circuit breaker
-        updated_circuit = handle_circuit_success(circuit_breaker)
-        CircuitBreakerRegistry.update(updated_circuit)
-
-        # Emit success telemetry
         emit_call_telemetry(service_name, call_type, :success, duration_ms)
 
       {:error, :circuit_open} ->
-        # Circuit breaker blocked the call
         emit_call_telemetry(service_name, call_type, :circuit_open, duration_ms)
 
       {:error, _reason} ->
-        # Call failed - update circuit breaker
-        updated_circuit = handle_circuit_failure(circuit_breaker)
-        CircuitBreakerRegistry.update(updated_circuit)
-
-        # Emit failure telemetry
         emit_call_telemetry(service_name, call_type, :failure, duration_ms)
     end
 
@@ -150,51 +140,6 @@ defmodule Server.ExternalCall do
     rescue
       error ->
         reraise error, __STACKTRACE__
-    end
-  end
-
-  defp handle_circuit_success(circuit_breaker) do
-    case circuit_breaker.state do
-      :closed ->
-        # Reset failure count on success
-        %{circuit_breaker | failure_count: 0}
-
-      :half_open ->
-        # Track successes in half-open state
-        new_success_count = circuit_breaker.half_open_success_count + 1
-
-        if new_success_count >= circuit_breaker.config.success_threshold do
-          # Enough successes, close the circuit
-          %{
-            circuit_breaker
-            | state: :closed,
-              failure_count: 0,
-              half_open_success_count: 0,
-              last_failure_time: nil,
-              state_changed_at: DateTime.utc_now()
-          }
-        else
-          # Continue in half-open state
-          %{circuit_breaker | half_open_success_count: new_success_count}
-        end
-
-      :open ->
-        # This shouldn't happen, but handle gracefully
-        circuit_breaker
-    end
-  end
-
-  defp handle_circuit_failure(circuit_breaker) do
-    new_failure_count = circuit_breaker.failure_count + 1
-    now = DateTime.utc_now()
-
-    updated_circuit = %{circuit_breaker | failure_count: new_failure_count, last_failure_time: now}
-
-    # Check if we should open the circuit
-    if new_failure_count >= circuit_breaker.config.failure_threshold do
-      %{updated_circuit | state: :open, state_changed_at: now}
-    else
-      updated_circuit
     end
   end
 

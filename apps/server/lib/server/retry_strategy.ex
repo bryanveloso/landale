@@ -402,7 +402,7 @@ defmodule Server.RetryStrategy do
   defp ensure_circuit_table do
     case :ets.whereis(:circuit_breaker_state) do
       :undefined ->
-        :ets.new(:circuit_breaker_state, [:set, :public, :named_table])
+        :ets.new(:circuit_breaker_state, [:set, :protected, :named_table])
 
       _ ->
         :ok

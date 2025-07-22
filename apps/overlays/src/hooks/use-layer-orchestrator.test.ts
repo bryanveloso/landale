@@ -189,6 +189,29 @@ describe('Layer Orchestrator State Management', () => {
     })
   })
 
+  describe('Memory Management', () => {
+    test('unregisterLayer cleans up layer state', () => {
+      orchestrator.registerLayer('background', mockElement)
+      orchestrator.showLayer('background', { test: 'data' })
+      
+      expect(orchestrator.getLayerState('background')).toBe('entering')
+      
+      orchestrator.unregisterLayer('background')
+      expect(orchestrator.getLayerState('background')).toBe('hidden')
+    })
+    
+    test('can re-register layer after unregister', () => {
+      orchestrator.registerLayer('background', mockElement)
+      orchestrator.unregisterLayer('background')
+      
+      const newElement = createMockElement()
+      orchestrator.registerLayer('background', newElement)
+      
+      expect(orchestrator.getLayerState('background')).toBe('hidden')
+      expect(newElement.getAttribute('data-state')).toBe('hidden')
+    })
+  })
+
   describe('Edge Cases', () => {
     test('can call showLayer multiple times on same layer', () => {
       orchestrator.registerLayer('background', mockElement)

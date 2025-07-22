@@ -10,9 +10,10 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import numpy as np
+from shared import get_global_tracker
 
-from events import TranscriptionEvent
-from logger import get_logger
+from .events import TranscriptionEvent
+from .logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -107,7 +108,8 @@ class AudioProcessor:
     async def start(self) -> None:
         """Start the audio processor."""
         self.is_running = True
-        self.process_task = asyncio.create_task(self._processing_loop())
+        tracker = get_global_tracker()
+        self.process_task = tracker.create_task(self._processing_loop(), name="audio_processing_loop")
         logger.info("Audio processor started")
 
     async def stop(self) -> None:
@@ -405,10 +407,7 @@ class AudioProcessor:
 
                 for line in lines:
                     if line.strip():
-                        if line.startswith("[") and "] " in line:
-                            text = line.split("] ", 1)[1].strip()
-                        else:
-                            text = line.strip()
+                        text = line.split("] ", 1)[1].strip() if line.startswith("[") and "] " in line else line.strip()
 
                         if text and text not in ["[BLANK_AUDIO]", "Thank you."]:
                             text_parts.append(text)

@@ -31,34 +31,25 @@ defmodule ServerWeb.DashboardChannel do
   - `rainwave:set_station` - Change active Rainwave station
   """
 
-  use ServerWeb, :channel
-
-  require Logger
-
-  alias Server.CorrelationId
-  alias ServerWeb.ResponseBuilder
+  use ServerWeb.ChannelBase
 
   @impl true
   def join("dashboard:" <> room_id, _payload, socket) do
-    # Generate correlation ID for this session
-    correlation_id = CorrelationId.from_context(assigns: socket.assigns)
-    CorrelationId.put_logger_metadata(correlation_id)
-
-    Logger.info("Dashboard channel joined", room_id: room_id)
-
     socket =
       socket
+      |> setup_correlation_id()
       |> assign(:room_id, room_id)
-      |> assign(:correlation_id, correlation_id)
 
     # Subscribe to relevant PubSub topics for real-time updates
-    Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
-    Phoenix.PubSub.subscribe(Server.PubSub, "rainwave:events")
-    Phoenix.PubSub.subscribe(Server.PubSub, "system:health")
-    Phoenix.PubSub.subscribe(Server.PubSub, "system:performance")
+    subscribe_to_topics([
+      "obs:events",
+      "rainwave:events",
+      "system:health",
+      "system:performance"
+    ])
 
-    # Send initial state
-    send(self(), :send_initial_state)
+    # Send initial state after join
+    send_after_join(socket, :send_initial_state)
 
     {:ok, socket}
   end
@@ -107,6 +98,11 @@ defmodule ServerWeb.DashboardChannel do
 
   # Handle incoming messages from client
   @impl true
+  def handle_in("ping", payload, socket) do
+    handle_ping(payload, socket)
+  end
+
+  @impl true
   def handle_in("obs:get_status", _payload, socket) do
     correlation_id = socket.assigns.correlation_id
 
@@ -146,7 +142,7 @@ defmodule ServerWeb.DashboardChannel do
   def handle_in("obs:stop_streaming", _payload, socket) do
     case Server.Services.OBS.stop_streaming() do
       :ok ->
-        {:reply, ResponseBuilder.success(%{operation: "start_streaming"}), socket}
+        {:reply, ResponseBuilder.success(%{operation: "stop_streaming"}), socket}
 
       {:error, reason} ->
         {:reply, ResponseBuilder.error("operation_failed", reason), socket}
@@ -157,7 +153,7 @@ defmodule ServerWeb.DashboardChannel do
   def handle_in("obs:start_recording", _payload, socket) do
     case Server.Services.OBS.start_recording() do
       :ok ->
-        {:reply, ResponseBuilder.success(%{operation: "start_streaming"}), socket}
+        {:reply, ResponseBuilder.success(%{operation: "start_recording"}), socket}
 
       {:error, reason} ->
         {:reply, ResponseBuilder.error("operation_failed", reason), socket}
@@ -168,7 +164,7 @@ defmodule ServerWeb.DashboardChannel do
   def handle_in("obs:stop_recording", _payload, socket) do
     case Server.Services.OBS.stop_recording() do
       :ok ->
-        {:reply, ResponseBuilder.success(%{operation: "start_streaming"}), socket}
+        {:reply, ResponseBuilder.success(%{operation: "stop_recording"}), socket}
 
       {:error, reason} ->
         {:reply, ResponseBuilder.error("operation_failed", reason), socket}
@@ -179,7 +175,7 @@ defmodule ServerWeb.DashboardChannel do
   def handle_in("obs:set_current_scene", %{"scene_name" => scene_name}, socket) do
     case Server.Services.OBS.set_current_scene(scene_name) do
       :ok ->
-        {:reply, ResponseBuilder.success(%{operation: "start_streaming"}), socket}
+        {:reply, ResponseBuilder.success(%{operation: "set_current_scene"}), socket}
 
       {:error, reason} ->
         {:reply, ResponseBuilder.error("operation_failed", reason), socket}
@@ -216,25 +212,15 @@ defmodule ServerWeb.DashboardChannel do
 
   # Test event handlers
   @impl true
-  def handle_in("ping", payload, socket) do
-    {:reply, ResponseBuilder.success(payload), socket}
-  end
-
-  @impl true
   def handle_in("shout", payload, socket) do
     broadcast!(socket, "shout", payload)
     {:noreply, socket}
   end
 
-  # Catch-all for unhandled messages
+  # Catch-all for unhandled events
   @impl true
   def handle_in(event, payload, socket) do
-    Logger.warning("Unhandled dashboard channel message",
-      event: event,
-      payload: payload,
-      correlation_id: Map.get(socket.assigns, :correlation_id, "test")
-    )
-
+    log_unhandled_message(event, payload, socket)
     {:reply, ResponseBuilder.error("unknown_event", "Unknown event: #{event}"), socket}
   end
 end

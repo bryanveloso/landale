@@ -5,12 +5,13 @@ import os
 import signal
 
 from dotenv import load_dotenv
+from shared import get_global_tracker
 
-from audio_processor import AudioProcessor
-from health import create_health_app
-from logger import configure_json_logging, get_logger
-from server_client import ServerTranscriptionClient
-from websocket_server import PhononmaserServer
+from .audio_processor import AudioProcessor
+from .health import create_health_app
+from .logger import configure_json_logging, get_logger
+from .server_client import ServerTranscriptionClient
+from .websocket_server import PhononmaserServer
 
 # Load environment variables
 load_dotenv()
@@ -124,7 +125,8 @@ async def main():
 
     def handle_shutdown():
         logger.info("Received shutdown signal")
-        asyncio.create_task(service.stop())
+        tracker = get_global_tracker()
+        tracker.create_task(service.stop(), name="phononmaser_shutdown")
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, handle_shutdown)

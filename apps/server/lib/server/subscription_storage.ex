@@ -8,7 +8,7 @@ defmodule Server.SubscriptionStorage do
   ## Features
 
   - Owns ETS table with proper supervision
-  - Public table for direct reads (performance)
+  - Protected table for controlled reads (security)
   - Synchronous writes through GenServer (consistency)
   - Testable with dependency injection
   """
@@ -93,11 +93,11 @@ defmodule Server.SubscriptionStorage do
 
   @impl true
   def init(table_name) do
-    # Create public ETS table for fast reads
+    # Create protected ETS table for fast reads
     table =
       :ets.new(table_name, [
         :set,
-        :public,
+        :protected,
         :named_table,
         {:keypos, 1},
         {:read_concurrency, true}

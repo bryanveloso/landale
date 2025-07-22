@@ -1,164 +1,206 @@
 # CLAUDE.md - Landale Project Assistant
 
-## Core Principles
+## Project Overview
 
-1. **Verify Before Suggesting**: Always use available tools (file reading, searching, etc.) to understand the current state before proposing changes.
-2. **Be Direct**: Skip pleasantries. Get straight to solutions.
-3. **Code First**: Show working code rather than explaining what to do.
-4. **Respect Existing Patterns**: Match the project's style and conventions exactly.
+**What**: Personal streaming overlay system for OBS - single-user setup on local network
+**Purpose**: Create sophisticated, animated streaming overlays that respond to audio, chat, and viewer interactions in real-time
+**Architecture**: Event-driven monorepo with real-time WebSocket communication
+**Network**: Runs on Tailscale VPN (not public internet) - brilliant security simplification
+**Scale**: Personal project - avoid enterprise over-engineering
+**Status**: Successfully stabilized after addressing memory exhaustion, race conditions, and security vulnerabilities
 
-## Critical Rules
+### Key Features
+- Real-time WebSocket-based event distribution across multiple services
+- Multi-layered animation system with priority-based interruption handling
+- Live audio transcription and processing
+- AI-powered stream context analysis and correlation
+- Distributed multi-machine architecture (Zelan, Demi, Saya, Alys)
+- Comprehensive health monitoring and resilience patterns
 
-### Commit Messages
+## Tech Stack
 
-- **ALWAYS** end the first line with a period.
-- Format: `<type>: <description>.`
-- Examples:
-  - ✅ `fix: Resolve WebSocket reconnection issue.`
-  - ❌ `fix: Resolve WebSocket reconnection issue`
+### Core Technologies
+- **Runtime**: Bun (NOT Node.js) - use Bun APIs for everything
+- **Frontend**: SolidJS with GSAP animations
+- **Backend**: Elixir Phoenix with WebSocket channels
+- **Database**: PostgreSQL with TimescaleDB extension
+- **Python Services**: Phononmaser (audio), Seed (AI)
+- **Build**: Turborepo for monorepo management
+- **Process Management**: Custom Nurvus binary (Elixir-based)
+- **Container**: Docker Compose
+- **UI Framework**: Tauri for dashboard app
 
-### Problem Solving
+### Key Dependencies
+- **Frontend**: SolidJS, GSAP, Phoenix JS client, Tailwind CSS
+- **Backend**: Phoenix Framework, Ecto, Oban, Phoenix PubSub
+- **Python**: aiohttp, websockets, numpy, shared utilities
+- **Monitoring**: Custom logger with Seq transport
+- **Testing**: Bun test, ExUnit (Elixir)
 
-1. **Read First**: Check existing code/files before suggesting solutions
-2. **Test Assumptions**: Verify package versions, APIs, and configurations
-3. **No Guessing**: If unsure, say so and ask for clarification
-4. **Incremental Changes**: Small, testable modifications over large rewrites
+## Core Architecture
 
-### Code Standards
-
-- Runtime: Bun (not Node.js)
-- Frontend: React 19 RC with TypeScript strict mode
-- Testing: `bun test` (not Jest/Vitest)
-- Building: `bun build` (not webpack/esbuild)
-- Package management: `bun install` (not npm/yarn/pnpm)
-- Paths: Use configured aliases (@/_, +/_, ~/\*)
-
-### Quick Reference
-
-| Task             | Use                  | Don't Use                             |
-| ---------------- | -------------------- | ------------------------------------- |
-| Run TypeScript   | `bun file.ts`        | `node file.js`, `ts-node file.ts`     |
-| Install packages | `bun install`        | `npm install`, `yarn`, `pnpm install` |
-| Run tests        | `bun test`           | `jest`, `vitest`, `mocha`             |
-| Build/Bundle     | `bun build`          | `webpack`, `esbuild`, `vite build`    |
-| HTTP server      | `Bun.serve()`        | `express`, `koa`, `fastify`           |
-| WebSockets       | Built-in `WebSocket` | `ws`, `socket.io`                     |
-| File operations  | `Bun.file()`         | `fs.readFile`, `fs.writeFile`         |
-| Shell commands   | `Bun.$\`cmd\``       | `execa`, `child_process`              |
-| SQLite           | `bun:sqlite`         | `better-sqlite3`, `sqlite3`           |
-| PostgreSQL       | `Bun.sql`            | `pg`, `postgres.js`                   |
-| Redis            | `Bun.redis`          | `ioredis`, `redis`                    |
-| Env vars         | Automatic            | `dotenv`, `process.env`               |
-
-## Project Context
-
-**What**: Personal streaming overlay system for OBS
-**Where**: Local Mac Mini server (not cloud)
-**Stack**: Bun, React 19, tRPC, PostgreSQL, Tailwind v4
-**Ports**: WebSocket (7175), TCP (8080), Phononmaser (8889)
-
-## Commands Reference
-
-```bash
-# Development
-bun dev                                    # Start all workspaces
-bun run dev:phononmaser                    # Start audio service
-bun --hot ./index.ts                       # Hot reload server
-
-# Database
-bun --cwd packages/database db:push        # Push schema changes
-bun --cwd packages/database studio         # Prisma Studio
-
-# Testing
-bun test                                   # Run all tests
-bun test:watch                             # Watch mode
-bun test:coverage                          # Coverage report
-
-# Building
-bun build ./src/index.ts --outdir ./dist   # Build TypeScript
-bun build ./src/index.html                 # Build with HTML entry
-
-# Nurvus (Process Manager)
-cd apps/nurvus && mix increment_version    # Increment CalVer before builds
-cd apps/nurvus && mix release --overwrite # Build Burrito binary
-
-# Docker
-docker compose up                          # Run services
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   Overlays  │────▶│ Phoenix      │────▶│ PostgreSQL  │
+│ (SolidJS)   │     │ Server       │     │ TimescaleDB │
+└─────────────┘     └──────────────┘     └─────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│ Phononmaser │     │     Seed     │     │   Nurvus    │
+│   (Audio)   │     │     (AI)     │     │  (Manager)  │
+└─────────────┘     └──────────────┘     └─────────────┘
 ```
 
-## Bun-First Development
+### WebSocket Channels
+- `dashboard:*` - Control interface updates
+- `events:*` - General event stream
+- `overlay:*` - Overlay animations/state
+- `stream:*` - Stream status/control
+- `transcription:*` - Live transcription
 
-**Always use Bun's built-in features:**
+### Key Ports
+- WebSocket Server: 7175
+- TCP Server: 8080
+- Phononmaser: 8889
+- Health Checks: 8890
+- PostgreSQL: 5433 (custom port)
 
-- `Bun.serve()` for servers (not Express)
-- `Bun.test()` for testing (not Jest/Vitest)
-- `Bun.file()` for file operations (not fs)
-- `Bun.# CLAUDE.md - Landale Project Assistant
+## Established Patterns (CRITICAL)
 
-## Core Principles
+### 1. WebSocket Resilience
+```python
+# All Python services use shared ResilientWebSocketClient
+from shared.websockets import ResilientWebSocketClient
+# Features: exponential backoff, health checks, auto-reconnect
+```
 
-1. **Verify Before Suggesting**: Always use available tools (file reading, searching, etc.) to understand the current state before proposing changes.
-2. **Be Direct**: Skip pleasantries. Get straight to solutions.
-3. **Code First**: Show working code rather than explaining what to do.
-4. **Respect Existing Patterns**: Match the project's style and conventions exactly.
+### 2. Memory Safety
+```python
+# Bounded queues prevent exhaustion
+self.event_queue = asyncio.Queue(maxsize=200)  # ~20 seconds buffer
+```
+
+### 3. Event Batching
+```elixir
+# 50ms batching with critical event bypass
+@batch_window_ms 50
+@critical_events ["connection_lost", "stream_stopped", ...]
+```
+
+### 4. State Management
+```elixir
+# GenServer state > ETS tables (prevents race conditions)
+# Use :protected access when ETS is necessary
+```
+
+### 5. Layer Orchestration
+```typescript
+// State machine for overlay animations
+type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
+// Priority levels: foreground > midground > background
+```
 
 ## Critical Rules
 
-### Commit Messages
+1. **Commit Messages**: ALWAYS end with a period. Format: `<description>.`
+2. **Bun First**: Use Bun APIs, never Node.js equivalents
+3. **Personal Scale**: Single-user system - avoid enterprise patterns
+4. **Real-time Focus**: Optimize for low latency over throughput
+5. **Code First**: Show working code rather than explaining
+6. **Pattern Adherence**: Use established patterns from above
 
-- **ALWAYS** end the first line with a period.
-- Format: `<type>: <description>.`
-- Examples:
-  - ✅ `fix: Resolve WebSocket reconnection issue.`
-  - ❌ `fix: Resolve WebSocket reconnection issue`
+## Code Standards
 
-### Problem Solving
-
-1. **Read First**: Check existing code/files before suggesting solutions
-2. **Test Assumptions**: Verify package versions, APIs, and configurations
-3. **No Guessing**: If unsure, say so and ask for clarification
-4. **Incremental Changes**: Small, testable modifications over large rewrites
-
-### Code Standards
-
-- Runtime: Bun (not Node.js)
-- Frontend: React 19 RC with TypeScript strict mode
+- Frontend: SolidJS for overlays and dashboard
+- Animation: GSAP with layer orchestration pattern
 - Testing: Bun test (not Jest/Vitest)
 - Paths: Use configured aliases (@/_, +/_, ~/\*)
-- Imports: Always use Bun APIs over Node.js equivalents
+- Python: Use `uv` for ALL Python commands
+- Security: Change ETS tables from `:public` to `:protected`
 
-## Project Context
+## Architecture Patterns
 
-**What**: Personal streaming overlay system for OBS
-**Where**: Local Mac Mini server (not cloud)
-**Stack**: Bun, React 19, tRPC, PostgreSQL, Tailwind v4
-**Ports**: WebSocket (7175), TCP (8080), Phononmaser (8889)
+### Layer Orchestration
+- Three priority levels: foreground, midground, background
+- State machine: hidden → entering → active → interrupted → exiting
+- Higher priority layers interrupt lower ones
+- Use GSAP timelines for complex sequences
+
+### Event System
+- Correlation IDs track events across services
+- Phoenix PubSub for real-time broadcasting
+- Circuit breakers protect external API calls (needs GenServer refactor)
+- Batch event publishing when possible
+
+### Service Configuration
+- Environment variables for service URLs (avoid file path traversal)
+- Health checks on separate ports
+- Tailscale handles all networking security
 
 ## Commands Reference
 
 ```bash
 # Development
 bun dev                    # Start all workspaces
-bun run dev:phononmaser   # Start audio service
+bun run dev:phononmaser    # Start audio service
+bun run dev:seed           # Start AI service
 
-# Database
-bun --cwd packages/database db:push     # Push schema changes
-bun --cwd packages/database studio      # Prisma Studio
+# Python Dependencies
+uv sync                    # Update all Python packages from root
+uv cache clean             # Clean UV cache if needed
 
 # Testing
-bun test                 # Run all tests
-bun test:watch          # Watch mode
-bun test:coverage       # Coverage report
+bun test                   # Run all tests
+bun test:watch             # Watch mode
+bun test:coverage          # Coverage report
 
 # Docker
-docker compose up        # Run services
+docker compose up          # Run services
+
+# Nurvus Deployment
+cd apps/nurvus
+mix increment_version      # ALWAYS run before release
+mix release --overwrite
 ```
 
-for shell commands (not execa)
+## Bun Development
 
+**Always use Bun's built-in features:**
+
+- `Bun.serve()` for servers (not Express)
+- `Bun.test()` for testing (not Jest/Vitest)
+- `Bun.file()` for file operations (not fs)
+- `Bun.$` for shell commands (not execa)
 - `bun:sqlite` for SQLite (not better-sqlite3)
 - WebSocket is built-in (not ws package)
 - `.env` loads automatically (not dotenv)
+
+## Python Development
+
+- **UV Workspace**: Single .venv at root shared by all Python services
+- **Dependencies**: Run `uv sync` from root to update all packages
+- **Run Services**: 
+  - From root: `cd apps/[service] && uv run python -m src.main`
+  - Or use bun scripts: `bun run dev:phononmaser` or `bun run dev:seed`
+- **Editable Installs**: Changes to `packages/shared-python` reflect immediately
+- Use `uv` for ALL Python commands (not pip/poetry)
+- Services read config from environment variables
+
+## Known Issues & Improvements
+
+1. **Circuit Breaker**: Currently stateless - needs GenServer implementation
+2. **Animation Hook**: Consider simplifying with GSAP master timeline
+3. **Documentation**: Some guides in `docs/` are outdated - check `.claude/handoffs/implementation-roadmap.md` for latest patterns
+
+## Development Workflow
+
+1. **Check Patterns**: Review established patterns above before implementing
+2. **Use Shared Code**: Check `packages/shared-python` for Python utilities
+3. **Test Locally**: All services work on localhost for development
+4. **Health Checks**: Verify services via health endpoints before debugging
+5. **Version Increment**: For Nurvus changes, always increment version
 
 ## When Helping
 
@@ -166,24 +208,24 @@ for shell commands (not execa)
 2. **Match Style**: Follow existing patterns exactly
 3. **Be Specific**: Reference exact file paths and line numbers
 4. **Stay Focused**: Address only what was asked
-5. **Verify Commands**: Test that suggested commands work with the current setup
+5. **Verify Commands**: Test that suggested commands work with current setup
+6. **Use Established Patterns**: Apply patterns from this document
 
 ## Don't
 
-- Use `node`, `ts-node`, `npm`, `yarn`, or `pnpm` commands
-- Import `express`, `ws`, `dotenv`, `execa`, `better-sqlite3`, `ioredis`, `pg`, or `postgres.js`
-- Use `webpack`, `esbuild`, `jest`, or `vitest`
-- Import from `node:fs` when `Bun.file` would work
-- Create separate bundler configs - Bun handles bundling automatically
-- Add test runners - use `bun test`
-- Forget the period in commit messages
-- Make assumptions without checking actual files first
+- Use `node`, `ts-node`, `npm`, `yarn`, or `pnpm` commands (use `bun` instead)
+- Import Node.js-specific packages when Bun equivalents exist
+- Create enterprise patterns (service contracts, connection pooling)
+- Use `:public` ETS tables (security risk)
+- Forget to increment Nurvus version before builds
+- Trust outdated documentation in `docs/` directory
+- Over-engineer for scale - this is a personal project
 
 ## Nurvus Version Management (CRITICAL)
 
 **⚠️ WARNING: Burrito Caching Gotcha**
 
-Burrito caches binaries based on version numbers. If you don't increment the version, it will use a stale cached binary even after code changes. This cost us 6 hours of debugging.
+Burrito caches binaries based on version numbers. If you don't increment the version, it will use a stale cached binary even after code changes.
 
 ### CalVer Strategy
 
@@ -211,6 +253,64 @@ CI automatically runs `mix increment_version` before builds, so every commit get
 
 **Remember**: When debugging Burrito issues, ALWAYS check if you incremented the version first!
 
-# Supplimentary Documentation
+## Directory Structure
 
-@docs
+```
+landale/
+├── apps/                      # Main applications
+│   ├── server/               # Phoenix WebSocket hub (Elixir) - Central event distribution
+│   ├── overlays/             # SolidJS overlay UI - OBS browser sources
+│   ├── dashboard/            # Control interface (Tauri + SolidJS) - Stream management
+│   ├── phononmaser/          # Audio processing service (Python) - Transcription
+│   ├── seed/                 # AI/LLM integration (Python) - Context analysis
+│   └── nurvus/               # Process manager (Elixir) - Service orchestration
+├── packages/                  # Shared code
+│   ├── shared/               # TypeScript types/utilities
+│   ├── shared-python/        # Python utilities (WebSocket client, config)
+│   ├── shared-elixir/        # Elixir shared code
+│   └── logger/               # Custom logging with Seq transport
+├── handbook/                  # Architecture documentation and patterns
+├── scripts/                   # Utility scripts for development
+└── .claude/                   # Claude-specific handoffs and docs
+```
+
+## Integration Points
+
+### Internal Services
+- **Phoenix WebSocket Hub**: Central event broker (port 7175)
+- **Health Check API**: Service monitoring endpoints (port 8890)
+- **PostgreSQL + TimescaleDB**: Time-series event storage (port 5433)
+- **Inter-service Communication**: All via Phoenix PubSub channels
+
+### External Integrations
+- **OBS WebSocket**: Stream control and scene management
+- **AI/LLM APIs**: Context generation via Seed service
+- **Audio Pipeline**: Real-time transcription processing
+- **Seq Logging**: Centralized log aggregation
+
+### Multi-Machine Architecture
+- **Zelan**: Primary development machine
+- **Demi**: Production streaming machine
+- **Saya**: Secondary services host
+- **Alys**: Additional compute resources
+- All connected via Tailscale VPN mesh network
+
+## Current Challenges & Technical Debt
+
+### Active Issues
+1. **Circuit Breaker Pattern**: Currently stateless, needs GenServer implementation for proper fault tolerance
+2. **Documentation Drift**: Check `.claude/handoffs/implementation-roadmap.md` for latest patterns
+3. **Animation Complexity**: Animation hook could be simplified with GSAP master timeline approach
+4. **Test Coverage Gaps**: Python services need more comprehensive test suites
+
+### Recently Resolved ✅
+- **Memory Exhaustion**: Fixed with bounded queues (200 item limit)
+- **Race Conditions**: Resolved by preferring GenServer state over ETS tables
+- **Security Vulnerabilities**: Fixed by changing ETS tables from `:public` to `:protected`
+- **WebSocket Instability**: Implemented resilient client with exponential backoff
+
+### Future Considerations
+- **Observability**: Consider adding OpenTelemetry for distributed tracing
+- **State Persistence**: Evaluate need for persistent state across restarts
+- **Event Sourcing**: Current architecture supports future event sourcing if needed
+- **Performance Monitoring**: Add metrics for animation frame rates and latency

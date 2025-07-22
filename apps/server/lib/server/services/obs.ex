@@ -39,6 +39,16 @@ defmodule Server.Services.OBS do
   - `connection_lost` - WebSocket disconnected
   - `scene_current_changed` - Current scene changed
   - `stream_started` / `stream_stopped` - Streaming state changes
+
+  ## Batch Requests
+
+  This service supports batch requests as defined by the OBS WebSocket v5
+  specification. However, please note the following limitations:
+
+  - **`Sleep` requests are not supported in batch mode.** Attempting to use
+    `Sleep` within a batch will result in a `501 Not Implemented` error for
+    that specific request. This is by design to prevent blocking behavior in
+    batch processing.
   """
 
   use GenServer
@@ -1104,6 +1114,13 @@ defmodule Server.Services.OBS do
   end
 
   @impl GenServer
+  def handle_info({:send_sleep_response, request}, state) do
+    # Send the success response for the sleep request
+    response = success_response(request)
+    send_request_response(state, response)
+    {:noreply, state}
+  end
+
   def handle_info(info, state) do
     Logger.warning("Message unhandled", message: inspect(info, pretty: true))
     {:noreply, state}
@@ -1430,9 +1447,21 @@ defmodule Server.Services.OBS do
     case validate_request(request_data) do
       {:ok, validated_request} ->
         # Process the request and generate response
-        response = process_obs_request(state, validated_request)
-        send_request_response(state, response)
-        state
+        case process_obs_request(state, validated_request) do
+          {:async, new_state} ->
+            # Request will be handled asynchronously, response sent later
+            new_state
+
+          {:sync, response} ->
+            # Send response immediately
+            send_request_response(state, response)
+            state
+
+          response when is_map(response) ->
+            # Legacy format - send response immediately
+            send_request_response(state, response)
+            state
+        end
 
       {:error, status_code, comment} ->
         # Send error response
@@ -2016,50 +2045,52 @@ defmodule Server.Services.OBS do
   defp process_obs_request(state, %{"requestType" => request_type} = request) do
     case request_type do
       "GetVersion" ->
-        handle_get_version_request(state, request)
+        {:sync, handle_get_version_request(state, request)}
 
       "GetStats" ->
-        handle_get_stats_request(state, request)
+        {:sync, handle_get_stats_request(state, request)}
 
       "GetSceneList" ->
-        handle_get_scene_list_request(state, request)
+        {:sync, handle_get_scene_list_request(state, request)}
 
       "GetCurrentProgramScene" ->
-        handle_get_current_scene_request(state, request)
+        {:sync, handle_get_current_scene_request(state, request)}
 
       "SetCurrentProgramScene" ->
-        handle_set_current_scene_request(state, request)
+        {:sync, handle_set_current_scene_request(state, request)}
 
       "StartStream" ->
-        handle_start_stream_request(state, request)
+        {:sync, handle_start_stream_request(state, request)}
 
       "StopStream" ->
-        handle_stop_stream_request(state, request)
+        {:sync, handle_stop_stream_request(state, request)}
 
       "StartRecord" ->
-        handle_start_record_request(state, request)
+        {:sync, handle_start_record_request(state, request)}
 
       "StopRecord" ->
-        handle_stop_record_request(state, request)
+        {:sync, handle_stop_record_request(state, request)}
 
       "BroadcastCustomEvent" ->
-        handle_broadcast_custom_event_request(state, request)
+        {:sync, handle_broadcast_custom_event_request(state, request)}
 
       "Sleep" ->
+        # Sleep handler already returns the proper tuple format
         handle_sleep_request_individual(state, request)
 
       _ ->
         # Unknown request type
-        %{
-          "requestType" => request_type,
-          "requestId" => request["requestId"],
-          "requestStatus" => %{
-            "result" => false,
-            # UnknownRequestType
-            "code" => 204,
-            "comment" => "The request type is invalid or does not exist"
-          }
-        }
+        {:sync,
+         %{
+           "requestType" => request_type,
+           "requestId" => request["requestId"],
+           "requestStatus" => %{
+             "result" => false,
+             # UnknownRequestType
+             "code" => 204,
+             "comment" => "The request type is invalid or does not exist"
+           }
+         }}
     end
   end
 
@@ -2275,17 +2306,20 @@ defmodule Server.Services.OBS do
     }
   end
 
-  defp handle_sleep_request_individual(_state, request) do
+  defp handle_sleep_request_individual(state, request) do
     request_data = request["requestData"] || %{}
 
-    # Handle Sleep request same as in batch processing
+    # Handle Sleep request asynchronously to avoid blocking GenServer
     cond do
       sleep_millis = request_data["sleepMillis"] ->
         if sleep_millis > 0 and sleep_millis <= 50_000 do
-          Process.sleep(sleep_millis)
-          success_response(request)
+          # Schedule the response instead of blocking
+          Process.send_after(self(), {:send_sleep_response, request}, sleep_millis)
+          # Return state, response will be sent after delay
+          {:async, state}
         else
-          error_response(request, 402, "sleepMillis is outside the allowed range")
+          # Return error response immediately
+          {:sync, error_response(request, 402, "sleepMillis is outside the allowed range")}
         end
 
       sleep_frames = request_data["sleepFrames"] ->
@@ -2293,14 +2327,18 @@ defmodule Server.Services.OBS do
           # 60fps
           frame_duration = 16.67
           sleep_duration = round(sleep_frames * frame_duration)
-          Process.sleep(sleep_duration)
-          success_response(request)
+          # Schedule the response instead of blocking
+          Process.send_after(self(), {:send_sleep_response, request}, sleep_duration)
+          # Return state, response will be sent after delay
+          {:async, state}
         else
-          error_response(request, 402, "sleepFrames is outside the allowed range")
+          # Return error response immediately
+          {:sync, error_response(request, 402, "sleepFrames is outside the allowed range")}
         end
 
       true ->
-        error_response(request, 300, "Sleep request requires sleepMillis or sleepFrames")
+        # Return error response immediately
+        {:sync, error_response(request, 300, "Sleep request requires sleepMillis or sleepFrames")}
     end
   end
 
@@ -2388,7 +2426,28 @@ defmodule Server.Services.OBS do
     case validate_request(request_with_id) do
       {:ok, validated_request} ->
         # Process using the same infrastructure as individual requests
-        process_obs_request(state, validated_request)
+        case process_obs_request(state, validated_request) do
+          {:sync, response} ->
+            # Return the response for batch processing
+            response
+
+          {:async, _new_state} ->
+            # For batch requests, we can't handle async responses properly
+            # Return an error indicating Sleep is not supported in batch mode
+            %{
+              "requestType" => request_with_id["requestType"],
+              "requestId" => request_with_id["requestId"],
+              "requestStatus" => %{
+                "result" => false,
+                "code" => 501,
+                "comment" => "Sleep requests are not supported in batch mode"
+              }
+            }
+
+          response when is_map(response) ->
+            # Legacy format compatibility
+            response
+        end
 
       {:error, status_code, comment} ->
         # Return error response with same format as OpCode 6 errors
