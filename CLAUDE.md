@@ -6,6 +6,7 @@
 **Architecture**: Event-driven monorepo with real-time WebSocket communication
 **Network**: Runs on Tailscale VPN (not public internet) - brilliant security simplification
 **Scale**: Personal project - avoid enterprise over-engineering
+**Status**: Successfully stabilized after addressing memory exhaustion, race conditions, and security vulnerabilities
 
 ## Tech Stack
 
@@ -45,6 +46,41 @@
 - Phononmaser: 8889
 - Health Checks: 8890
 
+## Established Patterns (CRITICAL)
+
+### 1. WebSocket Resilience
+```python
+# All Python services use shared ResilientWebSocketClient
+from shared.websockets import ResilientWebSocketClient
+# Features: exponential backoff, health checks, auto-reconnect
+```
+
+### 2. Memory Safety
+```python
+# Bounded queues prevent exhaustion
+self.event_queue = asyncio.Queue(maxsize=200)  # ~20 seconds buffer
+```
+
+### 3. Event Batching
+```elixir
+# 50ms batching with critical event bypass
+@batch_window_ms 50
+@critical_events ["connection_lost", "stream_stopped", ...]
+```
+
+### 4. State Management
+```elixir
+# GenServer state > ETS tables (prevents race conditions)
+# Use :protected access when ETS is necessary
+```
+
+### 5. Layer Orchestration
+```typescript
+// State machine for overlay animations
+type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
+// Priority levels: foreground > midground > background
+```
+
 ## Critical Rules
 
 1. **Commit Messages**: ALWAYS end with a period. Format: `<description>.`
@@ -52,6 +88,7 @@
 3. **Personal Scale**: Single-user system - avoid enterprise patterns
 4. **Real-time Focus**: Optimize for low latency over throughput
 5. **Code First**: Show working code rather than explaining
+6. **Pattern Adherence**: Use established patterns from above
 
 ## Code Standards
 
@@ -60,6 +97,7 @@
 - Testing: Bun test (not Jest/Vitest)
 - Paths: Use configured aliases (@/_, +/_, ~/\*)
 - Python: Use `uv` for ALL Python commands
+- Security: Change ETS tables from `:public` to `:protected`
 
 ## Architecture Patterns
 
@@ -99,6 +137,11 @@ bun test:coverage          # Coverage report
 
 # Docker
 docker compose up          # Run services
+
+# Nurvus Deployment
+cd apps/nurvus
+mix increment_version      # ALWAYS run before release
+mix release --overwrite
 ```
 
 ## Bun Development
@@ -128,6 +171,15 @@ docker compose up          # Run services
 
 1. **Circuit Breaker**: Currently stateless - needs GenServer implementation
 2. **Animation Hook**: Consider simplifying with GSAP master timeline
+3. **Documentation**: Some guides in `docs/` are outdated - check `.claude/handoffs/implementation-roadmap.md` for latest patterns
+
+## Development Workflow
+
+1. **Check Patterns**: Review established patterns above before implementing
+2. **Use Shared Code**: Check `packages/shared-python` for Python utilities
+3. **Test Locally**: All services work on localhost for development
+4. **Health Checks**: Verify services via health endpoints before debugging
+5. **Version Increment**: For Nurvus changes, always increment version
 
 ## When Helping
 
@@ -135,18 +187,17 @@ docker compose up          # Run services
 2. **Match Style**: Follow existing patterns exactly
 3. **Be Specific**: Reference exact file paths and line numbers
 4. **Stay Focused**: Address only what was asked
-5. **Verify Commands**: Test that suggested commands work with the current setup
+5. **Verify Commands**: Test that suggested commands work with current setup
+6. **Use Established Patterns**: Apply patterns from this document
 
 ## Don't
 
 - Use `node`, `ts-node`, `npm`, `yarn`, or `pnpm` commands
-- Import `express`, `ws`, `dotenv`, `execa`, `better-sqlite3`, `ioredis`, `pg`, or `postgres.js`
-- Use `webpack`, `esbuild`, `jest`, or `vitest`
-- Import from `node:fs` when `Bun.file` would work
-- Create separate bundler configs - Bun handles bundling automatically
-- Add test runners - use `bun test`
-- Forget the period in commit messages
-- Make assumptions without checking actual files first
+- Import Node.js-specific packages when Bun equivalents exist
+- Create enterprise patterns (service contracts, connection pooling)
+- Use `:public` ETS tables (security risk)
+- Forget to increment Nurvus version before builds
+- Trust outdated documentation in `docs/` directory
 - Over-engineer for scale - this is a personal project
 
 ## Nurvus Version Management (CRITICAL)
