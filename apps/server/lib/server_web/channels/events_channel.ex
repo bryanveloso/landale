@@ -1,55 +1,60 @@
 defmodule ServerWeb.EventsChannel do
   @moduledoc "Phoenix channel for real-time event streaming."
 
-  use ServerWeb, :channel
-
-  require Logger
-
-  alias ServerWeb.ResponseBuilder
+  use ServerWeb.ChannelBase
 
   @impl true
   def join("events:" <> topic, _payload, socket) do
-    Logger.info("Events channel joined",
-      topic: topic,
-      correlation_id: socket.assigns.correlation_id
-    )
-
-    socket = assign(socket, :topic, topic)
+    socket =
+      socket
+      |> setup_correlation_id()
+      |> assign(:event_topic, topic)
 
     # Subscribe to the specific topic or all events
-    case topic do
-      "all" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "dashboard")
-        Phoenix.PubSub.subscribe(Server.PubSub, "chat")
-        Phoenix.PubSub.subscribe(Server.PubSub, "followers")
-        Phoenix.PubSub.subscribe(Server.PubSub, "subscriptions")
-        Phoenix.PubSub.subscribe(Server.PubSub, "cheers")
-        Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
-        Phoenix.PubSub.subscribe(Server.PubSub, "twitch:events")
-        Phoenix.PubSub.subscribe(Server.PubSub, "ironmon:events")
-        Phoenix.PubSub.subscribe(Server.PubSub, "rainwave:events")
-        Phoenix.PubSub.subscribe(Server.PubSub, "system:events")
+    topics_to_subscribe =
+      case topic do
+        "all" ->
+          [
+            "dashboard",
+            "chat",
+            "followers",
+            "subscriptions",
+            "cheers",
+            "obs:events",
+            "twitch:events",
+            "ironmon:events",
+            "rainwave:events",
+            "system:events"
+          ]
 
-      "chat" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "chat")
+        "chat" ->
+          ["chat"]
 
-      "twitch" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "dashboard")
-        Phoenix.PubSub.subscribe(Server.PubSub, "followers")
-        Phoenix.PubSub.subscribe(Server.PubSub, "subscriptions")
-        Phoenix.PubSub.subscribe(Server.PubSub, "cheers")
+        "twitch" ->
+          ["dashboard", "followers", "subscriptions", "cheers"]
 
-      "interactions" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "chat")
-        Phoenix.PubSub.subscribe(Server.PubSub, "followers")
-        Phoenix.PubSub.subscribe(Server.PubSub, "subscriptions")
-        Phoenix.PubSub.subscribe(Server.PubSub, "cheers")
+        "interactions" ->
+          ["chat", "followers", "subscriptions", "cheers"]
 
-      specific_topic ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "#{specific_topic}:events")
-    end
+        specific_topic ->
+          ["#{specific_topic}:events"]
+      end
 
+    subscribe_to_topics(topics_to_subscribe)
     {:ok, socket}
+  end
+
+  # Handle ping for connection health
+  @impl true
+  def handle_in("ping", payload, socket) do
+    handle_ping(payload, socket)
+  end
+
+  # Catch-all - just log unhandled messages
+  @impl true
+  def handle_in(event, payload, socket) do
+    log_unhandled_message(event, payload, socket)
+    {:noreply, socket}
   end
 
   @impl true
@@ -191,24 +196,6 @@ defmodule ServerWeb.EventsChannel do
       data: event,
       timestamp: event.timestamp
     })
-
-    {:noreply, socket}
-  end
-
-  # Handle ping for connection health
-  @impl true
-  def handle_in("ping", _payload, socket) do
-    {:reply, ResponseBuilder.success(%{pong: true, timestamp: System.system_time(:second)}), socket}
-  end
-
-  # Catch-all for unhandled messages
-  @impl true
-  def handle_in(event, payload, socket) do
-    Logger.warning("Unhandled events channel message",
-      event: event,
-      payload: payload,
-      correlation_id: socket.assigns.correlation_id
-    )
 
     {:noreply, socket}
   end

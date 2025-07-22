@@ -8,15 +8,14 @@ defmodule ServerWeb.StreamChannel do
   - Real-time content streaming to overlays
   """
 
-  use ServerWeb, :channel
-
-  require Logger
+  use ServerWeb.ChannelBase
 
   alias Server.StreamProducer
-  alias ServerWeb.ResponseBuilder
 
   @impl true
   def join("stream:overlays", _payload, socket) do
+    socket = setup_correlation_id(socket)
+
     Logger.info("Stream overlays channel joined",
       correlation_id: socket.assigns.correlation_id
     )
@@ -25,13 +24,15 @@ defmodule ServerWeb.StreamChannel do
     Phoenix.PubSub.subscribe(Server.PubSub, "stream:updates")
 
     # Send initial state after join completes
-    send(self(), :after_join)
+    send_after_join(socket, :after_join)
 
     {:ok, socket}
   end
 
   @impl true
   def join("stream:queue", _payload, socket) do
+    socket = setup_correlation_id(socket)
+
     Logger.info("Stream queue channel joined",
       correlation_id: socket.assigns.correlation_id
     )
@@ -40,14 +41,14 @@ defmodule ServerWeb.StreamChannel do
     Phoenix.PubSub.subscribe(Server.PubSub, "stream:updates")
 
     # Send initial queue state after join completes
-    send(self(), :after_queue_join)
+    send_after_join(socket, :after_queue_join)
 
     {:ok, socket}
   end
 
   @impl true
-  def handle_in("ping", _payload, socket) do
-    {:reply, ResponseBuilder.success(%{pong: true, timestamp: System.system_time(:second)}), socket}
+  def handle_in("ping", payload, socket) do
+    handle_ping(payload, socket)
   end
 
   @impl true
@@ -241,12 +242,7 @@ defmodule ServerWeb.StreamChannel do
   # Catch-all for unhandled messages
   @impl true
   def handle_in(event, payload, socket) do
-    Logger.warning("Unhandled stream channel message",
-      event: event,
-      payload: payload,
-      correlation_id: socket.assigns.correlation_id
-    )
-
+    log_unhandled_message(event, payload, socket)
     {:noreply, socket}
   end
 

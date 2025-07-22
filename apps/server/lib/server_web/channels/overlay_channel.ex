@@ -74,29 +74,9 @@ defmodule ServerWeb.OverlayChannel do
       })
   """
 
-  use ServerWeb, :channel
+  use ServerWeb.ChannelBase
 
-  require Logger
-
-  alias Server.CorrelationId
   alias ServerWeb.Helpers.SystemHelpers
-
-  # Service module configuration helpers
-  defp obs_service, do: Application.get_env(:server, :services, [])[:obs] || Server.Services.OBS
-  defp twitch_service, do: Application.get_env(:server, :services, [])[:twitch] || Server.Services.Twitch
-  defp ironmon_service, do: Application.get_env(:server, :services, [])[:ironmon_tcp] || Server.Services.IronmonTCP
-  defp rainwave_service, do: Application.get_env(:server, :services, [])[:rainwave] || Server.Services.Rainwave
-
-  # Helper function for common service command execution pattern
-  defp execute_service_command(service_module, function, args, socket) do
-    case apply(service_module, function, args) do
-      {:ok, result} ->
-        {:reply, {:ok, result}, socket}
-
-      {:error, reason} ->
-        {:reply, {:error, %{message: format_error(reason)}}, socket}
-    end
-  end
 
   # Channel metadata for self-documentation
   # These are accessed by ChannelRegistry for introspection
@@ -140,27 +120,41 @@ defmodule ServerWeb.OverlayChannel do
   @doc false
   def __channel_examples__, do: @channel_examples
 
+  # Service module configuration helpers
+  defp obs_service, do: Application.get_env(:server, :services, [])[:obs] || Server.Services.OBS
+  defp twitch_service, do: Application.get_env(:server, :services, [])[:twitch] || Server.Services.Twitch
+  defp ironmon_service, do: Application.get_env(:server, :services, [])[:ironmon_tcp] || Server.Services.IronmonTCP
+  defp rainwave_service, do: Application.get_env(:server, :services, [])[:rainwave] || Server.Services.Rainwave
+
+  # Helper function for common service command execution pattern
+  defp execute_service_command(service_module, function, args, socket) do
+    case apply(service_module, function, args) do
+      {:ok, result} ->
+        {:reply, {:ok, result}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{message: format_error(reason)}}, socket}
+    end
+  end
+
   @impl true
   def join("overlay:" <> overlay_type, _payload, socket) do
-    # Generate correlation ID for this overlay connection
-    correlation_id = CorrelationId.from_context(assigns: socket.assigns)
-    CorrelationId.put_logger_metadata(correlation_id)
+    # Setup correlation ID using base module helper
+    socket =
+      socket
+      |> setup_correlation_id()
+      |> assign(:overlay_type, overlay_type)
 
     Logger.info("Overlay channel joined",
       overlay_type: overlay_type,
-      correlation_id: correlation_id
+      correlation_id: socket.assigns.correlation_id
     )
-
-    socket =
-      socket
-      |> assign(:overlay_type, overlay_type)
-      |> assign(:correlation_id, correlation_id)
 
     # Subscribe to relevant events based on overlay type
     subscribe_to_events(overlay_type)
 
     # Send initial state for the overlay
-    send(self(), {:send_initial_state, overlay_type})
+    send_after_join(socket, {:send_initial_state, overlay_type})
 
     {:ok, socket}
   end
@@ -397,13 +391,7 @@ defmodule ServerWeb.OverlayChannel do
   # Catch-all for unhandled messages
   @impl true
   def handle_in(event, payload, socket) do
-    Logger.warning("Unhandled overlay channel message",
-      event: event,
-      payload: payload,
-      overlay_type: socket.assigns.overlay_type,
-      correlation_id: socket.assigns.correlation_id
-    )
-
+    log_unhandled_message(event, payload, socket)
     {:reply, {:error, %{message: "Unknown command: #{event}"}}, socket}
   end
 
@@ -490,7 +478,7 @@ defmodule ServerWeb.OverlayChannel do
   # Private helper functions
 
   # Parameter validation
-  defp validate_params(params, required_keys) when is_non_struct_map(params) and is_list(required_keys) do
+  defp validate_params(params, required_keys) when is_map(params) and is_list(required_keys) do
     missing_keys =
       required_keys
       |> Enum.reject(&Map.has_key?(params, &1))
@@ -501,7 +489,7 @@ defmodule ServerWeb.OverlayChannel do
     end
   end
 
-  defp validate_integer_param(params, key) when is_non_struct_map(params) do
+  defp validate_integer_param(params, key) when is_map(params) do
     case Map.get(params, key) do
       value when is_integer(value) and value > 0 ->
         {:ok, value}
@@ -550,9 +538,11 @@ defmodule ServerWeb.OverlayChannel do
         Phoenix.PubSub.subscribe(Server.PubSub, "rainwave:events")
 
       "system" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "system:health")
-        Phoenix.PubSub.subscribe(Server.PubSub, "system:performance")
-        Phoenix.PubSub.subscribe(Server.PubSub, "system:events")
+        subscribe_to_topics([
+          "system:health",
+          "system:performance",
+          "system:events"
+        ])
 
       _ ->
         Logger.warning("Unknown overlay type for event subscription", overlay_type: overlay_type)
