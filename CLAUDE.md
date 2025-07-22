@@ -204,7 +204,7 @@ mix release --overwrite
 
 **⚠️ WARNING: Burrito Caching Gotcha**
 
-Burrito caches binaries based on version numbers. If you don't increment the version, it will use a stale cached binary even after code changes. This cost us 6 hours of debugging.
+Burrito caches binaries based on version numbers. If you don't increment the version, it will use a stale cached binary even after code changes.
 
 ### CalVer Strategy
 
