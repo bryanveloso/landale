@@ -6,11 +6,11 @@ import signal
 
 from dotenv import load_dotenv
 
-from audio_processor import AudioProcessor
-from health import create_health_app
-from logger import configure_json_logging, get_logger
-from server_client import ServerTranscriptionClient
-from websocket_server import PhononmaserServer
+from .audio_processor import AudioProcessor
+from .health import create_health_app
+from .logger import configure_json_logging, get_logger
+from .server_client import ServerTranscriptionClient
+from .websocket_server import PhononmaserServer
 
 # Load environment variables
 load_dotenv()

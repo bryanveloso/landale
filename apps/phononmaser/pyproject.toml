@@ -11,7 +11,7 @@ dependencies = [
     "structlog>=24.1.0",
     "torch>=2.0.0",
     "torchaudio>=2.0.0",
-    "shared @ file://../../packages/shared-python",
+    "shared",
 ]
 
 [dependency-groups]
@@ -22,6 +22,9 @@ dev = [
     "ruff>=0.6",
     "psutil>=5.9",
 ]
+
+[tool.uv.sources]
+shared = { workspace = true }
 
 [tool.ruff]
 target-version = "py311"

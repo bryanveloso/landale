@@ -86,6 +86,11 @@
 # Development
 bun dev                    # Start all workspaces
 bun run dev:phononmaser    # Start audio service
+bun run dev:seed           # Start AI service
+
+# Python Dependencies
+uv sync                    # Update all Python packages from root
+uv cache clean             # Clean UV cache if needed
 
 # Testing
 bun test                   # Run all tests
@@ -110,15 +115,19 @@ docker compose up          # Run services
 
 ## Python Development
 
-- Use `uv` to run ALL Python-related commands
-- Services should read config from environment variables
-- Avoid hardcoded file paths for configuration
+- **UV Workspace**: Single .venv at root shared by all Python services
+- **Dependencies**: Run `uv sync` from root to update all packages
+- **Run Services**: 
+  - From root: `cd apps/[service] && uv run python -m src.main`
+  - Or use npm scripts: `bun run dev:phononmaser` or `bun run dev:seed`
+- **Editable Installs**: Changes to `packages/shared-python` reflect immediately
+- Use `uv` for ALL Python commands (not pip/poetry)
+- Services read config from environment variables
 
 ## Known Issues & Improvements
 
 1. **Circuit Breaker**: Currently stateless - needs GenServer implementation
-2. **Service Config**: Python services use brittle file traversal - migrate to env vars
-3. **Animation Hook**: Consider simplifying with GSAP master timeline
+2. **Animation Hook**: Consider simplifying with GSAP master timeline
 
 ## When Helping
 

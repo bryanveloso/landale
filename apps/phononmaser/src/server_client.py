@@ -5,9 +5,10 @@ from zoneinfo import ZoneInfo
 
 import aiohttp
 
-from events import TranscriptionEvent
-from logger import get_logger
-from timestamp_utils import convert_timestamp_to_iso
+from .events import TranscriptionEvent
+from .logger import get_logger
+from .timestamp_utils import convert_timestamp_to_iso
+from shared import retriable_network_call
 
 logger = get_logger(__name__)
 
@@ -36,6 +37,7 @@ class ServerTranscriptionClient:
         if self.session:
             await self.session.close()
 
+    @retriable_network_call(max_attempts=3, base_delay=0.5)
     async def send_transcription(self, event: TranscriptionEvent) -> bool:
         """
         Send transcription event to Phoenix server.
@@ -50,41 +52,36 @@ class ServerTranscriptionClient:
             logger.error("HTTP session not initialized")
             return False
 
-        try:
-            payload = {
-                "timestamp": convert_timestamp_to_iso(event.timestamp),
-                "duration": event.duration,
-                "text": event.text,
-                "source_id": "phononmaser",
-                "stream_session_id": self.stream_session_id,
-                "confidence": None,  # whisper.cpp doesn't provide confidence scores
-                "metadata": {"original_timestamp_us": event.timestamp, "source": "whisper_cpp", "language": "en"},
-            }
+        payload = {
+            "timestamp": convert_timestamp_to_iso(event.timestamp),
+            "duration": event.duration,
+            "text": event.text,
+            "source_id": "phononmaser",
+            "stream_session_id": self.stream_session_id,
+            "confidence": None,  # whisper.cpp doesn't provide confidence scores
+            "metadata": {"original_timestamp_us": event.timestamp, "source": "whisper_cpp", "language": "en"},
+        }
 
-            headers = {"Content-Type": "application/json", "User-Agent": "phononmaser/1.0"}
+        headers = {"Content-Type": "application/json", "User-Agent": "phononmaser/1.0"}
 
-            async with self.session.post(self.transcription_endpoint, json=payload, headers=headers) as response:
-                if response.status == 201:
-                    logger.debug(f"Transcription sent successfully: {event.text[:50]}...")
-                    return True
-                elif response.status == 422:
-                    # Validation error - log details
-                    try:
-                        error_data = await response.json()
-                        logger.warning(f"Transcription validation failed: {error_data}")
-                    except Exception:
-                        logger.warning(f"Transcription validation failed: HTTP {response.status}")
-                    return False
-                else:
-                    logger.warning(f"Unexpected response from server: HTTP {response.status}")
-                    return False
-
-        except aiohttp.ClientError as e:
-            logger.warning(f"HTTP client error sending transcription: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected error sending transcription: {e}")
-            return False
+        async with self.session.post(self.transcription_endpoint, json=payload, headers=headers) as response:
+            if response.status == 201:
+                logger.debug(f"Transcription sent successfully: {event.text[:50]}...")
+                return True
+            elif response.status == 422:
+                # Validation error - log details
+                try:
+                    error_data = await response.json()
+                    logger.warning(f"Transcription validation failed: {error_data}")
+                except Exception:
+                    logger.warning(f"Transcription validation failed: HTTP {response.status}")
+                return False
+            else:
+                logger.warning(f"Unexpected response from server: HTTP {response.status}")
+                # Raise for retry on server errors
+                if response.status >= 500:
+                    raise aiohttp.ClientError(f"Server error: HTTP {response.status}")
+                return False
 
     async def health_check(self) -> bool:
         """

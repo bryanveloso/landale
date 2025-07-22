@@ -11,8 +11,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from events import TranscriptionEvent
-from logger import get_logger
+from .events import TranscriptionEvent
+from .logger import get_logger
 
 logger = get_logger(__name__)
 

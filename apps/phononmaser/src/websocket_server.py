@@ -3,16 +3,18 @@
 import asyncio
 import contextlib
 import json
+import logging
 import struct
 import weakref
 
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-from audio_processor import AudioChunk, AudioFormat, AudioProcessor
-from events import TranscriptionEvent
-from logger import get_logger
-from service_config import _config as phononmaser_config
+from .audio_processor import AudioChunk, AudioFormat, AudioProcessor
+from .events import TranscriptionEvent
+from .logger import get_logger
+from .service_config import _config as phononmaser_config
+from shared import safe_handler, retriable_network_call, error_boundary
 
 logger = get_logger(__name__)
 
@@ -128,35 +130,31 @@ class PhononmaserServer:
         finally:
             self.clients.discard(websocket)
 
+    @safe_handler
     async def _handle_message(self, _websocket: WebSocketServerProtocol, message: bytes | str) -> None:
         """Handle incoming WebSocket message."""
-        try:
-            # Handle binary audio data
-            if isinstance(message, bytes):
-                await self._handle_binary_audio(message)
-                return
+        # Handle binary audio data
+        if isinstance(message, bytes):
+            await self._handle_binary_audio(message)
+            return
 
-            # Handle JSON messages
-            data = json.loads(message)
-            message_type = data.get("type")
+        # Handle JSON messages
+        data = json.loads(message)
+        message_type = data.get("type")
 
-            if message_type == "audio_data":
-                await self._handle_json_audio(data)
-            elif message_type == "start":
-                logger.info("Audio streaming started")
-                await self.audio_processor.start()
-            elif message_type == "stop":
-                logger.info("Audio streaming stopped")
-                await self.audio_processor.stop()
-            elif message_type == "heartbeat":
-                # Keep connection alive
-                pass
+        if message_type == "audio_data":
+            await self._handle_json_audio(data)
+        elif message_type == "start":
+            logger.info("Audio streaming started")
+            await self.audio_processor.start()
+        elif message_type == "stop":
+            logger.info("Audio streaming stopped")
+            await self.audio_processor.stop()
+        elif message_type == "heartbeat":
+            # Keep connection alive
+            pass
 
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON message")
-        except Exception as e:
-            logger.error(f"Error processing message: {e}")
-
+    @safe_handler
     async def _handle_binary_audio(self, data: bytes) -> None:
         """Handle binary audio data from OBS plugin."""
         # Minimum size check (header is 28 bytes)
@@ -298,6 +296,7 @@ class PhononmaserServer:
             self.dropped_events_count += 1
             return False
 
+    @error_boundary(log_level=logging.WARNING)
     def emit_transcription(self, event: TranscriptionEvent) -> None:
         """Emit transcription event for broadcasting."""
         event_dict = {
@@ -328,6 +327,7 @@ class PhononmaserServer:
                 logger.error("No main event loop running to schedule transcription event")
                 self.dropped_events_count += 1
 
+    @safe_handler
     async def _broadcast_loop(self) -> None:
         """Broadcast events to all connected clients."""
         while True:
