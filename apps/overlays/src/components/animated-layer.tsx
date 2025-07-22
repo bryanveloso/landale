@@ -1,4 +1,4 @@
-import { createEffect, onMount, type JSX } from 'solid-js'
+import { createEffect, onMount, onCleanup, type JSX } from 'solid-js'
 import type { LayerPriority } from '../hooks/use-layer-orchestrator'
 
 export interface AnimatedLayerProps {
@@ -7,6 +7,7 @@ export interface AnimatedLayerProps {
   contentType?: string
   show?: string
   onRegister?: (priority: LayerPriority, element: HTMLElement) => void
+  onUnregister?: (priority: LayerPriority) => void
   children?: JSX.Element
 }
 
@@ -17,6 +18,13 @@ export function AnimatedLayer(props: AnimatedLayerProps) {
   onMount(() => {
     if (props.onRegister && layerRef) {
       props.onRegister(props.priority, layerRef)
+    }
+  })
+  
+  // Unregister this layer on cleanup
+  onCleanup(() => {
+    if (props.onUnregister) {
+      props.onUnregister(props.priority)
     }
   })
   

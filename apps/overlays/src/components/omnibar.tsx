@@ -1,4 +1,4 @@
-import { createEffect, Show } from 'solid-js'
+import { createEffect, createMemo, Show } from 'solid-js'
 import { useStreamChannel } from '../hooks/use-stream-channel'
 import { useLayerOrchestrator } from '../hooks/use-layer-orchestrator'
 import { AnimatedLayer } from './animated-layer'
@@ -19,6 +19,16 @@ export function Omnibar() {
   const handleLayerRegister = (priority: 'foreground' | 'midground' | 'background', element: HTMLElement) => {
     orchestrator.registerLayer(priority, element)
   }
+  
+  // Unregister layer callback
+  const handleLayerUnregister = (priority: 'foreground' | 'midground' | 'background') => {
+    orchestrator.unregisterLayer(priority)
+  }
+  
+  // Memoized layer content to prevent redundant calculations
+  const foregroundContent = createMemo(() => getLayerContent('foreground'))
+  const midgroundContent = createMemo(() => getLayerContent('midground'))
+  const backgroundContent = createMemo(() => getLayerContent('background'))
   
   // React to stream state changes and orchestrate layer visibility
   createEffect(() => {
@@ -96,15 +106,16 @@ export function Omnibar() {
         {/* Foreground Layer - Highest priority alerts */}
         <AnimatedLayer
           priority="foreground"
-          content={getLayerContent('foreground')}
-          contentType={getLayerContent('foreground')?.type}
+          content={foregroundContent()}
+          contentType={foregroundContent()?.type}
           show={streamState().current_show}
           onRegister={handleLayerRegister}
+          onUnregister={handleLayerUnregister}
         >
-          <Show when={getLayerContent('foreground')}>
+          <Show when={foregroundContent()}>
             <LayerRenderer
-              content={getLayerContent('foreground')}
-              contentType={getLayerContent('foreground')?.type || ''}
+              content={foregroundContent()}
+              contentType={foregroundContent()?.type || ''}
               show={streamState().current_show}
             />
           </Show>
@@ -113,15 +124,16 @@ export function Omnibar() {
         {/* Midground Layer - Sub trains, celebrations */}
         <AnimatedLayer
           priority="midground"
-          content={getLayerContent('midground')}
-          contentType={getLayerContent('midground')?.type}
+          content={midgroundContent()}
+          contentType={midgroundContent()?.type}
           show={streamState().current_show}
           onRegister={handleLayerRegister}
+          onUnregister={handleLayerUnregister}
         >
-          <Show when={getLayerContent('midground')}>
+          <Show when={midgroundContent()}>
             <LayerRenderer
-              content={getLayerContent('midground')}
-              contentType={getLayerContent('midground')?.type || ''}
+              content={midgroundContent()}
+              contentType={midgroundContent()?.type || ''}
               show={streamState().current_show}
             />
           </Show>
@@ -130,15 +142,16 @@ export function Omnibar() {
         {/* Background Layer - Ticker content, stats */}
         <AnimatedLayer
           priority="background"
-          content={getLayerContent('background')}
-          contentType={getLayerContent('background')?.type}
+          content={backgroundContent()}
+          contentType={backgroundContent()?.type}
           show={streamState().current_show}
           onRegister={handleLayerRegister}
+          onUnregister={handleLayerUnregister}
         >
-          <Show when={getLayerContent('background')}>
+          <Show when={backgroundContent()}>
             <LayerRenderer
-              content={getLayerContent('background')}
-              contentType={getLayerContent('background')?.type || ''}
+              content={backgroundContent()}
+              contentType={backgroundContent()?.type || ''}
               show={streamState().current_show}
             />
           </Show>
