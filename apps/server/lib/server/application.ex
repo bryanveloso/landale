@@ -39,7 +39,7 @@ defmodule Server.Application do
             Server.Events.BatchPublisher,
             Server.Cache,
             # Circuit breakers for external service resilience
-            Server.CircuitBreakerRegistry,
+            Server.CircuitBreakerServer,
             # Stream coordination
             Server.ContentAggregator,
             Server.StreamProducer,
