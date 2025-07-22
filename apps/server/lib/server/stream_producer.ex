@@ -98,10 +98,10 @@ defmodule Server.StreamProducer do
     Phoenix.PubSub.subscribe(Server.PubSub, "twitch:events")
     Phoenix.PubSub.subscribe(Server.PubSub, "channel:updates")
 
-    # Create persistence table (public so it survives process restarts)
+    # Create persistence table (protected to prevent unauthorized writes)
     # Handle race condition in tests gracefully
     try do
-      :ets.new(@state_persistence_table, [:named_table, :set, :public])
+      :ets.new(@state_persistence_table, [:named_table, :set, :protected])
     catch
       :error, {:badarg, _} ->
         # Table already exists, which is fine

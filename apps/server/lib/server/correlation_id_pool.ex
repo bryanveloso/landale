@@ -69,7 +69,7 @@ defmodule Server.CorrelationIdPool do
   @impl true
   def init(_opts) do
     # Create ETS table for the pool
-    :ets.new(@pool_table_name, [:named_table, :public, :bag])
+    :ets.new(@pool_table_name, [:named_table, :protected, :bag])
 
     # Pre-fill the pool
     fill_pool()

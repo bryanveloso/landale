@@ -81,7 +81,7 @@ defmodule Server.CircuitBreakerRegistry do
   @impl true
   def init(_opts) do
     # Create ETS table for fast circuit breaker access
-    :ets.new(@table_name, [:named_table, :public, read_concurrency: true])
+    :ets.new(@table_name, [:named_table, :protected, read_concurrency: true])
 
     # Schedule periodic cleanup
     schedule_cleanup()

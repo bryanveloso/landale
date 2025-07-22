@@ -64,9 +64,9 @@ defmodule Server.ContentAggregator do
     Logger.info("ContentAggregator starting")
 
     # Create ETS tables for fast data access
-    :ets.new(@emote_stats_table, [:named_table, :public, :set])
-    :ets.new(@followers_table, [:named_table, :public, :ordered_set])
-    :ets.new(@daily_stats_table, [:named_table, :public, :set])
+    :ets.new(@emote_stats_table, [:named_table, :protected, :set])
+    :ets.new(@followers_table, [:named_table, :protected, :ordered_set])
+    :ets.new(@daily_stats_table, [:named_table, :protected, :set])
 
     # Subscribe to relevant events
     Phoenix.PubSub.subscribe(Server.PubSub, "chat")

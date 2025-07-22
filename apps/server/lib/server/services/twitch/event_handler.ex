@@ -402,12 +402,9 @@ defmodule Server.Services.Twitch.EventHandler do
 
   defp extract_badges(_), do: []
 
-  @doc """
-  Extracts emotes and native emotes from Twitch message fragments.
-
-  Native emotes are those that start with "avalon" prefix.
-  Regular emotes are all other emotes.
-  """
+  # Extracts emotes and native emotes from Twitch message fragments.
+  # Native emotes are those that start with "avalon" prefix.
+  # Regular emotes are all other emotes.
   defp extract_emotes_from_fragments(fragments) when is_list(fragments) do
     emotes =
       fragments

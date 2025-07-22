@@ -244,7 +244,7 @@ defmodule Server.Cache do
   @impl true
   def init(_opts) do
     # Create ETS table for cache storage
-    :ets.new(@cache_table_name, [:named_table, :public, :set])
+    :ets.new(@cache_table_name, [:named_table, :protected, :set])
 
     # Schedule periodic cleanup
     cleanup_timer = schedule_cleanup()
