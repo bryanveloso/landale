@@ -15,6 +15,8 @@ defmodule Server.Services.OBS.Protocol do
   require Logger
 
   # OBS WebSocket v5 OpCodes
+  # These constants document the protocol opcodes.
+  # The Connection module pattern matches on numeric values directly.
   @op_hello 0
   @op_hello_response 0
   @op_identify 1
@@ -25,6 +27,18 @@ defmodule Server.Services.OBS.Protocol do
   @op_request_response 7
   @op_request_batch 8
   @op_request_batch_response 9
+
+  # Export opcodes for external use
+  def op_hello, do: @op_hello
+  def op_hello_response, do: @op_hello_response
+  def op_identify, do: @op_identify
+  def op_identified, do: @op_identified
+  def op_reidentify, do: @op_reidentify
+  def op_event, do: @op_event
+  def op_request, do: @op_request
+  def op_request_response, do: @op_request_response
+  def op_request_batch, do: @op_request_batch
+  def op_request_batch_response, do: @op_request_batch_response
 
   # Event subscription flags
   @event_subscription_general 1
