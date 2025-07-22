@@ -69,14 +69,22 @@ defmodule Server.Services.OBS do
       scene_state = GenServer.call(scene_manager, :get_state)
       stream_state = GenServer.call(stream_manager, :get_state)
 
-      {:ok,
-       %{
-         connection_state: state,
-         current_scene: scene_state.current_scene,
-         scene_list: scene_state.scene_list,
-         streaming_active: stream_state.streaming_active,
-         recording_active: stream_state.recording_active
-       }}
+      %{
+        connection_state: state,
+        current_scene: scene_state.current_scene,
+        scene_list: scene_state.scene_list,
+        streaming: %{
+          active: stream_state.streaming_active,
+          timecode: stream_state.streaming_timecode,
+          duration: stream_state.streaming_duration
+        },
+        recording: %{
+          active: stream_state.recording_active,
+          paused: stream_state.recording_paused,
+          timecode: stream_state.recording_timecode,
+          duration: stream_state.recording_duration
+        }
+      }
     end
   end
 
@@ -85,10 +93,15 @@ defmodule Server.Services.OBS do
     case get_connection() do
       {:ok, conn} ->
         state = Server.Services.OBS.Connection.get_state(conn)
-        {:ok, %{connected: state in [:ready, :authenticating]}}
 
-      {:error, _} ->
-        {:ok, %{connected: false}}
+        {:ok,
+         %{
+           connected: state in [:ready, :authenticating],
+           connection_state: state
+         }}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
