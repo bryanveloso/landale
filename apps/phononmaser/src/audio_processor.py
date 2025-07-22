@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 import numpy as np
+from shared import get_global_tracker
 
 from .events import TranscriptionEvent
 from .logger import get_logger
@@ -107,7 +108,8 @@ class AudioProcessor:
     async def start(self) -> None:
         """Start the audio processor."""
         self.is_running = True
-        self.process_task = asyncio.create_task(self._processing_loop())
+        tracker = get_global_tracker()
+        self.process_task = tracker.create_task(self._processing_loop(), name="audio_processing_loop")
         logger.info("Audio processor started")
 
     async def stop(self) -> None:

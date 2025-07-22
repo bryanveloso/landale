@@ -4,11 +4,11 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import aiohttp
+from shared import retriable_network_call
 
 from .events import TranscriptionEvent
 from .logger import get_logger
 from .timestamp_utils import convert_timestamp_to_iso
-from shared import retriable_network_call
 
 logger = get_logger(__name__)
 

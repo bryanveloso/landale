@@ -8,13 +8,13 @@ import struct
 import weakref
 
 import websockets
+from shared import error_boundary, get_global_tracker, safe_handler
 from websockets.server import WebSocketServerProtocol
 
 from .audio_processor import AudioChunk, AudioFormat, AudioProcessor
 from .events import TranscriptionEvent
 from .logger import get_logger
 from .service_config import _config as phononmaser_config
-from shared import safe_handler, retriable_network_call, error_boundary
 
 logger = get_logger(__name__)
 
@@ -48,7 +48,8 @@ class PhononmaserServer:
         self.main_loop = asyncio.get_running_loop()
 
         # Start broadcast task
-        self.broadcast_task = asyncio.create_task(self._broadcast_loop())
+        tracker = get_global_tracker()
+        self.broadcast_task = tracker.create_task(self._broadcast_loop(), name="websocket_broadcast_loop")
 
         # Start WebSocket server
         host = phononmaser_config.bind_host  # Use the bind_host from shared configuration
@@ -307,9 +308,10 @@ class PhononmaserServer:
         }
 
         # Use async-safe emission (this is called from sync context)
+        tracker = get_global_tracker()
         try:
             # Create and track the task
-            task = asyncio.create_task(self._emit_event(event_dict))
+            task = tracker.create_task(self._emit_event(event_dict), name="emit_transcription_event")
             self.background_tasks.add(task)
             # Task removes itself from the set when done
             task.add_done_callback(self.background_tasks.discard)
@@ -318,7 +320,7 @@ class PhononmaserServer:
             if hasattr(self, "main_loop") and self.main_loop and self.main_loop.is_running():
                 # Schedule the event emission on the main event loop thread
                 def create_emit_task():
-                    task = asyncio.create_task(self._emit_event(event_dict))
+                    task = tracker.create_task(self._emit_event(event_dict), name="emit_transcription_event_threadsafe")
                     self.background_tasks.add(task)
                     task.add_done_callback(self.background_tasks.discard)
 

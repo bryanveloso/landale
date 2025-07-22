@@ -5,6 +5,7 @@ import os
 import signal
 
 from dotenv import load_dotenv
+from shared import get_global_tracker
 
 from .context_client import ContextClient
 from .correlator import StreamCorrelator
@@ -93,11 +94,12 @@ class SeedService:
         self.health_runner = await create_health_app(port=health_port)
 
         # Start listening tasks
+        tracker = get_global_tracker()
         self.tasks = [
-            asyncio.create_task(self.transcription_client.listen()),
-            asyncio.create_task(self.server_client.listen()),
-            asyncio.create_task(self.correlator.periodic_analysis_loop()),
-            asyncio.create_task(self._health_check_loop()),
+            tracker.create_task(self.transcription_client.listen(), name="seed_transcription_listener"),
+            tracker.create_task(self.server_client.listen(), name="seed_server_listener"),
+            tracker.create_task(self.correlator.periodic_analysis_loop(), name="seed_correlator_loop"),
+            tracker.create_task(self._health_check_loop(), name="seed_health_check_loop"),
         ]
 
         logger.info("SEED intelligence service started successfully")
@@ -196,7 +198,8 @@ async def main():
 
     def handle_shutdown():
         logger.info("Received shutdown signal")
-        asyncio.create_task(service.stop())
+        tracker = get_global_tracker()
+        tracker.create_task(service.stop(), name="seed_shutdown")
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, handle_shutdown)

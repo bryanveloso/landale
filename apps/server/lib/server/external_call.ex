@@ -109,9 +109,13 @@ defmodule Server.ExternalCall do
     start_time = System.monotonic_time(:millisecond)
 
     result =
-      CircuitBreakerServer.call(service_name, fn ->
-        measure_external_call(service_name, call_type, request_fn)
-      end, config)
+      CircuitBreakerServer.call(
+        service_name,
+        fn ->
+          measure_external_call(service_name, call_type, request_fn)
+        end,
+        config
+      )
 
     duration_ms = System.monotonic_time(:millisecond) - start_time
 

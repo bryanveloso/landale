@@ -5,9 +5,9 @@ from collections.abc import Callable
 from datetime import datetime
 
 import websockets
+from shared import safe_handler
 from shared.websockets import BaseWebSocketClient
 from websockets.client import WebSocketClientProtocol
-from shared import safe_handler, retriable_network_call
 
 from .events import ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from .logger import get_logger
