@@ -55,6 +55,12 @@ This vision drives every architectural decision in Landale. It's not about real-
 Audio → Phononmaser → Analysis WebSocket → Correlation Processing
 Chat → Twitch EventSub → EventsChannel → Analysis → Pattern Storage
 Interactions → Twitch EventSub → EventsChannel → TimescaleDB
+                                    ↓
+                          ViewerInteractionEvent
+                                    ↓
+                          Stream Correlator (with buffers)
+                                    ↓
+                          Contextual Analysis to LMS
 ```
 
 ### Stack Alignment
@@ -93,8 +99,13 @@ What this foundation enables:
 This vision is actively driving current development:
 
 - **Event correlation system** → Capturing comprehensive stream context
+  - Stream Correlator maintains audio, chat, and interaction buffers
+  - Rich context building for LMS analysis requests
+  - ViewerInteractionEvent model for all Twitch interactions
 - **TimescaleDB integration** → Building long-term memory foundation
 - **Pattern analysis pipeline** → Periodic correlation building
+  - High-value interactions trigger immediate context capture
+  - Temporal correlation between streamer audio and viewer actions
 - **Community-specific metrics** → Native emote tracking, friend interactions
 
 **The goal**: Build HAL, C3PO, or Marvin - not Alexa.

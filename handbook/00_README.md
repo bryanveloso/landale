@@ -13,12 +13,16 @@ This handbook contains the patterns, decisions, and context I need to remember w
 
 ### 🏗️ Architecture  
 - **[System Overviews](02_architecture/system_overviews/)** - How complex parts work
+  - [Stream Correlation System](02_architecture/system_overviews/stream_correlation_system.md)
+  - [Event to Layer Mapping](02_architecture/system_overviews/event_to_layer_mapping.md)
+  - [IronMON Integration](02_architecture/system_overviews/ironmon_integration.md)
 - **[Architecture Decisions](02_architecture/decisions/)** - Why I chose specific technologies
 
 ### 🧠 Patterns & Practices
 - **[Phoenix Channel Resilience](03_patterns_and_practices/phoenix_channel_resilience.md)** - WebSocket patterns that work
 - **[GSAP Memory Management](03_patterns_and_practices/gsap_memory_management.md)** - Animation cleanup patterns
 - **[Async Operation Lifecycle](03_patterns_and_practices/async_operation_lifecycle.md)** - Timer and cleanup patterns
+- **[Correlation ID Tracing](03_patterns_and_practices/correlation_id_tracing.md)** - Request tracing across services
 
 ### 🔧 Operations
 - **[macOS Setup](04_operations/macos_setup.md)** - Getting Nurvus running on macOS
