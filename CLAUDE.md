@@ -3,19 +3,39 @@
 ## Project Overview
 
 **What**: Personal streaming overlay system for OBS - single-user setup on local network
+**Purpose**: Create sophisticated, animated streaming overlays that respond to audio, chat, and viewer interactions in real-time
 **Architecture**: Event-driven monorepo with real-time WebSocket communication
 **Network**: Runs on Tailscale VPN (not public internet) - brilliant security simplification
 **Scale**: Personal project - avoid enterprise over-engineering
 **Status**: Successfully stabilized after addressing memory exhaustion, race conditions, and security vulnerabilities
 
+### Key Features
+- Real-time WebSocket-based event distribution across multiple services
+- Multi-layered animation system with priority-based interruption handling
+- Live audio transcription and processing
+- AI-powered stream context analysis and correlation
+- Distributed multi-machine architecture (Zelan, Demi, Saya, Alys)
+- Comprehensive health monitoring and resilience patterns
+
 ## Tech Stack
 
+### Core Technologies
 - **Runtime**: Bun (NOT Node.js) - use Bun APIs for everything
 - **Frontend**: SolidJS with GSAP animations
 - **Backend**: Elixir Phoenix with WebSocket channels
-- **Database**: PostgreSQL with TimescaleDB
+- **Database**: PostgreSQL with TimescaleDB extension
 - **Python Services**: Phononmaser (audio), Seed (AI)
 - **Build**: Turborepo for monorepo management
+- **Process Management**: Custom Nurvus binary (Elixir-based)
+- **Container**: Docker Compose
+- **UI Framework**: Tauri for dashboard app
+
+### Key Dependencies
+- **Frontend**: SolidJS, GSAP, Phoenix JS client, Tailwind CSS
+- **Backend**: Phoenix Framework, Ecto, Oban, Phoenix PubSub
+- **Python**: aiohttp, websockets, numpy, shared utilities
+- **Monitoring**: Custom logger with Seq transport
+- **Testing**: Bun test, ExUnit (Elixir)
 
 ## Core Architecture
 
@@ -45,6 +65,7 @@
 - TCP Server: 8080
 - Phononmaser: 8889
 - Health Checks: 8890
+- PostgreSQL: 5433 (custom port)
 
 ## Established Patterns (CRITICAL)
 
@@ -231,3 +252,65 @@ The Mix task automatically:
 CI automatically runs `mix increment_version` before builds, so every commit gets a unique version.
 
 **Remember**: When debugging Burrito issues, ALWAYS check if you incremented the version first!
+
+## Directory Structure
+
+```
+landale/
+├── apps/                      # Main applications
+│   ├── server/               # Phoenix WebSocket hub (Elixir) - Central event distribution
+│   ├── overlays/             # SolidJS overlay UI - OBS browser sources
+│   ├── dashboard/            # Control interface (Tauri + SolidJS) - Stream management
+│   ├── phononmaser/          # Audio processing service (Python) - Transcription
+│   ├── seed/                 # AI/LLM integration (Python) - Context analysis
+│   └── nurvus/               # Process manager (Elixir) - Service orchestration
+├── packages/                  # Shared code
+│   ├── shared/               # TypeScript types/utilities
+│   ├── shared-python/        # Python utilities (WebSocket client, config)
+│   ├── shared-elixir/        # Elixir shared code
+│   └── logger/               # Custom logging with Seq transport
+├── handbook/                  # Architecture documentation and patterns
+├── scripts/                   # Utility scripts for development
+└── .claude/                   # Claude-specific handoffs and docs
+```
+
+## Integration Points
+
+### Internal Services
+- **Phoenix WebSocket Hub**: Central event broker (port 7175)
+- **Health Check API**: Service monitoring endpoints (port 8890)
+- **PostgreSQL + TimescaleDB**: Time-series event storage (port 5433)
+- **Inter-service Communication**: All via Phoenix PubSub channels
+
+### External Integrations
+- **OBS WebSocket**: Stream control and scene management
+- **AI/LLM APIs**: Context generation via Seed service
+- **Audio Pipeline**: Real-time transcription processing
+- **Seq Logging**: Centralized log aggregation
+
+### Multi-Machine Architecture
+- **Zelan**: Primary development machine
+- **Demi**: Production streaming machine
+- **Saya**: Secondary services host
+- **Alys**: Additional compute resources
+- All connected via Tailscale VPN mesh network
+
+## Current Challenges & Technical Debt
+
+### Active Issues
+1. **Circuit Breaker Pattern**: Currently stateless, needs GenServer implementation for proper fault tolerance
+2. **Documentation Drift**: Check `.claude/handoffs/implementation-roadmap.md` for latest patterns
+3. **Animation Complexity**: Animation hook could be simplified with GSAP master timeline approach
+4. **Test Coverage Gaps**: Python services need more comprehensive test suites
+
+### Recently Resolved ✅
+- **Memory Exhaustion**: Fixed with bounded queues (200 item limit)
+- **Race Conditions**: Resolved by preferring GenServer state over ETS tables
+- **Security Vulnerabilities**: Fixed by changing ETS tables from `:public` to `:protected`
+- **WebSocket Instability**: Implemented resilient client with exponential backoff
+
+### Future Considerations
+- **Observability**: Consider adding OpenTelemetry for distributed tracing
+- **State Persistence**: Evaluate need for persistent state across restarts
+- **Event Sourcing**: Current architecture supports future event sourcing if needed
+- **Performance Monitoring**: Add metrics for animation frame rates and latency
