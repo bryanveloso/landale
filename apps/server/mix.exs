@@ -59,7 +59,8 @@ defmodule Server.MixProject do
       {:benchee_html, "~> 1.0", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
-      {:hammox, "~> 0.7", only: :test}
+      {:hammox, "~> 0.7", only: :test},
+      {:stream_data, "~> 1.0", only: [:test, :dev]}
     ]
   end
 
