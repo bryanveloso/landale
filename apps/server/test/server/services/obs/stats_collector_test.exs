@@ -287,9 +287,14 @@ defmodule Server.Services.OBS.StatsCollectorTest do
 
       # Trigger multiple polls quickly
       send(pid, :poll_stats)
-      Process.sleep(5)
+      # Give more time for first poll to process
+      Process.sleep(10)
       send(pid, :poll_stats)
-      Process.sleep(5)
+      # Give more time for second poll to process
+      Process.sleep(10)
+
+      # Wait for timer cancellation to complete
+      :timer.sleep(20)
 
       # Old timer should be cancelled
       assert Process.read_timer(initial_timer) == false

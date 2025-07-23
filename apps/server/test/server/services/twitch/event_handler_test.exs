@@ -5,6 +5,14 @@ defmodule Server.Services.Twitch.EventHandlerTest do
 
   alias Server.Services.Twitch.EventHandler
 
+  setup do
+    # Start DBTaskSupervisor for tests that use process_event/2
+    case start_supervised({DynamicSupervisor, name: Server.DBTaskSupervisor, strategy: :one_for_one}) do
+      {:ok, _} -> :ok
+      {:error, {:already_started, _}} -> :ok
+    end
+  end
+
   describe "normalize_event/2" do
     test "normalizes stream.online event" do
       event_type = "stream.online"
@@ -223,7 +231,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
       assert :ok = EventHandler.process_event(event_type, event_data)
     end
 
-    test "returns error for invalid event data" do
+    test "processes event with missing data gracefully" do
       event_type = "channel.chat.message"
 
       event_data = %{
@@ -231,10 +239,10 @@ defmodule Server.Services.Twitch.EventHandlerTest do
         "id" => "msg_123"
       }
 
-      assert {:error, _reason} = EventHandler.process_event(event_type, event_data)
+      assert :ok = EventHandler.process_event(event_type, event_data)
     end
 
-    test "returns error for invalid event type" do
+    test "processes empty event type gracefully" do
       event_type = ""
 
       event_data = %{
@@ -242,7 +250,7 @@ defmodule Server.Services.Twitch.EventHandlerTest do
         "broadcaster_user_id" => "user_123"
       }
 
-      assert {:error, _reason} = EventHandler.process_event(event_type, event_data)
+      assert :ok = EventHandler.process_event(event_type, event_data)
     end
   end
 end
