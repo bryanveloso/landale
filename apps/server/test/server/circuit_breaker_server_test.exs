@@ -16,7 +16,7 @@ defmodule Server.CircuitBreakerServerTest do
     test "successful calls keep circuit closed" do
       # Multiple successful calls
       for i <- 1..5 do
-        assert {:ok, i} = CircuitBreakerServer.call("test-service", fn -> i end)
+        assert {:ok, ^i} = CircuitBreakerServer.call("test-service", fn -> i end)
       end
 
       # Circuit should remain closed
@@ -28,11 +28,13 @@ defmodule Server.CircuitBreakerServerTest do
 
       # First two failures don't open circuit
       for i <- 1..2 do
-        assert {:error, "failure #{i}"} =
+        expected_message = "failure #{i}"
+
+        assert {:error, ^expected_message} =
                  CircuitBreakerServer.call(
                    "failing-service",
                    fn ->
-                     raise "failure #{i}"
+                     raise expected_message
                    end,
                    config
                  )
