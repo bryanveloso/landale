@@ -106,7 +106,7 @@ defmodule Server.Services.OBS.StreamManagerPropertyTest do
 
         # If recording is not active, pause state should be false (logical invariant)
         if not state.recording_active do
-          # Note: The actual implementation doesn't enforce this, 
+          # Note: The actual implementation doesn't enforce this,
           # but it's a logical expectation we could test for
           assert true
         end

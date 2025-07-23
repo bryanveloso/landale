@@ -44,7 +44,7 @@ defmodule Server.Services.TwitchTest do
       :ets.new(:server_cache, [:set, :public, :named_table])
     end
 
-    # Create a test cache table if not exists  
+    # Create a test cache table if not exists
     if :ets.info(:twitch_service) == :undefined do
       :ets.new(:twitch_service, [:set, :public, :named_table])
     end

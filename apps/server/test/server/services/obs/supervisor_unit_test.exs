@@ -9,8 +9,8 @@ defmodule Server.Services.OBS.SupervisorUnitTest do
   """
   use ExUnit.Case, async: true
 
-  alias Server.Services.OBS.Supervisor, as: OBSSupervisor
   alias Server.Services.OBS.SessionRegistry
+  alias Server.Services.OBS.Supervisor, as: OBSSupervisor
 
   describe "via_tuple/2" do
     test "generates correct Registry tuple for supervisor without process type" do
@@ -201,7 +201,7 @@ defmodule Server.Services.OBS.SupervisorUnitTest do
           %{id: id} -> id
         end)
 
-      # The last module might have a tuple as ID for Task.Supervisor  
+      # The last module might have a tuple as ID for Task.Supervisor
       actual_modules =
         Enum.map(actual_modules, fn
           {Server.Services.OBS.SessionRegistry, {_session_id, :task_supervisor}} ->

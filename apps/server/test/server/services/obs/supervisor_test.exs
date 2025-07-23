@@ -12,8 +12,8 @@ defmodule Server.Services.OBS.SupervisorTest do
   """
   use ExUnit.Case, async: false
 
-  alias Server.Services.OBS.Supervisor, as: OBSSupervisor
   alias Server.Services.OBS.SessionRegistry
+  alias Server.Services.OBS.Supervisor, as: OBSSupervisor
 
   @test_session_id "test_session_#{:rand.uniform(10000)}"
   @test_uri "ws://localhost:4455"

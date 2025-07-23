@@ -12,8 +12,8 @@ defmodule Server.Services.OBS.SupervisorPropertyTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
 
-  alias Server.Services.OBS.Supervisor, as: OBSSupervisor
   alias Server.Services.OBS.SessionRegistry
+  alias Server.Services.OBS.Supervisor, as: OBSSupervisor
 
   # Skip these tests until child modules are implemented
   @moduletag :skip
@@ -331,7 +331,7 @@ defmodule Server.Services.OBS.SupervisorPropertyTest do
   # Generator functions
 
   defp session_id_gen do
-    map({string(:alphanumeric, min_length: 1), integer(1..10000)}, fn {prefix, num} ->
+    map({string(:alphanumeric, min_length: 1), integer(1..10_000)}, fn {prefix, num} ->
       "#{prefix}_#{num}"
     end)
   end

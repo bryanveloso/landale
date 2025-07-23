@@ -287,7 +287,7 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
   # Generator functions
 
   defp session_id_gen do
-    map({string(:alphanumeric, min_length: 1), integer(1..10000)}, fn {prefix, num} ->
+    map({string(:alphanumeric, min_length: 1), integer(1..10_000)}, fn {prefix, num} ->
       "#{prefix}_#{num}"
     end)
   end

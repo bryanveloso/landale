@@ -318,17 +318,17 @@ defmodule Server.Services.OBS.StatsCollectorPropertyTest do
         # CPU
         float(min: 0.0, max: 100.0),
         # Memory MB
-        float(min: 0.0, max: 65536.0),
+        float(min: 0.0, max: 65_536.0),
         # Disk MB
         float(min: 0.0, max: 1_000_000.0),
         # Render total
         integer(0..1_000_000),
         # Render skipped
-        integer(0..10000),
+        integer(0..10_000),
         # Output total
         integer(0..1_000_000),
         # Output skipped
-        integer(0..10000)
+        integer(0..10_000)
       },
       fn {fps, frame_time, cpu, memory, disk, render_total, render_skip, output_total, output_skip} ->
         %{
@@ -348,7 +348,7 @@ defmodule Server.Services.OBS.StatsCollectorPropertyTest do
 
   defp frame_stats_gen do
     map(
-      {integer(0..1_000_000), integer(0..10000), integer(0..1_000_000), integer(0..10000)},
+      {integer(0..1_000_000), integer(0..10_000), integer(0..1_000_000), integer(0..10_000)},
       fn {render_total, render_skip, output_total, output_skip} ->
         %{
           renderTotalFrames: render_total,

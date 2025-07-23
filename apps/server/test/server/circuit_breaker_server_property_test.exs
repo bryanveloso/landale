@@ -47,7 +47,7 @@ defmodule Server.CircuitBreakerServerPropertyTest do
             failure_threshold: 3,
             success_threshold: 2,
             timeout_ms: 5000,
-            reset_timeout_ms: 10000
+            reset_timeout_ms: 10_000
           }
         }
       end

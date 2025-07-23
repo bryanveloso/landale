@@ -98,7 +98,7 @@ defmodule Server.Services.OBS.StatsCollectorTest do
         cpuUsage: 25.5,
         memoryUsage: 1024.0,
         availableDiskSpace: 5000.0,
-        renderTotalFrames: 10000,
+        renderTotalFrames: 10_000,
         renderSkippedFrames: 5,
         outputTotalFrames: 9995,
         outputSkippedFrames: 2
@@ -185,10 +185,10 @@ defmodule Server.Services.OBS.StatsCollectorTest do
         averageFrameTime: 16.7,
         cpuUsage: 45.2,
         memoryUsage: 2048.5,
-        availableDiskSpace: 10000.0,
-        renderTotalFrames: 50000,
+        availableDiskSpace: 10_000.0,
+        renderTotalFrames: 50_000,
         renderSkippedFrames: 10,
-        outputTotalFrames: 49990,
+        outputTotalFrames: 49_990,
         outputSkippedFrames: 5
       }
 
@@ -201,10 +201,10 @@ defmodule Server.Services.OBS.StatsCollectorTest do
       assert state.average_frame_time == 16.7
       assert state.cpu_usage == 45.2
       assert state.memory_usage == 2048.5
-      assert state.available_disk_space == 10000.0
-      assert state.render_total_frames == 50000
+      assert state.available_disk_space == 10_000.0
+      assert state.render_total_frames == 50_000
       assert state.render_skipped_frames == 10
-      assert state.output_total_frames == 49990
+      assert state.output_total_frames == 49_990
       assert state.output_skipped_frames == 5
       assert is_struct(state.stats_last_updated, DateTime)
     end

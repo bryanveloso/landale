@@ -8,8 +8,8 @@ defmodule Server.Services.OBS.ConnectionTest do
   use ExUnit.Case, async: true
   import ExUnit.CaptureLog
 
-  alias Server.Services.OBS.Connection
   alias Server.OBSTestHelpers
+  alias Server.Services.OBS.Connection
 
   setup do
     # Ensure PubSub is available

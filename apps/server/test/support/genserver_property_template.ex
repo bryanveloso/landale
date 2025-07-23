@@ -16,6 +16,15 @@ defmodule Server.GenServerPropertyTemplate do
 
       alias unquote(module_under_test)
 
+      unquote(lifecycle_tests(module_under_test))
+      unquote(state_invariant_tests())
+      unquote(default_generators())
+      unquote(default_helpers())
+    end
+  end
+
+  defp lifecycle_tests(module_under_test) do
+    quote do
       describe "GenServer lifecycle properties" do
         property "init/1 always returns a valid response" do
           check all(init_args <- init_args_generator()) do
@@ -70,7 +79,11 @@ defmodule Server.GenServerPropertyTemplate do
           end
         end
       end
+    end
+  end
 
+  defp state_invariant_tests do
+    quote do
       describe "State invariant properties" do
         property "state transitions maintain invariants" do
           check all(
@@ -116,7 +129,11 @@ defmodule Server.GenServerPropertyTemplate do
           end
         end
       end
+    end
+  end
 
+  defp default_generators do
+    quote do
       # Override these functions in your test module
 
       defp init_args_generator do
@@ -164,7 +181,11 @@ defmodule Server.GenServerPropertyTemplate do
           info_message_generator()
         ])
       end
+    end
+  end
 
+  defp default_helpers do
+    quote do
       defp apply_operation(operation, state) do
         # Default implementation - override in your test
         # This simulates how an operation would change the state
