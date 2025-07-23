@@ -52,12 +52,16 @@ defmodule Server.Services.OBS.ConnectionsSupervisor do
   Stop an OBS session.
   """
   def stop_session(session_id) do
-    case Server.Services.OBS.Supervisor.whereis(session_id) do
-      nil ->
-        {:error, :not_found}
+    try do
+      case Server.Services.OBS.Supervisor.whereis(session_id) do
+        nil ->
+          {:error, :not_found}
 
-      pid ->
-        DynamicSupervisor.terminate_child(__MODULE__, pid)
+        pid ->
+          DynamicSupervisor.terminate_child(__MODULE__, pid)
+      end
+    catch
+      _type, _reason -> {:error, :not_found}
     end
   end
 
@@ -65,9 +69,13 @@ defmodule Server.Services.OBS.ConnectionsSupervisor do
   List all active sessions.
   """
   def list_sessions do
-    DynamicSupervisor.which_children(__MODULE__)
-    |> Enum.map(fn {_, pid, _, _} -> pid end)
-    |> Enum.filter(&is_pid/1)
+    try do
+      DynamicSupervisor.which_children(__MODULE__)
+      |> Enum.map(fn {_, pid, _, _} -> pid end)
+      |> Enum.filter(&is_pid/1)
+    catch
+      :exit, _ -> []
+    end
   end
 
   @impl true

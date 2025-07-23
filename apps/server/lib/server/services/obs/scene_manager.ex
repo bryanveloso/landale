@@ -34,9 +34,13 @@ defmodule Server.Services.OBS.SceneManager do
   def get_scenes_cached(session_id) do
     table_name = :"obs_scenes_#{session_id}"
 
-    case :ets.lookup(table_name, :scenes) do
-      [{:scenes, scenes}] -> {:ok, scenes}
-      [] -> {:error, :not_found}
+    try do
+      case :ets.lookup(table_name, :scenes) do
+        [{:scenes, scenes}] -> {:ok, scenes}
+        [] -> {:error, :not_found}
+      end
+    catch
+      :error, :badarg -> {:error, :not_found}
     end
   end
 

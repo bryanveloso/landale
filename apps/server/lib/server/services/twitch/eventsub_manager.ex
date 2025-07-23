@@ -283,7 +283,9 @@ defmodule Server.Services.Twitch.EventSubManager do
     # Get access token from token manager
     case token_manager_module.get_valid_token(state.token_manager) do
       {:ok, access_token, _updated_manager} ->
-        url = "https://api.twitch.tv/helix/eventsub/subscriptions?id=#{subscription_id}"
+        # Properly encode the subscription ID to handle UTF-8 characters
+        encoded_id = URI.encode_www_form(subscription_id)
+        url = "https://api.twitch.tv/helix/eventsub/subscriptions?id=#{encoded_id}"
 
         headers = [
           {"authorization", "Bearer #{access_token}"},

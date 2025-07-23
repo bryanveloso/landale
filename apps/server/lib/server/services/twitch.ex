@@ -128,11 +128,11 @@ defmodule Server.Services.Twitch do
         state = GenServer.call(__MODULE__, :get_internal_state)
 
         %{
-          connected: state.state.connection.connected,
-          connection_state: state.state.connection.connection_state,
-          session_id: state.state.connection.session_id,
-          last_connected: state.state.connection.last_connected,
-          websocket_url: state.state.connection.websocket_url
+          connected: state.connection.connected,
+          connection_state: state.connection.connection_state,
+          session_id: state.connection.session_id,
+          last_connected: state.connection.last_connected,
+          websocket_url: @eventsub_websocket_url
         }
       end,
       ttl_seconds: 10
@@ -338,7 +338,8 @@ defmodule Server.Services.Twitch do
   def handle_call({:delete_subscription, subscription_id}, _from, state) do
     # Create manager state for EventSubManager
     manager_state = %{
-      oauth2_client: state.token_manager.oauth2_client
+      oauth2_client: state.token_manager.oauth2_client,
+      token_manager: state.token_manager
     }
 
     case EventSubManager.delete_subscription(manager_state, subscription_id) do
@@ -374,7 +375,8 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_call(:list_subscriptions, _from, state) do
-    {:reply, {:ok, state.subscriptions}, state}
+    subscriptions = Map.values(state.subscriptions)
+    {:reply, {:ok, subscriptions}, state}
   end
 
   defp handle_subscription_creation(event_type, condition, opts, state) do
@@ -1180,6 +1182,7 @@ defmodule Server.Services.Twitch do
     if state.token_validation_task do
       case Task.shutdown(state.token_validation_task, 5_000) do
         :ok -> :ok
+        {:exit, :normal} -> :ok
         nil -> Logger.warning("Token validation task timeout during termination")
       end
     end
@@ -1187,6 +1190,7 @@ defmodule Server.Services.Twitch do
     if state.token_refresh_task do
       case Task.shutdown(state.token_refresh_task, 5_000) do
         :ok -> :ok
+        {:exit, :normal} -> :ok
         nil -> Logger.warning("Token refresh task timeout during termination")
       end
     end

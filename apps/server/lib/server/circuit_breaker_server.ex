@@ -210,8 +210,8 @@ defmodule Server.CircuitBreakerServer do
     end
   end
 
-  defp can_execute?(%CircuitBreaker{state: :closed}), do: {:ok, nil}
-  defp can_execute?(%CircuitBreaker{state: :half_open}), do: {:ok, nil}
+  defp can_execute?(%CircuitBreaker{state: :closed} = circuit), do: {:ok, circuit}
+  defp can_execute?(%CircuitBreaker{state: :half_open} = circuit), do: {:ok, circuit}
   defp can_execute?(%CircuitBreaker{state: :open}), do: {:error, :circuit_open}
 
   defp should_attempt_reset?(%CircuitBreaker{state: :open} = circuit) do
