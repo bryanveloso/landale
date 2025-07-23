@@ -50,14 +50,14 @@ defmodule ServerWeb.ChannelBaseTest do
 
     @impl true
     def handle_info(:after_join, socket) do
-      push(socket, "joined", %{status: "connected"})
+      Phoenix.Channel.push(socket, "joined", %{status: "connected"})
       {:noreply, socket}
     end
 
     # Test info handler for batch events
     @impl true
     def handle_info({:batch_push, event_name, events}, socket) do
-      push(socket, event_name, %{
+      Phoenix.Channel.push(socket, event_name, %{
         events: events,
         count: length(events),
         timestamp: System.system_time(:millisecond)
