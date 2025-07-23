@@ -283,9 +283,17 @@ defmodule Server.Services.OBS do
     end
   end
 
+  @impl true
   def get_version do
     with {:ok, conn} <- get_connection() do
       Server.Services.OBS.Connection.send_request(conn, "GetVersion", %{})
+    end
+  end
+
+  @impl true
+  def get_stats do
+    with {:ok, conn} <- get_connection() do
+      Server.Services.OBS.Connection.send_request(conn, "GetStats", %{})
     end
   end
 

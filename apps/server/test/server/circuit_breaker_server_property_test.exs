@@ -20,10 +20,15 @@ defmodule Server.CircuitBreakerServerPropertyTest do
         {string(:alphanumeric, min_length: 3), circuit_breaker_state_gen()},
         max_length: 10
       ),
-      fn breakers ->
+      fn circuits ->
+        circuits_with_names =
+          circuits
+          |> Enum.map(fn {name, circuit} -> {name, Map.put(circuit, :name, name)} end)
+          |> Map.new()
+
         %{
-          breakers: Map.new(breakers),
-          cleanup_interval: 300_000
+          circuits: circuits_with_names,
+          cleanup_timer: nil
         }
       end
     )
@@ -35,14 +40,18 @@ defmodule Server.CircuitBreakerServerPropertyTest do
         one_of([:closed, :open, :half_open]),
         integer(0..10),
         integer(0..100),
+        positive_integer(),
+        positive_integer(),
         positive_integer()
       },
-      fn {state, failure_count, success_count, last_failure_time} ->
+      fn {state, failure_count, half_open_success_count, last_failure_time, state_changed_at, last_accessed_at} ->
         %{
           state: state,
           failure_count: failure_count,
-          success_count: success_count,
+          half_open_success_count: half_open_success_count,
           last_failure_time: last_failure_time,
+          state_changed_at: state_changed_at,
+          last_accessed_at: last_accessed_at,
           config: %{
             failure_threshold: 3,
             success_threshold: 2,
@@ -56,23 +65,25 @@ defmodule Server.CircuitBreakerServerPropertyTest do
 
   defp call_request_generator do
     one_of([
-      tuple({constant(:call), string(:alphanumeric), function_gen(), PropertyTestHelpers.circuit_breaker_config_gen()}),
-      tuple({constant(:get_state), string(:alphanumeric)}),
+      tuple(
+        {constant(:execute), string(:alphanumeric, min_length: 1), function_gen(),
+         PropertyTestHelpers.circuit_breaker_config_gen()}
+      ),
+      tuple({constant(:get_state), string(:alphanumeric, min_length: 1)}),
       constant(:get_all_metrics),
-      tuple({constant(:remove), string(:alphanumeric)})
+      tuple({constant(:remove), string(:alphanumeric, min_length: 1)})
     ])
   end
 
   defp cast_request_generator do
-    # CircuitBreakerServer doesn't use cast, but we need to provide this
-    constant({:noop})
+    # CircuitBreakerServer doesn't implement handle_cast - this should never be called
+    # But the property template requires it, so generate empty to skip the test
+    constant(:skip_cast_test)
   end
 
   defp info_message_generator do
-    one_of([
-      constant(:cleanup_stale_breakers),
-      tuple({constant(:reset_breaker), string(:alphanumeric)})
-    ])
+    # Only generate messages that the server actually handles
+    constant(:cleanup)
   end
 
   defp function_gen do

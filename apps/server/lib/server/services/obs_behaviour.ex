@@ -8,6 +8,8 @@ defmodule Server.Services.OBSBehaviour do
 
   @callback get_state() :: {:ok, map()} | {:error, term()}
   @callback get_status() :: {:ok, map()} | {:error, term()}
+  @callback get_stats() :: {:ok, map()} | {:error, term()}
+  @callback get_version() :: {:ok, map()} | {:error, term()}
 
   # Scene management
   @callback set_current_scene(scene_name :: String.t()) :: {:ok, map()} | {:error, term()}
