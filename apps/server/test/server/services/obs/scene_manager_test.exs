@@ -1,15 +1,10 @@
 defmodule Server.Services.OBS.SceneManagerTest do
   @moduledoc """
-  Unit tests for the OBS SceneManager GenServer.
+  Behavior-driven tests for the OBS SceneManager GenServer.
 
-  Tests scene state management including:
-  - GenServer initialization with ETS table
-  - Scene list management
-  - Current scene tracking
-  - Preview scene tracking  
-  - Studio mode state
-  - ETS cache operations
-  - PubSub event handling and broadcasting
+  Tests focus on observable behavior through public APIs rather than
+  internal message handling. Events are delivered through the proper
+  PubSub channel as they would be in production.
   """
   use ExUnit.Case, async: true
 
@@ -33,20 +28,13 @@ defmodule Server.Services.OBS.SceneManagerTest do
       assert {:ok, pid} = SceneManager.start_link(opts)
       assert Process.alive?(pid)
 
-      # Verify state initialization
-      state = SceneManager.get_state(pid)
-
-      assert %SceneManager{
-               session_id: ^session_id,
-               current_scene: nil,
-               preview_scene: nil,
-               scene_list: [],
-               studio_mode_enabled: false,
-               ets_table: table
-             } = state
+      # Verify initial state through public API
+      assert SceneManager.get_scenes(pid) == []
+      assert SceneManager.get_current_scene(pid) == nil
+      assert SceneManager.get_preview_scene(pid) == nil
+      assert SceneManager.studio_mode_enabled?(pid) == false
 
       # Verify ETS table was created
-      assert is_atom(table) or is_reference(table)
       table_name = :"obs_scenes_#{session_id}"
       assert :ets.info(table_name) != :undefined
 
@@ -60,27 +48,9 @@ defmodule Server.Services.OBS.SceneManagerTest do
 
       assert {:error, _} = SceneManager.start_link(opts)
     end
-
-    test "subscribes to PubSub topic on init" do
-      session_id = test_session_id()
-      opts = [session_id: session_id, name: :"scene_pubsub_#{session_id}"]
-      {:ok, pid} = SceneManager.start_link(opts)
-
-      # Send test event to verify subscription
-      topic = "obs_events:#{session_id}"
-      event = %{eventType: "SceneListChanged", eventData: %{scenes: []}}
-      Phoenix.PubSub.broadcast(Server.PubSub, topic, {:obs_event, event})
-
-      Process.sleep(10)
-
-      # Should still be alive
-      assert Process.alive?(pid)
-
-      GenServer.stop(pid)
-    end
   end
 
-  describe "get_state/1" do
+  describe "public API queries" do
     setup do
       session_id = test_session_id()
       opts = [session_id: session_id, name: :"scene_state_#{:rand.uniform(10000)}"]
@@ -88,20 +58,27 @@ defmodule Server.Services.OBS.SceneManagerTest do
       {:ok, pid: pid, session_id: session_id}
     end
 
-    test "returns current state", %{pid: pid, session_id: session_id} do
-      state = SceneManager.get_state(pid)
+    test "get_scene_info returns comprehensive state", %{pid: pid, session_id: session_id} do
+      info = SceneManager.get_scene_info(pid)
 
-      assert %SceneManager{
-               session_id: ^session_id,
+      assert %{
+               scenes: [],
                current_scene: nil,
                preview_scene: nil,
-               scene_list: [],
-               studio_mode_enabled: false
-             } = state
+               studio_mode_enabled: false,
+               session_id: ^session_id
+             } = info
+    end
+
+    test "individual state queries work correctly", %{pid: pid} do
+      assert SceneManager.get_scenes(pid) == []
+      assert SceneManager.get_current_scene(pid) == nil
+      assert SceneManager.get_preview_scene(pid) == nil
+      assert SceneManager.studio_mode_enabled?(pid) == false
     end
   end
 
-  describe "handle_info - SceneListChanged" do
+  describe "scene list management" do
     setup do
       session_id = test_session_id()
       opts = [session_id: session_id, name: :"scene_list_#{:rand.uniform(10000)}"]
@@ -109,64 +86,75 @@ defmodule Server.Services.OBS.SceneManagerTest do
       {:ok, pid: pid, session_id: session_id}
     end
 
-    test "updates scene list in state and ETS", %{pid: pid, session_id: session_id} do
+    test "updates scene list from OBS events", %{pid: pid, session_id: session_id} do
       scenes = [
         %{sceneName: "Scene 1", sceneIndex: 0},
         %{sceneName: "Scene 2", sceneIndex: 1},
         %{sceneName: "Scene 3", sceneIndex: 2}
       ]
 
-      event = %{
-        eventType: "SceneListChanged",
-        eventData: %{scenes: scenes}
-      }
+      # Simulate OBS event through proper channel
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
+        {:obs_event,
+         %{
+           eventType: "SceneListChanged",
+           eventData: %{scenes: scenes}
+         }}
+      )
 
-      send(pid, {:obs_event, event})
+      # Allow time for async processing
       Process.sleep(10)
 
-      # Check state was updated
-      state = SceneManager.get_state(pid)
-      assert state.scene_list == scenes
+      # Verify state through public API
+      assert SceneManager.get_scenes(pid) == scenes
 
-      # Check ETS was updated
-      table_name = :"obs_scenes_#{session_id}"
-      assert [{:scenes, ^scenes}] = :ets.lookup(table_name, :scenes)
+      # Verify ETS cache was updated
+      assert {:ok, ^scenes} = SceneManager.get_scenes_cached(session_id)
     end
 
     test "handles empty scene list", %{pid: pid, session_id: session_id} do
-      event = %{
-        eventType: "SceneListChanged",
-        eventData: %{scenes: []}
-      }
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
+        {:obs_event,
+         %{
+           eventType: "SceneListChanged",
+           eventData: %{scenes: []}
+         }}
+      )
 
-      send(pid, {:obs_event, event})
       Process.sleep(10)
 
-      state = SceneManager.get_state(pid)
-      assert state.scene_list == []
+      assert SceneManager.get_scenes(pid) == []
     end
 
-    test "handles missing scenes field", %{pid: pid, session_id: session_id} do
-      event = %{
-        eventType: "SceneListChanged",
-        eventData: %{}
-      }
+    test "handles missing scenes field gracefully", %{pid: pid, session_id: session_id} do
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
+        {:obs_event,
+         %{
+           eventType: "SceneListChanged",
+           eventData: %{}
+         }}
+      )
 
-      send(pid, {:obs_event, event})
       Process.sleep(10)
 
-      state = SceneManager.get_state(pid)
-      assert state.scene_list == []
+      # Should default to empty list
+      assert SceneManager.get_scenes(pid) == []
     end
   end
 
-  describe "handle_info - CurrentProgramSceneChanged" do
+  describe "current scene changes" do
     setup do
       session_id = test_session_id()
       opts = [session_id: session_id, name: :"scene_current_#{:rand.uniform(10000)}"]
       {:ok, pid} = start_supervised({SceneManager, opts})
 
-      # Subscribe to broadcast topic
+      # Subscribe to broadcast topic for verification
       Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
 
       {:ok, pid: pid, session_id: session_id}
@@ -175,14 +163,22 @@ defmodule Server.Services.OBS.SceneManagerTest do
     test "updates current scene and broadcasts event", %{pid: pid, session_id: session_id} do
       scene_name = "Main Scene"
 
-      event = %{
-        eventType: "CurrentProgramSceneChanged",
-        eventData: %{sceneName: scene_name}
-      }
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
+        {:obs_event,
+         %{
+           eventType: "CurrentProgramSceneChanged",
+           eventData: %{sceneName: scene_name}
+         }}
+      )
 
-      send(pid, {:obs_event, event})
+      Process.sleep(10)
 
-      # Should receive broadcast
+      # Verify state through public API
+      assert SceneManager.get_current_scene(pid) == scene_name
+
+      # Verify broadcast was sent
       assert_receive {:scene_current_changed,
                       %{
                         session_id: ^session_id,
@@ -190,30 +186,29 @@ defmodule Server.Services.OBS.SceneManagerTest do
                       }},
                      100
 
-      # Check state was updated
-      state = SceneManager.get_state(pid)
-      assert state.current_scene == scene_name
-
-      # Check ETS was updated
+      # Verify ETS cache was updated
       table_name = :"obs_scenes_#{session_id}"
       assert [{:current_scene, ^scene_name}] = :ets.lookup(table_name, :current_scene)
     end
 
     test "handles scene change to nil", %{pid: pid, session_id: session_id} do
-      event = %{
-        eventType: "CurrentProgramSceneChanged",
-        eventData: %{sceneName: nil}
-      }
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
+        {:obs_event,
+         %{
+           eventType: "CurrentProgramSceneChanged",
+           eventData: %{sceneName: nil}
+         }}
+      )
 
-      send(pid, {:obs_event, event})
       Process.sleep(10)
 
-      state = SceneManager.get_state(pid)
-      assert state.current_scene == nil
+      assert SceneManager.get_current_scene(pid) == nil
     end
   end
 
-  describe "handle_info - CurrentPreviewSceneChanged" do
+  describe "preview scene changes" do
     setup do
       session_id = test_session_id()
       opts = [session_id: session_id, name: :"scene_preview_#{:rand.uniform(10000)}"]
@@ -224,25 +219,28 @@ defmodule Server.Services.OBS.SceneManagerTest do
     test "updates preview scene in state and ETS", %{pid: pid, session_id: session_id} do
       scene_name = "Preview Scene"
 
-      event = %{
-        eventType: "CurrentPreviewSceneChanged",
-        eventData: %{sceneName: scene_name}
-      }
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
+        {:obs_event,
+         %{
+           eventType: "CurrentPreviewSceneChanged",
+           eventData: %{sceneName: scene_name}
+         }}
+      )
 
-      send(pid, {:obs_event, event})
       Process.sleep(10)
 
-      # Check state was updated
-      state = SceneManager.get_state(pid)
-      assert state.preview_scene == scene_name
+      # Verify state through public API
+      assert SceneManager.get_preview_scene(pid) == scene_name
 
-      # Check ETS was updated
+      # Verify ETS cache was updated
       table_name = :"obs_scenes_#{session_id}"
       assert [{:preview_scene, ^scene_name}] = :ets.lookup(table_name, :preview_scene)
     end
   end
 
-  describe "handle_info - StudioModeStateChanged" do
+  describe "studio mode changes" do
     setup do
       session_id = test_session_id()
       opts = [session_id: session_id, name: :"scene_studio_#{:rand.uniform(10000)}"]
@@ -251,57 +249,37 @@ defmodule Server.Services.OBS.SceneManagerTest do
     end
 
     test "updates studio mode state", %{pid: pid, session_id: session_id} do
-      event = %{
-        eventType: "StudioModeStateChanged",
-        eventData: %{studioModeEnabled: true}
-      }
+      # Enable studio mode
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
+        {:obs_event,
+         %{
+           eventType: "StudioModeStateChanged",
+           eventData: %{studioModeEnabled: true}
+         }}
+      )
 
-      send(pid, {:obs_event, event})
       Process.sleep(10)
+      assert SceneManager.studio_mode_enabled?(pid) == true
 
-      state = SceneManager.get_state(pid)
-      assert state.studio_mode_enabled == true
+      # Disable studio mode
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
+        {:obs_event,
+         %{
+           eventType: "StudioModeStateChanged",
+           eventData: %{studioModeEnabled: false}
+         }}
+      )
 
-      # Send disable event
-      event2 = %{
-        eventType: "StudioModeStateChanged",
-        eventData: %{studioModeEnabled: false}
-      }
-
-      send(pid, {:obs_event, event2})
       Process.sleep(10)
-
-      state2 = SceneManager.get_state(pid)
-      assert state2.studio_mode_enabled == false
+      assert SceneManager.studio_mode_enabled?(pid) == false
     end
   end
 
-  describe "handle_info - unknown events" do
-    setup do
-      session_id = test_session_id()
-      opts = [session_id: session_id, name: :"scene_unknown_#{:rand.uniform(10000)}"]
-      {:ok, pid} = start_supervised({SceneManager, opts})
-      {:ok, pid: pid, session_id: session_id}
-    end
-
-    test "ignores unknown event types", %{pid: pid, session_id: session_id} do
-      initial_state = SceneManager.get_state(pid)
-
-      event = %{
-        eventType: "UnknownEventType",
-        eventData: %{some: "data"}
-      }
-
-      send(pid, {:obs_event, event})
-      Process.sleep(10)
-
-      # State should be unchanged
-      final_state = SceneManager.get_state(pid)
-      assert initial_state == final_state
-    end
-  end
-
-  describe "get_scenes_cached/1" do
+  describe "ETS cache functionality" do
     setup do
       session_id = "cache_test_#{:rand.uniform(10000)}"
       opts = [session_id: session_id, name: :"scene_cache_#{session_id}"]
@@ -309,8 +287,8 @@ defmodule Server.Services.OBS.SceneManagerTest do
       {:ok, pid: pid, session_id: session_id}
     end
 
-    test "returns scenes from ETS cache", %{pid: pid, session_id: session_id} do
-      # Initially empty
+    test "get_scenes_cached returns scenes from ETS", %{pid: _pid, session_id: session_id} do
+      # Initially not found
       assert {:error, :not_found} = SceneManager.get_scenes_cached(session_id)
 
       # Update scenes
@@ -319,12 +297,16 @@ defmodule Server.Services.OBS.SceneManagerTest do
         %{sceneName: "Scene B", sceneIndex: 1}
       ]
 
-      event = %{
-        eventType: "SceneListChanged",
-        eventData: %{scenes: scenes}
-      }
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
+        {:obs_event,
+         %{
+           eventType: "SceneListChanged",
+           eventData: %{scenes: scenes}
+         }}
+      )
 
-      send(pid, {:obs_event, event})
       Process.sleep(10)
 
       # Should now return scenes from cache
@@ -336,7 +318,7 @@ defmodule Server.Services.OBS.SceneManagerTest do
     end
   end
 
-  describe "comprehensive scene management flow" do
+  describe "comprehensive scene workflow" do
     setup do
       session_id = test_session_id()
       opts = [session_id: session_id, name: :"scene_flow_#{:rand.uniform(10000)}"]
@@ -348,8 +330,8 @@ defmodule Server.Services.OBS.SceneManagerTest do
       {:ok, pid: pid, session_id: session_id}
     end
 
-    test "handles complete scene workflow", %{pid: pid, session_id: session_id} do
-      # 1. Set scene list
+    test "handles complete scene management workflow", %{pid: pid, session_id: session_id} do
+      # Set scene list
       scenes = [
         %{sceneName: "Starting Scene", sceneIndex: 0},
         %{sceneName: "Main Scene", sceneIndex: 1},
@@ -357,8 +339,9 @@ defmodule Server.Services.OBS.SceneManagerTest do
         %{sceneName: "Ending Scene", sceneIndex: 3}
       ]
 
-      send(
-        pid,
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
         {:obs_event,
          %{
            eventType: "SceneListChanged",
@@ -366,9 +349,10 @@ defmodule Server.Services.OBS.SceneManagerTest do
          }}
       )
 
-      # 2. Enable studio mode
-      send(
-        pid,
+      # Enable studio mode
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
         {:obs_event,
          %{
            eventType: "StudioModeStateChanged",
@@ -376,9 +360,10 @@ defmodule Server.Services.OBS.SceneManagerTest do
          }}
       )
 
-      # 3. Set current scene
-      send(
-        pid,
+      # Set current scene
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
         {:obs_event,
          %{
            eventType: "CurrentProgramSceneChanged",
@@ -386,9 +371,10 @@ defmodule Server.Services.OBS.SceneManagerTest do
          }}
       )
 
-      # 4. Set preview scene
-      send(
-        pid,
+      # Set preview scene
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
         {:obs_event,
          %{
            eventType: "CurrentPreviewSceneChanged",
@@ -399,12 +385,12 @@ defmodule Server.Services.OBS.SceneManagerTest do
       # Wait for all events to process
       Process.sleep(20)
 
-      # Verify final state
-      state = SceneManager.get_state(pid)
-      assert state.scene_list == scenes
-      assert state.studio_mode_enabled == true
-      assert state.current_scene == "Starting Scene"
-      assert state.preview_scene == "Main Scene"
+      # Verify final state through public API
+      info = SceneManager.get_scene_info(pid)
+      assert info.scenes == scenes
+      assert info.studio_mode_enabled == true
+      assert info.current_scene == "Starting Scene"
+      assert info.preview_scene == "Main Scene"
 
       # Verify broadcast was received
       assert_received {:scene_current_changed,
@@ -432,6 +418,36 @@ defmodule Server.Services.OBS.SceneManagerTest do
 
       # Table should be gone
       assert :ets.info(table_name) == :undefined
+    end
+  end
+
+  describe "resilience" do
+    setup do
+      session_id = test_session_id()
+      opts = [session_id: session_id, name: :"scene_resilience_#{:rand.uniform(10000)}"]
+      {:ok, pid} = start_supervised({SceneManager, opts})
+      {:ok, pid: pid, session_id: session_id}
+    end
+
+    test "ignores unknown event types", %{pid: pid, session_id: session_id} do
+      initial_info = SceneManager.get_scene_info(pid)
+
+      # Send unknown event
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "obs_events:#{session_id}",
+        {:obs_event,
+         %{
+           eventType: "UnknownEventType",
+           eventData: %{some: "data"}
+         }}
+      )
+
+      Process.sleep(10)
+
+      # State should be unchanged
+      final_info = SceneManager.get_scene_info(pid)
+      assert initial_info == final_info
     end
   end
 end

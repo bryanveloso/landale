@@ -154,7 +154,7 @@ defmodule Server.Services.Twitch.Protocol do
   @spec format_for_logging(map()) :: map()
   def format_for_logging(message) do
     case message do
-      %{"payload" => %{"event" => event} = payload} = msg when is_map(event) ->
+      %{"payload" => %{"event" => event}} = msg when is_map(event) ->
         # Truncate event data if too large
         truncated_event =
           if map_size(event) > 10 do

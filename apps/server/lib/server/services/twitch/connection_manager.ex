@@ -105,15 +105,20 @@ defmodule Server.Services.Twitch.ConnectionManager do
     owner = Keyword.get(opts, :owner, self())
     correlation_id = CorrelationId.generate()
 
+    # Accept optional parameters for testing
+    uri = Keyword.get(opts, :url, @eventsub_uri)
+    client_id = Keyword.get(opts, :client_id)
+
     state = %{
-      uri: @eventsub_uri,
+      uri: uri,
       ws_conn: nil,
       session_id: nil,
       connection_state: :disconnected,
       owner: owner,
       owner_ref: Process.monitor(owner),
       keepalive_timer: nil,
-      correlation_id: correlation_id
+      correlation_id: correlation_id,
+      client_id: client_id
     }
 
     Logger.info("[#{correlation_id}] Twitch ConnectionManager initialized",
@@ -239,6 +244,53 @@ defmodule Server.Services.Twitch.ConnectionManager do
     {:stop, :normal, state}
   end
 
+  # Catch-all for WebSocketConnection messages with mismatched ws_conn
+  @impl true
+  def handle_info({WebSocketConnection, _ws_conn, {:websocket_frame, {:text, frame}}} = msg, state) do
+    Logger.debug("[#{state.correlation_id}] Received frame from different ws_conn, processing anyway",
+      message: inspect(msg),
+      state_ws_conn: inspect(state.ws_conn)
+    )
+
+    state = handle_frame(frame, state)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({WebSocketConnection, _ws_conn, {:websocket_error, %{reason: reason}}} = msg, state) do
+    Logger.debug("[#{state.correlation_id}] Received error from different ws_conn, processing anyway",
+      message: inspect(msg),
+      state_ws_conn: inspect(state.ws_conn),
+      reason: inspect(reason)
+    )
+
+    state = handle_disconnect(reason, state)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({WebSocketConnection, _ws_conn, {:websocket_disconnected, %{reason: reason}}} = msg, state) do
+    Logger.debug("[#{state.correlation_id}] Received disconnect from different ws_conn, processing anyway",
+      message: inspect(msg),
+      state_ws_conn: inspect(state.ws_conn),
+      reason: inspect(reason)
+    )
+
+    state = handle_disconnect(reason, state)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({WebSocketConnection, _ws_conn, {:websocket_connected, _data}} = msg, state) do
+    Logger.debug("[#{state.correlation_id}] Received connected from different ws_conn, processing anyway",
+      message: inspect(msg),
+      state_ws_conn: inspect(state.ws_conn)
+    )
+
+    state = %{state | connection_state: :connected}
+    {:noreply, state}
+  end
+
   @impl true
   def handle_info(msg, state) do
     Logger.debug("[#{state.correlation_id}] Unhandled message",
@@ -254,7 +306,7 @@ defmodule Server.Services.Twitch.ConnectionManager do
       reason: inspect(reason)
     )
 
-    if state.ws_conn do
+    if state.ws_conn && is_pid(state.ws_conn) do
       WebSocketConnection.disconnect(state.ws_conn)
     end
 
@@ -268,7 +320,7 @@ defmodule Server.Services.Twitch.ConnectionManager do
 
     # CloudFront-specific headers for Twitch
     headers = [
-      {"client-id", get_client_id()},
+      {"client-id", get_client_id(state)},
       {"sec-websocket-protocol", "wss"}
     ]
 
@@ -435,9 +487,10 @@ defmodule Server.Services.Twitch.ConnectionManager do
     send(state.owner, {:twitch_connection, message})
   end
 
-  defp get_client_id do
-    # This should come from configuration
-    Application.get_env(:server, :twitch)[:client_id] ||
+  defp get_client_id(state) do
+    # Use client_id from state if available (for testing), otherwise from config
+    state[:client_id] ||
+      Application.get_env(:server, :twitch)[:client_id] ||
       raise "Twitch client_id not configured"
   end
 end

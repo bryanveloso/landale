@@ -14,6 +14,20 @@ defmodule Server.Services.OBS.EventHandler do
     GenServer.start_link(__MODULE__, opts, name: opts[:name])
   end
 
+  @doc """
+  Get the current state.
+  """
+  def get_state(handler) do
+    GenServer.call(handler, :get_state)
+  end
+
+  @doc """
+  Get the session ID.
+  """
+  def get_session_id(handler) do
+    GenServer.call(handler, :get_session_id)
+  end
+
   @impl true
   def init(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
@@ -22,6 +36,15 @@ defmodule Server.Services.OBS.EventHandler do
     Phoenix.PubSub.subscribe(Server.PubSub, "obs_events:#{session_id}")
 
     {:ok, %__MODULE__{session_id: session_id}}
+  end
+
+  @impl true
+  def handle_call(:get_state, _from, state) do
+    {:reply, state, state}
+  end
+
+  def handle_call(:get_session_id, _from, state) do
+    {:reply, state.session_id, state}
   end
 
   @impl true

@@ -39,6 +39,48 @@ defmodule Server.Services.OBS.StreamManager do
     GenServer.call(manager, :get_state)
   end
 
+  @doc """
+  Check if currently streaming.
+  """
+  def streaming?(manager) do
+    GenServer.call(manager, :is_streaming)
+  end
+
+  @doc """
+  Check if currently recording.
+  """
+  def recording?(manager) do
+    GenServer.call(manager, :is_recording)
+  end
+
+  @doc """
+  Check if recording is paused.
+  """
+  def recording_paused?(manager) do
+    GenServer.call(manager, :is_recording_paused)
+  end
+
+  @doc """
+  Check if virtual camera is active.
+  """
+  def virtual_cam_active?(manager) do
+    GenServer.call(manager, :is_virtual_cam_active)
+  end
+
+  @doc """
+  Check if replay buffer is active.
+  """
+  def replay_buffer_active?(manager) do
+    GenServer.call(manager, :is_replay_buffer_active)
+  end
+
+  @doc """
+  Get comprehensive stream information.
+  """
+  def get_stream_info(manager) do
+    GenServer.call(manager, :get_stream_info)
+  end
+
   @impl true
   def init(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
@@ -56,6 +98,39 @@ defmodule Server.Services.OBS.StreamManager do
   @impl true
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
+  end
+
+  def handle_call(:is_streaming, _from, state) do
+    {:reply, state.streaming_active, state}
+  end
+
+  def handle_call(:is_recording, _from, state) do
+    {:reply, state.recording_active, state}
+  end
+
+  def handle_call(:is_recording_paused, _from, state) do
+    {:reply, state.recording_paused, state}
+  end
+
+  def handle_call(:is_virtual_cam_active, _from, state) do
+    {:reply, state.virtual_cam_active, state}
+  end
+
+  def handle_call(:is_replay_buffer_active, _from, state) do
+    {:reply, state.replay_buffer_active, state}
+  end
+
+  def handle_call(:get_stream_info, _from, state) do
+    info = %{
+      streaming: state.streaming_active,
+      recording: state.recording_active,
+      recording_paused: state.recording_paused,
+      virtual_cam: state.virtual_cam_active,
+      replay_buffer: state.replay_buffer_active,
+      session_id: state.session_id
+    }
+
+    {:reply, info, state}
   end
 
   @impl true
