@@ -117,139 +117,148 @@ defmodule Server.Services.Twitch.EventHandler do
       timestamp: DateTime.utc_now()
     }
 
-    case event_type do
-      "stream.online" ->
-        Map.merge(base_event, %{
-          stream_id: event_data["id"],
-          broadcaster_user_id: event_data["broadcaster_user_id"],
-          broadcaster_user_login: event_data["broadcaster_user_login"],
-          broadcaster_user_name: event_data["broadcaster_user_name"],
-          stream_type: event_data["type"],
-          started_at: parse_datetime(event_data["started_at"])
-        })
+    Map.merge(base_event, get_event_specific_data(event_type, event_data))
+  end
 
-      "stream.offline" ->
-        Map.merge(base_event, %{
-          broadcaster_user_id: event_data["broadcaster_user_id"],
-          broadcaster_user_login: event_data["broadcaster_user_login"],
-          broadcaster_user_name: event_data["broadcaster_user_name"]
-        })
+  defp get_event_specific_data("stream.online", event_data) do
+    %{
+      stream_id: event_data["id"],
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      stream_type: event_data["type"],
+      started_at: parse_datetime(event_data["started_at"])
+    }
+  end
 
-      "channel.follow" ->
-        Map.merge(base_event, %{
-          user_id: event_data["user_id"],
-          user_login: event_data["user_login"],
-          user_name: event_data["user_name"],
-          broadcaster_user_id: event_data["broadcaster_user_id"],
-          broadcaster_user_login: event_data["broadcaster_user_login"],
-          broadcaster_user_name: event_data["broadcaster_user_name"],
-          followed_at: parse_datetime(event_data["followed_at"])
-        })
+  defp get_event_specific_data("stream.offline", event_data) do
+    %{
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"]
+    }
+  end
 
-      "channel.subscribe" ->
-        Map.merge(base_event, %{
-          user_id: event_data["user_id"],
-          user_login: event_data["user_login"],
-          user_name: event_data["user_name"],
-          broadcaster_user_id: event_data["broadcaster_user_id"],
-          broadcaster_user_login: event_data["broadcaster_user_login"],
-          broadcaster_user_name: event_data["broadcaster_user_name"],
-          tier: event_data["tier"],
-          is_gift: event_data["is_gift"] || false
-        })
+  defp get_event_specific_data("channel.follow", event_data) do
+    %{
+      user_id: event_data["user_id"],
+      user_login: event_data["user_login"],
+      user_name: event_data["user_name"],
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      followed_at: parse_datetime(event_data["followed_at"])
+    }
+  end
 
-      "channel.subscription.gift" ->
-        Map.merge(base_event, %{
-          user_id: event_data["user_id"],
-          user_login: event_data["user_login"],
-          user_name: event_data["user_name"],
-          broadcaster_user_id: event_data["broadcaster_user_id"],
-          broadcaster_user_login: event_data["broadcaster_user_login"],
-          broadcaster_user_name: event_data["broadcaster_user_name"],
-          tier: event_data["tier"],
-          total: event_data["total"],
-          cumulative_total: event_data["cumulative_total"],
-          is_anonymous: event_data["is_anonymous"] || false
-        })
+  defp get_event_specific_data("channel.subscribe", event_data) do
+    %{
+      user_id: event_data["user_id"],
+      user_login: event_data["user_login"],
+      user_name: event_data["user_name"],
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      tier: event_data["tier"],
+      is_gift: event_data["is_gift"] || false
+    }
+  end
 
-      "channel.cheer" ->
-        Map.merge(base_event, %{
-          user_id: event_data["user_id"],
-          user_login: event_data["user_login"],
-          user_name: event_data["user_name"],
-          broadcaster_user_id: event_data["broadcaster_user_id"],
-          broadcaster_user_login: event_data["broadcaster_user_login"],
-          broadcaster_user_name: event_data["broadcaster_user_name"],
-          is_anonymous: event_data["is_anonymous"] || false,
-          bits: event_data["bits"],
-          message: event_data["message"]
-        })
+  defp get_event_specific_data("channel.subscription.gift", event_data) do
+    %{
+      user_id: event_data["user_id"],
+      user_login: event_data["user_login"],
+      user_name: event_data["user_name"],
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      tier: event_data["tier"],
+      total: event_data["total"],
+      cumulative_total: event_data["cumulative_total"],
+      is_anonymous: event_data["is_anonymous"] || false
+    }
+  end
 
-      "channel.update" ->
-        Map.merge(base_event, %{
-          broadcaster_user_id: event_data["broadcaster_user_id"],
-          broadcaster_user_login: event_data["broadcaster_user_login"],
-          broadcaster_user_name: event_data["broadcaster_user_name"],
-          title: event_data["title"],
-          language: event_data["language"],
-          category_id: event_data["category_id"],
-          category_name: event_data["category_name"],
-          content_classification_labels: event_data["content_classification_labels"] || []
-        })
+  defp get_event_specific_data("channel.cheer", event_data) do
+    %{
+      user_id: event_data["user_id"],
+      user_login: event_data["user_login"],
+      user_name: event_data["user_name"],
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      is_anonymous: event_data["is_anonymous"] || false,
+      bits: event_data["bits"],
+      message: event_data["message"]
+    }
+  end
 
-      "channel.chat.message" ->
-        fragments = event_data["message"]["fragments"] || []
-        {emotes, native_emotes} = extract_emotes_from_fragments(fragments)
+  defp get_event_specific_data("channel.update", event_data) do
+    %{
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      title: event_data["title"],
+      language: event_data["language"],
+      category_id: event_data["category_id"],
+      category_name: event_data["category_name"],
+      content_classification_labels: event_data["content_classification_labels"] || []
+    }
+  end
 
-        Map.merge(base_event, %{
-          message_id: event_data["message_id"],
-          broadcaster_user_id: event_data["broadcaster_user_id"],
-          broadcaster_user_login: event_data["broadcaster_user_login"],
-          broadcaster_user_name: event_data["broadcaster_user_name"],
-          user_id: event_data["chatter_user_id"],
-          user_login: event_data["chatter_user_login"],
-          user_name: event_data["chatter_user_name"],
-          message: event_data["message"]["text"],
-          fragments: fragments,
-          emotes: emotes,
-          native_emotes: native_emotes,
-          color: event_data["color"],
-          badges: extract_badges(event_data["badges"]),
-          message_type: event_data["message_type"],
-          cheer: event_data["cheer"],
-          reply: event_data["reply"],
-          channel_points_custom_reward_id: event_data["channel_points_custom_reward_id"],
-          source_broadcaster_user_id: event_data["source_broadcaster_user_id"],
-          source_broadcaster_user_login: event_data["source_broadcaster_user_login"],
-          source_broadcaster_user_name: event_data["source_broadcaster_user_name"],
-          source_message_id: event_data["source_message_id"],
-          source_badges: event_data["source_badges"]
-        })
+  defp get_event_specific_data("channel.chat.message", event_data) do
+    fragments = event_data["message"]["fragments"] || []
+    {emotes, native_emotes} = extract_emotes_from_fragments(fragments)
 
-      "channel.chat.clear" ->
-        Map.merge(base_event, %{
-          broadcaster_user_id: event_data["broadcaster_user_id"],
-          broadcaster_user_login: event_data["broadcaster_user_login"],
-          broadcaster_user_name: event_data["broadcaster_user_name"]
-        })
+    %{
+      message_id: event_data["message_id"],
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      user_id: event_data["chatter_user_id"],
+      user_login: event_data["chatter_user_login"],
+      user_name: event_data["chatter_user_name"],
+      message: event_data["message"]["text"],
+      fragments: fragments,
+      emotes: emotes,
+      native_emotes: native_emotes,
+      color: event_data["color"],
+      badges: extract_badges(event_data["badges"]),
+      message_type: event_data["message_type"],
+      cheer: event_data["cheer"],
+      reply: event_data["reply"],
+      channel_points_custom_reward_id: event_data["channel_points_custom_reward_id"],
+      source_broadcaster_user_id: event_data["source_broadcaster_user_id"],
+      source_broadcaster_user_login: event_data["source_broadcaster_user_login"],
+      source_broadcaster_user_name: event_data["source_broadcaster_user_name"],
+      source_message_id: event_data["source_message_id"],
+      source_badges: event_data["source_badges"]
+    }
+  end
 
-      "channel.chat.message_delete" ->
-        Map.merge(base_event, %{
-          broadcaster_user_id: event_data["broadcaster_user_id"],
-          broadcaster_user_login: event_data["broadcaster_user_login"],
-          broadcaster_user_name: event_data["broadcaster_user_name"],
-          target_user_id: event_data["target_user_id"],
-          target_user_login: event_data["target_user_login"],
-          target_user_name: event_data["target_user_name"],
-          message_id: event_data["message_id"]
-        })
+  defp get_event_specific_data("channel.chat.clear", event_data) do
+    %{
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"]
+    }
+  end
 
-      _ ->
-        # For unknown event types, include all original data
-        Map.merge(base_event, %{
-          raw_data: event_data
-        })
-    end
+  defp get_event_specific_data("channel.chat.message_delete", event_data) do
+    %{
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      target_user_id: event_data["target_user_id"],
+      target_user_login: event_data["target_user_login"],
+      target_user_name: event_data["target_user_name"],
+      message_id: event_data["message_id"]
+    }
+  end
+
+  defp get_event_specific_data(_event_type, event_data) do
+    # For unknown event types, include all original data
+    %{raw_data: event_data}
   end
 
   @doc """
@@ -528,75 +537,92 @@ defmodule Server.Services.Twitch.EventHandler do
     # Wrap both operations in a transaction for atomicity
     result =
       Server.Repo.transaction(fn ->
-        # First, store the event
-        case ActivityLog.store_event(event_attrs) do
-          {:ok, event} ->
-            Logger.debug("Event stored in ActivityLog database",
-              event_type: event_type,
-              event_id: normalized_event.id,
-              database_id: event.id,
-              correlation_id: event_attrs[:correlation_id],
-              timestamp: event_attrs[:timestamp]
-            )
-
-            # Then, upsert user information if we have user data
-            if normalized_event[:user_id] && normalized_event[:user_login] do
-              user_attrs = %{
-                twitch_id: normalized_event.user_id,
-                login: normalized_event.user_login,
-                display_name: normalized_event[:user_name]
-              }
-
-              case ActivityLog.upsert_user(user_attrs) do
-                {:ok, user} ->
-                  Logger.debug("User upserted in ActivityLog",
-                    user_id: normalized_event.user_id,
-                    login: normalized_event.user_login
-                  )
-
-                  {event, user}
-
-                {:error, changeset} ->
-                  Logger.error("FAILED: User upsert in ActivityLog",
-                    user_id: normalized_event.user_id,
-                    login: normalized_event.user_login,
-                    errors: inspect(changeset.errors)
-                  )
-
-                  Server.Repo.rollback({:user_upsert_failed, changeset})
-              end
-            else
-              # No user data, just return the event
-              {event, nil}
-            end
-
-          {:error, changeset} ->
-            Logger.error("FAILED: Event storage in ActivityLog database",
-              event_type: event_type,
-              event_id: normalized_event.id,
-              correlation_id: event_attrs[:correlation_id],
-              errors: inspect(changeset.errors),
-              changeset_details: inspect(changeset, limit: :infinity)
-            )
-
-            Server.Repo.rollback({:event_storage_failed, changeset})
-        end
+        store_event_with_user(event_attrs, event_type, normalized_event)
       end)
 
-    case result do
-      {:ok, _} ->
-        Logger.debug("Transaction completed successfully",
-          event_type: event_type,
-          correlation_id: event_attrs[:correlation_id]
+    log_transaction_result(result, event_type, event_attrs[:correlation_id])
+  end
+
+  defp store_event_with_user(event_attrs, event_type, normalized_event) do
+    case ActivityLog.store_event(event_attrs) do
+      {:ok, event} ->
+        log_event_stored(event, event_type, normalized_event, event_attrs)
+        handle_user_upsert(event, normalized_event)
+
+      {:error, changeset} ->
+        log_event_storage_failure(event_type, normalized_event, event_attrs, changeset)
+        Server.Repo.rollback({:event_storage_failed, changeset})
+    end
+  end
+
+  defp handle_user_upsert(event, normalized_event) do
+    if normalized_event[:user_id] && normalized_event[:user_login] do
+      upsert_user(event, normalized_event)
+    else
+      {event, nil}
+    end
+  end
+
+  defp upsert_user(event, normalized_event) do
+    user_attrs = %{
+      twitch_id: normalized_event.user_id,
+      login: normalized_event.user_login,
+      display_name: normalized_event[:user_name]
+    }
+
+    case ActivityLog.upsert_user(user_attrs) do
+      {:ok, user} ->
+        Logger.debug("User upserted in ActivityLog",
+          user_id: normalized_event.user_id,
+          login: normalized_event.user_login
         )
 
-      {:error, reason} ->
-        Logger.error("Transaction failed",
-          event_type: event_type,
-          correlation_id: event_attrs[:correlation_id],
-          reason: inspect(reason)
+        {event, user}
+
+      {:error, changeset} ->
+        Logger.error("FAILED: User upsert in ActivityLog",
+          user_id: normalized_event.user_id,
+          login: normalized_event.user_login,
+          errors: inspect(changeset.errors)
         )
+
+        Server.Repo.rollback({:user_upsert_failed, changeset})
     end
+  end
+
+  defp log_event_stored(event, event_type, normalized_event, event_attrs) do
+    Logger.debug("Event stored in ActivityLog database",
+      event_type: event_type,
+      event_id: normalized_event.id,
+      database_id: event.id,
+      correlation_id: event_attrs[:correlation_id],
+      timestamp: event_attrs[:timestamp]
+    )
+  end
+
+  defp log_event_storage_failure(event_type, normalized_event, event_attrs, changeset) do
+    Logger.error("FAILED: Event storage in ActivityLog database",
+      event_type: event_type,
+      event_id: normalized_event.id,
+      correlation_id: event_attrs[:correlation_id],
+      errors: inspect(changeset.errors),
+      changeset_details: inspect(changeset, limit: :infinity)
+    )
+  end
+
+  defp log_transaction_result({:ok, _}, event_type, correlation_id) do
+    Logger.debug("Transaction completed successfully",
+      event_type: event_type,
+      correlation_id: correlation_id
+    )
+  end
+
+  defp log_transaction_result({:error, reason}, event_type, correlation_id) do
+    Logger.error("Transaction failed",
+      event_type: event_type,
+      correlation_id: correlation_id,
+      reason: inspect(reason)
+    )
   end
 
   # Simple correlation ID generation for events

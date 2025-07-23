@@ -1158,66 +1158,66 @@ defmodule Server.Services.Twitch do
   def terminate(reason, state) do
     Logger.info("Service terminating", reason: reason)
 
-    # Clean up all tracked subscriptions from monitor
-    Enum.each(state.subscriptions, fn {subscription_id, _subscription} ->
-      Server.SubscriptionMonitor.untrack_subscription(subscription_id)
-    end)
-
-    # Close WebSocket connection
-    if state.ws_client do
-      WebSocketClient.close(state.ws_client)
-    end
-
-    # Close OAuth token manager with error handling
-    if state.token_manager do
-      try do
-        OAuthTokenManager.close(state.token_manager)
-      rescue
-        error ->
-          Logger.warning("Token manager cleanup failed", error: inspect(error))
-      end
-    end
-
-    # Cancel async tasks gracefully
-    if state.token_validation_task do
-      case Task.shutdown(state.token_validation_task, 5_000) do
-        :ok -> :ok
-        {:exit, :normal} -> :ok
-        nil -> Logger.warning("Token validation task timeout during termination")
-      end
-    end
-
-    if state.token_refresh_task do
-      case Task.shutdown(state.token_refresh_task, 5_000) do
-        :ok -> :ok
-        {:exit, :normal} -> :ok
-        nil -> Logger.warning("Token refresh task timeout during termination")
-      end
-    end
-
-    # Cancel timers with validation
-    if state.reconnect_timer do
-      case Process.cancel_timer(state.reconnect_timer) do
-        false -> Logger.debug("Timer cleanup skipped", timer: "reconnect", reason: "already expired")
-        _time_left -> Logger.debug("Timer cleanup completed", timer: "reconnect")
-      end
-    end
-
-    if state.token_refresh_timer do
-      case Process.cancel_timer(state.token_refresh_timer) do
-        false -> Logger.debug("Timer cleanup skipped", timer: "token_refresh", reason: "already expired")
-        _time_left -> Logger.debug("Timer cleanup completed", timer: "token_refresh")
-      end
-    end
-
-    if state.retry_subscription_timer do
-      case Process.cancel_timer(state.retry_subscription_timer) do
-        false -> Logger.debug("Timer cleanup skipped", timer: "retry_subscription", reason: "already expired")
-        _time_left -> Logger.debug("Timer cleanup completed", timer: "retry_subscription")
-      end
-    end
+    cleanup_subscriptions(state.subscriptions)
+    cleanup_websocket(state.ws_client)
+    cleanup_token_manager(state.token_manager)
+    cleanup_tasks(state)
+    cleanup_timers(state)
 
     :ok
+  end
+
+  defp cleanup_subscriptions(subscriptions) do
+    Enum.each(subscriptions, fn {subscription_id, _subscription} ->
+      Server.SubscriptionMonitor.untrack_subscription(subscription_id)
+    end)
+  end
+
+  defp cleanup_websocket(nil), do: :ok
+
+  defp cleanup_websocket(ws_client) do
+    WebSocketClient.close(ws_client)
+  end
+
+  defp cleanup_token_manager(nil), do: :ok
+
+  defp cleanup_token_manager(token_manager) do
+    try do
+      OAuthTokenManager.close(token_manager)
+    rescue
+      error ->
+        Logger.warning("Token manager cleanup failed", error: inspect(error))
+    end
+  end
+
+  defp cleanup_tasks(state) do
+    shutdown_task(state.token_validation_task, "Token validation")
+    shutdown_task(state.token_refresh_task, "Token refresh")
+  end
+
+  defp shutdown_task(nil, _name), do: :ok
+
+  defp shutdown_task(task, name) do
+    case Task.shutdown(task, 5_000) do
+      :ok -> :ok
+      {:exit, :normal} -> :ok
+      nil -> Logger.warning("#{name} task timeout during termination")
+    end
+  end
+
+  defp cleanup_timers(state) do
+    cancel_timer(state.reconnect_timer, "reconnect")
+    cancel_timer(state.token_refresh_timer, "token_refresh")
+    cancel_timer(state.retry_subscription_timer, "retry_subscription")
+  end
+
+  defp cancel_timer(nil, _name), do: :ok
+
+  defp cancel_timer(timer_ref, name) do
+    case Process.cancel_timer(timer_ref) do
+      false -> Logger.debug("Timer cleanup skipped", timer: name, reason: "already expired")
+      _time_left -> Logger.debug("Timer cleanup completed", timer: name)
+    end
   end
 
   # Private functions
