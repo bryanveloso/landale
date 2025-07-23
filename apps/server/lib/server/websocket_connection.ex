@@ -30,7 +30,9 @@ defmodule Server.WebSocketConnection do
           conn_manager: ConnectionManager.connection_state(),
           owner: pid(),
           owner_ref: reference() | nil,
-          opts: keyword()
+          opts: keyword(),
+          cloudfront_retry_count: non_neg_integer(),
+          user_agent_index: non_neg_integer()
         }
 
   @type connection_state :: :disconnected | :connecting | :connected | :reconnecting | :error
@@ -39,6 +41,15 @@ defmodule Server.WebSocketConnection do
   @default_reconnect_base_delay 5_000
   @default_reconnect_max_delay 60_000
   @default_reconnect_factor 2
+  @cloudfront_max_retries 3
+
+  # CloudFront user agents for rotation
+  @user_agents [
+    "Landale/1.0 (WebSocket Client)",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+  ]
 
   # Client API
 
@@ -53,6 +64,9 @@ defmodule Server.WebSocketConnection do
   - `:reconnect_max_delay` - Maximum reconnection delay (default: 60000ms)
   - `:reconnect_factor` - Exponential backoff factor (default: 2)
   - `:headers` - Additional headers for WebSocket upgrade
+  - `:retry_config` - CloudFront retry configuration
+    - `:enabled` - Enable CloudFront 400 error retry (default: false)
+    - `:max_retries` - Maximum retry attempts (default: 3)
   """
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts)
@@ -97,7 +111,9 @@ defmodule Server.WebSocketConnection do
       conn_manager: ConnectionManager.init_connection_state(),
       owner: owner,
       owner_ref: Process.monitor(owner),
-      opts: opts
+      opts: opts,
+      cloudfront_retry_count: 0,
+      user_agent_index: 0
     }
 
     if Keyword.get(opts, :auto_connect, true) do
@@ -170,7 +186,8 @@ defmodule Server.WebSocketConnection do
       | stream_ref: stream_ref,
         connection_state: :connected,
         reconnect_attempt: 0,
-        conn_manager: conn_manager
+        conn_manager: conn_manager,
+        cloudfront_retry_count: 0
     }
 
     notify_owner(state, {:websocket_connected, %{uri: state.uri, headers: headers}})
@@ -197,6 +214,20 @@ defmodule Server.WebSocketConnection do
     Logger.error("Connection error", uri: state.uri, error: inspect(reason))
 
     state = handle_connection_loss(state, reason)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:gun_response, conn_pid, _stream_ref, _is_fin, status, headers}, %{conn_pid: conn_pid} = state) do
+    Logger.warning("WebSocket upgrade failed", uri: state.uri, status: status, headers: inspect(headers))
+
+    state =
+      if should_retry_cloudfront?(status, state) do
+        handle_cloudfront_retry(state)
+      else
+        handle_connection_failure(state, {:upgrade_failed, status})
+      end
+
     {:noreply, state}
   end
 
@@ -235,20 +266,15 @@ defmodule Server.WebSocketConnection do
 
     case connect_gun(state.uri, state.opts) do
       {:ok, conn_pid} ->
-        {monitor_ref, conn_manager} = ConnectionManager.add_monitor(state.conn_manager, conn_pid, :gun_connection)
+        {_monitor_ref, conn_manager} = ConnectionManager.add_monitor(state.conn_manager, conn_pid, :gun_connection)
 
         state = %{state | conn_pid: conn_pid, conn_manager: conn_manager}
 
         # Now perform WebSocket upgrade
-        case perform_ws_upgrade(conn_pid, state.uri, state.opts) do
-          {:ok, _stream_ref} ->
-            # Gun will send :gun_upgrade message when complete
-            state
-
-          {:error, reason} ->
-            Logger.error("[#{correlation_id}] WebSocket upgrade failed", error: inspect(reason))
-            handle_connection_failure(state, reason)
-        end
+        # perform_ws_upgrade always returns {:ok, stream_ref}
+        {:ok, _stream_ref} = perform_ws_upgrade(conn_pid, state.uri, state.opts, state)
+        # Gun will send :gun_upgrade message when complete
+        state
 
       {:error, reason} ->
         Logger.error("[#{correlation_id}] Connection failed", error: inspect(reason))
@@ -280,7 +306,7 @@ defmodule Server.WebSocketConnection do
     :gun.ws_send(conn_pid, stream_ref, data)
   end
 
-  defp connect_gun(uri, opts) do
+  defp connect_gun(uri, _opts) do
     uri_map = URI.parse(uri)
     host = String.to_charlist(uri_map.host || "localhost")
     port = uri_map.port || if(uri_map.scheme == "wss", do: 443, else: 80)
@@ -309,7 +335,7 @@ defmodule Server.WebSocketConnection do
     :gun.open(host, port, gun_opts)
   end
 
-  defp perform_ws_upgrade(conn_pid, uri, opts) do
+  defp perform_ws_upgrade(conn_pid, uri, opts, state) do
     uri_map = URI.parse(uri)
     path = uri_map.path || "/"
 
@@ -321,7 +347,7 @@ defmodule Server.WebSocketConnection do
         path
       end
 
-    headers = Keyword.get(opts, :headers, [])
+    headers = build_headers(uri_map, opts, state)
 
     stream_ref = :gun.ws_upgrade(conn_pid, path, headers)
     {:ok, stream_ref}
@@ -397,5 +423,85 @@ defmodule Server.WebSocketConnection do
 
   defp notify_owner(state, message) do
     send(state.owner, {__MODULE__, self(), message})
+  end
+
+  # CloudFront-specific functions
+
+  defp build_headers(uri_map, opts, state) do
+    base_headers = Keyword.get(opts, :headers, [])
+
+    # Add CloudFront-required headers if retry config is enabled
+    retry_config = Keyword.get(opts, :retry_config, [])
+
+    if Keyword.get(retry_config, :enabled, false) do
+      cloudfront_headers = [
+        {"user-agent", get_current_user_agent(state.user_agent_index)},
+        {"origin", "https://#{uri_map.host}"},
+        {"sec-websocket-protocol", "wss"},
+        {"sec-websocket-version", "13"},
+        {"sec-websocket-key", generate_ws_key()},
+        {"upgrade", "websocket"},
+        {"connection", "upgrade"}
+      ]
+
+      # Merge with base headers, preferring user-provided values
+      merge_headers(cloudfront_headers, base_headers)
+    else
+      base_headers
+    end
+  end
+
+  defp merge_headers(defaults, overrides) do
+    override_map = Map.new(overrides, fn {k, v} -> {String.downcase(k), v} end)
+
+    Enum.reduce(defaults, overrides, fn {key, value}, acc ->
+      if Map.has_key?(override_map, String.downcase(key)) do
+        acc
+      else
+        [{key, value} | acc]
+      end
+    end)
+  end
+
+  defp generate_ws_key do
+    :crypto.strong_rand_bytes(16) |> Base.encode64()
+  end
+
+  defp get_current_user_agent(index) do
+    Enum.at(@user_agents, rem(index, length(@user_agents)))
+  end
+
+  defp should_retry_cloudfront?(status, state) do
+    retry_config = Keyword.get(state.opts, :retry_config, [])
+    enabled = Keyword.get(retry_config, :enabled, false)
+    max_retries = Keyword.get(retry_config, :max_retries, @cloudfront_max_retries)
+
+    enabled && status == 400 && state.cloudfront_retry_count < max_retries
+  end
+
+  defp handle_cloudfront_retry(state) do
+    Logger.info("CloudFront 400 error, retrying with different user-agent",
+      uri: state.uri,
+      retry_count: state.cloudfront_retry_count + 1,
+      user_agent_index: state.user_agent_index + 1
+    )
+
+    # Close current connection
+    conn_manager = ConnectionManager.close_connection(state.conn_manager, :websocket)
+
+    # Update state for retry
+    state = %{
+      state
+      | conn_pid: nil,
+        stream_ref: nil,
+        cloudfront_retry_count: state.cloudfront_retry_count + 1,
+        user_agent_index: state.user_agent_index + 1,
+        conn_manager: conn_manager
+    }
+
+    # Schedule immediate reconnect
+    send(self(), :connect)
+
+    state
   end
 end
