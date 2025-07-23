@@ -40,6 +40,12 @@ defmodule Server.Services.OBS.EventHandler do
     {:noreply, state}
   end
 
+  # Catch-all for unexpected messages
+  def handle_info(_msg, state) do
+    # Ignore unexpected messages
+    {:noreply, state}
+  end
+
   # Event handlers
 
   defp handle_obs_event(%{eventType: "CurrentProgramSceneChanged"} = event, state) do
