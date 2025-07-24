@@ -45,6 +45,8 @@ defmodule Server.Application do
             # Stream coordination
             Server.ContentAggregator,
             Server.StreamProducer,
+            # IronMON tracking
+            Server.Ironmon.RunTracker,
             # Subscription monitoring
             {Server.SubscriptionStorage, [name: :subscriptions]},
             {Server.SubscriptionMonitor, [storage: :subscriptions]},

@@ -453,10 +453,42 @@ defmodule Server.Services.IronmonTCP do
 
       "seed" ->
         Logger.debug("Seed count updated", count: metadata.count)
+        # Create new seed in database (new attempt started)
+        # Get the first (and currently only) challenge
+        challenge_id =
+          case Server.Ironmon.list_challenges() do
+            [challenge | _] ->
+              challenge.id
+
+            [] ->
+              Logger.error("No challenges found in database - cannot create seed")
+              nil
+          end
+
+        if challenge_id do
+          # Use the seed count from IronMON as the seed ID
+          case Server.Ironmon.RunTracker.new_seed(challenge_id, metadata.count) do
+            {:ok, seed_id} ->
+              Logger.info("New IronMON attempt started", seed_id: seed_id, count: metadata.count)
+
+            {:error, reason} ->
+              Logger.error("Failed to create new seed", reason: inspect(reason))
+          end
+        end
+
         Events.publish_ironmon_event(type, event_data, batch: false)
 
       "checkpoint" ->
         Logger.info("Checkpoint cleared", id: metadata.id, name: metadata.name, seed: Map.get(metadata, :seed))
+        # Record checkpoint result (always true since we only get notified when cleared)
+        case Server.Ironmon.RunTracker.record_checkpoint(metadata.name, true) do
+          :ok ->
+            Logger.debug("Checkpoint recorded in database", name: metadata.name)
+
+          {:error, reason} ->
+            Logger.error("Failed to record checkpoint", name: metadata.name, reason: inspect(reason))
+        end
+
         Events.publish_ironmon_event(type, event_data, batch: false)
 
       "location" ->

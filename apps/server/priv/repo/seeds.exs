@@ -9,3 +9,6 @@
 #
 # We recommend using the bang functions (`insert!`, `update!`
 # and so on) as they will fail if something goes wrong.
+
+# Run IronMON seeds
+Code.eval_file("seeds_ironmon.exs", __DIR__)
