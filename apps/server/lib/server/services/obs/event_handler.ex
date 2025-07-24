@@ -147,7 +147,7 @@ defmodule Server.Services.OBS.EventHandler do
     new_state
   end
 
-  defp handle_obs_event(event, state) do
+  defp handle_obs_event(event, state) when is_map(event) do
     event_type = event[:eventType]
 
     # Update state to track unhandled events
@@ -167,5 +167,17 @@ defmodule Server.Services.OBS.EventHandler do
     )
 
     new_state
+  end
+
+  defp handle_obs_event(malformed_event, state) do
+    # Handle malformed events gracefully
+    Logger.warning("Received malformed OBS event",
+      service: "obs",
+      session_id: state.session_id,
+      event: malformed_event
+    )
+
+    # Don't update state for malformed events
+    state
   end
 end
