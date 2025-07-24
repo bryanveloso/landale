@@ -9,8 +9,8 @@ defmodule Server.Services.OBS.RequestTrackerRefactored do
   use GenServer
   require Logger
 
-  alias Server.{WebSocketConnection}
   alias Server.Services.OBS.Protocol
+  alias Server.WebSocketConnection
 
   # 30 seconds
   @request_timeout 30_000

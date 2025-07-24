@@ -21,7 +21,7 @@ defmodule Server.Services.TwitchRefactored do
   use GenServer
   require Logger
 
-  alias Server.Services.Twitch.{ConnectionManager, SessionManager, MessageRouter, EventHandler}
+  alias Server.Services.Twitch.{ConnectionManager, EventHandler, MessageRouter, SessionManager}
   alias Server.{Logging, OAuthTokenManager}
 
   defstruct [

@@ -12,7 +12,7 @@ defmodule Server.Ironmon.RunTracker do
   require Logger
 
   alias Server.Repo
-  alias Server.Ironmon.{Seed, Result, Checkpoint}
+  alias Server.Ironmon.{Checkpoint, Result, Seed}
   import Ecto.Query
 
   @name __MODULE__

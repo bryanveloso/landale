@@ -13,8 +13,8 @@ defmodule Server.Services.OBS.ConnectionRefactored do
   use GenServer
   require Logger
 
-  alias Server.WebSocketConnection
   alias Server.Services.OBS.Protocol
+  alias Server.WebSocketConnection
 
   # Timeouts
   @auth_timeout 10_000

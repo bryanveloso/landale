@@ -33,7 +33,7 @@ defmodule Server.Services.Twitch.ConnectionManager do
   use GenServer
   require Logger
 
-  alias Server.{WebSocketConnection, CorrelationId}
+  alias Server.{CorrelationId, WebSocketConnection}
   alias Server.Services.Twitch.Protocol
 
   @type state :: %{

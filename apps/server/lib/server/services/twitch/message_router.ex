@@ -24,7 +24,7 @@ defmodule Server.Services.Twitch.MessageRouter do
 
   require Logger
 
-  alias Server.Services.Twitch.{Protocol, SessionManager, EventHandler}
+  alias Server.Services.Twitch.{EventHandler, Protocol, SessionManager}
 
   @type router_state :: %{
           session_manager: pid() | nil,

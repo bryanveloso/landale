@@ -1,4 +1,11 @@
 defmodule ServerWeb.ServiceController do
+  @moduledoc """
+  Controller for service registry operations.
+
+  Provides REST endpoints for service discovery, health checks,
+  and service introspection.
+  """
+
   use ServerWeb, :controller
 
   @doc """
