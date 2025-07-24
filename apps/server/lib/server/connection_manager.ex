@@ -50,6 +50,7 @@ defmodule Server.ConnectionManager do
   """
 
   require Logger
+  alias Server.ConnectionManagerTelemetry
 
   @type connection_state :: %{
           monitors: %{reference() => {pid(), atom()}},
@@ -93,6 +94,7 @@ defmodule Server.ConnectionManager do
     updated_state = %{state | monitors: updated_monitors}
 
     Logger.debug("Added monitor", pid: inspect(pid), label: label, ref: inspect(monitor_ref))
+    ConnectionManagerTelemetry.monitor_added(pid, label)
 
     {monitor_ref, updated_state}
   end
@@ -114,9 +116,11 @@ defmodule Server.ConnectionManager do
         case Process.demonitor(monitor_ref, [:flush]) do
           true ->
             Logger.debug("Removed monitor", pid: inspect(pid), label: label, ref: inspect(monitor_ref))
+            ConnectionManagerTelemetry.monitor_removed(pid, label, true)
 
           false ->
             Logger.debug("Monitor already removed or expired", ref: inspect(monitor_ref))
+            ConnectionManagerTelemetry.monitor_removed(pid, label, false)
         end
 
         updated_monitors = Map.delete(state.monitors, monitor_ref)
@@ -124,6 +128,7 @@ defmodule Server.ConnectionManager do
 
       nil ->
         Logger.warning("Attempted to remove unknown monitor", ref: inspect(monitor_ref))
+        ConnectionManagerTelemetry.monitor_removed(nil, nil, false)
         state
     end
   end
@@ -149,6 +154,7 @@ defmodule Server.ConnectionManager do
           label: label,
           reason: inspect(reason)
         )
+        ConnectionManagerTelemetry.monitor_down(pid, label, reason)
 
         updated_monitors = Map.delete(state.monitors, monitor_ref)
         %{state | monitors: updated_monitors}
@@ -159,6 +165,7 @@ defmodule Server.ConnectionManager do
           actual_pid: inspect(pid),
           label: label
         )
+        ConnectionManagerTelemetry.monitor_down(pid, label, reason)
 
         updated_monitors = Map.delete(state.monitors, monitor_ref)
         %{state | monitors: updated_monitors}
@@ -168,6 +175,7 @@ defmodule Server.ConnectionManager do
           ref: inspect(monitor_ref),
           pid: inspect(pid)
         )
+        ConnectionManagerTelemetry.monitor_down(pid, nil, reason)
 
         state
     end
@@ -193,6 +201,8 @@ defmodule Server.ConnectionManager do
     updated_state = %{state | timers: updated_timers}
 
     Logger.debug("Added timer", label: label, ref: inspect(timer_ref))
+    ConnectionManagerTelemetry.timer_added(label)
+    
     updated_state
   end
 
@@ -210,6 +220,7 @@ defmodule Server.ConnectionManager do
   def cancel_timer(state, label) do
     case Map.get(state.timers, label) do
       nil ->
+        ConnectionManagerTelemetry.timer_cancelled(label, false)
         state
 
       timer_ref ->
@@ -221,6 +232,7 @@ defmodule Server.ConnectionManager do
             Logger.debug("Cancelled timer", label: label, time_left: time_left)
         end
 
+        ConnectionManagerTelemetry.timer_cancelled(label, true)
         updated_timers = Map.delete(state.timers, label)
         %{state | timers: updated_timers}
     end
@@ -349,10 +361,14 @@ defmodule Server.ConnectionManager do
   """
   @spec cleanup_all(connection_state()) :: :ok
   def cleanup_all(state) do
+    monitor_count = map_size(state.monitors)
+    timer_count = map_size(state.timers)
+    connection_count = map_size(state.connections)
+
     Logger.debug("Starting complete resource cleanup",
-      monitors: map_size(state.monitors),
-      timers: map_size(state.timers),
-      connections: map_size(state.connections)
+      monitors: monitor_count,
+      timers: timer_count,
+      connections: connection_count
     )
 
     # Create immutable snapshots to prevent race conditions during iteration
@@ -368,6 +384,9 @@ defmodule Server.ConnectionManager do
 
     # Demonitor all processes atomically
     cleanup_monitors(monitors_snapshot)
+
+    # Emit telemetry for cleanup
+    ConnectionManagerTelemetry.cleanup(monitor_count, timer_count)
 
     Logger.debug("Resource cleanup completed")
     :ok
