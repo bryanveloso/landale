@@ -1,14 +1,14 @@
 defmodule Server.ConnectionManagerTelemetry do
   @moduledoc """
   Telemetry instrumentation for ConnectionManager.
-  
+
   This module adds low-overhead telemetry events to monitor connection
   management operations without affecting existing functionality.
-  
+
   ## Events
-  
+
   The following events are emitted:
-  
+
   * `[:connection_manager, :monitor, :add]` - When a monitor is added
     * Measurements: none
     * Metadata: `:pid`, `:label`
@@ -35,7 +35,7 @@ defmodule Server.ConnectionManagerTelemetry do
   """
 
   require Logger
-  
+
   @doc """
   Emits a telemetry event for adding a monitor.
   """
@@ -46,7 +46,7 @@ defmodule Server.ConnectionManagerTelemetry do
       %{pid: pid, label: label}
     )
   end
-  
+
   @doc """
   Emits a telemetry event for removing a monitor.
   """
@@ -57,7 +57,7 @@ defmodule Server.ConnectionManagerTelemetry do
       %{pid: pid, label: label, found: found?}
     )
   end
-  
+
   @doc """
   Emits a telemetry event for a monitor going down.
   """
@@ -68,7 +68,7 @@ defmodule Server.ConnectionManagerTelemetry do
       %{pid: pid, label: label, reason: reason}
     )
   end
-  
+
   @doc """
   Emits a telemetry event for adding a timer.
   """
@@ -79,7 +79,7 @@ defmodule Server.ConnectionManagerTelemetry do
       %{label: label}
     )
   end
-  
+
   @doc """
   Emits a telemetry event for cancelling a timer.
   """
@@ -90,7 +90,7 @@ defmodule Server.ConnectionManagerTelemetry do
       %{label: label, found: found?}
     )
   end
-  
+
   @doc """
   Emits a telemetry event for cleanup operations.
   """
@@ -101,7 +101,7 @@ defmodule Server.ConnectionManagerTelemetry do
       %{}
     )
   end
-  
+
   @doc """
   Attaches default handlers for logging telemetry events.
   Call this in your application startup.
@@ -115,7 +115,7 @@ defmodule Server.ConnectionManagerTelemetry do
       [:connection_manager, :timer, :cancel],
       [:connection_manager, :cleanup]
     ]
-    
+
     :telemetry.attach_many(
       "connection-manager-log-handler",
       events,
@@ -123,7 +123,7 @@ defmodule Server.ConnectionManagerTelemetry do
       nil
     )
   end
-  
+
   defp handle_event([:connection_manager, :monitor, :down], _measurements, metadata, _config) do
     if metadata.reason != :normal do
       Logger.warning("ConnectionManager monitored process went down",
@@ -133,7 +133,7 @@ defmodule Server.ConnectionManagerTelemetry do
       )
     end
   end
-  
+
   defp handle_event([:connection_manager, :cleanup], measurements, _metadata, _config) do
     if measurements.monitor_count > 0 || measurements.timer_count > 0 do
       Logger.debug("ConnectionManager cleanup performed",
@@ -142,7 +142,7 @@ defmodule Server.ConnectionManagerTelemetry do
       )
     end
   end
-  
+
   defp handle_event(_event, _measurements, _metadata, _config) do
     # Other events are handled silently by default
     :ok

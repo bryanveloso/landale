@@ -154,6 +154,7 @@ defmodule Server.ConnectionManager do
           label: label,
           reason: inspect(reason)
         )
+
         ConnectionManagerTelemetry.monitor_down(pid, label, reason)
 
         updated_monitors = Map.delete(state.monitors, monitor_ref)
@@ -165,6 +166,7 @@ defmodule Server.ConnectionManager do
           actual_pid: inspect(pid),
           label: label
         )
+
         ConnectionManagerTelemetry.monitor_down(pid, label, reason)
 
         updated_monitors = Map.delete(state.monitors, monitor_ref)
@@ -175,6 +177,7 @@ defmodule Server.ConnectionManager do
           ref: inspect(monitor_ref),
           pid: inspect(pid)
         )
+
         ConnectionManagerTelemetry.monitor_down(pid, nil, reason)
 
         state
@@ -202,7 +205,7 @@ defmodule Server.ConnectionManager do
 
     Logger.debug("Added timer", label: label, ref: inspect(timer_ref))
     ConnectionManagerTelemetry.timer_added(label)
-    
+
     updated_state
   end
 

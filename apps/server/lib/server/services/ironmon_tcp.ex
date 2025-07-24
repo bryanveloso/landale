@@ -1,6 +1,4 @@
 defmodule Server.Services.IronmonTCP do
-  @behaviour Server.Services.IronmonTCPBehaviour
-
   @moduledoc """
   IronMON TCP server integration using Elixir GenServer.
 
@@ -26,10 +24,11 @@ defmodule Server.Services.IronmonTCP do
   "ironmon:events" topic for consumption by the dashboard and overlays.
   """
 
-  use GenServer
-  require Logger
-
-  alias Server.{CorrelationId, Events, Logging, ServiceError}
+  use Server.Service, 
+    service_name: "ironmon-tcp",
+    behaviour: Server.Services.IronmonTCPBehaviour
+    
+  use Server.Service.StatusReporter
 
   # Default TCP server configuration
   @default_port 8080
@@ -42,26 +41,7 @@ defmodule Server.Services.IronmonTCP do
     3 => "FireRed/LeafGreen"
   }
 
-  defstruct [
-    :listen_socket,
-    :port,
-    :hostname,
-    connections: %{}
-  ]
-
-  # Client API
-
-  @doc """
-  Starts the IronMON TCP server GenServer.
-
-  ## Options
-  - `:port` - TCP port to listen on (default: 8080)
-  - `:hostname` - Hostname to bind to (default: "0.0.0.0")
-  """
-  @spec start_link(keyword()) :: GenServer.on_start()
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
+  # Client API - start_link provided by Server.Service
 
   @doc """
   Gets the current status of the TCP server.
@@ -145,51 +125,56 @@ defmodule Server.Services.IronmonTCP do
     error -> {:error, inspect(error)}
   end
 
-  # GenServer Callbacks
-
-  @impl GenServer
-  def init(opts) do
+  # Service Implementation
+  
+  @impl Server.Service
+  def do_init(opts) do
     port = Keyword.get(opts, :port, @default_port)
     hostname = Keyword.get(opts, :hostname, @default_hostname)
-
-    state = %__MODULE__{
+    
+    state = %{
       port: port,
       hostname: hostname,
-      connections: %{}
+      connections: %{},
+      listen_socket: nil
     }
-
-    # Set service context for all log messages from this process
-    Logging.set_service_context(:ironmon_tcp, port: port, hostname: hostname)
-    correlation_id = Logging.set_correlation_id()
-
-    Logger.info("Service starting", correlation_id: correlation_id)
-
+    
     case start_tcp_server(state) do
       {:ok, new_state} ->
-        Logger.info("TCP server started", port: port, hostname: state.hostname)
+        Logger.info("TCP server started", port: port, hostname: hostname)
         {:ok, new_state}
-
+        
       {:error, reason} ->
-        error =
-          ServiceError.new(:ironmon_tcp, "start", :network_error, "Failed to start TCP server: #{inspect(reason)}")
-
-        Logging.log_error("TCP server startup failed", inspect(reason), port: port)
-        {:stop, error}
+        {:stop, {:tcp_startup_failed, reason}}
     end
   end
-
-  @impl GenServer
-  def handle_call(:get_status, _from, state) do
-    status = %{
-      listening: state.listen_socket != nil,
+  
+  @impl Server.Service
+  def do_terminate(_reason, state) do
+    if state[:listen_socket] do
+      :gen_tcp.close(state.listen_socket)
+    end
+    
+    # Close all client connections
+    Enum.each(state.connections, fn {socket, _buffer} ->
+      :gen_tcp.close(socket)
+    end)
+    
+    :ok
+  end
+  
+  @impl Server.Service.StatusReporter
+  def do_build_status(state) do
+    %{
+      listening: state[:listen_socket] != nil,
       port: state.port,
       hostname: state.hostname,
       connection_count: map_size(state.connections),
       connections: Map.keys(state.connections)
     }
-
-    {:reply, {:ok, status}, state}
   end
+
+  # GenServer Callbacks
 
   @impl GenServer
   def handle_info({:tcp, socket, data}, state) do
@@ -198,7 +183,8 @@ defmodule Server.Services.IronmonTCP do
     CorrelationId.with_context(correlation_id, fn ->
       Logger.debug("TCP data received",
         socket: inspect(socket),
-        data_size: byte_size(data)
+        data_size: byte_size(data),
+        raw_data: inspect(data)
       )
 
       case handle_tcp_data(socket, data, state) do
@@ -243,21 +229,6 @@ defmodule Server.Services.IronmonTCP do
     {:noreply, state}
   end
 
-  @impl GenServer
-  def terminate(reason, state) do
-    Logger.info("Service terminating", reason: inspect(reason))
-
-    if state.listen_socket do
-      :gen_tcp.close(state.listen_socket)
-    end
-
-    # Close all client connections
-    Enum.each(state.connections, fn {socket, _buffer} ->
-      :gen_tcp.close(socket)
-    end)
-
-    :ok
-  end
 
   # Private Functions
 
