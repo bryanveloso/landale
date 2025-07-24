@@ -42,6 +42,17 @@ defmodule Server.Services.OBS.Connection do
 
   # Client API
 
+  @doc false
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      type: :worker,
+      restart: :permanent,
+      shutdown: 5000
+    }
+  end
+
   def start_link(opts) do
     :gen_statem.start_link(__MODULE__, opts, name: opts[:name])
   end

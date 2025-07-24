@@ -210,8 +210,8 @@ defmodule Server.CircuitBreakerServer do
     end
   end
 
-  defp can_execute?(%CircuitBreaker{state: :closed}), do: {:ok, nil}
-  defp can_execute?(%CircuitBreaker{state: :half_open}), do: {:ok, nil}
+  defp can_execute?(%CircuitBreaker{state: :closed} = circuit), do: {:ok, circuit}
+  defp can_execute?(%CircuitBreaker{state: :half_open} = circuit), do: {:ok, circuit}
   defp can_execute?(%CircuitBreaker{state: :open}), do: {:error, :circuit_open}
 
   defp should_attempt_reset?(%CircuitBreaker{state: :open} = circuit) do
@@ -266,11 +266,6 @@ defmodule Server.CircuitBreakerServer do
         # Shouldn't happen, but handle gracefully
         {{:ok, result}, circuit}
     end
-  end
-
-  defp handle_failure(nil, error) do
-    Logger.error("Circuit breaker handle_failure called with nil circuit", error: inspect(error))
-    {error, nil}
   end
 
   defp handle_failure(circuit, error) do
@@ -349,11 +344,6 @@ defmodule Server.CircuitBreakerServer do
         last_failure_time: nil,
         state_changed_at: now
     }
-  end
-
-  defp update_circuit(state, nil) do
-    Logger.error("Attempted to update circuit with nil")
-    state
   end
 
   defp update_circuit(state, circuit) do
