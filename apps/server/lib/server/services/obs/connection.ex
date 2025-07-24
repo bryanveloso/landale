@@ -192,18 +192,18 @@ defmodule Server.Services.OBS.Connection do
     {:next_state, :disconnected, data, actions}
   end
 
+  def connecting(:info, {:gun_down, conn_pid, _protocol, _reason, _}, data)
+      when conn_pid == data.conn_pid do
+    # Connection failed before WebSocket upgrade
+    data = cleanup_connection(data)
+    actions = [{:state_timeout, @reconnect_delay, :retry_connect}]
+    {:next_state, :disconnected, data, actions}
+  end
+
   # State: authenticating
 
   def authenticating(:internal, :start_auth, data) do
-    # Send Hello message (OpCode 0)
-    hello_msg =
-      Protocol.encode_hello(%{
-        rpcVersion: 1,
-        eventSubscriptions: Protocol.event_subscription_all()
-      })
-
-    :ok = :gun.ws_send(data.conn_pid, data.stream_ref, {:text, hello_msg})
-
+    # Wait for Hello message from OBS - don't send anything yet
     actions = [{:state_timeout, @auth_timeout, :auth_timeout}]
     {:keep_state, data, actions}
   end
@@ -218,8 +218,22 @@ defmodule Server.Services.OBS.Connection do
         if hello_data[:authentication] do
           handle_authentication_required(hello_data.authentication, data)
         else
-          # No auth required, move to ready
-          complete_authentication(data)
+          # No auth required, but still need to send Identify
+          identify_msg =
+            Protocol.encode_identify(%{
+              rpcVersion: version,
+              eventSubscriptions: Protocol.event_subscription_all()
+            })
+
+          Logger.debug("Sending Identify message (no auth): #{identify_msg}",
+            service: "obs",
+            session_id: data.session_id
+          )
+
+          :ok = :gun.ws_send(data.conn_pid, data.stream_ref, {:text, identify_msg})
+
+          # Stay in authenticating state, waiting for Identified response
+          {:keep_state_and_data, []}
         end
 
       {:ok, %{op: 2, d: identified_data}} ->
@@ -238,7 +252,7 @@ defmodule Server.Services.OBS.Connection do
           session_id: data.session_id
         )
 
-        {:keep_state_and_data}
+        {:keep_state_and_data, []}
     end
   end
 
@@ -315,7 +329,7 @@ defmodule Server.Services.OBS.Connection do
         )
     end
 
-    {:keep_state_and_data}
+    {:keep_state_and_data, []}
   end
 
   def ready({:call, from}, {:send_request, request_type, request_data}, data) do
@@ -427,7 +441,7 @@ defmodule Server.Services.OBS.Connection do
       :ok = :gun.ws_send(data.conn_pid, data.stream_ref, {:text, identify_msg})
 
       # Stay in authenticating state, waiting for Identified response
-      {:keep_state_and_data}
+      {:keep_state_and_data, []}
     end
   end
 
