@@ -40,7 +40,7 @@ defmodule Server.Services.OBS do
     case Supervisor.start_link(children, supervisor_opts) do
       {:ok, supervisor} ->
         # Start default session after supervisor is up
-        uri = opts[:url] || System.get_env("OBS_WEBSOCKET_URL", "ws://localhost:4455")
+        uri = opts[:url] || System.get_env("OBS_WEBSOCKET_URL", "ws://demi:4455")
 
         case Server.Services.OBS.ConnectionsSupervisor.start_session(@default_session, uri: uri) do
           {:ok, _} ->
