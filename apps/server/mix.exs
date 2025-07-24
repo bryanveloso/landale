@@ -61,6 +61,7 @@ defmodule Server.MixProject do
       {:excoveralls, "~> 0.18", only: :test},
       {:hammox, "~> 0.7", only: :test},
       {:mox, "~> 1.1", only: :test},
+      {:bypass, "~> 2.1", only: :test},
       {:stream_data, "~> 1.0", only: [:test, :dev]}
     ]
   end

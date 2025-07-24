@@ -1,8 +1,6 @@
 defmodule Server.Services.Rainwave do
-  @behaviour Server.Services.RainwaveBehaviour
-
   @moduledoc """
-  Rainwave music service integration.
+  Rainwave music service integration using Server.Service abstraction.
 
   Polls the Rainwave API to track currently playing music and provides
   real-time updates to overlays via Phoenix channels.
@@ -12,11 +10,16 @@ defmodule Server.Services.Rainwave do
   - User-specific listening detection
   - Automatic station switching detection
   - Real-time overlay updates
+  - Health tracking and error recovery
   """
 
-  use GenServer
-  require Logger
-  alias Server.{Events, Logging, ServiceError}
+  use Server.Service,
+    service_name: "rainwave",
+    behaviour: Server.Services.RainwaveBehaviour
+
+  use Server.Service.StatusReporter
+
+  alias Server.Services.Rainwave.State
 
   # Rainwave station constants
   @stations %{
@@ -35,43 +38,7 @@ defmodule Server.Services.Rainwave do
     5 => "All"
   }
 
-  # API configuration
-  @api_base_url "https://rainwave.cc/api4"
-  # 10 seconds
-  @poll_interval 10_000
-
-  # State structure
-  defstruct [
-    :api_key,
-    :user_id,
-    :station_id,
-    :station_name,
-    :current_song,
-    :is_enabled,
-    :is_listening,
-    :poll_timer,
-    :correlation_id
-  ]
-
-  @type t :: %__MODULE__{
-          api_key: String.t() | nil,
-          user_id: String.t() | nil,
-          station_id: integer(),
-          station_name: String.t() | nil,
-          current_song: map() | nil,
-          is_enabled: boolean(),
-          is_listening: boolean(),
-          poll_timer: reference() | nil,
-          correlation_id: String.t()
-        }
-
-  ## Client API
-
-  @doc "Start the Rainwave service"
-  @spec start_link(keyword()) :: GenServer.on_start()
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
+  ## Client API (behaviour implementation)
 
   @doc "Get current service status"
   @spec get_status() :: {:ok, map()} | {:error, term()}
@@ -98,57 +65,101 @@ defmodule Server.Services.Rainwave do
     GenServer.cast(__MODULE__, {:update_config, config})
   end
 
-  ## GenServer Callbacks
+  ## Server.Service Callbacks
 
-  @impl true
-  def init(_opts) do
-    correlation_id = Server.CorrelationId.generate()
-    Logging.set_service_context(:rainwave, correlation_id: correlation_id)
+  @impl Server.Service
+  def do_init(opts) do
+    Logger.debug("Initializing Rainwave service with config", opts: opts)
 
-    Logger.info("Service starting", correlation_id: correlation_id)
+    try do
+      # Build initial state from environment and options
+      initial_state =
+        State.new(
+          api_key: Keyword.get(opts, :api_key, System.get_env("RAINWAVE_API_KEY")),
+          user_id: Keyword.get(opts, :user_id, System.get_env("RAINWAVE_USER_ID")),
+          api_base_url: Keyword.get(opts, :api_base_url, "https://rainwave.cc/api4"),
+          poll_interval: Keyword.get(opts, :poll_interval, 10_000),
+          station_id: Keyword.get(opts, :station_id, @stations.covers)
+        )
 
-    state = %__MODULE__{
-      api_key: System.get_env("RAINWAVE_API_KEY"),
-      user_id: System.get_env("RAINWAVE_USER_ID"),
-      # Default to Covers
-      station_id: @stations.covers,
-      station_name: @station_names[@stations.covers],
-      current_song: nil,
-      is_enabled: false,
-      is_listening: false,
-      poll_timer: nil,
-      correlation_id: correlation_id
-    }
+      # Set initial station name
+      initial_state = %{initial_state | station_name: @station_names[initial_state.station_id]}
 
-    # Start polling if we have credentials
-    if state.api_key && state.user_id do
-      {:ok, schedule_poll(state)}
-    else
-      Logger.warning("Rainwave credentials not found in environment")
+      # Convert to plain map for Server.Service compatibility
+      state = Map.from_struct(initial_state)
 
-      {:ok, state}
+      # Start polling if we have credentials
+      if State.has_credentials?(as_struct(state)) do
+        Logger.info("Rainwave service initialized with valid credentials",
+          station: state.station_name
+        )
+
+        {:ok, schedule_poll(state)}
+      else
+        Logger.warning("Rainwave credentials not found - service will run in degraded mode")
+        {:ok, state}
+      end
+    rescue
+      error ->
+        Logger.error("Failed to initialize Rainwave service", error: inspect(error))
+        {:stop, {:initialization_error, error}}
     end
   end
 
-  @impl true
-  def handle_call(:get_status, _from, state) do
-    status = %{
-      enabled: state.is_enabled,
-      listening: state.is_listening,
-      station_id: state.station_id,
-      station_name: state.station_name,
-      current_song: state.current_song,
-      has_credentials: !!(state.api_key && state.user_id)
-    }
+  @impl Server.Service
+  def do_terminate(_reason, state) do
+    # Cancel any pending timer
+    if state.poll_timer do
+      Process.cancel_timer(state.poll_timer)
+    end
 
-    {:reply, {:ok, status}, state}
+    Logger.debug("Rainwave service terminated")
+    :ok
   end
 
-  @impl true
+  @impl Server.Service.StatusReporter
+  def do_build_status(state) do
+    %{
+      # Service configuration
+      enabled: state.is_enabled,
+      has_credentials: State.has_credentials?(as_struct(state)),
+
+      # Current state
+      listening: state.is_listening,
+      station: %{
+        id: state.station_id,
+        name: state.station_name
+      },
+      current_song: state.current_song,
+
+      # API health metrics
+      api_health: %{
+        status: state.api_health_status,
+        last_call_at: state.last_api_call_at,
+        last_success_at: state.last_successful_at,
+        error_count: state.api_error_count,
+        consecutive_errors: state.consecutive_errors,
+        error_rate: State.error_rate(as_struct(state))
+      },
+
+      # Configuration
+      api_endpoint: state.api_base_url,
+      poll_interval_ms: state.poll_interval
+    }
+  end
+
+  def service_healthy?(state) do
+    # Service is healthy if it has credentials and isn't in a down state
+    State.has_credentials?(as_struct(state)) and state.api_health_status != :down
+  end
+
+  ## GenServer Callbacks
+
+  @impl GenServer
   def handle_cast({:set_enabled, enabled}, state) do
     new_state = %{state | is_enabled: enabled}
 
-    Logger.info("Service #{if enabled, do: "enabled", else: "disabled"}")
+    Logger.info("Rainwave service #{if enabled, do: "enabled", else: "disabled"}")
 
     if enabled do
       {:noreply, schedule_poll(new_state)}
@@ -157,14 +168,17 @@ defmodule Server.Services.Rainwave do
     end
   end
 
-  @impl true
+  @impl GenServer
   def handle_cast({:set_station, station}, state) do
     station_id = normalize_station_id(station)
     station_name = @station_names[station_id]
 
     new_state = %{state | station_id: station_id, station_name: station_name}
 
-    Logger.info("Station changed", station_id: station_id, station_name: station_name)
+    Logger.info("Rainwave station changed",
+      station_id: station_id,
+      station_name: station_name
+    )
 
     # Immediate poll to get new station data
     if state.is_enabled do
@@ -174,7 +188,7 @@ defmodule Server.Services.Rainwave do
     {:noreply, new_state}
   end
 
-  @impl true
+  @impl GenServer
   def handle_cast({:update_config, config}, state) do
     new_state =
       state
@@ -184,10 +198,10 @@ defmodule Server.Services.Rainwave do
     {:noreply, new_state}
   end
 
-  @impl true
+  @impl GenServer
   def handle_info(:poll, state) do
     new_state =
-      if state.is_enabled and not is_nil(state.api_key) and not is_nil(state.user_id) do
+      if state.is_enabled and State.has_credentials?(as_struct(state)) do
         fetch_now_playing(state)
       else
         state
@@ -196,27 +210,19 @@ defmodule Server.Services.Rainwave do
     {:noreply, schedule_poll(new_state)}
   end
 
-  @impl true
-  def handle_info({:EXIT, _pid, reason}, state) do
-    Logger.warning("HTTP request process exited", reason: reason)
-
-    {:noreply, state}
-  end
-
-  @impl true
-  def handle_info(message, state) do
-    Logger.debug("Unhandled message received", message: inspect(message))
-    {:noreply, state}
-  end
-
   ## Private Functions
+
+  # Helper to work with state as struct when needed
+  defp as_struct(state) when is_map(state) do
+    struct(State, state)
+  end
 
   defp schedule_poll(state) do
     # Cancel existing timer
     state = cancel_poll(state)
 
     if state.is_enabled do
-      timer_ref = Process.send_after(self(), :poll, @poll_interval)
+      timer_ref = Process.send_after(self(), :poll, state.poll_interval)
       %{state | poll_timer: timer_ref}
     else
       state
@@ -259,21 +265,35 @@ defmodule Server.Services.Rainwave do
   defp fetch_now_playing(state) do
     case make_api_request("/info", state) do
       {:ok, data} ->
-        process_api_response(data, state)
+        new_state = process_api_response(data, state)
+        struct_state = as_struct(new_state)
+        updated_struct = State.record_success(struct_state)
+        Map.from_struct(updated_struct)
 
       {:error, reason} ->
-        service_error = ServiceError.from_error_tuple(:rainwave, "fetch_now_playing", {:error, reason})
-        Logger.error("Failed to fetch Rainwave data", error: service_error)
+        Logger.error("Failed to fetch Rainwave data",
+          service: :rainwave,
+          error: reason,
+          consecutive_errors: state.consecutive_errors + 1
+        )
 
         # Clear current song on error but keep service running
-        new_state = %{state | current_song: nil, is_listening: false}
+        struct_state = as_struct(state)
+        updated_struct = State.record_failure(struct_state)
+
+        new_state =
+          updated_struct
+          |> Map.from_struct()
+          |> Map.put(:current_song, nil)
+          |> Map.put(:is_listening, false)
+
         broadcast_update(new_state)
         new_state
     end
   end
 
   defp make_api_request(endpoint, state) do
-    uri = URI.parse(@api_base_url <> endpoint)
+    uri = URI.parse(state.api_base_url <> endpoint)
 
     body =
       URI.encode_query(%{
@@ -287,8 +307,8 @@ defmodule Server.Services.Rainwave do
       {"accept", "application/json"}
     ]
 
-    timeout_ms = Server.NetworkConfig.http_timeout_ms()
-    receive_timeout_ms = Server.NetworkConfig.http_receive_timeout_ms()
+    timeout_ms = NetworkConfig.http_timeout_ms()
+    receive_timeout_ms = NetworkConfig.http_receive_timeout_ms()
 
     with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
          {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, timeout_ms),
@@ -298,12 +318,6 @@ defmodule Server.Services.Rainwave do
       parse_api_response(response)
     else
       {:error, reason} ->
-        Logger.error("Rainwave API request failed",
-          service: :rainwave,
-          correlation_id: state.correlation_id,
-          reason: inspect(reason)
-        )
-
         {:error, {:network_error, reason}}
     end
   end
@@ -366,10 +380,8 @@ defmodule Server.Services.Rainwave do
     # Broadcast update if something changed
     if state_changed?(state, new_state) do
       Logger.debug("Rainwave state updated",
-        service: :rainwave,
-        correlation_id: state.correlation_id,
         listening: new_state.is_listening,
-        has_song: !!new_state.current_song
+        has_song: not is_nil(new_state.current_song)
       )
 
       broadcast_update(new_state)
@@ -388,7 +400,7 @@ defmodule Server.Services.Rainwave do
 
   defp extract_current_song(data) do
     case Map.get(data, "sched_current") do
-      %{"songs" => [song | _]} = sched when is_non_struct_map(song) ->
+      %{"songs" => [song | _]} = sched when is_map(song) ->
         %{
           title: Map.get(song, "title", "Unknown"),
           artist: extract_artists(song),
@@ -419,14 +431,14 @@ defmodule Server.Services.Rainwave do
 
   defp extract_album(song) do
     case Map.get(song, "albums") do
-      [album | _] when is_non_struct_map(album) -> Map.get(album, "name", "Unknown")
+      [album | _] when is_map(album) -> Map.get(album, "name", "Unknown")
       _ -> "Unknown"
     end
   end
 
   defp extract_album_art(song) do
     case Map.get(song, "albums") do
-      [album | _] when is_non_struct_map(album) ->
+      [album | _] when is_map(album) ->
         case Map.get(album, "art") do
           art when is_binary(art) -> "https://rainwave.cc#{art}_320.jpg"
           _ -> nil
@@ -452,6 +464,7 @@ defmodule Server.Services.Rainwave do
       current_song: state.current_song
     }
 
-    Events.emit("rainwave:update", event_data, state.correlation_id)
+    correlation_id = Map.get(state, :__service_meta__, %{}) |> Map.get(:correlation_id)
+    Events.emit("rainwave:update", event_data, correlation_id)
   end
 end

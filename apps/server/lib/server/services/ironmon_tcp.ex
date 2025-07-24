@@ -24,10 +24,10 @@ defmodule Server.Services.IronmonTCP do
   "ironmon:events" topic for consumption by the dashboard and overlays.
   """
 
-  use Server.Service, 
+  use Server.Service,
     service_name: "ironmon-tcp",
     behaviour: Server.Services.IronmonTCPBehaviour
-    
+
   use Server.Service.StatusReporter
 
   # Default TCP server configuration
@@ -126,43 +126,43 @@ defmodule Server.Services.IronmonTCP do
   end
 
   # Service Implementation
-  
+
   @impl Server.Service
   def do_init(opts) do
     port = Keyword.get(opts, :port, @default_port)
     hostname = Keyword.get(opts, :hostname, @default_hostname)
-    
+
     state = %{
       port: port,
       hostname: hostname,
       connections: %{},
       listen_socket: nil
     }
-    
+
     case start_tcp_server(state) do
       {:ok, new_state} ->
         Logger.info("TCP server started", port: port, hostname: hostname)
         {:ok, new_state}
-        
+
       {:error, reason} ->
         {:stop, {:tcp_startup_failed, reason}}
     end
   end
-  
+
   @impl Server.Service
   def do_terminate(_reason, state) do
     if state[:listen_socket] do
       :gen_tcp.close(state.listen_socket)
     end
-    
+
     # Close all client connections
     Enum.each(state.connections, fn {socket, _buffer} ->
       :gen_tcp.close(socket)
     end)
-    
+
     :ok
   end
-  
+
   @impl Server.Service.StatusReporter
   def do_build_status(state) do
     %{
@@ -228,7 +228,6 @@ defmodule Server.Services.IronmonTCP do
     Logger.debug("Unhandled message received", message: inspect(message))
     {:noreply, state}
   end
-
 
   # Private Functions
 
