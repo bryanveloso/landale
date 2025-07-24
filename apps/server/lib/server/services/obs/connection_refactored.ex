@@ -255,16 +255,50 @@ defmodule Server.Services.OBS.ConnectionRefactored do
       session_id: state.session_id
     )
 
-    # For now, we'll log and disconnect
-    # In production, implement proper authentication
-    Logger.error("Authentication not implemented",
-      service: "obs",
-      session_id: state.session_id
-    )
+    # Get password from environment or configuration
+    password = System.get_env("OBS_WEBSOCKET_PASSWORD", "")
 
-    WebSocketConnection.disconnect(state.ws_conn)
-    state = cleanup_state(state)
-    {:noreply, state}
+    if password == "" do
+      Logger.error("OBS requires authentication but OBS_WEBSOCKET_PASSWORD not set",
+        service: "obs",
+        session_id: state.session_id
+      )
+
+      WebSocketConnection.disconnect(state.ws_conn)
+      state = cleanup_state(state)
+      {:noreply, state}
+    else
+      # Generate authentication string
+      # OBS uses: base64(sha256(password + salt) + challenge)
+      import Base, only: [encode64: 1]
+
+      secret = :crypto.hash(:sha256, password <> auth_data.salt)
+      auth_string = encode64(:crypto.hash(:sha256, secret <> auth_data.challenge))
+
+      # Send Identify message
+      identify_msg =
+        Protocol.encode_identify(%{
+          rpcVersion: state.rpc_version,
+          authentication: auth_string,
+          eventSubscriptions: Protocol.event_subscription_all()
+        })
+
+      case WebSocketConnection.send_data(state.ws_conn, identify_msg) do
+        :ok ->
+          # Stay in authenticating state, waiting for Identified response
+          {:noreply, state}
+
+        {:error, reason} ->
+          Logger.error("Failed to send Identify message: #{inspect(reason)}",
+            service: "obs",
+            session_id: state.session_id
+          )
+
+          WebSocketConnection.disconnect(state.ws_conn)
+          state = cleanup_state(state)
+          {:noreply, state}
+      end
+    end
   end
 
   defp complete_authentication(state) do
@@ -317,14 +351,27 @@ defmodule Server.Services.OBS.ConnectionRefactored do
 
   defp send_obs_request(state, request_type, request_data, _from) do
     case get_request_tracker(state.session_id) do
-      {:ok, tracker} ->
-        # Get connection info for RequestTracker
+      {:ok, _tracker} ->
+        # Get connection state to verify we're connected
         ws_state = WebSocketConnection.get_state(state.ws_conn)
 
         if ws_state.connected do
-          # RequestTracker needs to send through WebSocketConnection now
-          result = GenServer.call(tracker, {:track_and_send, request_type, request_data, state.ws_conn})
-          {:reply, result, state}
+          # Since RequestTracker expects Gun directly, we'll handle it inline
+          # Generate request ID here
+          request_id = generate_request_id()
+
+          # Create request message
+          request_msg = Protocol.encode_request(request_id, request_type, request_data)
+
+          # Send through WebSocketConnection
+          case WebSocketConnection.send_data(state.ws_conn, request_msg) do
+            :ok ->
+              # Return success with the request_id for tracking
+              {:reply, {:ok, request_id}, state}
+
+            {:error, reason} ->
+              {:reply, {:error, reason}, state}
+          end
         else
           {:reply, {:error, :not_connected}, state}
         end
@@ -332,6 +379,12 @@ defmodule Server.Services.OBS.ConnectionRefactored do
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
+  end
+
+  defp generate_request_id do
+    # Generate a unique request ID
+    System.unique_integer([:positive])
+    |> Integer.to_string()
   end
 
   defp queue_request(state, request) do
@@ -410,6 +463,7 @@ defmodule Server.Services.OBS.ConnectionRefactored do
   end
 
   defp get_request_tracker(session_id) do
+    # In test environment, we use a simpler approach
     tracker_name = :"obs_request_tracker_#{session_id}"
 
     case Process.whereis(tracker_name) do
