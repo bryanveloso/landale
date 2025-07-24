@@ -134,11 +134,16 @@ defmodule Server.Services.OBS.Connection do
     {:keep_state_and_data, [{:reply, from, {:error, :disconnected}}]}
   end
 
-  def disconnected({:call, from}, :get_state, _data) do
+  def disconnected({:call, from}, :get_state, _) do
     {:keep_state_and_data, [{:reply, from, :disconnected}]}
   end
 
   # State: connecting
+
+  def connecting(:info, {:gun_up, conn_pid, _protocol}, data) when conn_pid == data.conn_pid do
+    # Gun connection established, WebSocket upgrade is in progress
+    {:keep_state_and_data, []}
+  end
 
   def connecting(:info, {:gun_upgrade, conn_pid, stream_ref, ["websocket"], _headers}, data)
       when conn_pid == data.conn_pid do
@@ -171,8 +176,20 @@ defmodule Server.Services.OBS.Connection do
     {:keep_state, data}
   end
 
-  def connecting({:call, from}, :get_state, _data) do
+  def connecting({:call, from}, :get_state, _) do
     {:keep_state_and_data, [{:reply, from, :connecting}]}
+  end
+
+  def connecting(:info, {:gun_ws, conn_pid, stream_ref, {:close, code, reason}}, data)
+      when conn_pid == data.conn_pid and stream_ref == data.stream_ref do
+    Logger.warning("WebSocket closed during connection: #{code} - #{reason}",
+      service: "obs",
+      session_id: data.session_id
+    )
+
+    data = cleanup_connection(data)
+    actions = [{:next_event, :internal, :connect}]
+    {:next_state, :disconnected, data, actions}
   end
 
   # State: authenticating
@@ -242,8 +259,20 @@ defmodule Server.Services.OBS.Connection do
     {:keep_state, data}
   end
 
-  def authenticating({:call, from}, :get_state, _data) do
+  def authenticating({:call, from}, :get_state, _) do
     {:keep_state_and_data, [{:reply, from, :authenticating}]}
+  end
+
+  def authenticating(:info, {:gun_ws, conn_pid, stream_ref, {:close, code, reason}}, data)
+      when conn_pid == data.conn_pid and stream_ref == data.stream_ref do
+    Logger.warning("WebSocket closed during authentication: #{code} - #{reason}",
+      service: "obs",
+      session_id: data.session_id
+    )
+
+    data = cleanup_connection(data)
+    actions = [{:next_event, :internal, :connect}]
+    {:next_state, :disconnected, data, actions}
   end
 
   # State: ready
@@ -302,8 +331,22 @@ defmodule Server.Services.OBS.Connection do
     end
   end
 
-  def ready({:call, from}, :get_state, _data) do
+  def ready({:call, from}, :get_state, _) do
     {:keep_state_and_data, [{:reply, from, :ready}]}
+  end
+
+  def ready(:info, {:gun_ws, conn_pid, stream_ref, {:close, code, reason}}, data)
+      when conn_pid == data.conn_pid and stream_ref == data.stream_ref do
+    Logger.warning("WebSocket closed by server: #{code} - #{reason}",
+      service: "obs",
+      session_id: data.session_id
+    )
+
+    broadcast_event(data, :connection_lost, %{code: code, reason: reason})
+
+    # Move to reconnecting
+    actions = [{:next_event, :internal, :start_reconnect}]
+    {:next_state, :reconnecting, data, actions}
   end
 
   def ready(:info, {:gun_down, conn_pid, _protocol, reason, _}, data)
@@ -340,7 +383,7 @@ defmodule Server.Services.OBS.Connection do
     {:keep_state, data}
   end
 
-  def reconnecting({:call, from}, :get_state, _data) do
+  def reconnecting({:call, from}, :get_state, _) do
     {:keep_state_and_data, [{:reply, from, :reconnecting}]}
   end
 
