@@ -1472,11 +1472,17 @@ defmodule Server.Services.Twitch do
 
   # Helper functions for configuration
   defp get_client_id do
-    System.get_env("TWITCH_CLIENT_ID")
+    case Application.get_env(:server, :twitch) do
+      nil -> System.get_env("TWITCH_CLIENT_ID")
+      twitch_config -> Keyword.get(twitch_config, :client_id) || System.get_env("TWITCH_CLIENT_ID")
+    end
   end
 
   defp get_client_secret do
-    System.get_env("TWITCH_CLIENT_SECRET")
+    case Application.get_env(:server, :twitch) do
+      nil -> System.get_env("TWITCH_CLIENT_SECRET")
+      twitch_config -> Keyword.get(twitch_config, :client_secret) || System.get_env("TWITCH_CLIENT_SECRET")
+    end
   end
 
   # Start API client with validated token and user_id

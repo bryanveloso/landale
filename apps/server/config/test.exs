@@ -43,3 +43,9 @@ config :server, :services,
   twitch: Server.Mocks.TwitchMock,
   ironmon_tcp: Server.Mocks.IronmonTCPMock,
   rainwave: Server.Mocks.RainwaveMock
+
+# Configure test Twitch credentials to allow service startup in tests
+config :server, :twitch,
+  client_id: "test_client_id",
+  client_secret: "test_client_secret",
+  client_impl: Server.Services.TwitchClientMock

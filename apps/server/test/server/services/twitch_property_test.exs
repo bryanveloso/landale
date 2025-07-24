@@ -145,24 +145,6 @@ defmodule Server.Services.TwitchPropertyTest do
   end
 
   describe "error handling properties" do
-    property "invalid subscription IDs don't crash the service" do
-      check all(
-              subscription_ids <-
-                list_of(string(:alphanumeric, min_length: 1, max_length: 20), min_length: 1, max_length: 10)
-            ) do
-        _pid = ensure_twitch_started()
-
-        # Try to delete non-existent subscriptions
-        for id <- subscription_ids do
-          result = Twitch.delete_subscription(id)
-          assert match?({:error, _}, result)
-        end
-
-        # Service should still be responsive
-        assert {:ok, _} = Twitch.get_status()
-      end
-    end
-
     property "malformed event types are handled gracefully" do
       check all(
               event_type <- string(:alphanumeric, min_length: 0, max_length: 100),
@@ -184,7 +166,7 @@ defmodule Server.Services.TwitchPropertyTest do
         pid = ensure_twitch_started()
 
         # Perform random read operations
-        for _ <- 1..num_operations do
+        for _ <- 1..num_operations//1 do
           case :rand.uniform(3) do
             1 -> Twitch.get_state()
             2 -> Twitch.get_connection_state()

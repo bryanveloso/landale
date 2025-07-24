@@ -4,14 +4,14 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
 
   Tests invariants and properties including:
   - Event processing never crashes the handler
-  - All events are logged appropriately
+  - State is updated correctly based on event types
+  - PubSub messages are published for relevant events
   - Session ID remains constant
   - Concurrent event handling maintains consistency
-  - Event ordering is preserved per sender
+  - Unknown events are handled gracefully
   """
   use ExUnit.Case, async: true
   use ExUnitProperties
-  import ExUnit.CaptureLog
 
   alias Server.Services.OBS.EventHandler
 
@@ -49,7 +49,7 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
       end
     end
 
-    property "all valid events produce log entries" do
+    property "all valid events update state and last_event_type" do
       check all(
               session_id <- session_id_gen(),
               event_type <- event_type_gen(),
@@ -61,15 +61,14 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
 
         event = %{eventType: event_type, eventData: event_data}
 
-        log =
-          capture_log([level: :debug], fn ->
-            send(pid, {:obs_event, event})
-            Process.sleep(10)
-          end)
+        # Send event
+        send(pid, {:obs_event, event})
+        Process.sleep(10)
 
-        # All events should be logged
-        assert log =~ "OBS event received" or log =~ "changed"
-        assert log =~ session_id
+        # Verify state was updated
+        state = EventHandler.get_state(pid)
+        assert state.last_event_type == event_type
+        assert state.session_id == session_id
 
         # Clean up
         GenServer.stop(pid)
@@ -105,41 +104,45 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
   end
 
   describe "concurrent event properties" do
-    property "concurrent events from same source maintain order" do
+    property "concurrent events from same source update state correctly" do
       check all(
               session_id <- session_id_gen(),
-              scene_names <- uniq_list_of(scene_name_gen(), min_length: 5, max_length: 10)
+              scene_names <- list_of(scene_name_gen(), min_length: 3, max_length: 8)
             ) do
         name = :"test_handler_#{session_id}_#{:rand.uniform(10000)}"
         opts = [session_id: session_id, name: name]
         {:ok, pid} = EventHandler.start_link(opts)
 
+        # Subscribe to PubSub to track scene changes
+        Phoenix.PubSub.subscribe(Server.PubSub, "overlay:scene_changed")
+
         # Send scene change events in order
-        log =
-          capture_log(fn ->
-            for scene_name <- scene_names do
-              event = %{
-                eventType: "CurrentProgramSceneChanged",
-                eventData: %{sceneName: scene_name}
-              }
-
-              send(pid, {:obs_event, event})
-            end
-
-            Process.sleep(50)
-          end)
-
-        # Verify all scenes appear in log
         for scene_name <- scene_names do
-          assert log =~ scene_name
+          event = %{
+            eventType: "CurrentProgramSceneChanged",
+            eventData: %{sceneName: scene_name}
+          }
+
+          send(pid, {:obs_event, event})
         end
+
+        Process.sleep(50)
+
+        # Verify final state shows the last scene
+        state = EventHandler.get_state(pid)
+        last_scene = List.last(scene_names)
+        assert state.current_scene == last_scene
+        assert state.last_event_type == "CurrentProgramSceneChanged"
+
+        # Verify we received PubSub messages for scene changes
+        assert_received %{scene: _, session_id: ^session_id}
 
         # Clean up
         GenServer.stop(pid)
       end
     end
 
-    property "handles mixed event types without interference" do
+    property "handles mixed event types and updates state correctly" do
       check all(
               session_id <- session_id_gen(),
               mixed_events <- mixed_events_gen()
@@ -148,24 +151,29 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
         opts = [session_id: session_id, name: name]
         {:ok, pid} = EventHandler.start_link(opts)
 
-        log =
-          capture_log([level: :debug], fn ->
-            for event <- mixed_events do
-              send(pid, {:obs_event, event})
-            end
+        # Subscribe to relevant PubSub topics
+        Phoenix.PubSub.subscribe(Server.PubSub, "overlay:scene_changed")
+        Phoenix.PubSub.subscribe(Server.PubSub, "overlay:stream_state")
+        Phoenix.PubSub.subscribe(Server.PubSub, "overlay:record_state")
+        Phoenix.PubSub.subscribe(Server.PubSub, "overlay:unhandled_event")
 
-            Process.sleep(50)
-          end)
+        # Send all events
+        for event <- mixed_events do
+          send(pid, {:obs_event, event})
+        end
 
-        # Count expected log entries
-        scene_events = Enum.count(mixed_events, &(&1.eventType == "CurrentProgramSceneChanged"))
-        stream_events = Enum.count(mixed_events, &(&1.eventType == "StreamStateChanged"))
-        record_events = Enum.count(mixed_events, &(&1.eventType == "RecordStateChanged"))
+        Process.sleep(50)
 
-        # Verify appropriate number of specific log entries
-        assert count_occurrences(log, "Scene changed to:") >= scene_events
-        assert count_occurrences(log, "Stream state changed") >= stream_events
-        assert count_occurrences(log, "Record state changed") >= record_events
+        # Verify state reflects the last event
+        state = EventHandler.get_state(pid)
+        last_event = List.last(mixed_events)
+        assert state.last_event_type == last_event.eventType
+
+        # Verify we received some PubSub messages
+        if length(mixed_events) > 0 do
+          # Should have received at least one message
+          assert_received %{session_id: ^session_id}
+        end
 
         # Clean up
         GenServer.stop(pid)
@@ -223,8 +231,8 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
     end
   end
 
-  describe "logging properties" do
-    property "known event types produce specific log messages" do
+  describe "behavior properties" do
+    property "known event types update state and publish events correctly" do
       check all(
               session_id <- session_id_gen(),
               known_event <- known_event_gen()
@@ -233,22 +241,39 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
         opts = [session_id: session_id, name: name]
         {:ok, pid} = EventHandler.start_link(opts)
 
-        log =
-          capture_log(fn ->
-            send(pid, {:obs_event, known_event})
-            Process.sleep(10)
-          end)
+        # Subscribe to appropriate PubSub topic based on event type
+        topic =
+          case known_event.eventType do
+            "CurrentProgramSceneChanged" -> "overlay:scene_changed"
+            "StreamStateChanged" -> "overlay:stream_state"
+            "RecordStateChanged" -> "overlay:record_state"
+          end
 
-        # Verify specific log messages based on event type
+        Phoenix.PubSub.subscribe(Server.PubSub, topic)
+
+        # Send event
+        send(pid, {:obs_event, known_event})
+        Process.sleep(10)
+
+        # Verify state was updated and PubSub message was sent
+        state = EventHandler.get_state(pid)
+        assert state.last_event_type == known_event.eventType
+
         case known_event.eventType do
           "CurrentProgramSceneChanged" ->
-            assert log =~ "Scene changed to:"
+            scene_name = known_event.eventData.sceneName
+            assert state.current_scene == scene_name
+            assert_received %{scene: ^scene_name, session_id: ^session_id}
 
           "StreamStateChanged" ->
-            assert log =~ "Stream state changed"
+            stream_active = known_event.eventData.outputActive
+            assert state.stream_active == stream_active
+            assert_received %{active: ^stream_active, session_id: ^session_id}
 
           "RecordStateChanged" ->
-            assert log =~ "Record state changed"
+            record_active = known_event.eventData.outputActive
+            assert state.record_active == record_active
+            assert_received %{active: ^record_active, session_id: ^session_id}
         end
 
         # Clean up
@@ -256,7 +281,7 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
       end
     end
 
-    property "unknown event types are logged as unhandled" do
+    property "unknown event types publish unhandled events" do
       check all(
               session_id <- session_id_gen(),
               unknown_type <- unknown_event_type_gen(),
@@ -266,17 +291,21 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
         opts = [session_id: session_id, name: name]
         {:ok, pid} = EventHandler.start_link(opts)
 
+        # Subscribe to unhandled event topic
+        Phoenix.PubSub.subscribe(Server.PubSub, "overlay:unhandled_event")
+
         event = %{eventType: unknown_type, eventData: event_data}
 
-        log =
-          capture_log([level: :debug], fn ->
-            send(pid, {:obs_event, event})
-            Process.sleep(10)
-          end)
+        # Send event
+        send(pid, {:obs_event, event})
+        Process.sleep(10)
 
-        # Should log as unhandled
-        assert log =~ "Unhandled OBS event"
-        assert log =~ unknown_type
+        # Verify state was updated and unhandled event was published
+        state = EventHandler.get_state(pid)
+        assert state.last_event_type == unknown_type
+
+        # Should receive unhandled event message
+        assert_received %{event_type: ^unknown_type, session_id: ^session_id}
 
         # Clean up
         GenServer.stop(pid)
@@ -420,14 +449,5 @@ defmodule Server.Services.OBS.EventHandlerPropertyTest do
         }
       end)
     ])
-  end
-
-  # Helper functions
-
-  defp count_occurrences(string, substring) do
-    string
-    |> String.split(substring)
-    |> length()
-    |> Kernel.-(1)
   end
 end

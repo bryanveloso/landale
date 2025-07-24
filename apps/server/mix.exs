@@ -60,6 +60,7 @@ defmodule Server.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
       {:hammox, "~> 0.7", only: :test},
+      {:mox, "~> 1.1", only: :test},
       {:stream_data, "~> 1.0", only: [:test, :dev]}
     ]
   end
