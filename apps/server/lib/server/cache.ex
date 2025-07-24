@@ -151,10 +151,7 @@ defmodule Server.Cache do
   """
   @spec invalidate(atom(), term()) :: :ok
   def invalidate(namespace, key) do
-    cache_key = {namespace, key}
-    :ets.delete(@cache_table_name, cache_key)
-
-    Logger.debug("Cache invalidated", namespace: namespace, key: inspect(key))
+    GenServer.cast(__MODULE__, {:invalidate, namespace, key})
     :ok
   end
 
@@ -166,11 +163,7 @@ defmodule Server.Cache do
   """
   @spec invalidate_namespace(atom()) :: :ok
   def invalidate_namespace(namespace) do
-    # Use match pattern to delete all entries with the namespace
-    pattern = {{namespace, :_}, :_, :_}
-    :ets.match_delete(@cache_table_name, pattern)
-
-    Logger.debug("Cache namespace invalidated", namespace: namespace)
+    GenServer.cast(__MODULE__, {:invalidate_namespace, namespace})
     :ok
   end
 
@@ -290,6 +283,23 @@ defmodule Server.Cache do
   def handle_cast(:force_cleanup, state) do
     new_state = perform_cleanup(state)
     {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_cast({:invalidate, namespace, key}, state) do
+    cache_key = {namespace, key}
+    :ets.delete(@cache_table_name, cache_key)
+    Logger.debug("Cache invalidated", namespace: namespace, key: inspect(key))
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({:invalidate_namespace, namespace}, state) do
+    # Use match pattern to delete all entries with the namespace
+    pattern = {{namespace, :_}, :_, :_}
+    :ets.match_delete(@cache_table_name, pattern)
+    Logger.debug("Cache namespace invalidated", namespace: namespace)
+    {:noreply, state}
   end
 
   @impl true

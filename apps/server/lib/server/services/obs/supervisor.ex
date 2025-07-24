@@ -8,12 +8,23 @@ defmodule Server.Services.OBS.Supervisor do
   """
   use Supervisor
 
+  def start_link(opts) when is_list(opts) do
+    session_id = Keyword.fetch!(opts, :session_id)
+    name = via_tuple(session_id)
+    Supervisor.start_link(__MODULE__, opts, name: name)
+  end
+
   def start_link({session_id, opts}) do
     name = via_tuple(session_id)
     Supervisor.start_link(__MODULE__, {session_id, opts}, name: name)
   end
 
   @impl true
+  def init(opts) when is_list(opts) do
+    session_id = Keyword.fetch!(opts, :session_id)
+    init({session_id, opts})
+  end
+
   def init({session_id, opts}) do
     children = [
       # Core connection process using gen_statem
