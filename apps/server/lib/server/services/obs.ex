@@ -7,6 +7,7 @@ defmodule Server.Services.OBS do
   """
 
   @behaviour Server.Services.OBSBehaviour
+  @behaviour Server.ServiceBehaviour
 
   require Logger
 
@@ -304,6 +305,85 @@ defmodule Server.Services.OBS do
 
       {:ok, %{outputActive: state.virtual_cam_active}}
     end
+  end
+
+  # ServiceBehaviour implementation
+
+  @impl Server.ServiceBehaviour
+  def get_health do
+    # Check connection status
+    connection_status =
+      case get_connection() do
+        {:ok, conn} ->
+          case Server.Services.OBS.Connection.get_state(conn) do
+            :ready -> :pass
+            :authenticating -> :warn
+            :connecting -> :warn
+            :reconnecting -> :warn
+            _ -> :fail
+          end
+
+        {:error, _} ->
+          :fail
+      end
+
+    # Check sub-services
+    scene_manager_status =
+      case get_scene_manager() do
+        {:ok, _} -> :pass
+        {:error, _} -> :fail
+      end
+
+    stream_manager_status =
+      case get_stream_manager() do
+        {:ok, _} -> :pass
+        {:error, _} -> :fail
+      end
+
+    # Get detailed state if available
+    details =
+      case get_state() do
+        %{connection_state: conn_state} = state ->
+          %{
+            connection_state: conn_state,
+            streaming_active: get_in(state, [:streaming, :active]),
+            recording_active: get_in(state, [:recording, :active]),
+            current_scene: state[:current_scene]
+          }
+
+        _ ->
+          %{}
+      end
+
+    # Determine overall health
+    health_status =
+      cond do
+        connection_status == :fail -> :unhealthy
+        scene_manager_status == :fail or stream_manager_status == :fail -> :degraded
+        connection_status == :warn -> :degraded
+        true -> :healthy
+      end
+
+    {:ok,
+     %{
+       status: health_status,
+       checks: %{
+         websocket_connection: connection_status,
+         scene_manager: scene_manager_status,
+         stream_manager: stream_manager_status
+       },
+       details: details
+     }}
+  end
+
+  @impl Server.ServiceBehaviour
+  def get_info do
+    %{
+      name: "obs",
+      version: "2.0.0",
+      capabilities: [:websocket, :streaming, :recording, :scene_management, :multi_session],
+      description: "OBS WebSocket integration for streaming control and scene management"
+    }
   end
 
   # Private helpers

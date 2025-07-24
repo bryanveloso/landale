@@ -42,6 +42,8 @@ defmodule Server.Application do
             Server.Cache,
             # Circuit breakers for external service resilience
             Server.CircuitBreakerServer,
+            # Service registry for unified service discovery
+            Server.ServiceRegistry,
             # Stream coordination
             Server.ContentAggregator,
             Server.StreamProducer,
@@ -65,6 +67,12 @@ defmodule Server.Application do
     case Supervisor.start_link(children, opts) do
       {:ok, _pid} = result ->
         Logger.info("Server application started successfully")
+
+        # Register services with the registry in non-test environments
+        if Application.get_env(:server, :env) != :test do
+          register_services()
+        end
+
         result
 
       {:error, reason} = error ->
@@ -155,5 +163,68 @@ defmodule Server.Application do
           Logger.warning("Error stopping service", service: service, error: inspect(error))
       end
     end)
+  end
+
+  defp register_services do
+    # List of services to register
+    services = [
+      Server.Services.OBS,
+      Server.Services.Twitch,
+      Server.Services.IronmonTCP,
+      Server.Services.Rainwave
+    ]
+
+    # Wait for each service to be ready and register it
+    Enum.each(services, fn service_module ->
+      case wait_for_service(service_module, 5000) do
+        {:ok, pid} ->
+          case Server.ServiceRegistry.register(service_module, pid) do
+            :ok ->
+              Logger.debug("Service registered with ServiceRegistry", service: service_module)
+
+            {:error, reason} ->
+              Logger.error("Failed to register service",
+                service: service_module,
+                reason: inspect(reason)
+              )
+          end
+
+        {:error, :timeout} ->
+          Logger.warning("Service not available for registration", service: service_module)
+      end
+    end)
+  end
+
+  defp wait_for_service(service_module, timeout) do
+    start_time = System.monotonic_time(:millisecond)
+    wait_for_service_loop(service_module, start_time, timeout)
+  end
+
+  defp wait_for_service_loop(service_module, start_time, timeout) do
+    case Process.whereis(service_module) do
+      nil ->
+        current_time = System.monotonic_time(:millisecond)
+
+        if current_time - start_time >= timeout do
+          {:error, :timeout}
+        else
+          Process.sleep(50)
+          wait_for_service_loop(service_module, start_time, timeout)
+        end
+
+      pid ->
+        # Additional check to ensure the service is actually ready
+        try do
+          # Try a simple call to verify the service is responsive
+          case GenServer.call(pid, :get_status, 1000) do
+            {:ok, _status} -> {:ok, pid}
+            # Even if status call fails, register the service
+            _ -> {:ok, pid}
+          end
+        catch
+          # Fallback - register anyway
+          _, _ -> {:ok, pid}
+        end
+    end
   end
 end

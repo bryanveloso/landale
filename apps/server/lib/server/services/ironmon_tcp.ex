@@ -30,6 +30,8 @@ defmodule Server.Services.IronmonTCP do
 
   use Server.Service.StatusReporter
 
+  @behaviour Server.ServiceBehaviour
+
   # Default TCP server configuration
   @default_port 8080
   @default_hostname "0.0.0.0"
@@ -127,6 +129,21 @@ defmodule Server.Services.IronmonTCP do
 
   # Service Implementation
 
+  @impl Server.ServiceBehaviour
+  def get_health do
+    GenServer.call(__MODULE__, :get_health)
+  end
+
+  @impl Server.ServiceBehaviour
+  def get_info do
+    %{
+      name: "ironmon-tcp",
+      version: "1.0.0",
+      capabilities: [:tcp_server, :json_protocol, :game_tracking, :checkpoint_tracking],
+      description: "IronMON TCP server for tracking Pokemon game state and checkpoints"
+    }
+  end
+
   @impl Server.Service
   def do_init(opts) do
     port = Keyword.get(opts, :port, @default_port)
@@ -175,6 +192,31 @@ defmodule Server.Services.IronmonTCP do
   end
 
   # GenServer Callbacks
+
+  @impl GenServer
+  def handle_call(:get_health, _from, state) do
+    # Determine health status based on service state
+    health_status = cond do
+      state[:listen_socket] == nil -> :unhealthy
+      true -> :healthy
+    end
+
+    health_response = %{
+      status: health_status,
+      checks: %{
+        tcp_socket: if(state[:listen_socket] != nil, do: :pass, else: :fail),
+        listening: if(state[:listen_socket] != nil, do: :pass, else: :fail)
+      },
+      details: %{
+        port: state.port,
+        hostname: state.hostname,
+        connection_count: map_size(state.connections),
+        listening: state[:listen_socket] != nil
+      }
+    }
+
+    {:reply, {:ok, health_response}, state}
+  end
 
   @impl GenServer
   def handle_info({:tcp, socket, data}, state) do

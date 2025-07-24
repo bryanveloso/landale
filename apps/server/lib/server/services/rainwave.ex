@@ -21,6 +21,8 @@ defmodule Server.Services.Rainwave do
 
   alias Server.Services.Rainwave.State
 
+  @behaviour Server.ServiceBehaviour
+
   # Rainwave station constants
   @stations %{
     game: 1,
@@ -153,6 +155,23 @@ defmodule Server.Services.Rainwave do
     State.has_credentials?(as_struct(state)) and state.api_health_status != :down
   end
 
+  ## ServiceBehaviour Implementation
+
+  @impl Server.ServiceBehaviour
+  def get_health do
+    GenServer.call(__MODULE__, :get_health)
+  end
+
+  @impl Server.ServiceBehaviour
+  def get_info do
+    %{
+      name: "rainwave",
+      version: "1.0.0",
+      capabilities: [:polling, :multi_station, :user_tracking],
+      description: "Rainwave music service integration for real-time now-playing updates"
+    }
+  end
+
   ## GenServer Callbacks
 
   @impl GenServer
@@ -210,11 +229,54 @@ defmodule Server.Services.Rainwave do
     {:noreply, schedule_poll(new_state)}
   end
 
+  @impl GenServer
+  def handle_call(:get_health, _from, state) do
+    health_status = determine_health_status(state)
+
+    health_response = %{
+      status: health_status,
+      checks: %{
+        credentials: if(State.has_credentials?(as_struct(state)), do: :pass, else: :fail),
+        api_connection: api_health_check(state),
+        polling: if(state.is_enabled, do: :pass, else: :warn)
+      },
+      details: %{
+        api_health_status: state.api_health_status,
+        consecutive_errors: state.consecutive_errors,
+        error_rate: State.error_rate(as_struct(state)),
+        last_successful_at: state.last_successful_at,
+        current_station: state.station_name,
+        is_listening: state.is_listening
+      }
+    }
+
+    {:reply, {:ok, health_response}, state}
+  end
+
   ## Private Functions
 
   # Helper to work with state as struct when needed
   defp as_struct(state) when is_map(state) do
     struct(State, state)
+  end
+
+  defp determine_health_status(state) do
+    cond do
+      not State.has_credentials?(as_struct(state)) -> :unhealthy
+      state.api_health_status == :down -> :unhealthy
+      state.api_health_status == :degraded -> :degraded
+      state.consecutive_errors > 0 -> :degraded
+      true -> :healthy
+    end
+  end
+
+  defp api_health_check(state) do
+    case state.api_health_status do
+      :ok -> :pass
+      :degraded -> :warn
+      :down -> :fail
+      _ -> :unknown
+    end
   end
 
   defp schedule_poll(state) do
@@ -342,14 +404,14 @@ defmodule Server.Services.Rainwave do
   end
 
   defp parse_api_response({200, _headers, body}) do
-    case JSON.decode(body) do
+    case Jason.decode(body) do
       {:ok, data} -> {:ok, data}
       {:error, reason} -> {:error, {:json_decode_error, reason}}
     end
   end
 
   defp parse_api_response({status, _headers, body}) when status >= 400 do
-    case JSON.decode(body) do
+    case Jason.decode(body) do
       {:ok, %{"error" => error}} ->
         {:error, String.to_atom(error)}
 

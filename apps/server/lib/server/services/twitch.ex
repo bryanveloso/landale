@@ -1,5 +1,6 @@
 defmodule Server.Services.Twitch do
   @behaviour Server.Services.TwitchBehaviour
+  @behaviour Server.ServiceBehaviour
 
   @moduledoc """
   Main Twitch EventSub service coordinating WebSocket connection and subscription management.
@@ -206,6 +207,83 @@ defmodule Server.Services.Twitch do
   @spec list_subscriptions() :: {:ok, list(map())} | {:error, binary()}
   def list_subscriptions do
     GenServer.call(__MODULE__, :list_subscriptions)
+  end
+
+  # ServiceBehaviour implementation
+
+  @impl Server.ServiceBehaviour
+  def get_health do
+    # Get current state to check health
+    state = get_state()
+
+    # Check WebSocket connection
+    ws_connection_status =
+      case get_in(state, [:state, :connection, :connected]) do
+        true -> :pass
+        false -> :fail
+        nil -> :unknown
+      end
+
+    # Check OAuth token status
+    oauth_status =
+      if state[:state][:token_manager] do
+        case OAuthTokenManager.has_valid_token?(state[:state][:token_manager]) do
+          {:ok, true} -> :pass
+          {:ok, false} -> :warn
+          {:error, _} -> :fail
+        end
+      else
+        :fail
+      end
+
+    # Check subscription status
+    subscription_status =
+      case state[:state][:subscriptions] do
+        subs when is_map(subs) and map_size(subs) > 0 -> :pass
+        # No subscriptions but capable
+        subs when is_map(subs) -> :warn
+        _ -> :fail
+      end
+
+    # Get detailed metrics
+    details = %{
+      connection_state: get_in(state, [:state, :connection, :connection_state]),
+      session_id: get_in(state, [:state, :session_id]),
+      subscription_count: map_size(state[:state][:subscriptions] || %{}),
+      subscription_cost: get_in(state, [:state, :subscription_total_cost]) || 0,
+      user_id: state[:state][:user_id],
+      default_subscriptions_created: state[:state][:default_subscriptions_created] || false
+    }
+
+    # Determine overall health
+    health_status =
+      cond do
+        ws_connection_status == :fail or oauth_status == :fail -> :unhealthy
+        subscription_status == :fail -> :degraded
+        ws_connection_status == :unknown or oauth_status == :warn -> :degraded
+        true -> :healthy
+      end
+
+    {:ok,
+     %{
+       status: health_status,
+       checks: %{
+         websocket_connection: ws_connection_status,
+         oauth_token: oauth_status,
+         eventsub_subscriptions: subscription_status
+       },
+       details: details
+     }}
+  end
+
+  @impl Server.ServiceBehaviour
+  def get_info do
+    %{
+      name: "twitch",
+      version: "2.0.0",
+      capabilities: [:eventsub, :oauth, :webhooks, :cloudfront_compatible],
+      description: "Twitch EventSub WebSocket integration for real-time stream events"
+    }
   end
 
   # GenServer callbacks

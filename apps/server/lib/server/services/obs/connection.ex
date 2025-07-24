@@ -110,7 +110,8 @@ defmodule Server.Services.OBS.Connection do
 
     # Request connection from ConnectionManager
     # For now, connect directly with gun
-    # TODO: Integrate with ConnectionManager when available
+    # TODO: Refactor to use Server.WebSocketConnection for consistency and shared features
+    # This would provide exponential backoff, CloudFront retries, and unified connection management
     case connect_websocket(data.uri) do
       {:ok, conn_pid} ->
         actions = [{:state_timeout, @connect_timeout, :connection_timeout}]

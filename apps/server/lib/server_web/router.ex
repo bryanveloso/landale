@@ -79,6 +79,13 @@ defmodule ServerWeb.Router do
     get "/control/tokens", ControlController, :tokens
     post "/control/ping", ControlController, :ping
 
+    # Service registry
+    get "/services", ServiceController, :index
+    get "/services/health", ServiceController, :health
+    get "/services/system-health", ServiceController, :system_health
+    get "/services/:id", ServiceController, :show
+    get "/services/:id/health", ServiceController, :service_health
+
     # WebSocket API introspection
     get "/websocket/schema", WebSocketController, :schema
     get "/websocket/channels", WebSocketController, :channels
