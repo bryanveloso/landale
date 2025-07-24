@@ -196,10 +196,11 @@ defmodule Server.Services.IronmonTCP do
   @impl GenServer
   def handle_call(:get_health, _from, state) do
     # Determine health status based on service state
-    health_status = cond do
-      state[:listen_socket] == nil -> :unhealthy
-      true -> :healthy
-    end
+    health_status =
+      cond do
+        state[:listen_socket] == nil -> :unhealthy
+        true -> :healthy
+      end
 
     health_response = %{
       status: health_status,
