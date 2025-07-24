@@ -7,7 +7,7 @@
 **Architecture**: Event-driven monorepo with real-time WebSocket communication
 **Network**: Runs on Tailscale VPN (not public internet) - brilliant security simplification
 **Scale**: Personal project - avoid enterprise over-engineering
-**Status**: Successfully stabilized after addressing memory exhaustion, race conditions, and security vulnerabilities
+**Stability**: Production-ready with resilient patterns for memory management, state handling, and security
 
 ### Key Features
 - Real-time WebSocket-based event distribution across multiple services
@@ -188,11 +188,11 @@ mix release --overwrite
 - Use `uv` for ALL Python commands (not pip/poetry)
 - Services read config from environment variables
 
-## Known Issues & Improvements
+## Known Limitations
 
-1. **Circuit Breaker**: Currently stateless - needs GenServer implementation
-2. **Animation Hook**: Consider simplifying with GSAP master timeline
-3. **Documentation**: Some guides in `docs/` are outdated - check `.claude/handoffs/implementation-roadmap.md` for latest patterns
+1. **Circuit Breaker**: Stateless implementation - GenServer refactor would improve fault tolerance
+2. **Animation Hook**: Complex implementation - GSAP master timeline could simplify
+3. **Documentation**: Guides in `docs/` may be outdated - `.claude/handoffs/implementation-roadmap.md` has latest patterns
 
 ## Development Workflow
 
@@ -295,22 +295,22 @@ landale/
 - **Alys**: Additional compute resources
 - All connected via Tailscale VPN mesh network
 
-## Current Challenges & Technical Debt
+## Technical Architecture Notes
 
-### Active Issues
-1. **Circuit Breaker Pattern**: Currently stateless, needs GenServer implementation for proper fault tolerance
-2. **Documentation Drift**: Check `.claude/handoffs/implementation-roadmap.md` for latest patterns
-3. **Animation Complexity**: Animation hook could be simplified with GSAP master timeline approach
-4. **Test Coverage Gaps**: Python services need more comprehensive test suites
+### Key Design Decisions
+- **Memory Protection**: Bounded queues (200 item limit) prevent exhaustion
+- **State Management**: GenServer state preferred over ETS tables to prevent race conditions
+- **Security**: ETS tables use `:protected` access (never `:public`)
+- **Connection Resilience**: WebSocket clients implement exponential backoff and auto-reconnect
 
-### Recently Resolved ✅
-- **Memory Exhaustion**: Fixed with bounded queues (200 item limit)
-- **Race Conditions**: Resolved by preferring GenServer state over ETS tables
-- **Security Vulnerabilities**: Fixed by changing ETS tables from `:public` to `:protected`
-- **WebSocket Instability**: Implemented resilient client with exponential backoff
+### Architectural Limitations
+1. **Circuit Breaker**: Stateless implementation - GenServer would provide better fault isolation
+2. **Documentation**: Some guides in `docs/` may not reflect current patterns
+3. **Animation System**: Complex hook implementation - could benefit from GSAP master timeline
+4. **Test Coverage**: Python services lack comprehensive test suites
 
-### Future Considerations
-- **Observability**: Consider adding OpenTelemetry for distributed tracing
-- **State Persistence**: Evaluate need for persistent state across restarts
-- **Event Sourcing**: Current architecture supports future event sourcing if needed
-- **Performance Monitoring**: Add metrics for animation frame rates and latency
+### Extension Points
+- **Observability**: Architecture supports OpenTelemetry integration
+- **State Persistence**: Could add persistent state across restarts if needed
+- **Event Sourcing**: Current design allows future event sourcing implementation
+- **Performance Metrics**: Can add animation frame rate and latency monitoring
