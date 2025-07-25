@@ -8,6 +8,11 @@ defmodule Server.Application do
 
   @impl true
   def start(_type, _args) do
+    # Validate all required configuration is present - fail fast if missing
+    if Application.get_env(:server, :env) != :test do
+      Server.Config.validate_all!()
+    end
+
     # Set up graceful shutdown handling for Docker (skip in test environment)
     if Application.get_env(:server, :env) != :test do
       setup_signal_handlers()

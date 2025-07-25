@@ -536,7 +536,7 @@ defmodule Server.Services.Twitch.EventSubManager do
     Enum.all?(required_scopes, fn scope -> MapSet.member?(user_scopes, scope) end)
   end
 
-  # Get client ID from state or OAuth config
+  # Get client ID from state or fail-fast config
   defp get_client_id(state) do
     # The Twitch service passes its client_id in the state
     cond do
@@ -548,10 +548,9 @@ defmodule Server.Services.Twitch.EventSubManager do
       get_in(state, [:oauth2_client, :client_id]) != nil ->
         get_in(state, [:oauth2_client, :client_id])
 
-      # Last resort: check application config (mainly for tests)
+      # Last resort: use fail-fast config (raises clear error if missing)
       true ->
-        Application.get_env(:server, Server.Services.Twitch)[:client_id] ||
-          raise "Missing Twitch client_id configuration"
+        Server.Config.twitch_client_id()
     end
   end
 
