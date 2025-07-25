@@ -114,7 +114,6 @@ defmodule Server.Config do
     # Call all required config functions to trigger validation
     twitch_client_id()
     twitch_client_secret()
-    database_url()
     secret_key_base()
 
     :ok
