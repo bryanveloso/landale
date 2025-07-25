@@ -300,11 +300,29 @@ defmodule Server.Services.IronmonTCP do
 
         case :gen_tcp.listen(state.port, tcp_options) do
           {:ok, listen_socket} ->
+            Logger.info("TCP socket bound successfully",
+              service: "ironmon_tcp",
+              port: state.port,
+              ip: to_string(:inet.ntoa(ip_address))
+            )
+
             # Start accepting connections
-            spawn_link(fn -> accept_connections(listen_socket, self()) end)
+            pid = spawn_link(fn -> accept_connections(listen_socket, self()) end)
+
+            Logger.info("TCP accept process spawned",
+              service: "ironmon_tcp",
+              accept_pid: inspect(pid)
+            )
+
             {:ok, %{state | listen_socket: listen_socket}}
 
           {:error, reason} ->
+            Logger.error("Failed to bind TCP socket",
+              service: "ironmon_tcp",
+              port: state.port,
+              error: inspect(reason)
+            )
+
             {:error, reason}
         end
 
@@ -356,6 +374,13 @@ defmodule Server.Services.IronmonTCP do
     buffer = Map.get(state.connections, socket, "")
     updated_buffer = buffer <> data
 
+    Logger.info("TCP data buffered",
+      service: "ironmon_tcp",
+      buffer_size: byte_size(updated_buffer),
+      new_data_size: byte_size(data),
+      preview: String.slice(updated_buffer, 0, 100)
+    )
+
     # Process all complete messages in the buffer
     {remaining_buffer, new_state} = process_messages(socket, updated_buffer, state)
 
@@ -371,6 +396,12 @@ defmodule Server.Services.IronmonTCP do
   end
 
   defp process_messages(socket, buffer, state) do
+    Logger.debug("Processing buffer",
+      service: "ironmon_tcp",
+      buffer_size: byte_size(buffer),
+      preview: String.slice(buffer, 0, 50)
+    )
+
     case String.split(buffer, " ", parts: 2) do
       [length_str, rest] ->
         case Integer.parse(length_str) do
@@ -378,12 +409,21 @@ defmodule Server.Services.IronmonTCP do
             # We have a complete message
             <<message::binary-size(length), remaining::binary>> = rest
 
+            Logger.info("Found complete message",
+              service: "ironmon_tcp",
+              message_length: length,
+              remaining_buffer: byte_size(remaining)
+            )
+
             case process_message(message) do
               :ok ->
-                Logger.debug("Message processed")
+                Logger.debug("Message processed successfully",
+                  service: "ironmon_tcp"
+                )
 
               {:error, reason} ->
                 Logger.warning("Message processing failed",
+                  service: "ironmon_tcp",
                   error: inspect(reason)
                 )
             end
