@@ -154,7 +154,7 @@ defmodule Server.Services.Twitch.EventSubManager do
 
         headers = [
           {"authorization", "Bearer #{access_token}"},
-          {"client-id", get_client_id()},
+          {"client-id", get_client_id(state)},
           {"content-type", "application/json"}
         ]
 
@@ -285,7 +285,7 @@ defmodule Server.Services.Twitch.EventSubManager do
 
         headers = [
           {"authorization", "Bearer #{access_token}"},
-          {"client-id", get_client_id()}
+          {"client-id", get_client_id(state)}
         ]
 
         delete_subscription_with_headers(url, headers, subscription_id)
@@ -536,10 +536,23 @@ defmodule Server.Services.Twitch.EventSubManager do
     Enum.all?(required_scopes, fn scope -> MapSet.member?(user_scopes, scope) end)
   end
 
-  # Get client ID from environment config
-  defp get_client_id do
-    Application.get_env(:server, Server.Services.Twitch)[:client_id] ||
-      raise "Missing Twitch client_id configuration"
+  # Get client ID from state or OAuth config
+  defp get_client_id(state) do
+    # The Twitch service passes its client_id in the state
+    cond do
+      # First check if client_id is directly in state (from Twitch service)
+      Map.has_key?(state, :client_id) && is_binary(state.client_id) ->
+        state.client_id
+
+      # Then check oauth2_client for backwards compatibility
+      get_in(state, [:oauth2_client, :client_id]) != nil ->
+        get_in(state, [:oauth2_client, :client_id])
+
+      # Last resort: check application config (mainly for tests)
+      true ->
+        Application.get_env(:server, Server.Services.Twitch)[:client_id] ||
+          raise "Missing Twitch client_id configuration"
+    end
   end
 
   @doc """

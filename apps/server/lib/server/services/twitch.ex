@@ -35,6 +35,9 @@ defmodule Server.Services.Twitch do
     :user_id,
     :scopes,
     :retry_subscription_timer,
+    :client_id,
+    :keepalive_timer,
+    :last_keepalive,
     subscriptions: %{},
     cloudfront_retry_count: 0,
     default_subscriptions_created: false,
@@ -338,7 +341,8 @@ defmodule Server.Services.Twitch do
       ws_client: ws_client,
       subscriptions: %{},
       token_validation_task: nil,
-      token_refresh_task: nil
+      token_refresh_task: nil,
+      client_id: client_id
     }
 
     # Set service context for all log messages from this process
@@ -475,7 +479,8 @@ defmodule Server.Services.Twitch do
       service_name: :twitch,
       session_id: state.session_id,
       user_id: state.user_id,
-      scopes: state.scopes
+      scopes: state.scopes,
+      client_id: state.client_id
     }
 
     case EventSubManager.delete_subscription(manager_state, subscription_id) do
@@ -543,7 +548,8 @@ defmodule Server.Services.Twitch do
       session_id: state.session_id,
       service_name: :twitch,
       scopes: state.scopes,
-      user_id: state.user_id
+      user_id: state.user_id,
+      client_id: state.client_id
     }
 
     case EventSubManager.create_subscription(manager_state, event_type, condition, opts) do
@@ -853,7 +859,12 @@ defmodule Server.Services.Twitch do
   def handle_info({:websocket_disconnected, client, reason}, state) do
     Logger.warning("WebSocket connection lost", error: reason)
 
-    state = %{state | ws_client: client}
+    # Cancel keepalive timer if active
+    if state.keepalive_timer do
+      Process.cancel_timer(state.keepalive_timer)
+    end
+
+    state = %{state | ws_client: client, keepalive_timer: nil}
 
     state =
       update_connection_state(state, %{
@@ -892,6 +903,23 @@ defmodule Server.Services.Twitch do
     Logger.info("WebSocket reconnection started")
     state = %{state | ws_client: client}
     send(self(), :connect)
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info(:keepalive_timeout, state) do
+    Logger.error("EventSub keepalive timeout - connection may be dead")
+
+    # Force reconnection
+    state = %{state | connected: false, connection_state: "keepalive_timeout"}
+
+    # Disconnect the current WebSocket
+    # WebSocket will disconnect when process terminates
+    # No explicit disconnect needed
+
+    # Schedule reconnection
+    send(self(), :retry_connection)
+
     {:noreply, state}
   end
 
@@ -1135,7 +1163,8 @@ defmodule Server.Services.Twitch do
         session_id: session_id,
         service_name: :twitch,
         scopes: state.scopes,
-        user_id: state.user_id
+        user_id: state.user_id,
+        client_id: state.client_id
       }
 
       if state.default_subscriptions_created do
@@ -1197,7 +1226,8 @@ defmodule Server.Services.Twitch do
         session_id: session_id,
         service_name: :twitch,
         scopes: state.scopes,
-        user_id: state.user_id
+        user_id: state.user_id,
+        client_id: state.client_id
       }
 
       if state.default_subscriptions_created do
@@ -1365,6 +1395,9 @@ defmodule Server.Services.Twitch do
 
     Logger.info("EventSub session established", session_id: session_id)
 
+    # Start keepalive timer (15 seconds = 10s timeout + 5s buffer)
+    keepalive_timer = Process.send_after(self(), :keepalive_timeout, 15_000)
+
     state =
       update_connection_state(state, %{
         connected: true,
@@ -1373,6 +1406,8 @@ defmodule Server.Services.Twitch do
         last_connected: DateTime.utc_now()
       })
       |> Map.put(:session_id, session_id)
+      |> Map.put(:keepalive_timer, keepalive_timer)
+      |> Map.put(:last_keepalive, DateTime.utc_now())
 
     # Create default subscriptions using EventSubManager
     # Check if user_id is available from token validation or OAuth service
@@ -1403,7 +1438,8 @@ defmodule Server.Services.Twitch do
         session_id: session_id,
         service_name: :twitch,
         scopes: scopes,
-        user_id: user_id
+        user_id: user_id,
+        client_id: state.client_id
       }
 
       if state.default_subscriptions_created do
@@ -1453,7 +1489,15 @@ defmodule Server.Services.Twitch do
   defp handle_eventsub_protocol_message(state, %{
          "metadata" => %{"message_type" => "session_keepalive"}
        }) do
-    state
+    # Cancel existing keepalive timer
+    if state.keepalive_timer do
+      Process.cancel_timer(state.keepalive_timer)
+    end
+
+    # Set a new timer for 15 seconds (10s timeout + 5s buffer)
+    keepalive_timer = Process.send_after(self(), :keepalive_timeout, 15_000)
+
+    %{state | keepalive_timer: keepalive_timer, last_keepalive: DateTime.utc_now()}
   end
 
   defp handle_eventsub_protocol_message(
