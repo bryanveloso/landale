@@ -155,7 +155,45 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 5. **Check off each reference** as you update it
 6. **Only commit when refactor.md is empty**
 
-**Why this matters**: The OAuth refactoring disaster happened because we changed some references but not others. This protocol makes incomplete refactoring impossible.
+**Why this matters**: During recent OAuth refactoring, we encountered runtime errors because some references were updated while others weren't. This protocol ensures systematic reference handling.
+
+## Issue Analysis Framework (IAI)
+
+**When documenting any code issues, bugs, or technical challenges, use this structure:**
+
+### 1. Incident (Factual & Neutral)
+- **What happened**: Specific, observable behavior
+- **When**: Timeline if relevant  
+- **Impact**: Quantifiable effects
+- **Avoid**: Dramatic language, blame, emotional framing
+
+### 2. Analysis (Technical Causality)
+- **Root cause**: Technical explanation of why it occurred
+- **Contributing factors**: System conditions that enabled the issue
+- **Evidence**: Code references, logs, reproduction steps
+- **Avoid**: "We messed up", "huge oversight", personal fault
+
+### 3. Improvement (Systematic & Actionable)
+- **Immediate fix**: What resolved the issue
+- **Preventive measures**: System changes to prevent recurrence
+- **Process improvements**: Workflow updates
+- **Verification**: How to confirm the fix works
+
+**Example Template:**
+```markdown
+## Engineering Analysis: [Brief Description]
+
+**Incident**: During X deployment, we observed Y behavior resulting in Z impact.
+
+**Analysis**: Root cause was [technical explanation]. This occurred because [system conditions].
+
+**Improvements**: 
+- Fixed by [immediate resolution]
+- Prevented future occurrences with [systematic change]
+- Updated process to [workflow improvement]
+```
+
+**Remember**: Technical challenges are normal engineering work. Frame them as learning opportunities and process improvements, not crises.
 
 ## Commands Reference
 
