@@ -94,7 +94,7 @@ defmodule Server.Config do
   Gets Phoenix secret key base - REQUIRED for session security
   """
   def secret_key_base do
-    Application.fetch_env!(:server, Server.Endpoint)[:secret_key_base]
+    Application.fetch_env!(:server, ServerWeb.Endpoint)[:secret_key_base]
   rescue
     ArgumentError ->
       raise """
