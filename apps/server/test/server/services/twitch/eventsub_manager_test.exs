@@ -27,6 +27,12 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
   end
 
   setup do
+    # Store original config
+    original_config = Application.get_env(:server, Server.Services.Twitch, [])
+
+    # Set test config for client_id
+    Application.put_env(:server, Server.Services.Twitch, client_id: "test_client_id")
+
     # Start CircuitBreakerServer if not already started
     case Process.whereis(Server.CircuitBreakerServer) do
       nil -> start_supervised!(Server.CircuitBreakerServer)
@@ -61,6 +67,11 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
       service_name: :twitch
     }
 
+    on_exit(fn ->
+      # Restore original config
+      Application.put_env(:server, Server.Services.Twitch, original_config)
+    end)
+
     {:ok, state: state}
   end
 
@@ -81,9 +92,18 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
       event_type = "channel.update"
       condition = %{"broadcaster_user_id" => "123456"}
 
-      # Since EventSubManager now uses OAuth service, it will fail with :no_tokens
-      # when no tokens are stored for the service
-      result = EventSubManager.create_subscription(state, event_type, condition)
+      # Create a new state without registering tokens
+      state_without_tokens = %{state | service_name: :twitch_no_tokens}
+
+      # Register service without tokens
+      Server.OAuthService.register_service(:twitch_no_tokens, %{
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        auth_url: "https://id.twitch.tv/oauth2/authorize",
+        token_url: "https://id.twitch.tv/oauth2/token"
+      })
+
+      result = EventSubManager.create_subscription(state_without_tokens, event_type, condition)
 
       assert {:error, {:token_unavailable, _reason}} = result
     end
@@ -116,7 +136,18 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
     test "handles token unavailable error", %{state: state} do
       subscription_id = "test_sub_123"
 
-      result = EventSubManager.delete_subscription(state, subscription_id)
+      # Create a new state without registering tokens
+      state_without_tokens = %{state | service_name: :twitch_no_tokens_delete}
+
+      # Register service without tokens
+      Server.OAuthService.register_service(:twitch_no_tokens_delete, %{
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        auth_url: "https://id.twitch.tv/oauth2/authorize",
+        token_url: "https://id.twitch.tv/oauth2/token"
+      })
+
+      result = EventSubManager.delete_subscription(state_without_tokens, subscription_id)
 
       assert {:error, {:token_unavailable, _reason}} = result
     end

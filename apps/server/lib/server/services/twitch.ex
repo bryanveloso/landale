@@ -541,7 +541,7 @@ defmodule Server.Services.Twitch do
     # Create subscription using EventSubManager
     manager_state = %{
       session_id: state.session_id,
-      oauth2_client: state.token_manager.oauth2_client,
+      service_name: :twitch,
       scopes: state.scopes,
       user_id: state.user_id
     }
@@ -1133,8 +1133,7 @@ defmodule Server.Services.Twitch do
     if state.user_id && state.session_id == session_id do
       manager_state = %{
         session_id: session_id,
-        token_manager: state.token_manager,
-        oauth2_client: state.token_manager.oauth2_client,
+        service_name: :twitch,
         scopes: state.scopes,
         user_id: state.user_id
       }
@@ -1196,8 +1195,7 @@ defmodule Server.Services.Twitch do
 
       manager_state = %{
         session_id: session_id,
-        token_manager: state.token_manager,
-        oauth2_client: state.token_manager.oauth2_client,
+        service_name: :twitch,
         scopes: state.scopes,
         user_id: state.user_id
       }
@@ -1320,6 +1318,7 @@ defmodule Server.Services.Twitch do
   defp shutdown_task(task, name) do
     case Task.shutdown(task, 5_000) do
       :ok -> :ok
+      {:ok, _} -> :ok
       {:exit, :normal} -> :ok
       nil -> Logger.warning("#{name} task timeout during termination")
     end
@@ -1402,8 +1401,7 @@ defmodule Server.Services.Twitch do
     if user_id do
       manager_state = %{
         session_id: session_id,
-        token_manager: state.token_manager,
-        oauth2_client: state.token_manager.oauth2_client,
+        service_name: :twitch,
         scopes: scopes,
         user_id: user_id
       }

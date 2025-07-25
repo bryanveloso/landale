@@ -149,7 +149,7 @@ defmodule Server.Services.Twitch.EventSubManager do
   def create_subscription(state, event_type, condition, _opts \\ []) do
     # Get access token from OAuth service
     case Server.OAuthService.get_valid_token(state.service_name || :twitch) do
-      {:ok, %{access_token: access_token}} ->
+      {:ok, access_token} when is_binary(access_token) ->
         url = "https://api.twitch.tv/helix/eventsub/subscriptions"
 
         headers = [
@@ -278,7 +278,7 @@ defmodule Server.Services.Twitch.EventSubManager do
   def delete_subscription(state, subscription_id, _opts \\ []) do
     # Get access token from OAuth service
     case Server.OAuthService.get_valid_token(state.service_name || :twitch) do
-      {:ok, %{access_token: access_token}} ->
+      {:ok, access_token} when is_binary(access_token) ->
         # Properly encode the subscription ID to handle UTF-8 characters
         encoded_id = URI.encode_www_form(subscription_id)
         url = "https://api.twitch.tv/helix/eventsub/subscriptions?id=#{encoded_id}"

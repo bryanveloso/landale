@@ -20,6 +20,9 @@ defmodule Server.Services.TwitchTest do
   end
 
   defp setup_test_dependencies do
+    # Set test config for client_id
+    Application.put_env(:server, Server.Services.Twitch, client_id: "test_client_id")
+
     # Start PubSub only if not already started
     case Process.whereis(Server.PubSub) do
       nil -> start_supervised!({Phoenix.PubSub, name: Server.PubSub})
