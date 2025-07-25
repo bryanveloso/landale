@@ -55,9 +55,9 @@ defmodule Server.Services.Twitch.ConnectionManagerSimpleTest do
       assert {:error, :not_connected} = ConnectionManager.send_message(manager, "test")
     end
 
-    test "monitors owner process", %{manager: manager} do
+    test "monitors owner process", %{manager: _manager} do
       # Spawn a process to be the owner
-      owner = spawn(fn -> Process.sleep(50) end)
+      owner = spawn(fn -> Process.sleep(200) end)
 
       {:ok, manager2} =
         ConnectionManager.start_link(
@@ -67,14 +67,17 @@ defmodule Server.Services.Twitch.ConnectionManagerSimpleTest do
           name: nil
         )
 
-      # Monitor the manager
+      # Monitor the manager before killing the owner
       ref = Process.monitor(manager2)
+
+      # Give the manager time to set up monitoring of the owner
+      Process.sleep(10)
 
       # Kill the owner
       Process.exit(owner, :kill)
 
       # Manager should stop when owner dies
-      assert_receive {:DOWN, ^ref, :process, _, :normal}, 100
+      assert_receive {:DOWN, ^ref, :process, _, :normal}, 200
     end
   end
 

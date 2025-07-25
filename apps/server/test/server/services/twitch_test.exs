@@ -10,11 +10,16 @@ defmodule Server.Services.TwitchTest do
   - Error recovery mechanisms
   - Cache behavior
   """
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Server.Services.Twitch
 
   setup do
+    setup_test_dependencies()
+    :ok
+  end
+
+  defp setup_test_dependencies do
     # Start PubSub only if not already started
     case Process.whereis(Server.PubSub) do
       nil -> start_supervised!({Phoenix.PubSub, name: Server.PubSub})
@@ -54,8 +59,6 @@ defmodule Server.Services.TwitchTest do
       nil -> start_supervised!(Server.OAuthService)
       _pid -> :ok
     end
-
-    :ok
   end
 
   describe "start_link/1" do
@@ -230,6 +233,9 @@ defmodule Server.Services.TwitchTest do
 
   describe "delete_subscription/1" do
     setup do
+      # Start dependencies first
+      setup_test_dependencies()
+
       {:ok, _pid} = start_supervised(Twitch)
       :ok
     end
@@ -246,6 +252,9 @@ defmodule Server.Services.TwitchTest do
 
   describe "list_subscriptions/0" do
     setup do
+      # Start dependencies first
+      setup_test_dependencies()
+
       {:ok, _pid} = start_supervised(Twitch)
       :ok
     end
@@ -259,6 +268,9 @@ defmodule Server.Services.TwitchTest do
 
   describe "connection state management" do
     setup do
+      # Start dependencies first
+      setup_test_dependencies()
+
       {:ok, _pid} = start_supervised(Twitch)
       :ok
     end

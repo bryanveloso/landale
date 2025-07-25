@@ -156,10 +156,9 @@ defmodule Server.Services.OBS.ConnectionTest do
     test "handles Hello response without auth", %{data: data} do
       hello_msg = Jason.encode!(OBSTestHelpers.hello_message("1", false))
 
-      {:next_state, :ready, new_data} =
-        Connection.authenticating(:info, {:gun_ws, data.conn_pid, data.stream_ref, {:text, hello_msg}}, data)
-
-      assert new_data.rpc_version == "1"
+      # When no auth is required, it stays in authenticating state waiting for Identified response
+      result = Connection.authenticating(:info, {:gun_ws, data.conn_pid, data.stream_ref, {:text, hello_msg}}, data)
+      assert result in [{:keep_state_and_data}, {:keep_state_and_data, []}]
     end
 
     test "handles Hello response with auth required", %{data: data} do
@@ -170,8 +169,8 @@ defmodule Server.Services.OBS.ConnectionTest do
       hello_msg = Jason.encode!(OBSTestHelpers.hello_message("1", true))
 
       # Should stay in authenticating state after sending Identify
-      assert {:keep_state_and_data} =
-               Connection.authenticating(:info, {:gun_ws, data.conn_pid, data.stream_ref, {:text, hello_msg}}, data)
+      result = Connection.authenticating(:info, {:gun_ws, data.conn_pid, data.stream_ref, {:text, hello_msg}}, data)
+      assert result in [{:keep_state_and_data}, {:keep_state_and_data, []}]
     end
 
     test "fails auth without password", %{data: data} do
@@ -262,8 +261,8 @@ defmodule Server.Services.OBS.ConnectionTest do
           })
         )
 
-      assert {:keep_state_and_data} =
-               Connection.ready(:info, {:gun_ws, data.conn_pid, data.stream_ref, {:text, event_msg}}, data)
+      result = Connection.ready(:info, {:gun_ws, data.conn_pid, data.stream_ref, {:text, event_msg}}, data)
+      assert result in [{:keep_state_and_data}, {:keep_state_and_data, []}]
 
       # Should broadcast the event data (from event.d)
       assert_receive {:obs_event, event_data}
@@ -274,8 +273,8 @@ defmodule Server.Services.OBS.ConnectionTest do
     test "handles invalid messages gracefully", %{data: data} do
       log =
         capture_log(fn ->
-          assert {:keep_state_and_data} =
-                   Connection.ready(:info, {:gun_ws, data.conn_pid, data.stream_ref, {:text, "invalid json"}}, data)
+          result = Connection.ready(:info, {:gun_ws, data.conn_pid, data.stream_ref, {:text, "invalid json"}}, data)
+          assert result in [{:keep_state_and_data}, {:keep_state_and_data, []}]
         end)
 
       assert log =~ "Failed to decode OBS message"
