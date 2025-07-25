@@ -224,9 +224,9 @@ defmodule Server.Services.IronmonTCP do
 
     CorrelationId.with_context(correlation_id, fn ->
       Logger.debug("TCP data received",
-        socket: inspect(socket),
-        data_size: byte_size(data),
-        raw_data: inspect(data)
+        service: "ironmon_tcp",
+        correlation_id: correlation_id,
+        data_size: byte_size(data)
       )
 
       case handle_tcp_data(socket, data, state) do
@@ -238,7 +238,9 @@ defmodule Server.Services.IronmonTCP do
 
   @impl GenServer
   def handle_info({:tcp_closed, socket}, state) do
-    Logger.info("Client disconnected", socket: inspect(socket))
+    Logger.info("Client disconnected",
+      service: "ironmon_tcp"
+    )
 
     new_connections = Map.delete(state.connections, socket)
     {:noreply, %{state | connections: new_connections}}
@@ -246,7 +248,10 @@ defmodule Server.Services.IronmonTCP do
 
   @impl GenServer
   def handle_info({:tcp_error, socket, reason}, state) do
-    Logger.warning("Socket error", error: inspect(reason), socket: inspect(socket))
+    Logger.warning("TCP socket error",
+      service: "ironmon_tcp",
+      error: inspect(reason)
+    )
 
     new_connections = Map.delete(state.connections, socket)
     {:noreply, %{state | connections: new_connections}}
@@ -254,8 +259,6 @@ defmodule Server.Services.IronmonTCP do
 
   @impl GenServer
   def handle_info({:tcp_accept, listen_socket, client_socket}, %{listen_socket: listen_socket} = state) do
-    Logger.info("Client connected", socket: inspect(client_socket))
-
     # Accept the connection
     :gen_tcp.controlling_process(client_socket, self())
     :inet.setopts(client_socket, active: true)
@@ -267,7 +270,11 @@ defmodule Server.Services.IronmonTCP do
 
   @impl GenServer
   def handle_info(message, state) do
-    Logger.debug("Unhandled message received", message: inspect(message))
+    Logger.debug("Unhandled message",
+      service: "ironmon_tcp",
+      message: inspect(message)
+    )
+
     {:noreply, state}
   end
 
@@ -300,16 +307,27 @@ defmodule Server.Services.IronmonTCP do
   end
 
   defp accept_connections(listen_socket, server_pid) do
-    Logger.info("TCP accept loop started, waiting for connections", port: :inet.port(listen_socket))
+    {:ok, port} = :inet.port(listen_socket)
+
+    Logger.info("TCP server listening for connections",
+      service: "ironmon_tcp",
+      port: port
+    )
+
     accept_loop(listen_socket, server_pid)
   end
 
   defp accept_loop(listen_socket, server_pid) do
-    Logger.debug("Waiting for TCP connection...")
-
     case :gen_tcp.accept(listen_socket) do
       {:ok, client_socket} ->
-        Logger.info("TCP connection accepted", client: :inet.peername(client_socket))
+        {:ok, {ip, port}} = :inet.peername(client_socket)
+
+        Logger.info("Client connected",
+          service: "ironmon_tcp",
+          client_ip: to_string(:inet.ntoa(ip)),
+          client_port: port
+        )
+
         send(server_pid, {:tcp_accept, listen_socket, client_socket})
         accept_loop(listen_socket, server_pid)
 
@@ -317,7 +335,11 @@ defmodule Server.Services.IronmonTCP do
         :ok
 
       {:error, reason} ->
-        Logger.error("Connection accept failed", reason: inspect(reason))
+        Logger.error("TCP accept failed",
+          service: "ironmon_tcp",
+          error: inspect(reason)
+        )
+
         accept_loop(listen_socket, server_pid)
     end
   end
@@ -367,7 +389,11 @@ defmodule Server.Services.IronmonTCP do
             {buffer, state}
 
           :error ->
-            Logging.log_error("Message length invalid", "parse failed", length_str: length_str)
+            Logger.error("Invalid message length",
+              service: "ironmon_tcp",
+              length_str: length_str
+            )
+
             # Skip invalid data
             {rest, state}
         end
@@ -379,23 +405,33 @@ defmodule Server.Services.IronmonTCP do
   end
 
   defp process_message(message_str) do
-    Logger.debug("Processing raw message", message: message_str)
+    Logger.debug("Processing IronMON message",
+      service: "ironmon_tcp",
+      message_size: byte_size(message_str)
+    )
 
     with {:ok, json} <- JSON.decode(message_str),
-         {:ok, message} <- validate_message(json) do
-      # Log the v2.0 fields if present
-      if Map.has_key?(json, "timestamp") do
-        Logger.debug("IronmonConnect v2.0 message",
-          timestamp: json["timestamp"],
-          frame: Map.get(json, "frame")
-        )
-      end
+         {:ok, validated} <- validate_message(json) do
+      # Extract v2.0 fields if present
+      timestamp = Map.get(json, "timestamp")
+      frame = Map.get(json, "frame")
 
-      handle_ironmon_message(message)
+      # Enhance the validated message with v2.0 fields
+      message =
+        if timestamp do
+          validated
+          |> Map.put(:timestamp, timestamp)
+          |> Map.put(:frame, frame)
+        else
+          validated
+        end
+
+      handle_ironmon_message(message, json)
     else
       {:error, reason} ->
-        Logger.warning("Failed to process message",
-          reason: inspect(reason),
+        Logger.warning("Invalid IronMON message",
+          service: "ironmon_tcp",
+          error: inspect(reason),
           raw_message: message_str
         )
 
@@ -476,27 +512,61 @@ defmodule Server.Services.IronmonTCP do
 
   defp validate_location_data(_), do: {:error, "Invalid location data"}
 
-  defp handle_ironmon_message(%{type: type, metadata: metadata}) do
+  defp handle_ironmon_message(%{type: type, metadata: metadata} = message, raw_json) do
     correlation_id = CorrelationId.get_logger_metadata()
 
+    # Build event data with v2.0 fields if available
     event_data = %{
       type: type,
       metadata: metadata,
       source: "tcp",
       correlation_id: correlation_id,
-      timestamp: System.system_time(:second)
+      timestamp: Map.get(message, :timestamp, System.system_time(:second))
     }
 
-    Logger.info("Message processing started", type: type, metadata: metadata)
+    # Add frame if present
+    event_data =
+      if Map.has_key?(message, :frame) do
+        Map.put(event_data, :frame, message.frame)
+      else
+        event_data
+      end
+
+    # Add raw data field for v2.0 compatibility
+    event_data =
+      if Map.has_key?(raw_json, "data") do
+        Map.put(event_data, :data, raw_json["data"])
+      else
+        event_data
+      end
+
+    Logger.info("IronMON event received",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id,
+      event_type: type,
+      frame: Map.get(message, :frame)
+    )
 
     case type do
       "init" ->
         game_name = Map.get(@games, metadata.game, "Unknown")
-        Logger.info("Game initialized", version: metadata.version, game: game_name)
+
+        Logger.info("IronMON game initialized",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          version: metadata.version,
+          game: game_name
+        )
+
         Events.publish_ironmon_event(type, event_data, batch: false)
 
       "seed" ->
-        Logger.debug("Seed count updated", count: metadata.count)
+        Logger.info("IronMON seed updated",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          seed_count: metadata.count
+        )
+
         # Create new seed in database (new attempt started)
         # Get the first (and currently only) challenge
         challenge_id =
@@ -505,7 +575,11 @@ defmodule Server.Services.IronmonTCP do
               challenge.id
 
             [] ->
-              Logger.error("No challenges found in database - cannot create seed")
+              Logger.error("No IronMON challenges found",
+                service: "ironmon_tcp",
+                correlation_id: correlation_id
+              )
+
               nil
           end
 
@@ -513,30 +587,60 @@ defmodule Server.Services.IronmonTCP do
           # Use the seed count from IronMON as the seed ID
           case Server.Ironmon.RunTracker.new_seed(challenge_id, metadata.count) do
             {:ok, seed_id} ->
-              Logger.info("New IronMON attempt started", seed_id: seed_id, count: metadata.count)
+              Logger.info("IronMON attempt started",
+                service: "ironmon_tcp",
+                correlation_id: correlation_id,
+                seed_id: seed_id,
+                seed_count: metadata.count
+              )
 
             {:error, reason} ->
-              Logger.error("Failed to create new seed", reason: inspect(reason))
+              Logger.error("Failed to create IronMON seed",
+                service: "ironmon_tcp",
+                correlation_id: correlation_id,
+                error: inspect(reason)
+              )
           end
         end
 
         Events.publish_ironmon_event(type, event_data, batch: false)
 
       "checkpoint" ->
-        Logger.info("Checkpoint cleared", id: metadata.id, name: metadata.name, seed: Map.get(metadata, :seed))
+        Logger.info("IronMON checkpoint cleared",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          checkpoint_id: metadata.id,
+          checkpoint_name: metadata.name,
+          seed: Map.get(metadata, :seed)
+        )
+
         # Record checkpoint result (always true since we only get notified when cleared)
         case Server.Ironmon.RunTracker.record_checkpoint(metadata.name, true) do
           :ok ->
-            Logger.debug("Checkpoint recorded in database", name: metadata.name)
+            Logger.debug("Checkpoint recorded",
+              service: "ironmon_tcp",
+              correlation_id: correlation_id,
+              checkpoint_name: metadata.name
+            )
 
           {:error, reason} ->
-            Logger.error("Failed to record checkpoint", name: metadata.name, reason: inspect(reason))
+            Logger.error("Failed to record checkpoint",
+              service: "ironmon_tcp",
+              correlation_id: correlation_id,
+              checkpoint_name: metadata.name,
+              error: inspect(reason)
+            )
         end
 
         Events.publish_ironmon_event(type, event_data, batch: false)
 
       "location" ->
-        Logger.debug("Location changed", id: metadata.id)
+        Logger.debug("IronMON location changed",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          location_id: metadata.id
+        )
+
         Events.publish_ironmon_event(type, event_data, batch: false)
     end
 
