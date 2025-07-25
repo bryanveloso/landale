@@ -139,6 +139,24 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 - Health checks on separate ports
 - Tailscale handles all networking security
 
+## Refactoring Protocol (CRITICAL)
+
+**Before ANY refactoring that renames, moves, or removes code:**
+
+1. **Create refactor.md** in project root (gitignored)
+2. **Document intent**: "Renaming `old_thing` to `new_thing` because..."
+3. **Search and document ALL references**:
+   ```bash
+   rg 'old_function_name' --type elixir
+   rg 'old_config_key' --type elixir
+   rg ':old_field' --type elixir
+   ```
+4. **Paste full results** (files + line numbers) into refactor.md
+5. **Check off each reference** as you update it
+6. **Only commit when refactor.md is empty**
+
+**Why this matters**: The OAuth refactoring disaster happened because we changed some references but not others. This protocol makes incomplete refactoring impossible.
+
 ## Commands Reference
 
 ```bash

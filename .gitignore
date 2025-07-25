@@ -111,3 +111,7 @@ apps/overlays/public/emotes/
 
 # Claude
 .claude/
+
+# Refactoring scratchpad
+refactor.md
+refactor_*.md
