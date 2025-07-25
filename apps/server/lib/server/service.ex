@@ -65,7 +65,24 @@ defmodule Server.Service do
       @service_name unquote(service_name) || to_string(__MODULE__)
 
       # Default implementations
+      unquote(define_default_functions())
 
+      # GenServer callbacks
+      unquote(define_genserver_callbacks())
+
+      # Helper functions
+      unquote(define_helper_functions())
+
+      # Allow services to override these
+      defoverridable init: 1,
+                     terminate: 2,
+                     start_link: 1,
+                     child_spec: 1
+    end
+  end
+
+  defp define_default_functions do
+    quote do
       def start_link(opts \\ []) do
         GenServer.start_link(__MODULE__, opts, name: __MODULE__)
       end
@@ -79,7 +96,11 @@ defmodule Server.Service do
           shutdown: 5000
         }
       end
+    end
+  end
 
+  defp define_genserver_callbacks do
+    quote do
       @impl GenServer
       def init(opts) do
         # Set up service context
@@ -126,9 +147,11 @@ defmodule Server.Service do
         status = build_status(state)
         {:reply, {:ok, status}, state}
       end
+    end
+  end
 
-      # Helper functions available to all services
-
+  defp define_helper_functions do
+    quote do
       defp service_name_to_atom(name) when is_binary(name) do
         name
         |> String.downcase()
@@ -177,12 +200,6 @@ defmodule Server.Service do
           started_at -> DateTime.diff(DateTime.utc_now(), started_at)
         end
       end
-
-      # Allow services to override these
-      defoverridable init: 1,
-                     terminate: 2,
-                     start_link: 1,
-                     child_spec: 1
     end
   end
 end

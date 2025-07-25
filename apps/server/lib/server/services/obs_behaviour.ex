@@ -6,8 +6,14 @@ defmodule Server.Services.OBSBehaviour do
   and the new decomposed facade must implement, ensuring backward compatibility.
   """
 
-  @callback get_state() :: {:ok, map()} | {:error, term()}
+  # Common service interface (duplicated from ServiceBehaviour)
+  @callback start_link(opts :: keyword()) :: GenServer.on_start()
   @callback get_status() :: {:ok, map()} | {:error, term()}
+  @callback get_health() :: {:ok, map()} | {:error, term()}
+  @callback get_info() :: map()
+
+  # OBS-specific methods
+  @callback get_state() :: {:ok, map()} | {:error, term()}
   @callback get_stats() :: {:ok, map()} | {:error, term()}
   @callback get_version() :: {:ok, map()} | {:error, term()}
 

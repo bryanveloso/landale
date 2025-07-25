@@ -21,8 +21,6 @@ defmodule Server.Services.Rainwave do
 
   alias Server.Services.Rainwave.State
 
-  @behaviour Server.ServiceBehaviour
-
   # Rainwave station constants
   @stations %{
     game: 1,
@@ -51,12 +49,14 @@ defmodule Server.Services.Rainwave do
 
   @doc "Enable/disable the service"
   @spec set_enabled(boolean()) :: :ok
+  @impl Server.Services.RainwaveBehaviour
   def set_enabled(enabled) do
     GenServer.cast(__MODULE__, {:set_enabled, enabled})
   end
 
   @doc "Change active station"
   @spec set_station(atom() | integer()) :: :ok
+  @impl Server.Services.RainwaveBehaviour
   def set_station(station) do
     GenServer.cast(__MODULE__, {:set_station, station})
   end
@@ -157,12 +157,12 @@ defmodule Server.Services.Rainwave do
 
   ## ServiceBehaviour Implementation
 
-  @impl Server.ServiceBehaviour
+  @impl Server.Services.RainwaveBehaviour
   def get_health do
     GenServer.call(__MODULE__, :get_health)
   end
 
-  @impl Server.ServiceBehaviour
+  @impl Server.Services.RainwaveBehaviour
   def get_info do
     %{
       name: "rainwave",

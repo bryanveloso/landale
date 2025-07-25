@@ -19,8 +19,22 @@ defmodule Server.Service.ConnectionManager do
     quote do
       alias Server.{ConnectionManager, NetworkConfig}
 
-      # Connection state management
+      # State update functions
+      unquote(define_state_update_functions())
 
+      # Timer management functions
+      unquote(define_timer_functions())
+
+      # Connection status functions
+      unquote(define_connection_status_functions())
+
+      # WebSocket management functions
+      unquote(define_websocket_functions())
+    end
+  end
+
+  defp define_state_update_functions do
+    quote do
       @doc """
       Updates connection state and triggers change handlers if the state changed.
       """
@@ -36,28 +50,6 @@ defmodule Server.Service.ConnectionManager do
         else
           new_state
         end
-      end
-
-      @doc """
-      Schedules a reconnection attempt after the specified delay.
-      Cancels any existing reconnection timer.
-      """
-      def schedule_reconnect(state, delay \\ nil) do
-        delay = delay || NetworkConfig.reconnect_interval_ms()
-        state = cancel_reconnect_timer(state)
-
-        timer = Process.send_after(self(), :reconnect, delay)
-        Map.put(state, :reconnect_timer, timer)
-      end
-
-      @doc """
-      Cancels any pending reconnection timer.
-      """
-      def cancel_reconnect_timer(%{reconnect_timer: nil} = state), do: state
-
-      def cancel_reconnect_timer(%{reconnect_timer: timer} = state) do
-        Process.cancel_timer(timer)
-        Map.put(state, :reconnect_timer, nil)
       end
 
       @doc """
@@ -95,7 +87,37 @@ defmodule Server.Service.ConnectionManager do
           connected_at: nil
         })
       end
+    end
+  end
 
+  defp define_timer_functions do
+    quote do
+      @doc """
+      Schedules a reconnection attempt after the specified delay.
+      Cancels any existing reconnection timer.
+      """
+      def schedule_reconnect(state, delay \\ nil) do
+        delay = delay || NetworkConfig.reconnect_interval_ms()
+        state = cancel_reconnect_timer(state)
+
+        timer = Process.send_after(self(), :reconnect, delay)
+        Map.put(state, :reconnect_timer, timer)
+      end
+
+      @doc """
+      Cancels any pending reconnection timer.
+      """
+      def cancel_reconnect_timer(%{reconnect_timer: nil} = state), do: state
+
+      def cancel_reconnect_timer(%{reconnect_timer: timer} = state) do
+        Process.cancel_timer(timer)
+        Map.put(state, :reconnect_timer, nil)
+      end
+    end
+  end
+
+  defp define_connection_status_functions do
+    quote do
       @doc """
       Checks if the service is currently connected.
       """
@@ -112,9 +134,11 @@ defmodule Server.Service.ConnectionManager do
           connected_at -> DateTime.diff(DateTime.utc_now(), connected_at)
         end
       end
+    end
+  end
 
-      # WebSocket connection management
-
+  defp define_websocket_functions do
+    quote do
       @doc """
       Initializes WebSocket connection tracking in state.
       """

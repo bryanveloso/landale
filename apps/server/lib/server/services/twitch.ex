@@ -1,6 +1,5 @@
 defmodule Server.Services.Twitch do
   @behaviour Server.Services.TwitchBehaviour
-  @behaviour Server.ServiceBehaviour
 
   @moduledoc """
   Main Twitch EventSub service coordinating WebSocket connection and subscription management.
@@ -67,6 +66,7 @@ defmodule Server.Services.Twitch do
   - `{:error, reason}` on failure
   """
   @spec start_link(keyword()) :: GenServer.on_start()
+  @impl true
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -80,6 +80,7 @@ defmodule Server.Services.Twitch do
   - Map containing connection, subscriptions, and EventSub state
   """
   @spec get_state() :: map()
+  @impl Server.Services.TwitchBehaviour
   def get_state do
     Server.Cache.get_or_compute(
       :twitch_service,
@@ -121,6 +122,7 @@ defmodule Server.Services.Twitch do
   - Map with connection details
   """
   @spec get_connection_state() :: map()
+  @impl Server.Services.TwitchBehaviour
   def get_connection_state do
     Server.Cache.get_or_compute(
       :twitch_service,
@@ -147,6 +149,7 @@ defmodule Server.Services.Twitch do
   - Map with subscription counts and costs
   """
   @spec get_subscription_metrics() :: map()
+  @impl Server.Services.TwitchBehaviour
   def get_subscription_metrics do
     Server.Cache.get_or_compute(
       :twitch_service,
@@ -178,6 +181,7 @@ defmodule Server.Services.Twitch do
   - `{:error, reason}` if creation fails or limits exceeded
   """
   @spec create_subscription(binary(), map(), keyword()) :: {:ok, map()} | {:error, binary()}
+  @impl Server.Services.TwitchBehaviour
   def create_subscription(event_type, condition, opts \\ []) do
     GenServer.call(__MODULE__, {:create_subscription, event_type, condition, opts})
   end
@@ -193,6 +197,7 @@ defmodule Server.Services.Twitch do
   - `{:error, reason}` if deletion fails
   """
   @spec delete_subscription(binary()) :: :ok | {:error, binary()}
+  @impl Server.Services.TwitchBehaviour
   def delete_subscription(subscription_id) do
     GenServer.call(__MODULE__, {:delete_subscription, subscription_id})
   end
@@ -205,64 +210,22 @@ defmodule Server.Services.Twitch do
   - `{:error, reason}` if service is unavailable
   """
   @spec list_subscriptions() :: {:ok, list(map())} | {:error, binary()}
+  @impl Server.Services.TwitchBehaviour
   def list_subscriptions do
     GenServer.call(__MODULE__, :list_subscriptions)
   end
 
   # ServiceBehaviour implementation
 
-  @impl Server.ServiceBehaviour
+  @impl true
   def get_health do
-    # Get current state to check health
     state = get_state()
 
-    # Check WebSocket connection
-    ws_connection_status =
-      case get_in(state, [:state, :connection, :connected]) do
-        true -> :pass
-        false -> :fail
-        nil -> :unknown
-      end
-
-    # Check OAuth token status
-    oauth_status =
-      if state[:state][:token_manager] do
-        case OAuthTokenManager.has_valid_token?(state[:state][:token_manager]) do
-          {:ok, true} -> :pass
-          {:ok, false} -> :warn
-          {:error, _} -> :fail
-        end
-      else
-        :fail
-      end
-
-    # Check subscription status
-    subscription_status =
-      case state[:state][:subscriptions] do
-        subs when is_map(subs) and map_size(subs) > 0 -> :pass
-        # No subscriptions but capable
-        subs when is_map(subs) -> :warn
-        _ -> :fail
-      end
-
-    # Get detailed metrics
-    details = %{
-      connection_state: get_in(state, [:state, :connection, :connection_state]),
-      session_id: get_in(state, [:state, :session_id]),
-      subscription_count: map_size(state[:state][:subscriptions] || %{}),
-      subscription_cost: get_in(state, [:state, :subscription_total_cost]) || 0,
-      user_id: state[:state][:user_id],
-      default_subscriptions_created: state[:state][:default_subscriptions_created] || false
-    }
-
-    # Determine overall health
-    health_status =
-      cond do
-        ws_connection_status == :fail or oauth_status == :fail -> :unhealthy
-        subscription_status == :fail -> :degraded
-        ws_connection_status == :unknown or oauth_status == :warn -> :degraded
-        true -> :healthy
-      end
+    ws_connection_status = check_websocket_connection(state)
+    oauth_status = check_oauth_status(state)
+    subscription_status = check_subscription_status(state)
+    details = build_health_details(state)
+    health_status = determine_overall_health(ws_connection_status, oauth_status, subscription_status)
 
     {:ok,
      %{
@@ -276,7 +239,55 @@ defmodule Server.Services.Twitch do
      }}
   end
 
-  @impl Server.ServiceBehaviour
+  defp check_websocket_connection(state) do
+    case get_in(state, [:state, :connection, :connected]) do
+      true -> :pass
+      false -> :fail
+      nil -> :unknown
+    end
+  end
+
+  defp check_oauth_status(state) do
+    if state[:state][:token_manager] do
+      case OAuthTokenManager.get_valid_token(state[:state][:token_manager]) do
+        {:ok, _token, _manager} -> :pass
+        {:error, :token_expired} -> :warn
+        {:error, _} -> :fail
+      end
+    else
+      :fail
+    end
+  end
+
+  defp check_subscription_status(state) do
+    case state[:state][:subscriptions] do
+      subs when is_map(subs) and map_size(subs) > 0 -> :pass
+      subs when is_map(subs) -> :warn
+      _ -> :fail
+    end
+  end
+
+  defp build_health_details(state) do
+    %{
+      connection_state: get_in(state, [:state, :connection, :connection_state]),
+      session_id: get_in(state, [:state, :session_id]),
+      subscription_count: map_size(state[:state][:subscriptions] || %{}),
+      subscription_cost: get_in(state, [:state, :subscription_total_cost]) || 0,
+      user_id: state[:state][:user_id],
+      default_subscriptions_created: state[:state][:default_subscriptions_created] || false
+    }
+  end
+
+  defp determine_overall_health(ws_status, oauth_status, subscription_status) do
+    cond do
+      ws_status == :fail or oauth_status == :fail -> :unhealthy
+      subscription_status == :fail -> :degraded
+      ws_status == :unknown or oauth_status == :warn -> :degraded
+      true -> :healthy
+    end
+  end
+
+  @impl true
   def get_info do
     %{
       name: "twitch",
