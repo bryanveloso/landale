@@ -17,6 +17,13 @@ defmodule Server.Services.IronmonTCP do
   - `seed` - Seed count updates
   - `checkpoint` - Checkpoint clears with ID and optional seed
   - `location` - Location changes with area ID
+  - `battle_start` - Battle encounters with trainer and pokemon info
+  - `battle_end` - Battle results with outcome and pokemon state
+  - `pokemon_update` - Team composition changes
+  - `item_update` - Inventory changes
+  - `stats_update` - Trainer stats updates
+  - `error` - Error notifications from the client
+  - `heartbeat` - Keep-alive messages
 
   ## Events Published
 
@@ -465,6 +472,27 @@ defmodule Server.Services.IronmonTCP do
       "location" ->
         validate_location_data(data)
 
+      "battle_start" ->
+        validate_battle_start_data(data)
+
+      "battle_end" ->
+        validate_battle_end_data(data)
+
+      "pokemon_update" ->
+        validate_pokemon_update_data(data)
+
+      "item_update" ->
+        validate_item_update_data(data)
+
+      "stats_update" ->
+        validate_stats_update_data(data)
+
+      "error" ->
+        validate_error_data(data)
+
+      "heartbeat" ->
+        validate_heartbeat_data(data)
+
       _ ->
         {:error, "Unknown message type: #{type}"}
     end
@@ -511,6 +539,53 @@ defmodule Server.Services.IronmonTCP do
   end
 
   defp validate_location_data(_), do: {:error, "Invalid location data"}
+
+  defp validate_battle_start_data(%{"trainer" => trainer, "pokemon" => pokemon})
+       when is_binary(trainer) and is_list(pokemon) do
+    {:ok, %{type: "battle_start", metadata: %{trainer: trainer, pokemon: pokemon}}}
+  end
+
+  defp validate_battle_start_data(_), do: {:error, "Invalid battle_start data"}
+
+  defp validate_battle_end_data(%{"result" => result, "pokemon" => pokemon})
+       when result in ["win", "loss", "run"] and is_list(pokemon) do
+    {:ok, %{type: "battle_end", metadata: %{result: result, pokemon: pokemon}}}
+  end
+
+  defp validate_battle_end_data(_), do: {:error, "Invalid battle_end data"}
+
+  defp validate_pokemon_update_data(%{"team" => team})
+       when is_list(team) do
+    {:ok, %{type: "pokemon_update", metadata: %{team: team}}}
+  end
+
+  defp validate_pokemon_update_data(_), do: {:error, "Invalid pokemon_update data"}
+
+  defp validate_item_update_data(%{"items" => items})
+       when is_list(items) do
+    {:ok, %{type: "item_update", metadata: %{items: items}}}
+  end
+
+  defp validate_item_update_data(_), do: {:error, "Invalid item_update data"}
+
+  defp validate_stats_update_data(%{"stats" => stats})
+       when is_map(stats) do
+    {:ok, %{type: "stats_update", metadata: %{stats: stats}}}
+  end
+
+  defp validate_stats_update_data(_), do: {:error, "Invalid stats_update data"}
+
+  defp validate_error_data(%{"code" => code, "message" => message})
+       when is_binary(code) and is_binary(message) do
+    {:ok, %{type: "error", metadata: %{code: code, message: message}}}
+  end
+
+  defp validate_error_data(_), do: {:error, "Invalid error data"}
+
+  defp validate_heartbeat_data(_data) do
+    # Heartbeat can have any data or none
+    {:ok, %{type: "heartbeat", metadata: %{}}}
+  end
 
   defp handle_ironmon_message(%{type: type, metadata: metadata} = message, raw_json) do
     correlation_id = CorrelationId.get_logger_metadata()
@@ -642,6 +717,71 @@ defmodule Server.Services.IronmonTCP do
         )
 
         Events.publish_ironmon_event(type, event_data, batch: false)
+
+      "battle_start" ->
+        Logger.info("IronMON battle started",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          trainer: metadata.trainer,
+          pokemon_count: length(metadata.pokemon)
+        )
+
+        Events.publish_ironmon_event(type, event_data, batch: false)
+
+      "battle_end" ->
+        Logger.info("IronMON battle ended",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          result: metadata.result,
+          pokemon_count: length(metadata.pokemon)
+        )
+
+        Events.publish_ironmon_event(type, event_data, batch: false)
+
+      "pokemon_update" ->
+        Logger.debug("IronMON team updated",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          team_size: length(metadata.team)
+        )
+
+        Events.publish_ironmon_event(type, event_data, batch: false)
+
+      "item_update" ->
+        Logger.debug("IronMON inventory updated",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          item_count: length(metadata.items)
+        )
+
+        Events.publish_ironmon_event(type, event_data, batch: false)
+
+      "stats_update" ->
+        Logger.debug("IronMON stats updated",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id
+        )
+
+        Events.publish_ironmon_event(type, event_data, batch: false)
+
+      "error" ->
+        Logger.warning("IronMON error received",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          error_code: metadata.code,
+          error_message: metadata.message
+        )
+
+        Events.publish_ironmon_event(type, event_data, batch: false)
+
+      "heartbeat" ->
+        Logger.debug("IronMON heartbeat",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id
+        )
+
+        # Don't publish heartbeats to avoid flooding the event stream
+        :ok
     end
 
     :ok
