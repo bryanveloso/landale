@@ -22,7 +22,9 @@ defmodule Server.Repo.Migrations.CreateIronmonTables do
     create index(:checkpoints, [:order])
 
     # Create seeds table
-    create table(:seeds) do
+    # IMPORTANT: id is NOT autoincrement - it comes from IronMON plugin seed count
+    create table(:seeds, primary_key: false) do
+      add :id, :integer, primary_key: true
       add :challenge_id, references(:challenges, on_delete: :restrict), null: false
     end
 

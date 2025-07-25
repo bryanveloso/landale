@@ -24,6 +24,7 @@ defmodule Server.Services.OBS do
     }
   end
 
+  @impl true
   def start_link(opts \\ []) do
     children = [
       # Registry for tracking OBS sessions
@@ -283,9 +284,17 @@ defmodule Server.Services.OBS do
     end
   end
 
+  @impl true
   def get_version do
     with {:ok, conn} <- get_connection() do
       Server.Services.OBS.Connection.send_request(conn, "GetVersion", %{})
+    end
+  end
+
+  @impl true
+  def get_stats do
+    with {:ok, conn} <- get_connection() do
+      Server.Services.OBS.Connection.send_request(conn, "GetStats", %{})
     end
   end
 
@@ -296,6 +305,93 @@ defmodule Server.Services.OBS do
 
       {:ok, %{outputActive: state.virtual_cam_active}}
     end
+  end
+
+  # ServiceBehaviour implementation
+
+  @impl true
+  def get_health do
+    connection_status = check_connection_status()
+    scene_manager_status = check_scene_manager_status()
+    stream_manager_status = check_stream_manager_status()
+    details = build_health_details()
+    health_status = determine_overall_health(connection_status, scene_manager_status, stream_manager_status)
+
+    {:ok,
+     %{
+       status: health_status,
+       checks: %{
+         websocket_connection: connection_status,
+         scene_manager: scene_manager_status,
+         stream_manager: stream_manager_status
+       },
+       details: details
+     }}
+  end
+
+  defp check_connection_status do
+    case get_connection() do
+      {:ok, conn} -> evaluate_connection_state(conn)
+      {:error, _} -> :fail
+    end
+  end
+
+  defp evaluate_connection_state(conn) do
+    case Server.Services.OBS.Connection.get_state(conn) do
+      :ready -> :pass
+      :authenticating -> :warn
+      :connecting -> :warn
+      :reconnecting -> :warn
+      _ -> :fail
+    end
+  end
+
+  defp check_scene_manager_status do
+    case get_scene_manager() do
+      {:ok, _} -> :pass
+      {:error, _} -> :fail
+    end
+  end
+
+  defp check_stream_manager_status do
+    case get_stream_manager() do
+      {:ok, _} -> :pass
+      {:error, _} -> :fail
+    end
+  end
+
+  defp build_health_details do
+    case get_state() do
+      %{connection_state: conn_state} = state ->
+        %{
+          connection_state: conn_state,
+          streaming_active: get_in(state, [:streaming, :active]),
+          recording_active: get_in(state, [:recording, :active]),
+          current_scene: state[:current_scene]
+        }
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp determine_overall_health(connection_status, scene_manager_status, stream_manager_status) do
+    cond do
+      connection_status == :fail -> :unhealthy
+      scene_manager_status == :fail or stream_manager_status == :fail -> :degraded
+      connection_status == :warn -> :degraded
+      true -> :healthy
+    end
+  end
+
+  @impl true
+  def get_info do
+    %{
+      name: "obs",
+      version: "2.0.0",
+      capabilities: [:websocket, :streaming, :recording, :scene_management, :multi_session],
+      description: "OBS WebSocket integration for streaming control and scene management"
+    }
   end
 
   # Private helpers

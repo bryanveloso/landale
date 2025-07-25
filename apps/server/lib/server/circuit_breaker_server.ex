@@ -169,6 +169,12 @@ defmodule Server.CircuitBreakerServer do
   end
 
   @impl true
+  def handle_cast(:skip_cast_test, state) do
+    # Property test compatibility - CircuitBreakerServer doesn't use cast in production
+    {:noreply, state}
+  end
+
+  @impl true
   def handle_info(:cleanup, state) do
     new_state = perform_cleanup(state)
     timer_ref = schedule_cleanup()

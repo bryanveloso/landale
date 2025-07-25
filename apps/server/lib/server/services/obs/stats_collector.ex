@@ -38,9 +38,13 @@ defmodule Server.Services.OBS.StatsCollector do
   def get_stats_cached(session_id) do
     table_name = :"obs_stats_#{session_id}"
 
-    case :ets.lookup(table_name, :stats) do
-      [{:stats, stats}] -> {:ok, stats}
-      [] -> {:error, :not_found}
+    try do
+      case :ets.lookup(table_name, :stats) do
+        [{:stats, stats}] -> {:ok, stats}
+        [] -> {:error, :not_found}
+      end
+    catch
+      :error, :badarg -> {:error, :not_found}
     end
   end
 
@@ -141,6 +145,10 @@ defmodule Server.Services.OBS.StatsCollector do
   end
 
   defp get_connection(session_id) do
-    Server.Services.OBS.Supervisor.get_process(session_id, :connection)
+    try do
+      Server.Services.OBS.Supervisor.get_process(session_id, :connection)
+    catch
+      _type, _reason -> {:error, :registry_not_found}
+    end
   end
 end

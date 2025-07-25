@@ -16,6 +16,9 @@ defmodule ServerWeb.Telemetry do
       # {Telemetry.Metrics.ConsoleReporter, metrics: metrics()}
     ]
 
+    # Attach telemetry handlers
+    attach_handlers()
+
     Supervisor.init(children, strategy: :one_for_one)
   end
 
@@ -129,5 +132,10 @@ defmodule ServerWeb.Telemetry do
         {Server.Telemetry, :measure_system_health, []}
       ]
     end
+  end
+
+  defp attach_handlers do
+    # Attach ConnectionManager telemetry handlers
+    Server.ConnectionManagerTelemetry.attach_default_handlers()
   end
 end

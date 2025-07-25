@@ -1,6 +1,4 @@
 defmodule Server.Services.IronmonTCP do
-  @behaviour Server.Services.IronmonTCPBehaviour
-
   @moduledoc """
   IronMON TCP server integration using Elixir GenServer.
 
@@ -26,10 +24,11 @@ defmodule Server.Services.IronmonTCP do
   "ironmon:events" topic for consumption by the dashboard and overlays.
   """
 
-  use GenServer
-  require Logger
+  use Server.Service,
+    service_name: "ironmon-tcp",
+    behaviour: Server.Services.IronmonTCPBehaviour
 
-  alias Server.{CorrelationId, Events, Logging, ServiceError}
+  use Server.Service.StatusReporter
 
   # Default TCP server configuration
   @default_port 8080
@@ -42,26 +41,7 @@ defmodule Server.Services.IronmonTCP do
     3 => "FireRed/LeafGreen"
   }
 
-  defstruct [
-    :listen_socket,
-    :port,
-    :hostname,
-    connections: %{}
-  ]
-
-  # Client API
-
-  @doc """
-  Starts the IronMON TCP server GenServer.
-
-  ## Options
-  - `:port` - TCP port to listen on (default: 8080)
-  - `:hostname` - Hostname to bind to (default: "0.0.0.0")
-  """
-  @spec start_link(keyword()) :: GenServer.on_start()
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
+  # Client API - start_link provided by Server.Service
 
   @doc """
   Gets the current status of the TCP server.
@@ -145,50 +125,97 @@ defmodule Server.Services.IronmonTCP do
     error -> {:error, inspect(error)}
   end
 
-  # GenServer Callbacks
+  # Service Implementation
 
-  @impl GenServer
-  def init(opts) do
+  @impl Server.Services.IronmonTCPBehaviour
+  def get_health do
+    GenServer.call(__MODULE__, :get_health)
+  end
+
+  @impl Server.Services.IronmonTCPBehaviour
+  def get_info do
+    %{
+      name: "ironmon-tcp",
+      version: "1.0.0",
+      capabilities: [:tcp_server, :json_protocol, :game_tracking, :checkpoint_tracking],
+      description: "IronMON TCP server for tracking Pokemon game state and checkpoints"
+    }
+  end
+
+  @impl Server.Service
+  def do_init(opts) do
     port = Keyword.get(opts, :port, @default_port)
     hostname = Keyword.get(opts, :hostname, @default_hostname)
 
-    state = %__MODULE__{
+    state = %{
       port: port,
       hostname: hostname,
-      connections: %{}
+      connections: %{},
+      listen_socket: nil
     }
-
-    # Set service context for all log messages from this process
-    Logging.set_service_context(:ironmon_tcp, port: port, hostname: hostname)
-    correlation_id = Logging.set_correlation_id()
-
-    Logger.info("Service starting", correlation_id: correlation_id)
 
     case start_tcp_server(state) do
       {:ok, new_state} ->
-        Logger.info("TCP server started", port: port, hostname: state.hostname)
+        Logger.info("TCP server started", port: port, hostname: hostname)
         {:ok, new_state}
 
       {:error, reason} ->
-        error =
-          ServiceError.new(:ironmon_tcp, "start", :network_error, "Failed to start TCP server: #{inspect(reason)}")
-
-        Logging.log_error("TCP server startup failed", inspect(reason), port: port)
-        {:stop, error}
+        {:stop, {:tcp_startup_failed, reason}}
     end
   end
 
-  @impl GenServer
-  def handle_call(:get_status, _from, state) do
-    status = %{
-      listening: state.listen_socket != nil,
+  @impl Server.Service
+  def do_terminate(_reason, state) do
+    if state[:listen_socket] do
+      :gen_tcp.close(state.listen_socket)
+    end
+
+    # Close all client connections
+    Enum.each(state.connections, fn {socket, _buffer} ->
+      :gen_tcp.close(socket)
+    end)
+
+    :ok
+  end
+
+  @impl Server.Service.StatusReporter
+  def do_build_status(state) do
+    %{
+      listening: state[:listen_socket] != nil,
       port: state.port,
       hostname: state.hostname,
       connection_count: map_size(state.connections),
       connections: Map.keys(state.connections)
     }
+  end
 
-    {:reply, {:ok, status}, state}
+  # GenServer Callbacks
+
+  @impl GenServer
+  def handle_call(:get_health, _from, state) do
+    # Determine health status based on service state
+    health_status =
+      if state[:listen_socket] == nil do
+        :unhealthy
+      else
+        :healthy
+      end
+
+    health_response = %{
+      status: health_status,
+      checks: %{
+        tcp_socket: if(state[:listen_socket] != nil, do: :pass, else: :fail),
+        listening: if(state[:listen_socket] != nil, do: :pass, else: :fail)
+      },
+      details: %{
+        port: state.port,
+        hostname: state.hostname,
+        connection_count: map_size(state.connections),
+        listening: state[:listen_socket] != nil
+      }
+    }
+
+    {:reply, {:ok, health_response}, state}
   end
 
   @impl GenServer
@@ -198,7 +225,8 @@ defmodule Server.Services.IronmonTCP do
     CorrelationId.with_context(correlation_id, fn ->
       Logger.debug("TCP data received",
         socket: inspect(socket),
-        data_size: byte_size(data)
+        data_size: byte_size(data),
+        raw_data: inspect(data)
       )
 
       case handle_tcp_data(socket, data, state) do
@@ -241,22 +269,6 @@ defmodule Server.Services.IronmonTCP do
   def handle_info(message, state) do
     Logger.debug("Unhandled message received", message: inspect(message))
     {:noreply, state}
-  end
-
-  @impl GenServer
-  def terminate(reason, state) do
-    Logger.info("Service terminating", reason: inspect(reason))
-
-    if state.listen_socket do
-      :gen_tcp.close(state.listen_socket)
-    end
-
-    # Close all client connections
-    Enum.each(state.connections, fn {socket, _buffer} ->
-      :gen_tcp.close(socket)
-    end)
-
-    :ok
   end
 
   # Private Functions
@@ -453,10 +465,42 @@ defmodule Server.Services.IronmonTCP do
 
       "seed" ->
         Logger.debug("Seed count updated", count: metadata.count)
+        # Create new seed in database (new attempt started)
+        # Get the first (and currently only) challenge
+        challenge_id =
+          case Server.Ironmon.list_challenges() do
+            [challenge | _] ->
+              challenge.id
+
+            [] ->
+              Logger.error("No challenges found in database - cannot create seed")
+              nil
+          end
+
+        if challenge_id do
+          # Use the seed count from IronMON as the seed ID
+          case Server.Ironmon.RunTracker.new_seed(challenge_id, metadata.count) do
+            {:ok, seed_id} ->
+              Logger.info("New IronMON attempt started", seed_id: seed_id, count: metadata.count)
+
+            {:error, reason} ->
+              Logger.error("Failed to create new seed", reason: inspect(reason))
+          end
+        end
+
         Events.publish_ironmon_event(type, event_data, batch: false)
 
       "checkpoint" ->
         Logger.info("Checkpoint cleared", id: metadata.id, name: metadata.name, seed: Map.get(metadata, :seed))
+        # Record checkpoint result (always true since we only get notified when cleared)
+        case Server.Ironmon.RunTracker.record_checkpoint(metadata.name, true) do
+          :ok ->
+            Logger.debug("Checkpoint recorded in database", name: metadata.name)
+
+          {:error, reason} ->
+            Logger.error("Failed to record checkpoint", name: metadata.name, reason: inspect(reason))
+        end
+
         Events.publish_ironmon_event(type, event_data, batch: false)
 
       "location" ->

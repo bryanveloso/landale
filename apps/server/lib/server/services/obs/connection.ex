@@ -58,6 +58,19 @@ defmodule Server.Services.OBS.Connection do
   end
 
   @doc """
+  Returns a specification to start this module under a supervisor.
+  """
+  def child_spec(opts) do
+    %{
+      id: opts[:id] || __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      type: :worker,
+      restart: :permanent,
+      shutdown: 5000
+    }
+  end
+
+  @doc """
   Send a request to OBS. Will queue if not ready.
   """
   def send_request(conn, request_type, request_data \\ %{}) do
@@ -108,7 +121,8 @@ defmodule Server.Services.OBS.Connection do
 
     # Request connection from ConnectionManager
     # For now, connect directly with gun
-    # TODO: Integrate with ConnectionManager when available
+    # TODO: Refactor to use Server.WebSocketConnection for consistency and shared features
+    # This would provide exponential backoff, CloudFront retries, and unified connection management
     case connect_websocket(data.uri) do
       {:ok, conn_pid} ->
         actions = [{:state_timeout, @connect_timeout, :connection_timeout}]

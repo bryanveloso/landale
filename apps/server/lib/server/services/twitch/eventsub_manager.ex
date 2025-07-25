@@ -283,7 +283,9 @@ defmodule Server.Services.Twitch.EventSubManager do
     # Get access token from token manager
     case token_manager_module.get_valid_token(state.token_manager) do
       {:ok, access_token, _updated_manager} ->
-        url = "https://api.twitch.tv/helix/eventsub/subscriptions?id=#{subscription_id}"
+        # Properly encode the subscription ID to handle UTF-8 characters
+        encoded_id = URI.encode_www_form(subscription_id)
+        url = "https://api.twitch.tv/helix/eventsub/subscriptions?id=#{encoded_id}"
 
         headers = [
           {"authorization", "Bearer #{access_token}"},
@@ -562,49 +564,37 @@ defmodule Server.Services.Twitch.EventSubManager do
   # Returns: Map containing the appropriate condition for the event type
   @spec build_condition_for_event_type(binary(), binary()) :: map()
   defp build_condition_for_event_type(event_type, user_id) do
-    case event_type do
-      # Events that require both broadcaster_user_id and moderator_user_id
-      "channel.follow" ->
+    cond do
+      event_type in moderator_events() ->
         %{"broadcaster_user_id" => user_id, "moderator_user_id" => user_id}
 
-      # Chat events that require both broadcaster_user_id and user_id
-      "channel.chat.clear" ->
+      event_type in chat_events() ->
         %{"broadcaster_user_id" => user_id, "user_id" => user_id}
 
-      "channel.chat.clear_user_messages" ->
-        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
-
-      "channel.chat.message" ->
-        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
-
-      "channel.chat.message_delete" ->
-        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
-
-      "channel.chat.notification" ->
-        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
-
-      "channel.chat_settings.update" ->
-        %{"broadcaster_user_id" => user_id, "user_id" => user_id}
-
-      # Moderation events that require both broadcaster_user_id and moderator_user_id
-      "channel.shoutout.create" ->
-        %{"broadcaster_user_id" => user_id, "moderator_user_id" => user_id}
-
-      "channel.shoutout.receive" ->
-        %{"broadcaster_user_id" => user_id, "moderator_user_id" => user_id}
-
-      # User events that require user_id instead of broadcaster_user_id
-      "user.update" ->
+      event_type == "user.update" ->
         %{"user_id" => user_id}
 
-      # Raid events require specific condition parameters (to_broadcaster_user_id for incoming raids)
-      "channel.raid" ->
+      event_type == "channel.raid" ->
         %{"to_broadcaster_user_id" => user_id}
 
-      # All other events use broadcaster_user_id
-      _ ->
+      true ->
         %{"broadcaster_user_id" => user_id}
     end
+  end
+
+  defp moderator_events do
+    ["channel.follow", "channel.shoutout.create", "channel.shoutout.receive"]
+  end
+
+  defp chat_events do
+    [
+      "channel.chat.clear",
+      "channel.chat.clear_user_messages",
+      "channel.chat.message",
+      "channel.chat.message_delete",
+      "channel.chat.notification",
+      "channel.chat_settings.update"
+    ]
   end
 
   # Helper function to determine the correct API version for each event type

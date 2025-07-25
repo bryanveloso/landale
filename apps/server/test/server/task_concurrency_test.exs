@@ -2,6 +2,16 @@ defmodule Server.TaskConcurrencyTest do
   use Server.DataCase
 
   describe "DBTaskSupervisor concurrency limits" do
+    setup do
+      # Start DBTaskSupervisor for tests
+      case start_supervised(
+             {DynamicSupervisor, name: Server.DBTaskSupervisor, strategy: :one_for_one, max_children: 10}
+           ) do
+        {:ok, _} -> :ok
+        {:error, {:already_started, _}} -> :ok
+      end
+    end
+
     test "respects max_children limit of 10" do
       # Get initial child count
       initial_count = DynamicSupervisor.count_children(Server.DBTaskSupervisor).active

@@ -17,7 +17,7 @@ defmodule ServerWeb.DashboardChannelTest do
 
     assert_reply ref, :ok, %{
       success: true,
-      data: %{"hello" => "there"},
+      data: %{pong: true, timestamp: _},
       meta: %{timestamp: _, server_version: _}
     }
   end

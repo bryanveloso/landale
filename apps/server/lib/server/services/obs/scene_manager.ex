@@ -34,10 +34,49 @@ defmodule Server.Services.OBS.SceneManager do
   def get_scenes_cached(session_id) do
     table_name = :"obs_scenes_#{session_id}"
 
-    case :ets.lookup(table_name, :scenes) do
-      [{:scenes, scenes}] -> {:ok, scenes}
-      [] -> {:error, :not_found}
+    try do
+      case :ets.lookup(table_name, :scenes) do
+        [{:scenes, scenes}] -> {:ok, scenes}
+        [] -> {:error, :not_found}
+      end
+    catch
+      :error, :badarg -> {:error, :not_found}
     end
+  end
+
+  @doc """
+  Get the list of available scenes.
+  """
+  def get_scenes(manager) do
+    GenServer.call(manager, :get_scenes)
+  end
+
+  @doc """
+  Get the current scene name.
+  """
+  def get_current_scene(manager) do
+    GenServer.call(manager, :get_current_scene)
+  end
+
+  @doc """
+  Get the preview scene name.
+  """
+  def get_preview_scene(manager) do
+    GenServer.call(manager, :get_preview_scene)
+  end
+
+  @doc """
+  Check if studio mode is enabled.
+  """
+  def studio_mode_enabled?(manager) do
+    GenServer.call(manager, :is_studio_mode_enabled)
+  end
+
+  @doc """
+  Get comprehensive scene information.
+  """
+  def get_scene_info(manager) do
+    GenServer.call(manager, :get_scene_info)
   end
 
   @impl true
@@ -62,6 +101,34 @@ defmodule Server.Services.OBS.SceneManager do
   @impl true
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
+  end
+
+  def handle_call(:get_scenes, _from, state) do
+    {:reply, state.scene_list, state}
+  end
+
+  def handle_call(:get_current_scene, _from, state) do
+    {:reply, state.current_scene, state}
+  end
+
+  def handle_call(:get_preview_scene, _from, state) do
+    {:reply, state.preview_scene, state}
+  end
+
+  def handle_call(:is_studio_mode_enabled, _from, state) do
+    {:reply, state.studio_mode_enabled, state}
+  end
+
+  def handle_call(:get_scene_info, _from, state) do
+    info = %{
+      scenes: state.scene_list,
+      current_scene: state.current_scene,
+      preview_scene: state.preview_scene,
+      studio_mode_enabled: state.studio_mode_enabled,
+      session_id: state.session_id
+    }
+
+    {:reply, info, state}
   end
 
   @impl true
