@@ -4,7 +4,7 @@ defmodule Server.StreamProducer do
 
   Manages priority-based content scheduling:
   - Alerts (priority 100) - breaking news style interrupts
-  - Sub trains (priority 50) - subscription celebration timers  
+  - Sub trains (priority 50) - subscription celebration timers
   - Ticker content (priority 10) - rotating stats and metrics
 
   Coordinates with show contexts (IronMON, variety, coding) to determine
@@ -97,6 +97,7 @@ defmodule Server.StreamProducer do
     Phoenix.PubSub.subscribe(Server.PubSub, "cheers")
     Phoenix.PubSub.subscribe(Server.PubSub, "twitch:events")
     Phoenix.PubSub.subscribe(Server.PubSub, "channel:updates")
+    Phoenix.PubSub.subscribe(Server.PubSub, "ironmon:runs")
 
     # Create persistence table (protected to prevent unauthorized writes)
     # Handle race condition in tests gracefully
@@ -336,6 +337,47 @@ defmodule Server.StreamProducer do
     {:noreply, state}
   end
 
+  # Handle IronMON events
+  @impl true
+  def handle_info({:new_run, %{seed_id: seed_id, challenge_id: _challenge_id}}, state) do
+    Logger.info("New IronMON run started", seed_id: seed_id)
+
+    # Force refresh of IronMON content if currently showing
+    if state.current_show == :ironmon and active_content_type(state) in [:ironmon_run_stats, :ironmon_progression] do
+      new_state = update_active_content(state)
+      broadcast_state_update(new_state)
+      {:noreply, new_state}
+    else
+      {:noreply, state}
+    end
+  end
+
+  @impl true
+  def handle_info({:checkpoint_result, %{checkpoint: checkpoint_name, passed: true} = event}, state) do
+    Logger.info("IronMON checkpoint cleared", checkpoint: checkpoint_name)
+
+    # Create a brief alert for checkpoint clear
+    if state.current_show == :ironmon do
+      add_interrupt(
+        :alert,
+        %{
+          type: :checkpoint_clear,
+          checkpoint_name: checkpoint_name,
+          seed_id: event[:seed_id]
+        },
+        duration: 5_000
+      )
+    end
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:checkpoint_result, %{passed: false}}, state) do
+    # Don't alert on failures, just track them
+    {:noreply, state}
+  end
+
   # Handle subscription events for sub trains
   @impl true
   def handle_info({:new_subscription, event}, state) do
@@ -397,7 +439,7 @@ defmodule Server.StreamProducer do
   ## Private Functions
 
   defp default_ticker_content(:ironmon) do
-    [:ironmon_run_stats, :ironmon_deaths, :emote_stats, :recent_follows]
+    [:ironmon_run_stats, :ironmon_progression]
   end
 
   defp default_ticker_content(:variety) do
@@ -641,8 +683,72 @@ defmodule Server.StreamProducer do
         )
 
       :ironmon_run_stats ->
-        # TODO: Get from IronMON service
-        Server.ContentFallbacks.get_fallback_content(:ironmon_run_stats)
+        safe_service_call_with_fallback(
+          fn ->
+            case Server.Ironmon.get_current_seed() do
+              nil ->
+                # No active run
+                %{
+                  run_number: nil,
+                  checkpoints_cleared: 0,
+                  current_checkpoint: "No active run",
+                  clear_rate: 0.0,
+                  message: "Start a new IronMON run!"
+                }
+
+              current_seed ->
+                stats = Server.Ironmon.get_run_statistics(current_seed.id)
+                checkpoint_progress = Server.Ironmon.get_current_checkpoint_progress()
+
+                %{
+                  run_number: current_seed.id,
+                  checkpoints_cleared: stats.checkpoints_cleared,
+                  total_checkpoints: stats.total_checkpoints,
+                  progress_percentage: stats.progress_percentage,
+                  current_checkpoint: checkpoint_progress[:current_checkpoint] || "Unknown",
+                  trainer: checkpoint_progress[:trainer],
+                  clear_rate: Float.round((checkpoint_progress[:clear_rate] || 0.0) * 100, 1)
+                }
+            end
+          end,
+          :ironmon_run_stats
+        )
+
+      :ironmon_progression ->
+        safe_service_call_with_fallback(
+          fn ->
+            case Server.Ironmon.get_current_checkpoint_progress() do
+              nil ->
+                # No active run
+                %{
+                  has_active_run: false,
+                  message: "No active IronMON run"
+                }
+
+              checkpoint_progress ->
+                # Find when we last beat this checkpoint
+                recent_clears = Server.Ironmon.get_recent_checkpoint_clears(100)
+
+                last_clear =
+                  Enum.find(recent_clears, fn clear ->
+                    clear.checkpoint_name == checkpoint_progress.current_checkpoint
+                  end)
+
+                %{
+                  has_active_run: true,
+                  current_checkpoint: checkpoint_progress.current_checkpoint,
+                  trainer: checkpoint_progress.trainer,
+                  clear_rate: checkpoint_progress.clear_rate,
+                  clear_rate_percentage: Float.round(checkpoint_progress.clear_rate * 100, 1),
+                  last_cleared_seed: last_clear && last_clear.seed_id,
+                  attempts_on_record: checkpoint_progress.attempts,
+                  checkpoints_cleared: checkpoint_progress.checkpoints_cleared,
+                  total_checkpoints: checkpoint_progress.total_checkpoints
+                }
+            end
+          end,
+          :ironmon_progression
+        )
 
       :commit_stats ->
         # TODO: Get from git integration

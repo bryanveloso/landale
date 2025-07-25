@@ -38,10 +38,21 @@ defmodule Server.ContentFallbacks do
   def get_fallback_content(:ironmon_run_stats) do
     %{
       run_number: nil,
-      deaths: 0,
-      location: "Unknown",
-      gym_progress: 0,
+      checkpoints_cleared: 0,
+      current_checkpoint: "Unknown",
+      clear_rate: 0.0,
       message: "IronMON data temporarily unavailable"
+    }
+  end
+
+  def get_fallback_content(:ironmon_progression) do
+    %{
+      has_active_run: false,
+      current_checkpoint: "Unknown",
+      trainer: "Unknown",
+      clear_rate_percentage: 0.0,
+      last_cleared_seed: nil,
+      message: "IronMON progression temporarily unavailable"
     }
   end
 

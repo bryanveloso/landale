@@ -58,19 +58,6 @@ defmodule Server.Services.OBS.Connection do
   end
 
   @doc """
-  Returns a specification to start this module under a supervisor.
-  """
-  def child_spec(opts) do
-    %{
-      id: opts[:id] || __MODULE__,
-      start: {__MODULE__, :start_link, [opts]},
-      type: :worker,
-      restart: :permanent,
-      shutdown: 5000
-    }
-  end
-
-  @doc """
   Send a request to OBS. Will queue if not ready.
   """
   def send_request(conn, request_type, request_data \\ %{}) do

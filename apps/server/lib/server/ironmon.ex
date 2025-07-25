@@ -352,4 +352,187 @@ defmodule Server.Ironmon do
       challenge -> {:ok, challenge}
     end
   end
+
+  ## StreamProducer Context Functions
+
+  @doc """
+  Gets the current active seed (latest run).
+  Delegates to RunTracker which maintains the authoritative state.
+
+  ## Returns
+  - Map with seed info if active run exists
+  - `nil` if no active run
+  """
+  @spec get_current_seed() :: map() | nil
+  def get_current_seed do
+    case Server.Ironmon.RunTracker.current_seed() do
+      nil ->
+        nil
+
+      seed_id ->
+        seed = Repo.get(Seed, seed_id)
+
+        if seed do
+          %{
+            id: seed.id,
+            challenge_id: seed.challenge_id,
+            created_at: seed.inserted_at
+          }
+        else
+          nil
+        end
+    end
+  end
+
+  @doc """
+  Gets current checkpoint progress for the active run.
+  Shows which checkpoint we're on and its historical clear rate.
+
+  ## Returns
+  - Map with checkpoint progress info
+  - `nil` if no active run
+  """
+  @spec get_current_checkpoint_progress() :: map() | nil
+  def get_current_checkpoint_progress do
+    with seed_id when not is_nil(seed_id) <- Server.Ironmon.RunTracker.current_seed(),
+         stats <- Server.Ironmon.RunTracker.current_stats(),
+         seed <- Repo.get!(Seed, seed_id) do
+      # Get the next uncompleted checkpoint
+      cleared_checkpoint_ids =
+        from(r in Result,
+          where: r.seed_id == ^seed_id and r.result == true,
+          select: r.checkpoint_id
+        )
+        |> Repo.all()
+
+      next_checkpoint =
+        from(c in Checkpoint,
+          where: c.challenge_id == ^seed.challenge_id and c.id not in ^cleared_checkpoint_ids,
+          order_by: [asc: c.order],
+          limit: 1
+        )
+        |> Repo.one()
+
+      if next_checkpoint do
+        checkpoint_stats = get_checkpoint_stats(next_checkpoint.id)
+
+        %{
+          current_checkpoint: next_checkpoint.name,
+          trainer: next_checkpoint.trainer,
+          clear_rate: checkpoint_stats.win_rate,
+          attempts: checkpoint_stats.total,
+          checkpoints_cleared: stats.checkpoints_cleared,
+          total_checkpoints: stats.total_checkpoints
+        }
+      else
+        # All checkpoints cleared
+        %{
+          current_checkpoint: "Complete!",
+          trainer: nil,
+          clear_rate: 1.0,
+          attempts: 0,
+          checkpoints_cleared: stats.checkpoints_cleared,
+          total_checkpoints: stats.total_checkpoints
+        }
+      end
+    else
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Gets recent checkpoint clears across all runs.
+
+  ## Parameters
+  - `limit` - Number of recent clears to return (default: 5)
+
+  ## Returns
+  - List of checkpoint clear maps
+  """
+  @spec get_recent_checkpoint_clears(integer()) :: [map()]
+  def get_recent_checkpoint_clears(limit \\ 5) do
+    from(r in Result,
+      join: c in Checkpoint,
+      on: r.checkpoint_id == c.id,
+      join: s in Seed,
+      on: r.seed_id == s.id,
+      where: r.result == true,
+      order_by: [desc: r.id],
+      limit: ^limit,
+      select: %{
+        checkpoint_name: c.name,
+        trainer: c.trainer,
+        seed_id: s.id,
+        # No timestamp data available
+        cleared_at: nil
+      }
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets aggregated run statistics for a seed or globally.
+
+  ## Parameters
+  - `seed_id` - Specific seed ID or `nil` for global stats
+
+  ## Returns
+  - Map with run statistics
+  """
+  @spec get_run_statistics(integer() | nil) :: map()
+  def get_run_statistics(seed_id \\ nil) do
+    if seed_id do
+      # Stats for specific seed
+      stats = Server.Ironmon.RunTracker.current_stats()
+
+      %{
+        seed_id: seed_id,
+        attempt_number: seed_id,
+        checkpoints_cleared: stats.checkpoints_cleared,
+        total_checkpoints: stats.total_checkpoints,
+        last_checkpoint: stats.last_checkpoint,
+        progress_percentage:
+          if stats.total_checkpoints > 0 do
+            Float.round(stats.checkpoints_cleared / stats.total_checkpoints * 100, 1)
+          else
+            0.0
+          end
+      }
+    else
+      # Global stats
+      total_seeds = Repo.aggregate(Seed, :count)
+
+      # Get checkpoint clear rates across all runs
+      checkpoint_stats =
+        from(c in Checkpoint,
+          left_join: r in Result,
+          on: c.id == r.checkpoint_id,
+          group_by: c.id,
+          select: %{
+            checkpoint_id: c.id,
+            total_attempts: count(r.id),
+            successful_attempts: sum(fragment("CASE WHEN ? THEN 1 ELSE 0 END", r.result))
+          }
+        )
+        |> Repo.all()
+        |> Enum.reduce({0, 0}, fn stat, {total, successful} ->
+          {total + (stat.total_attempts || 0),
+           successful + (stat.successful_attempts || Decimal.new(0) |> Decimal.to_integer())}
+        end)
+
+      {total_attempts, successful_clears} = checkpoint_stats
+
+      %{
+        total_attempts: total_seeds,
+        total_checkpoint_attempts: total_attempts,
+        total_checkpoint_clears: successful_clears,
+        overall_clear_rate:
+          if total_attempts > 0 do
+            Float.round(successful_clears / total_attempts * 100, 1)
+          else
+            0.0
+          end
+      }
+    end
+  end
 end
