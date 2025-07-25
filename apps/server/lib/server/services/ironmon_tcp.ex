@@ -300,17 +300,25 @@ defmodule Server.Services.IronmonTCP do
   end
 
   defp accept_connections(listen_socket, server_pid) do
+    Logger.info("TCP accept loop started, waiting for connections", port: :inet.port(listen_socket))
+    accept_loop(listen_socket, server_pid)
+  end
+
+  defp accept_loop(listen_socket, server_pid) do
+    Logger.debug("Waiting for TCP connection...")
+
     case :gen_tcp.accept(listen_socket) do
       {:ok, client_socket} ->
+        Logger.info("TCP connection accepted", client: :inet.peername(client_socket))
         send(server_pid, {:tcp_accept, listen_socket, client_socket})
-        accept_connections(listen_socket, server_pid)
+        accept_loop(listen_socket, server_pid)
 
       {:error, :closed} ->
         :ok
 
       {:error, reason} ->
-        Logging.log_error("Connection accept failed", inspect(reason))
-        accept_connections(listen_socket, server_pid)
+        Logger.error("Connection accept failed", reason: inspect(reason))
+        accept_loop(listen_socket, server_pid)
     end
   end
 
@@ -371,38 +379,62 @@ defmodule Server.Services.IronmonTCP do
   end
 
   defp process_message(message_str) do
+    Logger.debug("Processing raw message", message: message_str)
+
     with {:ok, json} <- JSON.decode(message_str),
          {:ok, message} <- validate_message(json) do
+      # Log the v2.0 fields if present
+      if Map.has_key?(json, "timestamp") do
+        Logger.debug("IronmonConnect v2.0 message",
+          timestamp: json["timestamp"],
+          frame: Map.get(json, "frame")
+        )
+      end
+
       handle_ironmon_message(message)
     else
-      {:error, _reason} ->
+      {:error, reason} ->
+        Logger.warning("Failed to process message",
+          reason: inspect(reason),
+          raw_message: message_str
+        )
+
         {:error, "Invalid JSON or message format"}
     end
   end
 
-  defp validate_message(%{"type" => type, "metadata" => metadata} = json)
-       when is_non_struct_map(metadata) do
+  # Support both old format (metadata) and new v2.0 format (data)
+  defp validate_message(%{"type" => type} = json) do
+    # Try new format first, fall back to old format
+    data = Map.get(json, "data") || Map.get(json, "metadata")
+
+    if is_non_struct_map(data) do
+      validate_message_by_type(type, data, json)
+    else
+      {:error, "Invalid message format: missing data or metadata"}
+    end
+  end
+
+  defp validate_message_by_type(type, data, _json) when is_non_struct_map(data) do
     case type do
       "init" ->
-        validate_init_message(json)
+        validate_init_data(data)
 
       "seed" ->
-        validate_seed_message(json)
+        validate_seed_data(data)
 
       "checkpoint" ->
-        validate_checkpoint_message(json)
+        validate_checkpoint_data(data)
 
       "location" ->
-        validate_location_message(json)
+        validate_location_data(data)
 
       _ ->
         {:error, "Unknown message type: #{type}"}
     end
   end
 
-  defp validate_message(_), do: {:error, "Invalid message format"}
-
-  defp validate_init_message(%{"metadata" => %{"version" => version, "game" => game}})
+  defp validate_init_data(%{"version" => version, "game" => game})
        when is_binary(version) and is_integer(game) do
     if Map.has_key?(@games, game) do
       {:ok, %{type: "init", metadata: %{version: version, game: game}}}
@@ -411,19 +443,19 @@ defmodule Server.Services.IronmonTCP do
     end
   end
 
-  defp validate_init_message(_), do: {:error, "Invalid init message"}
+  defp validate_init_data(_), do: {:error, "Invalid init data"}
 
-  defp validate_seed_message(%{"metadata" => %{"count" => count}})
+  defp validate_seed_data(%{"count" => count})
        when is_integer(count) do
     {:ok, %{type: "seed", metadata: %{count: count}}}
   end
 
-  defp validate_seed_message(_), do: {:error, "Invalid seed message"}
+  defp validate_seed_data(_), do: {:error, "Invalid seed data"}
 
-  defp validate_checkpoint_message(%{"metadata" => metadata}) do
-    with %{"id" => id, "name" => name} <- metadata,
+  defp validate_checkpoint_data(data) do
+    with %{"id" => id, "name" => name} <- data,
          true <- is_integer(id) and is_binary(name) do
-      seed = Map.get(metadata, "seed")
+      seed = Map.get(data, "seed")
       validated_metadata = %{id: id, name: name}
 
       validated_metadata =
@@ -433,16 +465,16 @@ defmodule Server.Services.IronmonTCP do
 
       {:ok, %{type: "checkpoint", metadata: validated_metadata}}
     else
-      _ -> {:error, "Invalid checkpoint message"}
+      _ -> {:error, "Invalid checkpoint data"}
     end
   end
 
-  defp validate_location_message(%{"metadata" => %{"id" => id}})
+  defp validate_location_data(%{"id" => id})
        when is_integer(id) do
     {:ok, %{type: "location", metadata: %{id: id}}}
   end
 
-  defp validate_location_message(_), do: {:error, "Invalid location message"}
+  defp validate_location_data(_), do: {:error, "Invalid location data"}
 
   defp handle_ironmon_message(%{type: type, metadata: metadata}) do
     correlation_id = CorrelationId.get_logger_metadata()
