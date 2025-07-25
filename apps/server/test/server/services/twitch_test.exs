@@ -49,6 +49,12 @@ defmodule Server.Services.TwitchTest do
       :ets.new(:twitch_service, [:set, :public, :named_table])
     end
 
+    # Start OAuth service if not already started
+    case Process.whereis(Server.OAuthService) do
+      nil -> start_supervised!(Server.OAuthService)
+      _pid -> :ok
+    end
+
     :ok
   end
 
@@ -82,7 +88,8 @@ defmodule Server.Services.TwitchTest do
       state = Twitch.get_state()
 
       assert is_map(state)
-      assert Map.has_key?(state, :connection)
+      assert Map.has_key?(state, :connected)
+      assert Map.has_key?(state, :connection_state)
       assert Map.has_key?(state, :subscription_total_cost)
       assert Map.has_key?(state, :subscription_count)
       assert Map.has_key?(state, :subscription_max_count)
@@ -111,7 +118,7 @@ defmodule Server.Services.TwitchTest do
 
       assert is_map(status)
       # Status should contain connection and subscription info
-      assert Map.has_key?(status, :connected)
+      assert Map.has_key?(status, :websocket_connected)
       assert Map.has_key?(status, :connection_state)
       assert Map.has_key?(status, :session_id)
       assert Map.has_key?(status, :subscription_count)
@@ -312,11 +319,11 @@ defmodule Server.Services.TwitchTest do
       assert state.subscriptions == %{}
       assert state.default_subscriptions_created == false
 
-      # Verify nested state structure
-      assert state.state.connection.connected == false
-      assert state.state.connection.connection_state == "disconnected"
-      assert state.state.subscription_count == 0
-      assert state.state.subscription_total_cost == 0
+      # Verify flattened state structure
+      assert state.connected == false
+      assert state.connection_state == "disconnected"
+      assert state.subscription_count == 0
+      assert state.subscription_total_cost == 0
     end
   end
 end

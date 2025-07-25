@@ -136,7 +136,7 @@ defmodule Server.Services.Twitch.EventSubManager do
   Creates a Twitch EventSub subscription via HTTP API.
 
   ## Parameters
-  - `state` - Twitch service state containing session_id and oauth2_client
+  - `state` - Twitch service state containing session_id and service_name
   - `event_type` - EventSub event type (e.g. "channel.update")
   - `condition` - Subscription condition map (e.g. %{"broadcaster_user_id" => "123"})
   - `opts` - Additional options (currently unused)
@@ -146,17 +146,15 @@ defmodule Server.Services.Twitch.EventSubManager do
   - `{:error, reason}` - Creation failed
   """
   @spec create_subscription(map(), binary(), map(), keyword()) :: {:ok, map()} | {:error, term()}
-  def create_subscription(state, event_type, condition, opts \\ []) do
-    token_manager_module = Keyword.get(opts, :token_manager_module, Server.OAuthTokenManager)
-
-    # Get access token from token manager
-    case token_manager_module.get_valid_token(state.token_manager) do
-      {:ok, access_token, _updated_manager} ->
+  def create_subscription(state, event_type, condition, _opts \\ []) do
+    # Get access token from OAuth service
+    case Server.OAuthService.get_valid_token(state.service_name || :twitch) do
+      {:ok, %{access_token: access_token}} ->
         url = "https://api.twitch.tv/helix/eventsub/subscriptions"
 
         headers = [
           {"authorization", "Bearer #{access_token}"},
-          {"client-id", state.oauth2_client.client_id},
+          {"client-id", get_client_id()},
           {"content-type", "application/json"}
         ]
 
@@ -277,19 +275,17 @@ defmodule Server.Services.Twitch.EventSubManager do
   - `{:error, reason}` - Deletion failed
   """
   @spec delete_subscription(map(), binary(), keyword()) :: :ok | {:error, term()}
-  def delete_subscription(state, subscription_id, opts \\ []) do
-    token_manager_module = Keyword.get(opts, :token_manager_module, Server.OAuthTokenManager)
-
-    # Get access token from token manager
-    case token_manager_module.get_valid_token(state.token_manager) do
-      {:ok, access_token, _updated_manager} ->
+  def delete_subscription(state, subscription_id, _opts \\ []) do
+    # Get access token from OAuth service
+    case Server.OAuthService.get_valid_token(state.service_name || :twitch) do
+      {:ok, %{access_token: access_token}} ->
         # Properly encode the subscription ID to handle UTF-8 characters
         encoded_id = URI.encode_www_form(subscription_id)
         url = "https://api.twitch.tv/helix/eventsub/subscriptions?id=#{encoded_id}"
 
         headers = [
           {"authorization", "Bearer #{access_token}"},
-          {"client-id", state.oauth2_client.client_id}
+          {"client-id", get_client_id()}
         ]
 
         delete_subscription_with_headers(url, headers, subscription_id)
@@ -480,14 +476,16 @@ defmodule Server.Services.Twitch.EventSubManager do
 
   # Provides specific guidance for known subscription failures
   defp log_subscription_failure_guidance(state, "channel.follow", condition, reason) do
+    reason_str = inspect(reason)
+
     cond do
-      String.contains?(to_string(reason), "Forbidden") ->
+      String.contains?(reason_str, "Forbidden") ->
         Logger.info("Channel follow subscription failed",
           error: "Forbidden - broadcaster may need explicit moderator verification",
           note: "This is common when using broadcaster token for moderator-required subscriptions"
         )
 
-      String.contains?(to_string(reason), "unauthorized") ->
+      String.contains?(reason_str, "unauthorized") ->
         Logger.info("Channel follow subscription failed",
           error: "Unauthorized - token may need additional verification",
           scope_present: MapSet.member?(state.scopes || MapSet.new(), "moderator:read:followers")
@@ -536,6 +534,12 @@ defmodule Server.Services.Twitch.EventSubManager do
 
   def validate_scopes_for_subscription(user_scopes, required_scopes) do
     Enum.all?(required_scopes, fn scope -> MapSet.member?(user_scopes, scope) end)
+  end
+
+  # Get client ID from environment config
+  defp get_client_id do
+    Application.get_env(:server, Server.Services.Twitch)[:client_id] ||
+      raise "Missing Twitch client_id configuration"
   end
 
   @doc """

@@ -27,6 +27,29 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
   end
 
   setup do
+    # Start CircuitBreakerServer if not already started
+    case Process.whereis(Server.CircuitBreakerServer) do
+      nil -> start_supervised!(Server.CircuitBreakerServer)
+      _pid -> :ok
+    end
+
+    # Start OAuth service if not already started
+    case Process.whereis(Server.OAuthService) do
+      nil -> start_supervised!(Server.OAuthService)
+      _pid -> :ok
+    end
+
+    # Register twitch service with OAuth
+    oauth_config = %{
+      client_id: "test_client_id",
+      client_secret: "test_client_secret",
+      auth_url: "https://id.twitch.tv/oauth2/authorize",
+      token_url: "https://id.twitch.tv/oauth2/token",
+      validate_url: "https://id.twitch.tv/oauth2/validate"
+    }
+
+    Server.OAuthService.register_service(:twitch, oauth_config)
+
     # Create a minimal state structure that EventSubManager expects
     state = %{
       session_id: "test_session_123",
@@ -34,7 +57,8 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
       scopes: MapSet.new(["channel:read:subscriptions", "moderator:read:followers"]),
       oauth2_client: %{client_id: "test_client_id"},
       token_manager: %{},
-      subscriptions: %{}
+      subscriptions: %{},
+      service_name: :twitch
     }
 
     {:ok, state: state}
@@ -53,14 +77,15 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
       assert {:error, _reason} = result
     end
 
-    test "handles token manager failure", %{state: state} do
+    test "handles token unavailable", %{state: state} do
       event_type = "channel.update"
       condition = %{"broadcaster_user_id" => "123456"}
-      opts = [token_manager_module: MockTokenManagerFailure]
 
-      result = EventSubManager.create_subscription(state, event_type, condition, opts)
+      # Since EventSubManager now uses OAuth service, it will fail with :no_tokens
+      # when no tokens are stored for the service
+      result = EventSubManager.create_subscription(state, event_type, condition)
 
-      assert {:error, {:token_unavailable, :token_expired}} = result
+      assert {:error, {:token_unavailable, _reason}} = result
     end
 
     test "accepts different event types and conditions", %{state: state} do
@@ -70,10 +95,8 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
         {"channel.raid", %{"to_broadcaster_user_id" => "111"}}
       ]
 
-      opts = [token_manager_module: MockTokenManager]
-
       for {event_type, condition} <- test_cases do
-        result = EventSubManager.create_subscription(state, event_type, condition, opts)
+        result = EventSubManager.create_subscription(state, event_type, condition)
         # All should return errors since we can't make real HTTP requests
         assert {:error, _} = result
       end
@@ -83,9 +106,8 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
   describe "delete_subscription/3" do
     test "attempts to delete subscription by ID", %{state: state} do
       subscription_id = "test_sub_123"
-      opts = [token_manager_module: MockTokenManager]
 
-      result = EventSubManager.delete_subscription(state, subscription_id, opts)
+      result = EventSubManager.delete_subscription(state, subscription_id)
 
       # Should get an error since we can't actually make the HTTP request
       assert {:error, _reason} = result
@@ -93,19 +115,16 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
 
     test "handles token unavailable error", %{state: state} do
       subscription_id = "test_sub_123"
-      opts = [token_manager_module: MockTokenManagerFailure]
 
-      result = EventSubManager.delete_subscription(state, subscription_id, opts)
+      result = EventSubManager.delete_subscription(state, subscription_id)
 
-      assert {:error, {:token_unavailable, :token_expired}} = result
+      assert {:error, {:token_unavailable, _reason}} = result
     end
   end
 
   describe "create_default_subscriptions/2" do
     test "creates default subscriptions when user_id is present", %{state: state} do
-      opts = [token_manager_module: MockTokenManager]
-
-      {success, failed} = EventSubManager.create_default_subscriptions(state, opts)
+      {success, failed} = EventSubManager.create_default_subscriptions(state)
 
       # All should fail since we can't make real HTTP requests
       assert success == 0
@@ -130,12 +149,11 @@ defmodule Server.Services.Twitch.EventSubManagerTest do
         # Empty scopes
         scopes: MapSet.new(),
         oauth2_client: %{client_id: "test_client_id"},
-        token_manager: %{}
+        token_manager: %{},
+        service_name: :twitch
       }
 
-      opts = [token_manager_module: MockTokenManager]
-
-      {success, failed} = EventSubManager.create_default_subscriptions(state, opts)
+      {success, failed} = EventSubManager.create_default_subscriptions(state)
 
       # All should be skipped due to missing scopes
       assert success == 0

@@ -1,21 +1,24 @@
 defmodule Server.Services.Twitch do
-  @behaviour Server.Services.TwitchBehaviour
-
   @moduledoc """
   Main Twitch EventSub service coordinating WebSocket connection and subscription management.
 
   This GenServer focuses on connection lifecycle and delegates to specialized modules:
   - `Server.Services.Twitch.EventSubManager` for subscription management
   - `Server.Services.Twitch.EventHandler` for event processing
-  - `Server.OAuthTokenManager` for token management
+  - `Server.OAuthService` for centralized token management
   - `Server.WebSocketClient` for WebSocket connection handling
   """
 
-  use GenServer
+  use Server.Service,
+    service_name: "twitch",
+    behaviour: Server.Services.TwitchBehaviour
+
+  use Server.Service.StatusReporter
+
   require Logger
 
   alias Server.Services.Twitch.{EventHandler, EventSubManager}
-  alias Server.{Logging, OAuthTokenManager, WebSocketClient}
+  alias Server.{Logging, WebSocketClient}
 
   # Twitch EventSub constants
   @eventsub_websocket_url "wss://eventsub.wss.twitch.tv/ws"
@@ -28,7 +31,6 @@ defmodule Server.Services.Twitch do
     :token_refresh_timer,
     :token_validation_task,
     :token_refresh_task,
-    :token_manager,
     :ws_client,
     :user_id,
     :scopes,
@@ -36,40 +38,19 @@ defmodule Server.Services.Twitch do
     subscriptions: %{},
     cloudfront_retry_count: 0,
     default_subscriptions_created: false,
-    state: %{
-      connection: %{
-        connected: false,
-        connection_state: "disconnected",
-        last_error: nil,
-        last_connected: nil,
-        session_id: nil
-      },
-      subscription_total_cost: 0,
-      subscription_max_cost: 10,
-      subscription_count: 0,
-      subscription_max_count: 300
-    }
+    # Connection fields (was state.connection)
+    connected: false,
+    connection_state: "disconnected",
+    last_error: nil,
+    last_connected: nil,
+    # Subscription fields (was state.subscription_*)
+    subscription_total_cost: 0,
+    subscription_max_cost: 10,
+    subscription_count: 0,
+    subscription_max_count: 300
   ]
 
   # Client API
-
-  @doc """
-  Starts the Twitch EventSub service GenServer.
-
-  ## Parameters
-  - `opts` - Keyword list of options (optional)
-    - `:client_id` - Twitch application client ID
-    - `:client_secret` - Twitch application client secret
-
-  ## Returns
-  - `{:ok, pid}` on success
-  - `{:error, reason}` on failure
-  """
-  @spec start_link(keyword()) :: GenServer.on_start()
-  @impl true
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
 
   @doc """
   Gets the current internal state of the Twitch service with caching.
@@ -131,10 +112,10 @@ defmodule Server.Services.Twitch do
         state = GenServer.call(__MODULE__, :get_internal_state)
 
         %{
-          connected: state.connection.connected,
-          connection_state: state.connection.connection_state,
-          session_id: state.connection.session_id,
-          last_connected: state.connection.last_connected,
+          connected: state.connected,
+          connection_state: state.connection_state,
+          session_id: state.session_id,
+          last_connected: state.last_connected,
           websocket_url: @eventsub_websocket_url
         }
       end,
@@ -240,27 +221,43 @@ defmodule Server.Services.Twitch do
   end
 
   defp check_websocket_connection(state) do
-    case get_in(state, [:state, :connection, :connected]) do
+    case state.connected do
       true -> :pass
       false -> :fail
       nil -> :unknown
     end
   end
 
-  defp check_oauth_status(state) do
-    if state[:state][:token_manager] do
-      case OAuthTokenManager.get_valid_token(state[:state][:token_manager]) do
-        {:ok, _token, _manager} -> :pass
-        {:error, :token_expired} -> :warn
-        {:error, _} -> :fail
-      end
-    else
-      :fail
+  defp check_oauth_status(_state) do
+    # Check OAuth status via centralized service
+    case Server.OAuthService.get_token_info(:twitch) do
+      {:ok, token_info} ->
+        if token_expired?(token_info) do
+          :warn
+        else
+          :pass
+        end
+
+      {:error, :no_tokens} ->
+        :fail
+
+      {:error, _} ->
+        :fail
+    end
+  end
+
+  defp token_expired?(token_info) do
+    case token_info.expires_at do
+      nil ->
+        false
+
+      expires_at ->
+        DateTime.compare(DateTime.utc_now(), expires_at) == :gt
     end
   end
 
   defp check_subscription_status(state) do
-    case state[:state][:subscriptions] do
+    case state.subscriptions do
       subs when is_map(subs) and map_size(subs) > 0 -> :pass
       subs when is_map(subs) -> :warn
       _ -> :fail
@@ -269,12 +266,12 @@ defmodule Server.Services.Twitch do
 
   defp build_health_details(state) do
     %{
-      connection_state: get_in(state, [:state, :connection, :connection_state]),
-      session_id: get_in(state, [:state, :session_id]),
-      subscription_count: map_size(state[:state][:subscriptions] || %{}),
-      subscription_cost: get_in(state, [:state, :subscription_total_cost]) || 0,
-      user_id: state[:state][:user_id],
-      default_subscriptions_created: state[:state][:default_subscriptions_created] || false
+      connection_state: state.connection_state,
+      session_id: state.session_id,
+      subscription_count: map_size(state.subscriptions || %{}),
+      subscription_cost: state.subscription_total_cost || 0,
+      user_id: state.user_id,
+      default_subscriptions_created: state.default_subscriptions_created || false
     }
   end
 
@@ -297,12 +294,9 @@ defmodule Server.Services.Twitch do
     }
   end
 
-  # GenServer callbacks
-  @impl GenServer
-  def init(opts) do
-    # Trap exits to ensure proper cleanup of DETS tables
-    Process.flag(:trap_exit, true)
-
+  # Server.Service callbacks
+  @impl Server.Service
+  def do_init(opts) do
     client_id = Keyword.get(opts, :client_id) || get_client_id()
     client_secret = Keyword.get(opts, :client_secret) || get_client_secret()
 
@@ -315,20 +309,22 @@ defmodule Server.Services.Twitch do
       )
     end
 
-    # Initialize OAuth token manager
-    {:ok, token_manager} =
-      OAuthTokenManager.new(
-        storage_key: :twitch_tokens,
-        client_id: client_id,
-        client_secret: client_secret,
-        auth_url: "https://id.twitch.tv/oauth2/authorize",
-        token_url: "https://id.twitch.tv/oauth2/token",
-        validate_url: "https://id.twitch.tv/oauth2/validate",
-        telemetry_prefix: [:server, :twitch, :oauth]
-      )
+    # Register with centralized OAuth service
+    oauth_config = %{
+      client_id: client_id,
+      client_secret: client_secret,
+      auth_url: "https://id.twitch.tv/oauth2/authorize",
+      token_url: "https://id.twitch.tv/oauth2/token",
+      validate_url: "https://id.twitch.tv/oauth2/validate"
+    }
 
-    # Load existing tokens
-    token_manager = OAuthTokenManager.load_tokens(token_manager)
+    case Server.OAuthService.register_service(:twitch, oauth_config) do
+      :ok ->
+        Logger.info("Registered with OAuth service")
+
+      {:error, reason} ->
+        Logger.error("Failed to register with OAuth service", error: reason)
+    end
 
     # Initialize WebSocket client
     ws_client =
@@ -339,7 +335,6 @@ defmodule Server.Services.Twitch do
       )
 
     state = %__MODULE__{
-      token_manager: token_manager,
       ws_client: ws_client,
       subscriptions: %{},
       token_validation_task: nil,
@@ -353,10 +348,16 @@ defmodule Server.Services.Twitch do
     Logger.info("Service starting", client_id: client_id, correlation_id: correlation_id)
 
     # Start connection process if we have tokens
-    case OAuthTokenManager.get_valid_token(token_manager) do
-      {:ok, _token, updated_manager} ->
+    case Server.OAuthService.get_valid_token(:twitch) do
+      {:ok, token} ->
         Logger.info("Token validation started")
-        state = %{state | token_manager: updated_manager}
+        # Update state with token info
+        state = %{
+          state
+          | user_id: Map.get(token, :user_id, state.user_id),
+            scopes: Map.get(token, :scopes, state.scopes)
+        }
+
         send(self(), :validate_token)
         {:ok, state}
 
@@ -367,19 +368,62 @@ defmodule Server.Services.Twitch do
     end
   end
 
-  @impl GenServer
-  def handle_call(:get_state, _from, state) do
-    {:reply, state.state, state}
+  @impl Server.Service
+  def do_terminate(reason, state) do
+    Logger.info("Service terminating", reason: reason)
+
+    cleanup_subscriptions(state.subscriptions)
+    cleanup_websocket(state.ws_client)
+    cleanup_tasks(state)
+    cleanup_timers(state)
+
+    :ok
+  end
+
+  # StatusReporter implementation
+
+  def service_healthy?(state) do
+    state.connected && state.session_id != nil
+  end
+
+  def connected?(state) do
+    state.connected
+  end
+
+  def connection_uptime(state) do
+    case state.last_connected do
+      nil -> 0
+      last_connected -> DateTime.diff(DateTime.utc_now(), last_connected)
+    end
+  end
+
+  @impl Server.Service.StatusReporter
+  def do_build_status(state) do
+    %{
+      websocket_connected: state.connected,
+      connection_state: state.connection_state,
+      session_id: state.session_id,
+      subscription_count: map_size(state.subscriptions),
+      subscription_cost: state.subscription_total_cost,
+      user_id: state.user_id,
+      scopes_count: if(state.scopes, do: MapSet.size(state.scopes), else: 0)
+    }
   end
 
   @impl GenServer
-  def handle_call(:get_status, _from, state) do
+  def handle_call(:get_state, _from, state) do
+    # Return the full state structure (no longer nested)
+    {:reply, state, state}
+  end
+
+  @impl GenServer
+  def handle_call(:get_service_status, _from, state) do
     status = %{
-      connected: state.state.connection.connected,
-      connection_state: state.state.connection.connection_state,
-      session_id: state.state.connection.session_id,
+      connected: state.connected,
+      connection_state: state.connection_state,
+      session_id: state.session_id,
       subscription_count: map_size(state.subscriptions),
-      subscription_cost: state.state.subscription_total_cost
+      subscription_cost: state.subscription_total_cost
     }
 
     {:reply, {:ok, status}, state}
@@ -388,8 +432,8 @@ defmodule Server.Services.Twitch do
   @impl GenServer
   def handle_call(:get_token_info, _from, state) do
     token_info =
-      case Server.OAuthTokenManager.get_valid_token(state.token_manager) do
-        {:ok, token, _updated_manager} ->
+      case Server.OAuthService.get_token_info(:twitch) do
+        {:ok, token} ->
           %{
             valid: true,
             expires_at: token.expires_at,
@@ -406,17 +450,18 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_call(:get_internal_state, _from, state) do
-    {:reply, state.state, state}
+    # Return the entire state structure for internal inspection
+    {:reply, state, state}
   end
 
   @impl GenServer
   def handle_call({:create_subscription, event_type, condition, opts}, _from, state) do
     cond do
-      not (state.state.connection.connected && state.session_id) ->
+      not (state.connected && state.session_id) ->
         {:reply, {:error, "WebSocket not connected"}, state}
 
-      state.state.subscription_count >= state.state.subscription_max_count ->
-        {:reply, {:error, "Subscription count limit exceeded (#{state.state.subscription_max_count})"}, state}
+      state.subscription_count >= state.subscription_max_count ->
+        {:reply, {:error, "Subscription count limit exceeded (#{state.subscription_max_count})"}, state}
 
       true ->
         handle_subscription_creation(event_type, condition, opts, state)
@@ -425,10 +470,12 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_call({:delete_subscription, subscription_id}, _from, state) do
-    # Create manager state for EventSubManager
+    # Create manager state for EventSubManager (using centralized OAuth)
     manager_state = %{
-      oauth2_client: state.token_manager.oauth2_client,
-      token_manager: state.token_manager
+      service_name: :twitch,
+      session_id: state.session_id,
+      user_id: state.user_id,
+      scopes: state.scopes
     }
 
     case EventSubManager.delete_subscription(manager_state, subscription_id) do
@@ -445,11 +492,8 @@ defmodule Server.Services.Twitch do
         new_state = %{
           state
           | subscriptions: new_subscriptions,
-            state: %{
-              state.state
-              | subscription_total_cost: max(0, state.state.subscription_total_cost - cost),
-                subscription_count: max(0, state.state.subscription_count - 1)
-            }
+            subscription_total_cost: max(0, state.subscription_total_cost - cost),
+            subscription_count: max(0, state.subscription_count - 1)
         }
 
         # Invalidate subscription-related caches
@@ -531,11 +575,8 @@ defmodule Server.Services.Twitch do
     new_state = %{
       state
       | subscriptions: new_subscriptions,
-        state: %{
-          state.state
-          | subscription_total_cost: state.state.subscription_total_cost + cost,
-            subscription_count: state.state.subscription_count + 1
-        }
+        subscription_total_cost: state.subscription_total_cost + cost,
+        subscription_count: state.subscription_count + 1
     }
 
     # Invalidate subscription-related caches
@@ -546,9 +587,15 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_info(:retry_connection, state) do
-    case OAuthTokenManager.get_valid_token(state.token_manager) do
-      {:ok, _token, updated_manager} ->
-        state = %{state | token_manager: updated_manager}
+    case Server.OAuthService.get_valid_token(:twitch) do
+      {:ok, token} ->
+        # Update state with token info if available
+        state = %{
+          state
+          | user_id: Map.get(token, :user_id, state.user_id),
+            scopes: Map.get(token, :scopes, state.scopes)
+        }
+
         send(self(), :validate_token)
         {:noreply, state}
 
@@ -604,7 +651,7 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_info(:validate_token, state) do
-    Logger.info("Token validation started", storage_key: state.token_manager.storage_key)
+    Logger.info("Token validation started", service: :twitch)
 
     # Cancel any existing validation task first
     state =
@@ -624,7 +671,7 @@ defmodule Server.Services.Twitch do
     # Start async token validation with supervisor
     task =
       Task.Supervisor.async_nolink(Server.TaskSupervisor, fn ->
-        OAuthTokenManager.validate_token(state.token_manager, "https://id.twitch.tv/oauth2/validate")
+        Server.OAuthService.validate_token(:twitch)
       end)
 
     {:noreply, %{state | token_validation_task: task}}
@@ -650,7 +697,7 @@ defmodule Server.Services.Twitch do
     # Start async token refresh with supervisor
     task =
       Task.Supervisor.async_nolink(Server.TaskSupervisor, fn ->
-        OAuthTokenManager.refresh_token(state.token_manager)
+        Server.OAuthService.refresh_token(:twitch)
       end)
 
     {:noreply, %{state | token_refresh_task: task}}
@@ -661,7 +708,7 @@ defmodule Server.Services.Twitch do
   def handle_info({ref, result}, %{token_validation_task: %Task{ref: ref}} = state) do
     # Token validation task completed
     case result do
-      {:ok, token_info, updated_manager} ->
+      {:ok, token_info} ->
         scopes_list = token_info[:scopes] || token_info["scopes"] || []
         has_user_read_chat = "user:read:chat" in scopes_list
 
@@ -683,17 +730,19 @@ defmodule Server.Services.Twitch do
 
         # Store user ID and scopes in state
         user_id = token_info[:user_id] || token_info["user_id"]
-        # Get scopes from token manager instead of validation response
-        # to ensure we have the complete scope set
-        scopes = updated_manager.token_info.scopes || MapSet.new()
+        # Convert scopes to MapSet if they're a list
+        scopes =
+          case token_info[:scopes] || token_info["scopes"] do
+            list when is_list(list) -> MapSet.new(list)
+            set -> set || MapSet.new()
+          end
 
         # Update logging context immediately with user_id
         Logging.set_service_context(:twitch, user_id: user_id)
 
         state = %{
           state
-          | token_manager: updated_manager,
-            user_id: user_id,
+          | user_id: user_id,
             scopes: scopes,
             token_validation_task: nil
         }
@@ -703,8 +752,7 @@ defmodule Server.Services.Twitch do
           has_session: state.session_id != nil
         )
 
-        # Start API client now that we have validated token and user_id
-        start_api_client(state.token_manager, state.user_id)
+        # API client start removed - OAuth service handles token management
 
         # If we already have a session established but deferred subscriptions, trigger them now
         if state.session_id do
@@ -740,9 +788,16 @@ defmodule Server.Services.Twitch do
   def handle_info({ref, result}, %{token_refresh_task: %Task{ref: ref}} = state) do
     # Token refresh task completed
     case result do
-      {:ok, updated_manager} ->
+      {:ok, token_info} ->
         Logger.info("Token refresh completed")
-        state = %{state | token_manager: updated_manager, token_refresh_task: nil}
+        # Update state with new token info if available
+        state = %{
+          state
+          | user_id: Map.get(token_info, :user_id, state.user_id),
+            scopes: Map.get(token_info, :scopes, state.scopes),
+            token_refresh_task: nil
+        }
+
         state = schedule_token_refresh(state)
         # Validate new token after successful refresh
         send(self(), :validate_token)
@@ -1243,19 +1298,6 @@ defmodule Server.Services.Twitch do
     {:noreply, state}
   end
 
-  @impl GenServer
-  def terminate(reason, state) do
-    Logger.info("Service terminating", reason: reason)
-
-    cleanup_subscriptions(state.subscriptions)
-    cleanup_websocket(state.ws_client)
-    cleanup_token_manager(state.token_manager)
-    cleanup_tasks(state)
-    cleanup_timers(state)
-
-    :ok
-  end
-
   defp cleanup_subscriptions(subscriptions) do
     Enum.each(subscriptions, fn {subscription_id, _subscription} ->
       Server.SubscriptionMonitor.untrack_subscription(subscription_id)
@@ -1266,17 +1308,6 @@ defmodule Server.Services.Twitch do
 
   defp cleanup_websocket(ws_client) do
     WebSocketClient.close(ws_client)
-  end
-
-  defp cleanup_token_manager(nil), do: :ok
-
-  defp cleanup_token_manager(token_manager) do
-    try do
-      OAuthTokenManager.close(token_manager)
-    rescue
-      error ->
-        Logger.warning("Token manager cleanup failed", error: inspect(error))
-    end
   end
 
   defp cleanup_tasks(state) do
@@ -1345,9 +1376,19 @@ defmodule Server.Services.Twitch do
       |> Map.put(:session_id, session_id)
 
     # Create default subscriptions using EventSubManager
-    # Check if user_id is available from token validation or token manager
-    user_id = state.user_id || get_user_id_from_token_manager(state.token_manager)
-    scopes = state.scopes || get_scopes_from_token_manager(state.token_manager)
+    # Check if user_id is available from token validation or OAuth service
+    {user_id, scopes} =
+      case {state.user_id, state.scopes} do
+        {nil, nil} ->
+          # Try to get from OAuth service
+          case Server.OAuthService.get_token_info(:twitch) do
+            {:ok, %{user_id: uid, scopes: sc}} -> {uid, sc}
+            _ -> {nil, nil}
+          end
+
+        {uid, sc} ->
+          {uid, sc}
+      end
 
     Logger.info("Session welcome subscription check",
       has_user_id: user_id != nil,
@@ -1355,7 +1396,7 @@ defmodule Server.Services.Twitch do
       session_id: inspect(session_id),
       has_scopes: scopes != nil,
       scope_count: if(scopes, do: MapSet.size(scopes), else: 0),
-      source: if(state.user_id, do: "state", else: "token_manager")
+      source: if(state.user_id, do: "state", else: "oauth_service")
     )
 
     if user_id do
@@ -1504,14 +1545,22 @@ defmodule Server.Services.Twitch do
 
   # State update helpers
   defp update_connection_state(state, updates) do
-    connection = Map.merge(state.state.connection, updates)
-    new_state = put_in(state.state.connection, connection)
+    # Merge updates directly into state (no more nested connection)
+    new_state = Map.merge(state, updates)
 
     # Invalidate relevant caches
     invalidate_twitch_caches([:connection_state, :connection_status, :full_state])
 
-    # Publish connection state changes
-    Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_connection_changed, connection})
+    # Publish connection state changes with connection-specific fields
+    connection_fields = %{
+      connected: new_state.connected,
+      connection_state: new_state.connection_state,
+      last_error: new_state.last_error,
+      last_connected: new_state.last_connected,
+      session_id: new_state.session_id
+    }
+
+    Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_connection_changed, connection_fields})
 
     new_state
   end
@@ -1529,33 +1578,17 @@ defmodule Server.Services.Twitch do
       Process.cancel_timer(state.token_refresh_timer)
     end
 
-    # Use OAuthTokenManager's built-in refresh timing
-    case OAuthTokenManager.get_valid_token(state.token_manager) do
-      {:ok, _token, updated_manager} ->
+    # Check if token needs refresh using OAuth service
+    case Server.OAuthService.get_valid_token(:twitch) do
+      {:ok, %{access_token: _token}} ->
         # Token is still valid, check again in 5 minutes
         timer = Process.send_after(self(), :refresh_token, @token_refresh_buffer)
-        %{state | token_manager: updated_manager, token_refresh_timer: timer}
+        %{state | token_refresh_timer: timer}
 
       {:error, _reason} ->
         # Token needs refresh now
         timer = Process.send_after(self(), :refresh_token, 1000)
         %{state | token_refresh_timer: timer}
-    end
-  end
-
-  # Extract user_id from token manager if not available in state
-  defp get_user_id_from_token_manager(token_manager) do
-    case token_manager.token_info do
-      nil -> nil
-      token_info -> token_info.user_id
-    end
-  end
-
-  # Extract scopes from token manager if not available in state
-  defp get_scopes_from_token_manager(token_manager) do
-    case token_manager.token_info do
-      nil -> nil
-      token_info -> token_info.scopes
     end
   end
 
@@ -1571,26 +1604,6 @@ defmodule Server.Services.Twitch do
     case Application.get_env(:server, :twitch) do
       nil -> System.get_env("TWITCH_CLIENT_SECRET")
       twitch_config -> Keyword.get(twitch_config, :client_secret) || System.get_env("TWITCH_CLIENT_SECRET")
-    end
-  end
-
-  # Start API client with validated token and user_id
-  defp start_api_client(token_manager, user_id) do
-    case DynamicSupervisor.start_child(
-           Server.DynamicSupervisor,
-           {Server.Services.Twitch.ApiClient, [token_manager: token_manager, user_id: user_id]}
-         ) do
-      {:ok, _pid} ->
-        Logger.info("Twitch API client started successfully", user_id: user_id)
-        :ok
-
-      {:error, {:already_started, _pid}} ->
-        Logger.debug("Twitch API client already running", user_id: user_id)
-        :ok
-
-      {:error, reason} ->
-        Logger.error("Failed to start Twitch API client", reason: reason, user_id: user_id)
-        {:error, reason}
     end
   end
 

@@ -114,20 +114,22 @@ defmodule Server.Service do
         )
 
         # Call service-specific initialization
-        case do_init(opts) do
-          {:ok, state} ->
-            {:ok,
-             Map.put(state, :__service_meta__, %{
-               name: @service_name,
-               service_atom: service_atom,
-               correlation_id: correlation_id,
-               started_at: DateTime.utc_now()
-             })}
-
-          {:stop, reason} = stop ->
-            error = ServiceError.new(service_atom, "init", :startup_error, inspect(reason))
-            Logging.log_error("Service startup failed", inspect(error))
-            stop
+        try do
+          case do_init(opts) do
+            {:ok, state} ->
+              {:ok,
+               Map.put(state, :__service_meta__, %{
+                 name: @service_name,
+                 service_atom: service_atom,
+                 correlation_id: correlation_id,
+                 started_at: DateTime.utc_now()
+               })}
+          end
+        rescue
+          error ->
+            error_msg = ServiceError.new(service_atom, "init", :startup_error, inspect(error))
+            Logging.log_error("Service startup failed", inspect(error_msg))
+            {:stop, {:startup_error, error}}
         end
       end
 
@@ -162,7 +164,7 @@ defmodule Server.Service do
       defp build_status(state) do
         base_status = %{
           service: @service_name,
-          started_at: get_in(state, [:__service_meta__, :started_at]),
+          started_at: Map.get(state, :__service_meta__, %{})[:started_at],
           uptime_seconds: calculate_uptime(state)
         }
 
@@ -177,9 +179,11 @@ defmodule Server.Service do
         # Add connection status if using ConnectionManager
         status_with_connection =
           if function_exported?(__MODULE__, :connected?, 1) do
+            connection_state = if Map.has_key?(state, :connection_state), do: state.connection_state, else: nil
+
             Map.merge(status_with_health, %{
               connected: apply(__MODULE__, :connected?, [state]),
-              connection_state: get_in(state, [:connection, :state]),
+              connection_state: connection_state,
               connection_uptime_seconds: apply(__MODULE__, :connection_uptime, [state])
             })
           else
@@ -195,7 +199,7 @@ defmodule Server.Service do
       end
 
       defp calculate_uptime(state) do
-        case get_in(state, [:__service_meta__, :started_at]) do
+        case Map.get(state, :__service_meta__, %{})[:started_at] do
           nil -> 0
           started_at -> DateTime.diff(DateTime.utc_now(), started_at)
         end
