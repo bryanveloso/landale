@@ -39,18 +39,10 @@ defmodule Server.Config do
   end
 
   @doc """
-  Gets OBS WebSocket password - REQUIRED for OBS integration
+  Gets OBS WebSocket password - optional, defaults to empty string
   """
   def obs_websocket_password do
-    Application.fetch_env!(:server, :obs_websocket_password)
-  rescue
-    ArgumentError ->
-      raise """
-      Missing required environment variable: OBS_WEBSOCKET_PASSWORD
-
-      This is required to connect to OBS WebSocket server.
-      Set it in your environment or config files.
-      """
+    Application.get_env(:server, :obs_websocket_password, "")
   end
 
   @doc """
@@ -122,7 +114,6 @@ defmodule Server.Config do
     # Call all required config functions to trigger validation
     twitch_client_id()
     twitch_client_secret()
-    obs_websocket_password()
     database_url()
     secret_key_base()
 
