@@ -348,14 +348,14 @@ defmodule Server.Services.Twitch do
     Logger.info("Service starting", client_id: client_id, correlation_id: correlation_id)
 
     # Start connection process if we have tokens
-    case Server.OAuthService.get_valid_token(:twitch) do
-      {:ok, token} ->
+    case Server.OAuthService.get_token_info(:twitch) do
+      {:ok, token_info} ->
         Logger.info("Token validation started")
         # Update state with token info
         state = %{
           state
-          | user_id: Map.get(token, :user_id, state.user_id),
-            scopes: Map.get(token, :scopes, state.scopes)
+          | user_id: Map.get(token_info, :user_id, state.user_id),
+            scopes: Map.get(token_info, :scopes, state.scopes)
         }
 
         send(self(), :validate_token)
@@ -587,13 +587,13 @@ defmodule Server.Services.Twitch do
 
   @impl GenServer
   def handle_info(:retry_connection, state) do
-    case Server.OAuthService.get_valid_token(:twitch) do
-      {:ok, token} ->
+    case Server.OAuthService.get_token_info(:twitch) do
+      {:ok, token_info} ->
         # Update state with token info if available
         state = %{
           state
-          | user_id: Map.get(token, :user_id, state.user_id),
-            scopes: Map.get(token, :scopes, state.scopes)
+          | user_id: Map.get(token_info, :user_id, state.user_id),
+            scopes: Map.get(token_info, :scopes, state.scopes)
         }
 
         send(self(), :validate_token)
@@ -1580,7 +1580,7 @@ defmodule Server.Services.Twitch do
 
     # Check if token needs refresh using OAuth service
     case Server.OAuthService.get_valid_token(:twitch) do
-      {:ok, %{access_token: _token}} ->
+      {:ok, _token} ->
         # Token is still valid, check again in 5 minutes
         timer = Process.send_after(self(), :refresh_token, @token_refresh_buffer)
         %{state | token_refresh_timer: timer}
