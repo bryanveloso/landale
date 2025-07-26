@@ -91,7 +91,7 @@ defmodule Server.Services.OBS.RequestTrackerTest do
     end
   end
 
-  describe "handle_cast - handle_response" do
+  describe "handle_cast - response_received" do
     setup do
       session_id = test_session_id()
       opts = [session_id: session_id, name: :"response_#{:rand.uniform(10000)}"]
@@ -110,7 +110,7 @@ defmodule Server.Services.OBS.RequestTrackerTest do
         responseData: %{obsVersion: "28.0.0"}
       }
 
-      GenServer.cast(pid, {:handle_response, response})
+      GenServer.cast(pid, {:response_received, response})
       Process.sleep(10)
 
       # Process should handle it gracefully
@@ -129,7 +129,7 @@ defmodule Server.Services.OBS.RequestTrackerTest do
         responseData: nil
       }
 
-      GenServer.cast(pid, {:handle_response, response})
+      GenServer.cast(pid, {:response_received, response})
       Process.sleep(10)
 
       # Process should handle it gracefully
@@ -147,7 +147,7 @@ defmodule Server.Services.OBS.RequestTrackerTest do
         responseData: %{}
       }
 
-      GenServer.cast(pid, {:handle_response, response})
+      GenServer.cast(pid, {:response_received, response})
 
       Process.sleep(10)
 
@@ -225,7 +225,7 @@ defmodule Server.Services.OBS.RequestTrackerTest do
               responseData: %{processed: i}
             }
 
-            GenServer.cast(pid, {:handle_response, response})
+            GenServer.cast(pid, {:response_received, response})
           end)
         end
 
@@ -258,7 +258,7 @@ defmodule Server.Services.OBS.RequestTrackerTest do
                 }
               end
 
-            GenServer.cast(pid, {:handle_response, response})
+            GenServer.cast(pid, {:response_received, response})
           end)
         end
 

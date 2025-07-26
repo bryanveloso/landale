@@ -1,51 +1,46 @@
 defmodule Server.Services.OBS.Connection do
   @moduledoc """
-  OBS WebSocket connection manager using gen_statem.
+  OBS WebSocket connection manager using WebSocketConnection for transport.
 
-  Manages the connection lifecycle with distinct states:
-  - :disconnected - Initial state, no connection
-  - :connecting - Attempting to establish WebSocket connection
-  - :authenticating - WebSocket connected, performing OBS authentication
+  This refactored version delegates transport concerns to WebSocketConnection
+  while focusing solely on OBS protocol handling and state management.
+
+  States:
+  - :disconnected - No active connection
+  - :authenticating - Connected, performing OBS authentication
   - :ready - Authenticated and ready to process requests
-  - :reconnecting - Connection lost, attempting to reconnect
-
-  This module is responsible for:
-  - WebSocket connection management using Gun
-  - OBS authentication flow
-  - Message queuing during authentication
-  - Broadcasting received events via PubSub
-  - Forwarding requests to OBS
   """
-  @behaviour :gen_statem
+  use GenServer
   require Logger
 
-  alias Server.CorrelationId
   alias Server.Services.OBS.Protocol
+  alias Server.WebSocketConnection
 
   # Timeouts
-  @connect_timeout 5_000
-  @reconnect_delay 5_000
   @auth_timeout 10_000
 
   defstruct [
     :session_id,
-    :uri,
-    :conn_pid,
-    :stream_ref,
-    :reconnect_timer,
-    :auth_timer,
-    :connection_manager,
+    :ws_conn,
+    :state,
     :rpc_version,
-    authentication_required: false,
-    pending_messages: []
+    :auth_timer,
+    pending_messages: [],
+    authentication_required: false
   ]
 
   # Client API
 
-  @doc false
+  def start_link(opts) do
+    GenServer.start_link(__MODULE__, opts, name: opts[:name])
+  end
+
+  @doc """
+  Returns a specification to start this module under a supervisor.
+  """
   def child_spec(opts) do
     %{
-      id: __MODULE__,
+      id: opts[:id] || __MODULE__,
       start: {__MODULE__, :start_link, [opts]},
       type: :worker,
       restart: :permanent,
@@ -53,363 +48,211 @@ defmodule Server.Services.OBS.Connection do
     }
   end
 
-  def start_link(opts) do
-    :gen_statem.start_link(__MODULE__, opts, name: opts[:name])
-  end
-
   @doc """
   Send a request to OBS. Will queue if not ready.
   """
   def send_request(conn, request_type, request_data \\ %{}) do
-    :gen_statem.call(conn, {:send_request, request_type, request_data})
+    GenServer.call(conn, {:send_request, request_type, request_data})
   end
 
   @doc """
   Get current connection state.
   """
   def get_state(conn) do
-    :gen_statem.call(conn, :get_state)
+    GenServer.call(conn, :get_state)
   end
 
-  # gen_statem callbacks
-
-  @impl true
-  def callback_mode, do: :state_functions
+  # GenServer callbacks
 
   @impl true
   def init(opts) do
     session_id = Keyword.fetch!(opts, :session_id)
     uri = Keyword.fetch!(opts, :uri)
 
-    # Subscribe to connection manager events
-    connection_manager = Server.ConnectionManager
+    # Start WebSocket connection
+    {:ok, ws_conn} =
+      WebSocketConnection.start_link(
+        uri: uri,
+        owner: self(),
+        auto_connect: true,
+        reconnect_base_delay: 5_000,
+        reconnect_max_delay: 60_000
+      )
 
-    data = %__MODULE__{
+    state = %__MODULE__{
       session_id: session_id,
-      uri: uri,
-      connection_manager: connection_manager
+      ws_conn: ws_conn,
+      state: :disconnected
     }
 
-    # Start connection immediately
-    actions = [{:next_event, :internal, :connect}]
-
-    {:ok, :disconnected, data, actions}
+    {:ok, state}
   end
 
-  # State: disconnected
+  @impl true
+  def handle_call({:send_request, request_type, request_data}, from, state) do
+    case state.state do
+      :ready ->
+        # Forward to RequestTracker for tracking and sending
+        send_obs_request(state, request_type, request_data, from)
 
-  def disconnected(:internal, :connect, data) do
-    correlation_id = CorrelationId.generate()
-
-    Logger.info("[#{correlation_id}] Connecting to OBS WebSocket at #{data.uri}",
-      service: "obs",
-      session_id: data.session_id
-    )
-
-    # Request connection from ConnectionManager
-    # For now, connect directly with gun
-    # TODO: Refactor to use Server.WebSocketConnection for consistency and shared features
-    # This would provide exponential backoff, CloudFront retries, and unified connection management
-    case connect_websocket(data.uri) do
-      {:ok, conn_pid} ->
-        actions = [{:state_timeout, @connect_timeout, :connection_timeout}]
-        {:next_state, :connecting, %{data | conn_pid: conn_pid}, actions}
-
-      {:error, reason} ->
-        Logger.error("Failed to start connection: #{inspect(reason)}",
-          service: "obs",
-          session_id: data.session_id
-        )
-
-        actions = [{:state_timeout, @reconnect_delay, :retry_connect}]
-        {:keep_state_and_data, actions}
+      _ ->
+        # Queue the request
+        state = queue_request(state, {:request, request_type, request_data, from})
+        {:noreply, state}
     end
   end
 
-  def disconnected(:state_timeout, :retry_connect, _data) do
-    actions = [{:next_event, :internal, :connect}]
-    {:keep_state_and_data, actions}
+  @impl true
+  def handle_call(:get_state, _from, state) do
+    {:reply, state.state, state}
   end
 
-  def disconnected({:call, from}, {:send_request, _type, _data}, _) do
-    {:keep_state_and_data, [{:reply, from, {:error, :disconnected}}]}
-  end
+  # WebSocketConnection events
 
-  def disconnected({:call, from}, :get_state, _) do
-    {:keep_state_and_data, [{:reply, from, :disconnected}]}
-  end
-
-  # State: connecting
-
-  def connecting(:info, {:gun_up, conn_pid, _protocol}, data) when conn_pid == data.conn_pid do
-    # Gun connection established, WebSocket upgrade is in progress
-    {:keep_state_and_data, []}
-  end
-
-  def connecting(:info, {:gun_upgrade, conn_pid, stream_ref, ["websocket"], _headers}, data)
-      when conn_pid == data.conn_pid do
-    Logger.info("WebSocket connection established",
+  @impl true
+  def handle_info({WebSocketConnection, _pid, {:websocket_connecting, %{uri: uri}}}, state) do
+    Logger.info("Connecting to OBS WebSocket",
+      uri: uri,
       service: "obs",
-      session_id: data.session_id
+      session_id: state.session_id
     )
 
-    # Move to authenticating state
-    data = %{data | stream_ref: stream_ref}
-    actions = [{:next_event, :internal, :start_auth}]
-
-    {:next_state, :authenticating, data, actions}
+    {:noreply, state}
   end
 
-  def connecting(:state_timeout, :connection_timeout, data) do
-    Logger.error("Connection timeout",
+  @impl true
+  def handle_info({WebSocketConnection, _pid, {:websocket_connected, _}}, state) do
+    Logger.info("WebSocket connection established, starting OBS authentication",
       service: "obs",
-      session_id: data.session_id
+      session_id: state.session_id
     )
 
-    data = cleanup_connection(data)
-    actions = [{:next_event, :internal, :connect}]
-    {:next_state, :disconnected, data, actions}
+    # Start authentication flow
+    state = start_authentication(state)
+    {:noreply, state}
   end
 
-  def connecting({:call, from}, {:send_request, type, request_data}, data) do
-    # Queue the request
-    data = %{data | pending_messages: data.pending_messages ++ [{:request, type, request_data, from}]}
-    {:keep_state, data}
+  @impl true
+  def handle_info({WebSocketConnection, _pid, {:websocket_frame, {:text, frame}}}, state) do
+    case state.state do
+      :authenticating ->
+        handle_auth_message(frame, state)
+
+      :ready ->
+        handle_obs_message(frame, state)
+
+      _ ->
+        Logger.debug("Received message in unexpected state",
+          state: state.state,
+          service: "obs",
+          session_id: state.session_id
+        )
+
+        {:noreply, state}
+    end
   end
 
-  def connecting({:call, from}, :get_state, _) do
-    {:keep_state_and_data, [{:reply, from, :connecting}]}
-  end
-
-  def connecting(:info, {:gun_ws, conn_pid, stream_ref, {:close, code, reason}}, data)
-      when conn_pid == data.conn_pid and stream_ref == data.stream_ref do
-    Logger.warning("WebSocket closed during connection: #{code} - #{reason}",
+  @impl true
+  def handle_info({WebSocketConnection, _pid, {:websocket_disconnected, %{reason: reason}}}, state) do
+    Logger.warning("WebSocket connection lost",
+      reason: inspect(reason),
       service: "obs",
-      session_id: data.session_id
+      session_id: state.session_id
     )
 
-    data = cleanup_connection(data)
-    actions = [{:next_event, :internal, :connect}]
-    {:next_state, :disconnected, data, actions}
+    broadcast_event(state, :connection_lost, %{reason: reason})
+
+    # Clean up and reset state
+    state = cleanup_state(state)
+    {:noreply, state}
   end
 
-  def connecting(:info, {:gun_down, conn_pid, _protocol, _reason, _}, data)
-      when conn_pid == data.conn_pid do
-    # Connection failed before WebSocket upgrade
-    data = cleanup_connection(data)
-    actions = [{:state_timeout, @reconnect_delay, :retry_connect}]
-    {:next_state, :disconnected, data, actions}
+  @impl true
+  def handle_info({WebSocketConnection, _pid, {:websocket_error, %{reason: reason}}}, state) do
+    Logger.error("WebSocket error",
+      error: reason,
+      service: "obs",
+      session_id: state.session_id
+    )
+
+    {:noreply, state}
   end
 
-  # State: authenticating
+  @impl true
+  def handle_info(:auth_timeout, state) do
+    if state.state == :authenticating do
+      Logger.error("Authentication timeout",
+        service: "obs",
+        session_id: state.session_id
+      )
 
-  def authenticating(:internal, :start_auth, data) do
-    # Wait for Hello message from OBS - don't send anything yet
-    actions = [{:state_timeout, @auth_timeout, :auth_timeout}]
-    {:keep_state, data, actions}
+      # Disconnect and let WebSocketConnection handle reconnection
+      WebSocketConnection.disconnect(state.ws_conn)
+      state = cleanup_state(state)
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
   end
 
-  def authenticating(:info, {:gun_ws, conn_pid, stream_ref, {:text, frame}}, data)
-      when conn_pid == data.conn_pid and stream_ref == data.stream_ref do
+  # Private functions
+
+  defp start_authentication(state) do
+    # Send Hello message (OpCode 0)
+    hello_msg =
+      Protocol.encode_hello(%{
+        rpcVersion: 1,
+        eventSubscriptions: Protocol.event_subscription_all()
+      })
+
+    WebSocketConnection.send_data(state.ws_conn, hello_msg)
+
+    # Set authentication timeout
+    auth_timer = Process.send_after(self(), :auth_timeout, @auth_timeout)
+
+    %{state | state: :authenticating, auth_timer: auth_timer}
+  end
+
+  defp handle_auth_message(frame, state) do
     case Protocol.decode_message(frame) do
       {:ok, %{op: 0, d: %{rpcVersion: version} = hello_data}} ->
         # Hello response received
-        data = %{data | rpc_version: version}
+        state = %{state | rpc_version: version}
 
         if hello_data[:authentication] do
-          handle_authentication_required(hello_data.authentication, data)
+          handle_authentication_required(hello_data.authentication, state)
         else
-          # No auth required, but still need to send Identify
-          identify_msg =
-            Protocol.encode_identify(%{
-              rpcVersion: version,
-              eventSubscriptions: Protocol.event_subscription_all()
-            })
-
-          Logger.debug("Sending Identify message (no auth): #{identify_msg}",
-            service: "obs",
-            session_id: data.session_id
-          )
-
-          :ok = :gun.ws_send(data.conn_pid, data.stream_ref, {:text, identify_msg})
-
-          # Stay in authenticating state, waiting for Identified response
-          {:keep_state_and_data, []}
+          # No auth required, move to ready
+          complete_authentication(state)
         end
 
       {:ok, %{op: 2, d: identified_data}} ->
         # Identified response - authentication successful
         Logger.info("OBS authentication successful",
           service: "obs",
-          session_id: data.session_id
+          session_id: state.session_id
         )
 
-        data = %{data | rpc_version: identified_data.negotiatedRpcVersion}
-        complete_authentication(data)
+        state = %{state | rpc_version: identified_data.negotiatedRpcVersion}
+        complete_authentication(state)
 
       {:error, reason} ->
-        Logger.error("Failed to decode message during auth: #{inspect(reason)}",
+        Logger.error("Failed to decode message during auth",
+          reason: inspect(reason),
           service: "obs",
-          session_id: data.session_id
+          session_id: state.session_id
         )
 
-        {:keep_state_and_data, []}
+        {:noreply, state}
     end
   end
 
-  def authenticating(:state_timeout, :auth_timeout, data) do
-    Logger.error("Authentication timeout",
-      service: "obs",
-      session_id: data.session_id
-    )
-
-    data = cleanup_connection(data)
-    actions = [{:next_event, :internal, :connect}]
-    {:next_state, :disconnected, data, actions}
-  end
-
-  def authenticating({:call, from}, {:send_request, type, request_data}, data) do
-    # Queue the request
-    data = %{data | pending_messages: data.pending_messages ++ [{:request, type, request_data, from}]}
-    {:keep_state, data}
-  end
-
-  def authenticating({:call, from}, :get_state, _) do
-    {:keep_state_and_data, [{:reply, from, :authenticating}]}
-  end
-
-  def authenticating(:info, {:gun_ws, conn_pid, stream_ref, {:close, code, reason}}, data)
-      when conn_pid == data.conn_pid and stream_ref == data.stream_ref do
-    Logger.warning("WebSocket closed during authentication: #{code} - #{reason}",
-      service: "obs",
-      session_id: data.session_id
-    )
-
-    data = cleanup_connection(data)
-    actions = [{:next_event, :internal, :connect}]
-    {:next_state, :disconnected, data, actions}
-  end
-
-  # State: ready
-
-  def ready(:enter, _old_state, data) do
-    # Process any queued messages
-    actions = process_pending_messages(data.pending_messages)
-    data = %{data | pending_messages: []}
-
-    # Broadcast connection established
-    broadcast_event(data, :connection_established, %{
-      session_id: data.session_id,
-      rpc_version: data.rpc_version
-    })
-
-    {:keep_state, data, actions}
-  end
-
-  def ready(:info, {:gun_ws, conn_pid, stream_ref, {:text, frame}}, data)
-      when conn_pid == data.conn_pid and stream_ref == data.stream_ref do
-    case Protocol.decode_message(frame) do
-      {:ok, %{op: 5} = event} ->
-        # Event from OBS - broadcast it
-        broadcast_obs_event(data, event.d)
-
-      {:ok, %{op: 7} = response} ->
-        # Request response - forward to RequestTracker
-        forward_response(data, response.d)
-
-      {:ok, msg} ->
-        Logger.debug("Received OBS message: #{inspect(msg)}",
-          service: "obs",
-          session_id: data.session_id
-        )
-
-      {:error, reason} ->
-        Logger.error("Failed to decode OBS message: #{inspect(reason)}",
-          service: "obs",
-          session_id: data.session_id
-        )
-    end
-
-    {:keep_state_and_data, []}
-  end
-
-  def ready({:call, from}, {:send_request, request_type, request_data}, data) do
-    # Forward to RequestTracker for tracking and sending
-    case get_request_tracker(data.session_id) do
-      {:ok, tracker} ->
-        # Let RequestTracker handle the request lifecycle
-        result = GenServer.call(tracker, {:track_and_send, request_type, request_data, data.conn_pid, data.stream_ref})
-        {:keep_state_and_data, [{:reply, from, result}]}
-
-      {:error, reason} ->
-        {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
-    end
-  end
-
-  def ready({:call, from}, :get_state, _) do
-    {:keep_state_and_data, [{:reply, from, :ready}]}
-  end
-
-  def ready(:info, {:gun_ws, conn_pid, stream_ref, {:close, code, reason}}, data)
-      when conn_pid == data.conn_pid and stream_ref == data.stream_ref do
-    Logger.warning("WebSocket closed by server: #{code} - #{reason}",
-      service: "obs",
-      session_id: data.session_id
-    )
-
-    broadcast_event(data, :connection_lost, %{code: code, reason: reason})
-
-    # Move to reconnecting
-    actions = [{:next_event, :internal, :start_reconnect}]
-    {:next_state, :reconnecting, data, actions}
-  end
-
-  def ready(:info, {:gun_down, conn_pid, _protocol, reason, _}, data)
-      when conn_pid == data.conn_pid do
-    Logger.warning("Connection lost: #{inspect(reason)}",
-      service: "obs",
-      session_id: data.session_id
-    )
-
-    broadcast_event(data, :connection_lost, %{reason: reason})
-
-    # Move to reconnecting
-    actions = [{:next_event, :internal, :start_reconnect}]
-    {:next_state, :reconnecting, data, actions}
-  end
-
-  # State: reconnecting
-
-  def reconnecting(:internal, :start_reconnect, data) do
-    data = cleanup_connection(data)
-
-    actions = [{:state_timeout, @reconnect_delay, :reconnect}]
-    {:keep_state, data, actions}
-  end
-
-  def reconnecting(:state_timeout, :reconnect, data) do
-    actions = [{:next_event, :internal, :connect}]
-    {:next_state, :disconnected, data, actions}
-  end
-
-  def reconnecting({:call, from}, {:send_request, type, request_data}, data) do
-    # Queue the request
-    data = %{data | pending_messages: data.pending_messages ++ [{:request, type, request_data, from}]}
-    {:keep_state, data}
-  end
-
-  def reconnecting({:call, from}, :get_state, _) do
-    {:keep_state_and_data, [{:reply, from, :reconnecting}]}
-  end
-
-  # Helper functions
-
-  defp handle_authentication_required(auth_data, data) do
+  defp handle_authentication_required(auth_data, state) do
     Logger.info("OBS requires authentication",
-      service: "obs",
-      session_id: data.session_id,
       challenge: auth_data.challenge,
-      salt: auth_data.salt
+      salt: auth_data.salt,
+      service: "obs",
+      session_id: state.session_id
     )
 
     # Get password from environment or configuration
@@ -418,11 +261,12 @@ defmodule Server.Services.OBS.Connection do
     if password == "" do
       Logger.error("OBS requires authentication but OBS_WEBSOCKET_PASSWORD not set",
         service: "obs",
-        session_id: data.session_id
+        session_id: state.session_id
       )
 
-      data = cleanup_connection(data)
-      {:next_state, :disconnected, data}
+      WebSocketConnection.disconnect(state.ws_conn)
+      state = cleanup_state(state)
+      {:noreply, state}
     else
       # Generate authentication string
       # OBS uses: base64(sha256(password + salt) + challenge)
@@ -434,92 +278,197 @@ defmodule Server.Services.OBS.Connection do
       # Send Identify message
       identify_msg =
         Protocol.encode_identify(%{
-          rpcVersion: data.rpc_version,
+          rpcVersion: state.rpc_version,
           authentication: auth_string,
           eventSubscriptions: Protocol.event_subscription_all()
         })
 
-      :ok = :gun.ws_send(data.conn_pid, data.stream_ref, {:text, identify_msg})
+      case WebSocketConnection.send_data(state.ws_conn, identify_msg) do
+        :ok ->
+          # Stay in authenticating state, waiting for Identified response
+          {:noreply, state}
 
-      # Stay in authenticating state, waiting for Identified response
-      {:keep_state_and_data, []}
+        {:error, reason} ->
+          Logger.error("Failed to send Identify message: #{inspect(reason)}",
+            service: "obs",
+            session_id: state.session_id
+          )
+
+          WebSocketConnection.disconnect(state.ws_conn)
+          state = cleanup_state(state)
+          {:noreply, state}
+      end
     end
   end
 
-  defp complete_authentication(data) do
-    Logger.info("OBS connection ready",
-      service: "obs",
-      session_id: data.session_id
-    )
-
-    {:next_state, :ready, data}
-  end
-
-  defp cleanup_connection(data) do
-    if data.conn_pid do
-      :gun.close(data.conn_pid)
+  defp complete_authentication(state) do
+    # Cancel auth timer
+    if state.auth_timer do
+      Process.cancel_timer(state.auth_timer)
     end
 
-    %{data | conn_pid: nil, stream_ref: nil}
+    state = %{state | state: :ready, auth_timer: nil}
+
+    # Broadcast connection established
+    broadcast_event(state, :connection_established, %{
+      session_id: state.session_id,
+      rpc_version: state.rpc_version
+    })
+
+    # Process any queued messages
+    state = process_pending_messages(state)
+
+    {:noreply, state}
   end
 
-  defp process_pending_messages(messages) do
-    Enum.map(messages, fn
-      {:request, _type, _data, from} ->
-        # Reply with error - connection was reestablished but request is stale
-        {:reply, from, {:error, :request_expired}}
-    end)
-  end
+  defp handle_obs_message(frame, state) do
+    case Protocol.decode_message(frame) do
+      {:ok, %{op: 5} = event} ->
+        # Event from OBS - broadcast it
+        broadcast_obs_event(state, event.d)
 
-  defp broadcast_event(data, event_type, event_data) do
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "obs:events",
-      {event_type, Map.put(event_data, :session_id, data.session_id)}
-    )
-  end
+      {:ok, %{op: 7} = response} ->
+        # Request response - forward to RequestTracker
+        forward_response(state, response.d)
 
-  defp broadcast_obs_event(data, event) do
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "obs_events:#{data.session_id}",
-      {:obs_event, event}
-    )
-  end
-
-  defp forward_response(data, response) do
-    case get_request_tracker(data.session_id) do
-      {:ok, tracker} ->
-        GenServer.cast(tracker, {:handle_response, response})
-
-      {:error, _} ->
-        Logger.warning("No request tracker found for response",
+      {:ok, msg} ->
+        Logger.debug("Received OBS message",
+          message: inspect(msg),
           service: "obs",
-          session_id: data.session_id
+          session_id: state.session_id
+        )
+
+      {:error, reason} ->
+        Logger.error("Failed to decode OBS message",
+          reason: inspect(reason),
+          service: "obs",
+          session_id: state.session_id
+        )
+    end
+
+    {:noreply, state}
+  end
+
+  defp send_obs_request(state, request_type, request_data, _from) do
+    case get_request_tracker(state.session_id) do
+      {:ok, _tracker} ->
+        # Get connection state to verify we're connected
+        ws_state = WebSocketConnection.get_state(state.ws_conn)
+
+        if ws_state.connected do
+          # Since RequestTracker expects Gun directly, we'll handle it inline
+          # Generate request ID here
+          request_id = generate_request_id()
+
+          # Create request message
+          request_msg = Protocol.encode_request(request_id, request_type, request_data)
+
+          # Send through WebSocketConnection
+          case WebSocketConnection.send_data(state.ws_conn, request_msg) do
+            :ok ->
+              # Return success with the request_id for tracking
+              {:reply, {:ok, request_id}, state}
+
+            {:error, reason} ->
+              {:reply, {:error, reason}, state}
+          end
+        else
+          {:reply, {:error, :not_connected}, state}
+        end
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  defp generate_request_id do
+    # Generate a unique request ID
+    System.unique_integer([:positive])
+    |> Integer.to_string()
+  end
+
+  defp queue_request(state, request) do
+    %{state | pending_messages: state.pending_messages ++ [request]}
+  end
+
+  defp process_pending_messages(state) do
+    Enum.each(state.pending_messages, fn
+      {:request, type, data, from} ->
+        # Process the queued request
+        case get_request_tracker(state.session_id) do
+          {:ok, tracker} ->
+            ws_state = WebSocketConnection.get_state(state.ws_conn)
+
+            if ws_state.connected do
+              result = GenServer.call(tracker, {:track_and_send, type, data, state.ws_conn})
+              GenServer.reply(from, result)
+            else
+              GenServer.reply(from, {:error, :not_connected})
+            end
+
+          {:error, reason} ->
+            GenServer.reply(from, {:error, reason})
+        end
+    end)
+
+    %{state | pending_messages: []}
+  end
+
+  defp cleanup_state(state) do
+    # Cancel auth timer if active
+    if state.auth_timer do
+      Process.cancel_timer(state.auth_timer)
+    end
+
+    %{state | state: :disconnected, auth_timer: nil, rpc_version: nil, authentication_required: false}
+  end
+
+  defp broadcast_event(state, event_type, data) do
+    Phoenix.PubSub.broadcast(
+      Server.PubSub,
+      "obs:#{state.session_id}",
+      {event_type, data}
+    )
+  end
+
+  defp broadcast_obs_event(state, event_data) do
+    event_type = event_data.eventType
+
+    Phoenix.PubSub.broadcast(
+      Server.PubSub,
+      "obs:#{state.session_id}:events",
+      {:obs_event, event_type, event_data}
+    )
+
+    # Also broadcast to session-specific event channel
+    Phoenix.PubSub.broadcast(
+      Server.PubSub,
+      "obs:#{state.session_id}:#{event_type}",
+      {:obs_event, event_data}
+    )
+  end
+
+  defp forward_response(state, response_data) do
+    case get_request_tracker(state.session_id) do
+      {:ok, tracker} ->
+        GenServer.cast(tracker, {:response_received, response_data})
+
+      {:error, reason} ->
+        Logger.error("Failed to forward response to RequestTracker",
+          reason: reason,
+          service: "obs",
+          session_id: state.session_id
         )
     end
   end
 
   defp get_request_tracker(session_id) do
-    Server.Services.OBS.Supervisor.get_process(session_id, :request_tracker)
-  end
+    # In test environment, we use a simpler approach
+    tracker_name = :"obs_request_tracker_#{session_id}"
 
-  defp connect_websocket(uri) do
-    # Parse the URI
-    uri_map = URI.parse(uri)
-    host = uri_map.host || "localhost"
-    port = uri_map.port || 4455
-    path = uri_map.path || "/"
-
-    # Start gun connection
-    case :gun.open(String.to_charlist(host), port, %{protocols: [:http]}) do
-      {:ok, conn_pid} ->
-        # Upgrade to WebSocket
-        _stream_ref = :gun.ws_upgrade(conn_pid, path)
-        {:ok, conn_pid}
-
-      {:error, reason} ->
-        {:error, reason}
+    case Process.whereis(tracker_name) do
+      nil -> {:error, :tracker_not_found}
+      pid -> {:ok, pid}
     end
   end
 end

@@ -1,15 +1,16 @@
 defmodule Server.Services.OBS.RequestTracker do
   @moduledoc """
-  Tracks OBS requests and responses.
+  Tracks OBS requests and responses (refactored for WebSocketConnection).
 
   Maintains a registry of pending requests and matches responses
   by request ID. Handles timeouts for requests that don't receive
-  responses.
+  responses. Works with WebSocketConnection instead of direct Gun calls.
   """
   use GenServer
   require Logger
 
   alias Server.Services.OBS.Protocol
+  alias Server.WebSocketConnection
 
   # 30 seconds
   @request_timeout 30_000
@@ -32,15 +33,15 @@ defmodule Server.Services.OBS.RequestTracker do
   end
 
   @impl true
-  def handle_call({:track_and_send, request_type, request_data, conn_pid, stream_ref}, from, state) do
+  def handle_call({:track_and_send, request_type, request_data, ws_conn}, from, state) do
     # Generate request ID
     request_id = to_string(state.next_id)
 
     # Create request message
     request_msg = Protocol.encode_request(request_id, request_type, request_data)
 
-    # Send to OBS
-    case :gun.ws_send(conn_pid, stream_ref, {:text, request_msg}) do
+    # Send through WebSocketConnection
+    case WebSocketConnection.send_data(ws_conn, request_msg) do
       :ok ->
         # Track the request
         timer_ref = Process.send_after(self(), {:request_timeout, request_id}, @request_timeout)
@@ -64,8 +65,8 @@ defmodule Server.Services.OBS.RequestTracker do
   end
 
   @impl true
-  def handle_cast({:handle_response, response}, state) do
-    request_id = response[:requestId]
+  def handle_cast({:response_received, response_data}, state) do
+    request_id = response_data[:requestId]
 
     case Map.get(state.requests, request_id) do
       nil ->
@@ -93,10 +94,10 @@ defmodule Server.Services.OBS.RequestTracker do
 
         # Reply to caller
         result =
-          if response[:requestStatus][:result] do
-            {:ok, response[:responseData]}
+          if response_data[:requestStatus][:result] do
+            {:ok, response_data[:responseData]}
           else
-            {:error, response[:requestStatus]}
+            {:error, response_data[:requestStatus]}
           end
 
         GenServer.reply(request_info.from, result)
