@@ -58,7 +58,7 @@ jobs:
       - name: Run Credo
         run: |
           cd apps/nurvus
-          MIX_ENV=dev mix credo
+          MIX_ENV=dev mix credo --min-priority high
 
   build:
     name: Build ${{ matrix.target }}

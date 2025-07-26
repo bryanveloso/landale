@@ -42,7 +42,7 @@ defmodule Server.OAuthService do
 
   require Logger
 
-  alias Server.{OAuthTokenManager, CorrelationId}
+  alias Server.{CorrelationId, OAuthTokenManager}
 
   # State structure
   defstruct [

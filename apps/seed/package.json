@@ -10,7 +10,8 @@
     "lint": "uv run ruff check .",
     "lint:fix": "uv run ruff check --fix .",
     "format": "uv run ruff format .",
-    "format:check": "uv run ruff format --check ."
+    "format:check": "uv run ruff format --check .",
+    "typecheck": "echo 'No TypeScript to check in Python workspace'"
   },
   "devDependencies": {}
 }

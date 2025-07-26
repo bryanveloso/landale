@@ -14,8 +14,8 @@ defmodule Server.Config do
   def twitch_client_id do
     Application.fetch_env!(:server, :twitch_client_id)
   rescue
-    ArgumentError ->
-      raise """
+    e in ArgumentError ->
+      reraise e, """
       Missing required environment variable: TWITCH_CLIENT_ID
 
       This is required for Twitch EventSub subscriptions to work.
@@ -29,8 +29,8 @@ defmodule Server.Config do
   def twitch_client_secret do
     Application.fetch_env!(:server, :twitch_client_secret)
   rescue
-    ArgumentError ->
-      raise """
+    e in ArgumentError ->
+      reraise e, """
       Missing required environment variable: TWITCH_CLIENT_SECRET
 
       This is required for OAuth token refresh to work.
@@ -51,8 +51,8 @@ defmodule Server.Config do
   def database_url do
     Application.fetch_env!(:server, :database_url)
   rescue
-    ArgumentError ->
-      raise """
+    e in ArgumentError ->
+      reraise e, """
       Missing required environment variable: DATABASE_URL
 
       This is required for PostgreSQL database connection.
@@ -96,8 +96,8 @@ defmodule Server.Config do
   def secret_key_base do
     Application.fetch_env!(:server, ServerWeb.Endpoint)[:secret_key_base]
   rescue
-    ArgumentError ->
-      raise """
+    e in ArgumentError ->
+      reraise e, """
       Missing required configuration: secret_key_base
 
       This is required for Phoenix session security.
