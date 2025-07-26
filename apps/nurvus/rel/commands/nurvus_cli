@@ -1,0 +1,9 @@
+#!/bin/sh
+# Custom CLI command for Nurvus release
+# This script will be packaged by Burrito and available as ./nurvus cli
+
+# Get the directory of the release
+RELEASE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Execute the CLI module within the running release environment
+exec "$RELEASE_ROOT/bin/nurvus" eval "Nurvus.CLI.main(System.argv())" -- "$@"

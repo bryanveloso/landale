@@ -143,7 +143,7 @@ defmodule Nurvus.ProcessManager do
         {:reply, {:error, :not_found}, state}
 
       config ->
-        case ProcessSupervisor.start_process(config) do
+        case start_process_with_routing(config) do
           {:ok, pid} ->
             Logger.info("Process start initiated: #{process_id} -> #{config.name}")
 
@@ -307,6 +307,10 @@ defmodule Nurvus.ProcessManager do
   end
 
   ## Private Functions
+
+  defp start_process_with_routing(config) do
+    ProcessSupervisor.start_process(config)
+  end
 
   defp stop_process_internal(process_id, state) do
     case Map.get(state.monitors, process_id) do

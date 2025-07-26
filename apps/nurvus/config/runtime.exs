@@ -21,6 +21,8 @@ log_level =
 
 config :logger, level: log_level
 
+# Configuration
+
 # Only set config_file if explicitly provided via environment variable
 # Otherwise let the application use its XDG default
 if config_file do

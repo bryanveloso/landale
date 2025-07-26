@@ -8,10 +8,14 @@ defmodule Nurvus.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      # Local process registry using standard Elixir Registry
+      {Registry, [keys: :unique, name: Nurvus.ProcessRegistry]},
+
       # Process supervision tree
       Nurvus.ProcessSupervisor,
       Nurvus.ProcessManager,
       Nurvus.ProcessMonitor,
+
       # HTTP API server
       Nurvus.HttpServer
     ]
