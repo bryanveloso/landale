@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import os
 import subprocess
 import tempfile
 import time
@@ -80,19 +81,23 @@ class AudioProcessor:
         self.process_task: asyncio.Task | None = None
         self.last_logged_duration = 0.0
 
+        # Enhanced buffer protection
+        self.max_chunk_count = 1000  # Prevent chunk explosion
+        self.buffer_overflow_events = 0  # Track overflow frequency
+
         # Transcription callback
         self.transcription_callback: Callable[[TranscriptionEvent], Awaitable[None]] | None = None
 
         # Store Whisper configuration
-        self.whisper_exe = "/usr/local/bin/whisper"
+        self.whisper_exe = os.getenv("WHISPER_EXECUTABLE", "/usr/local/bin/whisper")
         self.whisper_model_path = whisper_model_path
         self.whisper_language = whisper_language
         self.whisper_threads = whisper_threads
-        self.vad_model_path = "/Users/Avalonstar/Code/utilities/whisper.cpp/models/ggml-silero-v5.1.2.bin"
+        self.vad_model_path = os.getenv(
+            "WHISPER_VAD_MODEL_PATH", "/Users/Avalonstar/Code/utilities/whisper.cpp/models/ggml-silero-v5.1.2.bin"
+        )
 
         # Verify whisper executable exists
-        import os
-
         if not os.path.exists(self.whisper_exe):
             logger.error(f"Whisper executable not found: {self.whisper_exe}")
             raise FileNotFoundError(f"Whisper executable not found: {self.whisper_exe}")
@@ -137,12 +142,37 @@ class AudioProcessor:
         self.buffer.end_timestamp = chunk.timestamp
         self.buffer.total_size += len(chunk.data)
 
-        # Prevent buffer overflow
-        if self.buffer.total_size > self.max_buffer_size:
-            logger.warning("Audio buffer overflow, dropping oldest chunks")
-            while self.buffer.total_size > self.max_buffer_size and self.buffer.chunks:
-                removed = self.buffer.chunks.pop(0)
-                self.buffer.total_size -= len(removed.data)
+        # ENHANCED: Dual protection - size AND count limits
+        chunks_removed = 0
+        overflow_triggered = False
+
+        while (
+            self.buffer.total_size > self.max_buffer_size or len(self.buffer.chunks) > self.max_chunk_count
+        ) and self.buffer.chunks:
+            removed = self.buffer.chunks.pop(0)
+            self.buffer.total_size -= len(removed.data)
+            chunks_removed += 1
+            overflow_triggered = True
+
+        if overflow_triggered:
+            self.buffer_overflow_events += 1
+            logger.warning(
+                f"Buffer overflow #{self.buffer_overflow_events}: "
+                f"removed {chunks_removed} chunks "
+                f"(size: {self.buffer.total_size / 1024 / 1024:.1f}MB, "
+                f"chunks: {len(self.buffer.chunks)})"
+            )
+
+            # Update start timestamp after removing chunks
+            if self.buffer.chunks:
+                self.buffer.start_timestamp = self.buffer.chunks[0].timestamp
+
+            # If overflow happens frequently, log a warning
+            if self.buffer_overflow_events % 10 == 0:
+                logger.warning(
+                    f"Frequent buffer overflows detected: {self.buffer_overflow_events} total. "
+                    "Consider investigating audio input rate."
+                )
 
         # Log buffer status at meaningful intervals
         duration = self.get_buffer_duration()
@@ -160,14 +190,37 @@ class AudioProcessor:
         return (self.buffer.end_timestamp - self.buffer.start_timestamp) / 1_000_000
 
     async def _processing_loop(self) -> None:
-        """Main processing loop."""
+        """Main processing loop with robust error handling."""
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+        base_sleep_time = 0.1
+
         while self.is_running:
-            if self._should_process_buffer():
-                logger.info(f"Processing buffer with {self.get_buffer_duration():.1f}s of audio")
-                event = await self._process_buffer()
-                if event and self.transcription_callback:
-                    await self.transcription_callback(event)
-            await asyncio.sleep(0.1)  # Check every 100ms
+            try:
+                if self._should_process_buffer():
+                    logger.info(f"Processing buffer with {self.get_buffer_duration():.1f}s of audio")
+                    event = await self._process_buffer()
+                    if event and self.transcription_callback:
+                        await self.transcription_callback(event)
+                    # Reset error count on success
+                    consecutive_errors = 0
+            except Exception as e:
+                consecutive_errors += 1
+                logger.error(
+                    f"Transcription loop error ({consecutive_errors}/{max_consecutive_errors}): {e}", exc_info=True
+                )
+
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.critical("Too many consecutive errors, stopping transcription")
+                    self.is_running = False
+                    break
+
+                # Exponential backoff: 0.1s, 0.2s, 0.4s, 0.8s, 1.6s, then cap at 5s
+                sleep_time = min(base_sleep_time * (2**consecutive_errors), 5.0)
+                await asyncio.sleep(sleep_time)
+                continue
+
+            await asyncio.sleep(base_sleep_time)  # Check every 100ms
 
     def _should_process_buffer(self) -> bool:
         """Check if buffer should be processed."""
@@ -254,40 +307,13 @@ class AudioProcessor:
                     logger.error(f"Whisper failed with code {result.returncode}: {result.stderr}")
                     return None
 
-                # Parse text output
-                if result.stdout:
-                    # Extract text from timestamp format: [00:00:00.000 --> 00:00:00.000] text
-                    lines = result.stdout.strip().split("\n")
-                    text_parts = []
-
-                    for line in lines:
-                        if line.strip():
-                            # Remove timestamp brackets if present
-                            if line.startswith("[") and "] " in line:
-                                text = line.split("] ", 1)[1].strip()
-                            else:
-                                text = line.strip()
-
-                            if text and text not in ["[BLANK_AUDIO]", "Thank you."]:
-                                text_parts.append(text)
-
-                    if text_parts:
-                        full_text = " ".join(text_parts)
-                        logger.info(f'Transcription ({transcription_time:.2f}s): "{full_text}"')
-
-                        # Return transcription event
-                        return TranscriptionEvent(
-                            timestamp=processing_buffer.start_timestamp, duration=duration_seconds, text=full_text
-                        )
-                    else:
-                        logger.debug("No speech detected in buffer")
-
-                return None
+                # Parse text output using common parser
+                return self._parse_whisper_output(
+                    result.stdout, transcription_time, processing_buffer.start_timestamp, duration_seconds
+                )
 
             finally:
                 # Clean up temp file
-                import os
-
                 if os.path.exists(temp_wav):
                     os.unlink(temp_wav)
 
@@ -400,29 +426,13 @@ class AudioProcessor:
                 logger.error(f"In-memory Whisper failed with code {result.returncode}: {result.stderr}")
                 return None
 
-            # Parse text output (same as file-based processing)
-            if result.stdout:
-                lines = result.stdout.decode().strip().split("\n")
-                text_parts = []
-
-                for line in lines:
-                    if line.strip():
-                        text = line.split("] ", 1)[1].strip() if line.startswith("[") and "] " in line else line.strip()
-
-                        if text and text not in ["[BLANK_AUDIO]", "Thank you."]:
-                            text_parts.append(text)
-
-                if text_parts:
-                    full_text = " ".join(text_parts)
-                    logger.info(f'In-memory transcription ({transcription_time:.2f}s): "{full_text}"')
-
-                    return TranscriptionEvent(
-                        timestamp=processing_buffer.start_timestamp, duration=duration_seconds, text=full_text
-                    )
-                else:
-                    logger.debug("No speech detected in in-memory processing")
-
-            return None
+            # Parse text output using common parser
+            return self._parse_whisper_output(
+                result.stdout.decode() if result.stdout else "",
+                transcription_time,
+                processing_buffer.start_timestamp,
+                duration_seconds,
+            )
 
         except Exception as e:
             logger.error(f"Error in in-memory audio processing: {e}")
@@ -444,3 +454,37 @@ class AudioProcessor:
         self._memory_stats["peak_memory"] = max(self._memory_stats["peak_memory"], current_usage)
 
         return self._memory_stats.copy()
+
+    def _parse_whisper_output(
+        self, stdout: str, transcription_time: float, start_timestamp: int, duration: float
+    ) -> TranscriptionEvent | None:
+        """Parse Whisper output and create transcription event.
+
+        Extracts text from Whisper's timestamp format and filters out non-speech content.
+        """
+        if not stdout:
+            return None
+
+        # Extract text from timestamp format: [00:00:00.000 --> 00:00:00.000] text
+        lines = stdout.strip().split("\n")
+        text_parts = []
+
+        for line in lines:
+            if line.strip():
+                # Remove timestamp brackets if present
+                if line.startswith("[") and "] " in line:
+                    text = line.split("] ", 1)[1].strip()
+                else:
+                    text = line.strip()
+
+                # Filter out non-speech markers
+                if text and text not in ["[BLANK_AUDIO]", "Thank you."]:
+                    text_parts.append(text)
+
+        if text_parts:
+            full_text = " ".join(text_parts)
+            logger.info(f'Transcription ({transcription_time:.2f}s): "{full_text}"')
+            return TranscriptionEvent(timestamp=start_timestamp, duration=duration, text=full_text)
+        else:
+            logger.debug("No speech detected in buffer")
+            return None
