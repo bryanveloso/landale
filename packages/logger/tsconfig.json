@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.package.json",
+  "extends": "@landale/config-typescript/package-config",
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",

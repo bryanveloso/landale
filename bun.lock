@@ -60,6 +60,18 @@
         "vite-tsconfig-paths": "^5.1.4",
       },
     },
+    "apps/phononmaser": {
+      "name": "@landale/phononmaser",
+      "version": "0.1.0",
+    },
+    "apps/seed": {
+      "name": "@landale/seed",
+      "version": "0.1.0",
+    },
+    "packages/config-typescript": {
+      "name": "@landale/config-typescript",
+      "version": "0.0.0",
+    },
     "packages/logger": {
       "name": "@landale/logger",
       "version": "0.1.0",
@@ -238,11 +250,17 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.29", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-uw6guiW/gcAGPDhLmd77/6lW8QLeiV5RUTsAX46Db6oLhGaVj4lhnPwb184s1bkc8kdVg/+h988dro8GRDpmYQ=="],
 
+    "@landale/config-typescript": ["@landale/config-typescript@workspace:packages/config-typescript"],
+
     "@landale/dashboard": ["@landale/dashboard@workspace:apps/dashboard"],
 
     "@landale/logger": ["@landale/logger@workspace:packages/logger"],
 
     "@landale/overlays": ["@landale/overlays@workspace:apps/overlays"],
+
+    "@landale/phononmaser": ["@landale/phononmaser@workspace:apps/phononmaser"],
+
+    "@landale/seed": ["@landale/seed@workspace:apps/seed"],
 
     "@landale/shared": ["@landale/shared@workspace:packages/shared"],
 

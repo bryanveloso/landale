@@ -1,5 +1,5 @@
 {
-  "extends": "../tsconfig.node.json",
+  "extends": "@landale/config-typescript/node",
   "compilerOptions": {
     "composite": true,
     "noEmit": true,
