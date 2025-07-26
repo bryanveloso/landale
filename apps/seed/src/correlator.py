@@ -38,7 +38,7 @@ class StreamCorrelator:
         self.chat_buffer: deque[ChatMessage] = deque(maxlen=max_buffer_size * 2)  # Higher volume
         self.emote_buffer: deque[EmoteEvent] = deque(maxlen=max_buffer_size)
         self.interaction_buffer: deque[ViewerInteractionEvent] = deque(maxlen=max_buffer_size // 2)  # Lower volume
-        
+
         # Track overflow events
         self.overflow_counts = {
             "transcription": 0,
@@ -70,7 +70,7 @@ class StreamCorrelator:
         # Check if buffer is at capacity
         if len(self.transcription_buffer) >= self.max_buffer_size:
             self.overflow_counts["transcription"] += 1
-            
+
         self.transcription_buffer.append(event)
         self._cleanup_old_events()
 
@@ -82,7 +82,7 @@ class StreamCorrelator:
         # Check if buffer is at capacity
         if len(self.chat_buffer) >= self.max_buffer_size * 2:
             self.overflow_counts["chat"] += 1
-            
+
         self.chat_buffer.append(event)
         self._cleanup_old_events()
 
@@ -91,7 +91,7 @@ class StreamCorrelator:
         # Check if buffer is at capacity
         if len(self.emote_buffer) >= self.max_buffer_size:
             self.overflow_counts["emote"] += 1
-            
+
         self.emote_buffer.append(event)
         self._cleanup_old_events()
 
@@ -100,7 +100,7 @@ class StreamCorrelator:
         # Check if buffer is at capacity
         if len(self.interaction_buffer) >= self.max_buffer_size // 2:
             self.overflow_counts["interaction"] += 1
-            
+
         self.interaction_buffer.append(event)
         self._cleanup_old_events()
         logger.debug(f"Community interaction: {event.interaction_type} from {event.username}")

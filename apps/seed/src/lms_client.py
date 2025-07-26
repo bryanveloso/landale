@@ -34,14 +34,10 @@ class LMSClient:
         self.rate_window = rate_window  # seconds
         self.rate_limiter = asyncio.Semaphore(rate_limit)
         self.request_times: deque[float] = deque(maxlen=rate_limit)
-        
+
         # Circuit breaker for external API protection
         self.circuit_breaker = CircuitBreaker(
-            name="lms_api",
-            failure_threshold=5,
-            recovery_timeout=120.0,
-            success_threshold=2,
-            logger=logger
+            name="lms_api", failure_threshold=5, recovery_timeout=120.0, success_threshold=2, logger=logger
         )
 
     async def __aenter__(self):

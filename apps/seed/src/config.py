@@ -1,7 +1,6 @@
 """Configuration management for Seed service using Pydantic."""
 
 import os
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -149,7 +148,7 @@ class SeedConfig(BaseSettings):
 
 
 # Global config instance
-_config: Optional[SeedConfig] = None
+_config: SeedConfig | None = None
 
 
 def get_config() -> SeedConfig:
