@@ -10,7 +10,7 @@ from shared.websockets import BaseWebSocketClient
 from websockets.client import WebSocketClientProtocol
 
 from .events import ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
-from .logger import get_logger
+from .logger import bind_correlation_context, clear_context, get_logger
 
 logger = get_logger(__name__)
 
@@ -55,6 +55,10 @@ class PhononmaserClient(BaseWebSocketClient):
             data = json.loads(message)
             event_type = data.get("type")
 
+            # Extract correlation ID if present
+            correlation_id = data.get("correlation_id") or f"phono_{data.get('timestamp', 'unknown')}"
+            bind_correlation_context(correlation_id=correlation_id)
+
             if event_type == "audio:transcription":
                 event = TranscriptionEvent(
                     timestamp=data["timestamp"],
@@ -67,9 +71,11 @@ class PhononmaserClient(BaseWebSocketClient):
                     self.create_task(handler(event))
 
         except json.JSONDecodeError:
-            logger.error(f"Invalid JSON received: {message}")
+            logger.error("Invalid JSON received", message_preview=message[:100])
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
+            logger.error("Error processing phononmaser message", error=str(e), exc_info=True)
+        finally:
+            clear_context()
 
     async def _do_disconnect(self):
         """Disconnect from phononmaser."""
@@ -130,11 +136,25 @@ class ServerClient(BaseWebSocketClient):
     @safe_handler
     async def _handle_server_message(self, message: str):
         """Handle individual message from server."""
+        correlation_id = None
         try:
             data = json.loads(message)
+
+            # Extract correlation ID from Phoenix messages
+            if isinstance(data, dict):
+                correlation_id = data.get("correlation_id") or data.get("ref")
+            elif isinstance(data, list) and len(data) >= 2:
+                correlation_id = data[1]  # ref field in array format
+
+            if correlation_id:
+                bind_correlation_context(correlation_id=str(correlation_id))
+
         except json.JSONDecodeError:
-            logger.error(f"Invalid JSON received: {message}")
+            logger.error("Invalid JSON received from server", message_preview=message[:100])
             return
+        finally:
+            if correlation_id:
+                clear_context()
 
         # Handle Phoenix WebSocket messages (object format)
         if isinstance(data, dict):
@@ -153,7 +173,7 @@ class ServerClient(BaseWebSocketClient):
 
             # Handle join confirmation
             if event == "phx_reply" and payload.get("status") == "ok":
-                logger.info(f"Joined channel: {topic}")
+                logger.info("Joined Phoenix channel", topic=topic)
                 return
 
             # Handle specific event types

@@ -7,33 +7,47 @@ from typing import Any
 import structlog
 
 
-def configure_json_logging() -> None:
-    """Configure structured JSON logging for SEED service."""
+def configure_json_logging(level: str = "INFO", json_output: bool = True) -> None:
+    """Configure structured JSON logging for SEED service.
+
+    Args:
+        level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        json_output: Whether to output JSON format (True) or human-readable (False)
+    """
+    # Convert string level to logging constant
+    log_level = getattr(logging, level.upper(), logging.INFO)
 
     # Configure standard library logging to output to stdout
     logging.basicConfig(
         format="%(message)s",  # structlog will handle formatting
         stream=sys.stdout,
-        level=logging.INFO,
+        level=log_level,
     )
 
-    # Configure structlog for production JSON logging
+    # Choose processors based on output format
+    processors = [
+        # Add context variables (request IDs, correlation IDs, etc.)
+        structlog.contextvars.merge_contextvars,
+        # Add log level to event dict
+        structlog.processors.add_log_level,
+        # Add timestamp in ISO 8601 format
+        structlog.processors.TimeStamper(fmt="iso", utc=True),
+        # Add service metadata
+        add_service_metadata,
+        # Handle exceptions with structured tracebacks
+        structlog.processors.format_exc_info,
+    ]
+
+    # Add appropriate renderer
+    if json_output:
+        processors.append(structlog.processors.JSONRenderer())
+    else:
+        processors.append(structlog.dev.ConsoleRenderer())
+
+    # Configure structlog
     structlog.configure(
-        processors=[
-            # Add context variables (request IDs, correlation IDs, etc.)
-            structlog.contextvars.merge_contextvars,
-            # Add log level to event dict
-            structlog.processors.add_log_level,
-            # Add timestamp in ISO 8601 format
-            structlog.processors.TimeStamper(fmt="iso", utc=True),
-            # Add service metadata
-            add_service_metadata,
-            # Handle exceptions with structured tracebacks
-            structlog.processors.format_exc_info,
-            # Render as JSON
-            structlog.processors.JSONRenderer(),
-        ],
-        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        processors=processors,
+        wrapper_class=structlog.make_filtering_bound_logger(log_level),
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )

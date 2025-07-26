@@ -1,12 +1,12 @@
 """Main entry point for the SEED intelligence service."""
 
 import asyncio
-import os
 import signal
 
 from dotenv import load_dotenv
 from shared import get_global_tracker
 
+from .config import get_config
 from .context_client import ContextClient
 from .correlator import StreamCorrelator
 from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
@@ -19,8 +19,11 @@ from .websocket_client import ServerClient
 # Load environment variables
 load_dotenv()
 
-# Configure structured JSON logging
-configure_json_logging()
+# Get configuration
+config = get_config()
+
+# Configure structured JSON logging based on config
+configure_json_logging(level=config.log_level, json_output=config.json_logs)
 logger = get_logger(__name__)
 
 
@@ -28,23 +31,25 @@ class SeedService:
     """Main SEED intelligence service that coordinates all components."""
 
     def __init__(self):
-        # Configuration - hardcoded URLs for single-user setup with env overrides
-        self.server_events_url = os.getenv("SERVER_URL", "http://saya:7175")
-        self.server_ws_url = os.getenv("SERVER_WS_URL", "ws://saya:7175")
-        self.lms_url = os.getenv("LMS_API_URL", "http://zelan:1234/v1")
-        self.lms_model = os.getenv("LMS_MODEL", "meta/llama-3.3-70b")
+        # Store config
+        self.config = config
 
-        # Components
-        self.transcription_client = TranscriptionWebSocketClient(self.server_ws_url)
-        # Convert HTTP URL to WebSocket URL for server events
-        server_ws_events_url = (
-            self.server_ws_url.replace("/socket", "/socket/websocket")
-            if "/socket" in self.server_ws_url
-            else f"{self.server_ws_url}/socket/websocket"
+        # Log configuration on startup
+        logger.info(f"Starting {self.config.service_name} with configuration:")
+        logger.info(self.config.to_dict())
+
+        # Components initialized from config
+        self.transcription_client = TranscriptionWebSocketClient(self.config.get_phononmaser_url())
+        self.server_client = ServerClient(self.config.get_server_events_url())
+        self.lms_client = LMSClient(
+            api_url=self.config.lms.api_url,
+            model=self.config.lms.model,
+            rate_limit=self.config.lms.rate_limit,
+            rate_window=self.config.lms.rate_window,
         )
-        self.server_client = ServerClient(server_ws_events_url)
-        self.lms_client = LMSClient(self.lms_url, self.lms_model)
-        self.context_client = ContextClient(self.server_events_url.replace("ws://", "http://").replace("/events", ""))
+        self.context_client = ContextClient(
+            self.config.websocket.server_url.replace("ws://", "http://").replace("/events", "")
+        )
         self.correlator: StreamCorrelator | None = None
 
         # State
@@ -62,8 +67,15 @@ class SeedService:
         # Initialize context client
         await self.context_client.__aenter__()
 
-        # Initialize correlator with context client
-        self.correlator = StreamCorrelator(self.lms_client, self.context_client)
+        # Initialize correlator with context client and config
+        self.correlator = StreamCorrelator(
+            lms_client=self.lms_client,
+            context_client=self.context_client,
+            context_window_seconds=self.config.correlator.context_window_seconds,
+            analysis_interval_seconds=self.config.correlator.analysis_interval_seconds,
+            correlation_window_seconds=self.config.correlator.correlation_window_seconds,
+            max_buffer_size=self.config.correlator.max_buffer_size,
+        )
 
         # Register event handlers
         self.transcription_client.on_transcription(self._handle_transcription)
@@ -89,9 +101,10 @@ class SeedService:
 
         self.running = True
 
-        # Start health check endpoint
-        health_port = 8891  # Hardcoded health port for single-user setup
-        self.health_runner = await create_health_app(port=health_port)
+        # Start health check endpoint with service references
+        self.health_runner = await create_health_app(
+            port=self.config.health.port, service=self, correlator=self.correlator
+        )
 
         # Start listening tasks
         tracker = get_global_tracker()
@@ -133,7 +146,12 @@ class SeedService:
 
     async def _handle_transcription(self, event: TranscriptionEvent):
         """Handle transcription events from Phoenix server."""
-        logger.debug(f"Transcription: {event.text}")
+        logger.debug(
+            "Received transcription",
+            text_preview=event.text[:50] + "..." if len(event.text) > 50 else event.text,
+            duration=f"{event.duration:.1f}s",
+            confidence=event.confidence,
+        )
 
         # Add to correlator for analysis
         if self.correlator:
@@ -141,41 +159,66 @@ class SeedService:
 
     async def _handle_chat_message(self, event: ChatMessage):
         """Handle chat message events from server."""
-        logger.debug(f"Chat: {event.username}: {event.message}")
+        logger.debug(
+            "Received chat message",
+            username=event.username,
+            message_preview=event.message[:50] + "..." if len(event.message) > 50 else event.message,
+            emote_count=len(event.emotes),
+            is_subscriber=event.is_subscriber,
+        )
 
         if self.correlator:
             await self.correlator.add_chat_message(event)
 
     async def _handle_emote(self, event: EmoteEvent):
         """Handle emote events from server."""
-        logger.debug(f"Emote: {event.username} used {event.emote_name}")
+        logger.debug(
+            "Received emote event", username=event.username, emote_name=event.emote_name, emote_id=event.emote_id
+        )
 
         if self.correlator:
             await self.correlator.add_emote(event)
 
     async def _handle_viewer_interaction(self, event: ViewerInteractionEvent):
         """Handle viewer interaction events from server."""
-        logger.debug(f"Viewer interaction: {event.interaction_type} from {event.username}")
+        logger.debug(
+            "Received viewer interaction",
+            interaction_type=event.interaction_type,
+            username=event.username,
+            user_id=event.user_id,
+        )
 
         if self.correlator:
             await self.correlator.add_viewer_interaction(event)
 
     async def _handle_analysis_result(self, result: AnalysisResult):
         """Handle analysis results from correlator."""
-        logger.info(f"Analysis result: {result.sentiment} sentiment")
+        # Log comprehensive analysis result with structured data
+        analysis_data = {
+            "sentiment": result.sentiment,
+            "sentiment_trajectory": result.sentiment_trajectory,
+            "topics": result.topics,
+            "context_summary": result.context[:100] + "..." if len(result.context) > 100 else result.context,
+        }
 
-        # Log detailed results with new flexible patterns
-        logger.info(f"Topics: {result.topics}")
         if result.patterns:
-            logger.info(f"Energy level: {result.patterns.energy_level:.2f}")
-            logger.info(f"Engagement depth: {result.patterns.engagement_depth:.2f}")
-            logger.info(f"Community sync: {result.patterns.community_sync:.2f}")
-            logger.info(f"Content focus: {result.patterns.content_focus}")
-            logger.info(f"Temporal flow: {result.patterns.temporal_flow}")
+            analysis_data.update(
+                {
+                    "energy_level": result.patterns.energy_level,
+                    "engagement_depth": result.patterns.engagement_depth,
+                    "community_sync": result.patterns.community_sync,
+                    "content_focus": result.patterns.content_focus,
+                    "temporal_flow": result.patterns.temporal_flow,
+                }
+            )
+
         if result.chat_velocity:
-            logger.info(f"Chat velocity: {result.chat_velocity:.1f} msg/min")
+            analysis_data["chat_velocity"] = f"{result.chat_velocity:.1f} msg/min"
+
         if result.emote_frequency:
-            logger.info(f"Top emotes: {list(result.emote_frequency.keys())[:5]}")
+            analysis_data["top_emotes"] = list(result.emote_frequency.keys())[:5]
+
+        logger.info("Analysis result received", **analysis_data)
 
         # Future enhancements for training data pipeline
         # - Export rich context data for training datasets
@@ -186,7 +229,29 @@ class SeedService:
         """Periodic health check."""
         while self.running:
             await asyncio.sleep(60)  # Every minute
-            logger.info("Health check: Service is running")
+
+            # Get buffer stats if available
+            health_info = {
+                "status": "running",
+                "uptime_minutes": int((asyncio.get_event_loop().time() - self._start_time) / 60)
+                if hasattr(self, "_start_time")
+                else 0,
+            }
+
+            if self.correlator:
+                try:
+                    buffer_stats = self.correlator.get_buffer_stats()
+                    health_info["buffer_usage"] = {
+                        name: f"{size}/{limit}"
+                        for name, size in buffer_stats["buffer_sizes"].items()
+                        for limit_name, limit in buffer_stats["buffer_limits"].items()
+                        if name == limit_name
+                    }
+                    health_info["total_events"] = buffer_stats["total_events"]
+                except Exception as e:
+                    health_info["buffer_error"] = str(e)
+
+            logger.info("Periodic health check", **health_info)
 
 
 async def main():
@@ -205,6 +270,7 @@ async def main():
         loop.add_signal_handler(sig, handle_shutdown)
 
     try:
+        service._start_time = asyncio.get_event_loop().time()
         await service.start()
 
         # Keep running until stopped

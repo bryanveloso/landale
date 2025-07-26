@@ -2,6 +2,9 @@
 
 __version__ = "0.1.0-uv"
 
+# Export circuit breaker utilities
+from .circuit_breaker import CircuitBreaker, CircuitOpenError, circuit_breaker
+
 # Export error boundary utilities
 from .error_boundary import critical_operation, error_boundary, retriable_network_call, safe_handler
 
@@ -9,6 +12,10 @@ from .error_boundary import critical_operation, error_boundary, retriable_networ
 from .task_tracker import TaskTracker, create_tracked_task, get_global_tracker
 
 __all__ = [
+    # Circuit breaker
+    "CircuitBreaker",
+    "CircuitOpenError",
+    "circuit_breaker",
     # Error boundaries
     "error_boundary",
     "safe_handler",

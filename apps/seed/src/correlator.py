@@ -1,6 +1,7 @@
 """Correlates audio transcriptions with chat activity."""
 
 import asyncio
+import uuid
 from collections import Counter, deque
 from datetime import datetime, timedelta
 from typing import Any
@@ -8,7 +9,7 @@ from typing import Any
 from .context_client import ContextClient
 from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from .lms_client import LMSClient
-from .logger import get_logger
+from .logger import bind_correlation_context, clear_context, get_logger
 
 logger = get_logger(__name__)
 
@@ -23,18 +24,28 @@ class StreamCorrelator:
         context_window_seconds: int = 120,  # 2 minutes
         analysis_interval_seconds: int = 30,
         correlation_window_seconds: int = 10,  # How far to look for chat reactions
+        max_buffer_size: int = 1000,  # Maximum events per buffer
     ):
         self.lms_client = lms_client
         self.context_client = context_client
         self.context_window = context_window_seconds
         self.analysis_interval = analysis_interval_seconds
         self.correlation_window = correlation_window_seconds
+        self.max_buffer_size = max_buffer_size
 
-        # Buffers for events
-        self.transcription_buffer: deque[TranscriptionEvent] = deque()
-        self.chat_buffer: deque[ChatMessage] = deque()
-        self.emote_buffer: deque[EmoteEvent] = deque()
-        self.interaction_buffer: deque[ViewerInteractionEvent] = deque()
+        # Buffers for events with memory protection
+        self.transcription_buffer: deque[TranscriptionEvent] = deque(maxlen=max_buffer_size)
+        self.chat_buffer: deque[ChatMessage] = deque(maxlen=max_buffer_size * 2)  # Higher volume
+        self.emote_buffer: deque[EmoteEvent] = deque(maxlen=max_buffer_size)
+        self.interaction_buffer: deque[ViewerInteractionEvent] = deque(maxlen=max_buffer_size // 2)  # Lower volume
+        
+        # Track overflow events
+        self.overflow_counts = {
+            "transcription": 0,
+            "chat": 0,
+            "emote": 0,
+            "interaction": 0,
+        }
 
         # Analysis state
         self.last_analysis_time = 0
@@ -56,6 +67,10 @@ class StreamCorrelator:
             self.context_start_time = datetime.fromtimestamp(event.timestamp)
             self.current_session_id = self._generate_session_id()
 
+        # Check if buffer is at capacity
+        if len(self.transcription_buffer) >= self.max_buffer_size:
+            self.overflow_counts["transcription"] += 1
+            
         self.transcription_buffer.append(event)
         self._cleanup_old_events()
 
@@ -64,16 +79,28 @@ class StreamCorrelator:
 
     async def add_chat_message(self, event: ChatMessage):
         """Add a chat message event."""
+        # Check if buffer is at capacity
+        if len(self.chat_buffer) >= self.max_buffer_size * 2:
+            self.overflow_counts["chat"] += 1
+            
         self.chat_buffer.append(event)
         self._cleanup_old_events()
 
     async def add_emote(self, event: EmoteEvent):
         """Add an emote usage event."""
+        # Check if buffer is at capacity
+        if len(self.emote_buffer) >= self.max_buffer_size:
+            self.overflow_counts["emote"] += 1
+            
         self.emote_buffer.append(event)
         self._cleanup_old_events()
 
     async def add_viewer_interaction(self, event: ViewerInteractionEvent):
         """Add a viewer interaction event as context for periodic analysis."""
+        # Check if buffer is at capacity
+        if len(self.interaction_buffer) >= self.max_buffer_size // 2:
+            self.overflow_counts["interaction"] += 1
+            
         self.interaction_buffer.append(event)
         self._cleanup_old_events()
         logger.debug(f"Community interaction: {event.interaction_type} from {event.username}")
@@ -97,6 +124,17 @@ class StreamCorrelator:
         self.is_analyzing = True
         self.last_analysis_time = datetime.now().timestamp()
 
+        # Generate correlation ID for this analysis
+        correlation_id = f"analysis_{uuid.uuid4().hex[:8]}"
+        bind_correlation_context(correlation_id=correlation_id)
+
+        logger.info(
+            "Starting correlation analysis",
+            immediate=immediate,
+            transcription_count=len(self.transcription_buffer),
+            chat_count=len(self.chat_buffer),
+        )
+
         try:
             # Build transcription context
             transcription_context = self._build_transcription_context()
@@ -119,8 +157,8 @@ class StreamCorrelator:
                 f"{chat_context} | Interactions: {interaction_context}" if interaction_context else chat_context
             )
 
-            # Send to LMS for analysis
-            result = await self.lms_client.analyze(transcription_context, full_context)
+            # Send to LMS for analysis with fallback
+            result = await self.lms_client.analyze_with_fallback(transcription_context, full_context)
 
             if result:
                 # Add correlation metrics
@@ -128,7 +166,13 @@ class StreamCorrelator:
                 result.emote_frequency = emote_frequency
                 result.native_emote_frequency = native_emote_frequency
 
-                logger.info(f"Analysis complete: {result.sentiment} sentiment, {len(result.topics)} topics")
+                logger.info(
+                    "Analysis complete",
+                    sentiment=result.sentiment,
+                    topics=result.topics,
+                    chat_velocity=f"{chat_velocity:.1f} msg/min" if chat_velocity else "N/A",
+                    energy_level=result.patterns.energy_level if result.patterns else None,
+                )
 
                 # Notify all callbacks
                 for callback in self._analysis_callbacks:
@@ -137,11 +181,12 @@ class StreamCorrelator:
             return result
 
         except Exception as e:
-            logger.error(f"Analysis failed: {e}")
+            logger.error("Analysis failed", error=str(e), exc_info=True)
             return None
 
         finally:
             self.is_analyzing = False
+            clear_context()  # Clear correlation context
 
     async def periodic_analysis_loop(self):
         """Run periodic analysis."""
@@ -320,6 +365,16 @@ class StreamCorrelator:
         if not self.transcription_buffer or not self.context_start_time:
             return
 
+        # Generate correlation ID for context creation
+        context_id = f"context_{uuid.uuid4().hex[:8]}"
+        bind_correlation_context(correlation_id=context_id, session_id=self.current_session_id)
+
+        logger.info(
+            "Creating memory context",
+            session_id=self.current_session_id,
+            window_start=self.context_start_time.isoformat(),
+        )
+
         try:
             # Calculate context window end time
             context_end_time = self.context_start_time + timedelta(seconds=self.context_window)
@@ -363,7 +418,13 @@ class StreamCorrelator:
             if self.context_client:
                 success = await self.context_client.create_context(context_data)
                 if success:
-                    logger.info(f"Context stored: {self.current_session_id} ({actual_duration:.1f}s)")
+                    logger.info(
+                        "Context stored successfully",
+                        session_id=self.current_session_id,
+                        duration=f"{actual_duration:.1f}s",
+                        transcript_length=len(transcript),
+                        chat_messages=len(self.chat_buffer),
+                    )
                 else:
                     logger.error("Failed to store context in TimescaleDB")
             else:
@@ -373,8 +434,10 @@ class StreamCorrelator:
             self._reset_context_window()
 
         except Exception as e:
-            logger.error(f"Error creating context: {e}")
+            logger.error("Error creating context", error=str(e), exc_info=True)
             self._reset_context_window()
+        finally:
+            clear_context()  # Clear correlation context
 
     def _reset_context_window(self):
         """Reset the context window for the next 2-minute period."""
@@ -684,3 +747,29 @@ class StreamCorrelator:
             return "decreasing"
         else:
             return "stable"
+
+    def get_buffer_stats(self) -> dict[str, Any]:
+        """Get current buffer statistics for monitoring."""
+        return {
+            "buffer_sizes": {
+                "transcription": len(self.transcription_buffer),
+                "chat": len(self.chat_buffer),
+                "emote": len(self.emote_buffer),
+                "interaction": len(self.interaction_buffer),
+            },
+            "buffer_limits": {
+                "transcription": self.max_buffer_size,
+                "chat": self.max_buffer_size * 2,
+                "emote": self.max_buffer_size,
+                "interaction": self.max_buffer_size // 2,
+            },
+            "overflow_counts": self.overflow_counts.copy(),
+            "total_events": sum(
+                [
+                    len(self.transcription_buffer),
+                    len(self.chat_buffer),
+                    len(self.emote_buffer),
+                    len(self.interaction_buffer),
+                ]
+            ),
+        }
