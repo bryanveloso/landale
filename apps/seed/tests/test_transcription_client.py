@@ -1,11 +1,12 @@
 """Test transcription client timestamp parsing and event handling."""
 
-import pytest
-import time
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
-from src.transcription_client import TranscriptionWebSocketClient
+
+import pytest
+
 from src.events import TranscriptionEvent
+from src.transcription_client import TranscriptionWebSocketClient
 
 
 class TestTranscriptionClient:
@@ -37,9 +38,8 @@ class TestTranscriptionClient:
         assert event.duration == 1.5
 
         # Verify timestamp (2023-01-01 12:00:00 UTC)
-        from datetime import timezone
 
-        expected_dt = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        expected_dt = datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)
         expected_us = int(expected_dt.timestamp() * 1_000_000)
         assert event.timestamp == expected_us
 

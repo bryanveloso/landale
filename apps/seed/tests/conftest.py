@@ -1,7 +1,8 @@
 """Test configuration and shared fixtures for Seed tests."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 @pytest.fixture

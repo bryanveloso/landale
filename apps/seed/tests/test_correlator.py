@@ -1,9 +1,11 @@
 """Test correlator buffer management and event processing."""
 
-import pytest
 from datetime import datetime
+
+import pytest
+
 from src.correlator import StreamCorrelator
-from src.events import TranscriptionEvent, ChatMessage, EmoteEvent, ViewerInteractionEvent
+from src.events import ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 
 
 class TestCorrelator:
