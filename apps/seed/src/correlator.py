@@ -72,11 +72,13 @@ class StreamCorrelator:
         """Add a transcription event for periodic analysis."""
         # Initialize context window if first transcription
         if not self.context_start_time:
-            self.context_start_time = datetime.fromtimestamp(event.timestamp)
+            self.context_start_time = datetime.fromtimestamp(
+                event.timestamp / 1_000_000
+            )  # Convert microseconds to seconds
             self.current_session_id = self._generate_session_id()
 
         # Check if buffer is at capacity
-        if len(self.transcription_buffer) >= self.max_buffer_size:
+        if self._buffer_counts["transcription"] >= self.max_buffer_size:
             self.overflow_counts["transcription"] += 1
             # Buffer will auto-remove oldest due to maxlen, so count stays same
         else:
@@ -91,7 +93,7 @@ class StreamCorrelator:
     async def add_chat_message(self, event: ChatMessage):
         """Add a chat message event."""
         # Check if buffer is at capacity
-        if len(self.chat_buffer) >= self.max_buffer_size * 2:
+        if self._buffer_counts["chat"] >= self.max_buffer_size * 2:
             self.overflow_counts["chat"] += 1
             # Buffer will auto-remove oldest due to maxlen, so count stays same
         else:
@@ -103,7 +105,7 @@ class StreamCorrelator:
     async def add_emote(self, event: EmoteEvent):
         """Add an emote usage event."""
         # Check if buffer is at capacity
-        if len(self.emote_buffer) >= self.max_buffer_size:
+        if self._buffer_counts["emote"] >= self.max_buffer_size:
             self.overflow_counts["emote"] += 1
             # Buffer will auto-remove oldest due to maxlen, so count stays same
         else:
@@ -115,7 +117,7 @@ class StreamCorrelator:
     async def add_viewer_interaction(self, event: ViewerInteractionEvent):
         """Add a viewer interaction event as context for periodic analysis."""
         # Check if buffer is at capacity
-        if len(self.interaction_buffer) >= self.max_buffer_size // 2:
+        if self._buffer_counts["interaction"] >= self.max_buffer_size // 2:
             self.overflow_counts["interaction"] += 1
             # Buffer will auto-remove oldest due to maxlen, so count stays same
         else:
@@ -216,32 +218,32 @@ class StreamCorrelator:
 
     def _cleanup_old_events(self):
         """Remove events older than context window."""
-        cutoff_time = datetime.now().timestamp() - self.context_window
+        cutoff_time_us = (datetime.now().timestamp() - self.context_window) * 1_000_000  # Convert to microseconds
 
         # Clean transcriptions
         removed = 0
-        while self.transcription_buffer and self.transcription_buffer[0].timestamp < cutoff_time:
+        while self.transcription_buffer and self.transcription_buffer[0].timestamp < cutoff_time_us:
             self.transcription_buffer.popleft()
             removed += 1
         self._buffer_counts["transcription"] = max(0, self._buffer_counts["transcription"] - removed)
 
         # Clean chat
         removed = 0
-        while self.chat_buffer and self.chat_buffer[0].timestamp < cutoff_time:
+        while self.chat_buffer and self.chat_buffer[0].timestamp < cutoff_time_us:
             self.chat_buffer.popleft()
             removed += 1
         self._buffer_counts["chat"] = max(0, self._buffer_counts["chat"] - removed)
 
         # Clean emotes
         removed = 0
-        while self.emote_buffer and self.emote_buffer[0].timestamp < cutoff_time:
+        while self.emote_buffer and self.emote_buffer[0].timestamp < cutoff_time_us:
             self.emote_buffer.popleft()
             removed += 1
         self._buffer_counts["emote"] = max(0, self._buffer_counts["emote"] - removed)
 
         # Clean interactions
         removed = 0
-        while self.interaction_buffer and self.interaction_buffer[0].timestamp < cutoff_time:
+        while self.interaction_buffer and self.interaction_buffer[0].timestamp < cutoff_time_us:
             self.interaction_buffer.popleft()
             removed += 1
         self._buffer_counts["interaction"] = max(0, self._buffer_counts["interaction"] - removed)
@@ -316,7 +318,7 @@ class StreamCorrelator:
         # Get time span of messages
         oldest = self.chat_buffer[0].timestamp
         newest = self.chat_buffer[-1].timestamp
-        time_span_minutes = (newest - oldest) / 60
+        time_span_minutes = (newest - oldest) / (60 * 1_000_000)  # Convert microseconds to minutes
 
         if time_span_minutes < 0.1:  # Less than 6 seconds
             return 0.0
@@ -668,7 +670,9 @@ class StreamCorrelator:
         # Calculate speaking pace
         total_words = sum(len(t.text.split()) for t in fragments)
         total_duration = fragments[-1].timestamp - fragments[0].timestamp
-        words_per_minute = (total_words / total_duration) * 60 if total_duration > 0 else 0.0
+        words_per_minute = (
+            (total_words / total_duration) * 60 * 1_000_000 if total_duration > 0 else 0.0
+        )  # Convert microseconds to minutes
 
         # Calculate pauses between fragments
         pauses = []

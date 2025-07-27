@@ -122,8 +122,8 @@ class TranscriptionWebSocketClient:
             if timestamp_str:
                 try:
                     # Handle ISO format with or without Z suffix
-                    if timestamp_str.endswith('Z'):
-                        timestamp_str = timestamp_str[:-1] + '+00:00'
+                    if timestamp_str.endswith("Z"):
+                        timestamp_str = timestamp_str[:-1] + "+00:00"
 
                     timestamp_dt = datetime.fromisoformat(timestamp_str)
                     timestamp_us = int(timestamp_dt.timestamp() * 1_000_000)
