@@ -2,7 +2,9 @@
 
 import asyncio
 import json
+import time
 from collections.abc import Callable
+from datetime import datetime
 
 import websockets
 from websockets.client import WebSocketClientProtocol
@@ -118,12 +120,18 @@ class TranscriptionWebSocketClient:
             # Note: Phoenix timestamps are ISO strings, need to convert to microseconds
             timestamp_str = payload.get("timestamp")
             if timestamp_str:
-                # For now, use current timestamp in microseconds
-                # TODO: Parse ISO timestamp properly
-                import time
+                try:
+                    # Handle ISO format with or without Z suffix
+                    if timestamp_str.endswith('Z'):
+                        timestamp_str = timestamp_str[:-1] + '+00:00'
 
-                timestamp_us = int(time.time() * 1_000_000)
+                    timestamp_dt = datetime.fromisoformat(timestamp_str)
+                    timestamp_us = int(timestamp_dt.timestamp() * 1_000_000)
+                except (ValueError, AttributeError) as e:
+                    logger.warning(f"Failed to parse timestamp '{timestamp_str}': {e}")
+                    timestamp_us = int(time.time() * 1_000_000)
             else:
+                # Fallback to current time if no timestamp provided
                 timestamp_us = int(time.time() * 1_000_000)
 
             transcription = TranscriptionEvent(

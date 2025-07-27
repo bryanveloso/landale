@@ -47,6 +47,14 @@ class StreamCorrelator:
             "interaction": 0,
         }
 
+        # Track buffer counts to avoid O(n) len() operations
+        self._buffer_counts = {
+            "transcription": 0,
+            "chat": 0,
+            "emote": 0,
+            "interaction": 0,
+        }
+
         # Analysis state
         self.last_analysis_time = 0
         self.is_analyzing = False
@@ -70,6 +78,9 @@ class StreamCorrelator:
         # Check if buffer is at capacity
         if len(self.transcription_buffer) >= self.max_buffer_size:
             self.overflow_counts["transcription"] += 1
+            # Buffer will auto-remove oldest due to maxlen, so count stays same
+        else:
+            self._buffer_counts["transcription"] += 1
 
         self.transcription_buffer.append(event)
         self._cleanup_old_events()
@@ -82,6 +93,9 @@ class StreamCorrelator:
         # Check if buffer is at capacity
         if len(self.chat_buffer) >= self.max_buffer_size * 2:
             self.overflow_counts["chat"] += 1
+            # Buffer will auto-remove oldest due to maxlen, so count stays same
+        else:
+            self._buffer_counts["chat"] += 1
 
         self.chat_buffer.append(event)
         self._cleanup_old_events()
@@ -91,6 +105,9 @@ class StreamCorrelator:
         # Check if buffer is at capacity
         if len(self.emote_buffer) >= self.max_buffer_size:
             self.overflow_counts["emote"] += 1
+            # Buffer will auto-remove oldest due to maxlen, so count stays same
+        else:
+            self._buffer_counts["emote"] += 1
 
         self.emote_buffer.append(event)
         self._cleanup_old_events()
@@ -100,6 +117,9 @@ class StreamCorrelator:
         # Check if buffer is at capacity
         if len(self.interaction_buffer) >= self.max_buffer_size // 2:
             self.overflow_counts["interaction"] += 1
+            # Buffer will auto-remove oldest due to maxlen, so count stays same
+        else:
+            self._buffer_counts["interaction"] += 1
 
         self.interaction_buffer.append(event)
         self._cleanup_old_events()
@@ -199,20 +219,32 @@ class StreamCorrelator:
         cutoff_time = datetime.now().timestamp() - self.context_window
 
         # Clean transcriptions
+        removed = 0
         while self.transcription_buffer and self.transcription_buffer[0].timestamp < cutoff_time:
             self.transcription_buffer.popleft()
+            removed += 1
+        self._buffer_counts["transcription"] = max(0, self._buffer_counts["transcription"] - removed)
 
         # Clean chat
+        removed = 0
         while self.chat_buffer and self.chat_buffer[0].timestamp < cutoff_time:
             self.chat_buffer.popleft()
+            removed += 1
+        self._buffer_counts["chat"] = max(0, self._buffer_counts["chat"] - removed)
 
         # Clean emotes
+        removed = 0
         while self.emote_buffer and self.emote_buffer[0].timestamp < cutoff_time:
             self.emote_buffer.popleft()
+            removed += 1
+        self._buffer_counts["emote"] = max(0, self._buffer_counts["emote"] - removed)
 
         # Clean interactions
+        removed = 0
         while self.interaction_buffer and self.interaction_buffer[0].timestamp < cutoff_time:
             self.interaction_buffer.popleft()
+            removed += 1
+        self._buffer_counts["interaction"] = max(0, self._buffer_counts["interaction"] - removed)
 
     def _build_transcription_context(self) -> str:
         """Build context string from recent transcriptions."""
@@ -751,12 +783,7 @@ class StreamCorrelator:
     def get_buffer_stats(self) -> dict[str, Any]:
         """Get current buffer statistics for monitoring."""
         return {
-            "buffer_sizes": {
-                "transcription": len(self.transcription_buffer),
-                "chat": len(self.chat_buffer),
-                "emote": len(self.emote_buffer),
-                "interaction": len(self.interaction_buffer),
-            },
+            "buffer_sizes": self._buffer_counts.copy(),
             "buffer_limits": {
                 "transcription": self.max_buffer_size,
                 "chat": self.max_buffer_size * 2,
@@ -764,12 +791,5 @@ class StreamCorrelator:
                 "interaction": self.max_buffer_size // 2,
             },
             "overflow_counts": self.overflow_counts.copy(),
-            "total_events": sum(
-                [
-                    len(self.transcription_buffer),
-                    len(self.chat_buffer),
-                    len(self.emote_buffer),
-                    len(self.interaction_buffer),
-                ]
-            ),
+            "total_events": sum(self._buffer_counts.values()),
         }

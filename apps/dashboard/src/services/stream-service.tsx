@@ -567,10 +567,35 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   const updateLayerContent = (currentState: OverlayLayerState, update: PhoenixEvent): OverlayLayerState => {
     // Handle real-time updates like emote increments
     if (update.type === 'content_update' && update.data) {
-      // TODO: Implement proper content updates based on update.data
-      // This would update specific content properties without disrupting layer states
-      console.log('[StreamService] Content update received but not implemented:', update.data)
+      const { layer_id, content_id, updates } = update.data
+      
+      if (!layer_id || !updates) {
+        console.warn('[StreamService] Invalid content update:', update.data)
+        return currentState
+      }
+      
+      // Update content in the specified layer
+      const newState = { ...currentState }
+      const layer = newState.layers[layer_id as keyof typeof newState.layers]
+      
+      if (layer && layer.content && (!content_id || layer.content.id === content_id)) {
+        // Merge updates into existing content data
+        layer.content = {
+          ...layer.content,
+          data: {
+            ...layer.content.data,
+            ...updates
+          }
+        }
+        
+        newState.version = currentState.version + 1
+        newState.last_updated = new Date().toISOString()
+        
+        console.log('[StreamService] Content updated in layer:', layer_id, updates)
+        return newState
+      }
     }
+    
     return currentState
   }
 
