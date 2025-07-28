@@ -2,11 +2,13 @@
  * Shared IronMON types used by both server and overlay packages
  */
 
-export enum Game {
-  RubySapphire = 1,
-  Emerald = 2,
-  FireRedLeafGreen = 3
-}
+export const Game = {
+  RubySapphire: 1,
+  Emerald: 2,
+  FireRedLeafGreen: 3
+} as const
+
+export type Game = typeof Game[keyof typeof Game]
 
 export interface InitMessage {
   type: 'init'
