@@ -8,10 +8,17 @@
 
 import { createSignal, createResource, For, Show, onMount, createEffect, onCleanup, untrack } from 'solid-js'
 import { useStreamService } from '@/services/stream-service'
+import type { ChannelInfoUpdate } from '@/services/stream-service'
 import { useLayerState } from '@/hooks/use-layer-state'
 import { Button } from './ui/button'
 import { StreamValidationRules, validateForm, sanitizeFormData } from '@/services/form-validation'
 import type { ValidationRule } from '@/services/form-validation'
+import { createLogger } from '@landale/logger'
+
+const logger = createLogger({
+  service: 'dashboard',
+  defaultMeta: { module: 'StreamInformation' }
+})
 
 interface ChannelInfo {
   broadcaster_id: string
@@ -34,7 +41,7 @@ interface GameCategory {
 }
 
 export function StreamInformation() {
-  const { connectionState } = useStreamService()
+  const { connectionState, getChannelInfo, searchCategories, updateChannelInfo } = useStreamService()
   const { layerState } = useLayerState()
 
   const [isExpanded, setIsExpanded] = createSignal(false)
@@ -61,10 +68,18 @@ export function StreamInformation() {
     async () => {
       if (!isConnected()) return null
 
-      // TODO: Implement channel info loading
-      // This should fetch current stream info from Twitch API
-      // through the Phoenix backend
-      return null
+      try {
+        const response = await getChannelInfo()
+        if (response.status === 'ok' && response.data) {
+          // The backend returns the channel info in the data property
+          return response.data as unknown as ChannelInfo
+        }
+        return null
+      } catch (error) {
+        logger.error('Failed to load channel info', { error: error instanceof Error ? { message: error.message, type: error.constructor.name } : { message: String(error) } })
+        setLastAction('Failed to load channel information')
+        return null
+      }
     }
   )
 
@@ -118,10 +133,19 @@ export function StreamInformation() {
       return
     }
 
-    // TODO: Implement category search
-    // This should search for game categories through Twitch API
-    // via the Phoenix backend
-    setSearchResults([])
+    try {
+      const response = await searchCategories(query)
+      if (response.status === 'ok' && response.data) {
+        // The backend returns an array of categories
+        const categories = response.data as unknown as GameCategory[]
+        setSearchResults(categories)
+      } else {
+        setSearchResults([])
+      }
+    } catch (error) {
+      logger.error('Failed to search categories', { error: error instanceof Error ? { message: error.message, type: error.constructor.name } : { message: String(error) }, metadata: { query } })
+      setSearchResults([])
+    }
   }
 
   const handleSelectCategory = (category: GameCategory) => {
@@ -157,11 +181,7 @@ export function StreamInformation() {
       return
     }
 
-    const updates: Partial<{
-      title: string
-      game_id: string
-      broadcaster_language: string
-    }> = {}
+    const updates: ChannelInfoUpdate = {}
 
     const currentInfo = channelInfo()
     if (currentInfo) {
@@ -178,11 +198,20 @@ export function StreamInformation() {
       return
     }
 
-    // TODO: Implement channel info updates
-    // This should update stream title/category through Twitch API
-    // via the Phoenix backend
-    setLastAction('Channel updates not implemented yet')
-    setIsEditing(false)
+    try {
+      const response = await updateChannelInfo(updates)
+      if (response.status === 'ok') {
+        setLastAction('Channel information updated successfully')
+        setIsEditing(false)
+        // Refresh channel info to show updated values
+        refetchChannelInfo()
+      } else {
+        throw new Error('Update failed')
+      }
+    } catch (error) {
+      logger.error('Failed to update channel info', { error: error instanceof Error ? { message: error.message, type: error.constructor.name } : { message: String(error) }, metadata: { updates } })
+      setLastAction('Failed to update channel information')
+    }
 
     setIsSubmitting(false)
 
