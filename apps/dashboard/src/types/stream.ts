@@ -109,8 +109,16 @@ export interface QueueCommand {
   }
 }
 
+// Base response data that most commands return
+export interface BaseCommandResponseData {
+  status?: 'ok' | 'error'
+  error?: string
+  message?: string
+  [key: string]: unknown // Allow additional properties
+}
+
 // Response interfaces
-export interface CommandResponse<T = unknown> {
+export interface CommandResponse<T = BaseCommandResponseData> {
   status: 'ok' | 'error'
   data?: T
   error?: string

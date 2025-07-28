@@ -61,12 +61,9 @@ export function StreamInformation() {
     async () => {
       if (!isConnected()) return null
 
-      // Channel info loading not implemented yet
-      const result = { success: false, data: null }
-
-      if (result.success && result.data && (result.data as any).status === 'ok') {
-        return (result.data as any).data?.data?.[0] as ChannelInfo // Twitch API returns array
-      }
+      // TODO: Implement channel info loading
+      // This should fetch current stream info from Twitch API
+      // through the Phoenix backend
       return null
     }
   )
@@ -121,14 +118,10 @@ export function StreamInformation() {
       return
     }
 
-    // Category search not implemented yet
-    const result = { success: false, data: null }
-
-    if (result.success && result.data && (result.data as any).status === 'ok') {
-      setSearchResults((result.data as any).data?.data || [])
-    } else {
-      setSearchResults([])
-    }
+    // TODO: Implement category search
+    // This should search for game categories through Twitch API
+    // via the Phoenix backend
+    setSearchResults([])
   }
 
   const handleSelectCategory = (category: GameCategory) => {
@@ -185,20 +178,11 @@ export function StreamInformation() {
       return
     }
 
-    // Channel info updates not implemented yet
-    const result = { success: false, data: null }
-
-    if (result.success && result.data && (result.data as any).status === 'ok') {
-      setLastAction('Channel information updated successfully')
-      setIsEditing(false)
-      // Refresh channel info after update
-      setTimeout(() => refetchChannelInfo(), 1000)
-    } else {
-      const errorMessage = result.success 
-        ? `Failed to update: ${(result.data as any)?.error || 'Unknown error'}` 
-        : (result as any).error?.userMessage || 'Operation failed'
-      setLastAction(errorMessage)
-    }
+    // TODO: Implement channel info updates
+    // This should update stream title/category through Twitch API
+    // via the Phoenix backend
+    setLastAction('Channel updates not implemented yet')
+    setIsEditing(false)
 
     setIsSubmitting(false)
 
