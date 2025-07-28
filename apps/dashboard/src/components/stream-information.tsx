@@ -40,6 +40,41 @@ interface GameCategory {
   igdb_id: string
 }
 
+// Type guard functions for safe type casting
+function isChannelInfo(data: unknown): data is ChannelInfo {
+  if (typeof data !== 'object' || data === null) return false
+  
+  const obj = data as Record<string, unknown>
+  return (
+    typeof obj.broadcaster_id === 'string' &&
+    typeof obj.broadcaster_login === 'string' &&
+    typeof obj.broadcaster_name === 'string' &&
+    typeof obj.broadcaster_language === 'string' &&
+    typeof obj.game_id === 'string' &&
+    typeof obj.game_name === 'string' &&
+    typeof obj.title === 'string' &&
+    typeof obj.delay === 'number' &&
+    Array.isArray(obj.tags) &&
+    typeof obj.branded_content === 'boolean'
+  )
+}
+
+function isGameCategory(data: unknown): data is GameCategory {
+  if (typeof data !== 'object' || data === null) return false
+  
+  const obj = data as Record<string, unknown>
+  return (
+    typeof obj.id === 'string' &&
+    typeof obj.name === 'string' &&
+    typeof obj.box_art_url === 'string' &&
+    typeof obj.igdb_id === 'string'
+  )
+}
+
+function isGameCategoryArray(data: unknown): data is GameCategory[] {
+  return Array.isArray(data) && data.every(isGameCategory)
+}
+
 export function StreamInformation() {
   const { connectionState, getChannelInfo, searchCategories, updateChannelInfo } = useStreamService()
   const { layerState } = useLayerState()
@@ -71,8 +106,14 @@ export function StreamInformation() {
       try {
         const response = await getChannelInfo()
         if (response.status === 'ok' && response.data) {
-          // The backend returns the channel info in the data property
-          return response.data as unknown as ChannelInfo
+          // Validate the response data before using it
+          if (isChannelInfo(response.data)) {
+            return response.data
+          } else {
+            logger.warn('Invalid channel info format received', { data: response.data })
+            setLastAction('Received invalid channel information format')
+            return null
+          }
         }
         return null
       } catch (error) {
@@ -136,9 +177,13 @@ export function StreamInformation() {
     try {
       const response = await searchCategories(query)
       if (response.status === 'ok' && response.data) {
-        // The backend returns an array of categories
-        const categories = response.data as unknown as GameCategory[]
-        setSearchResults(categories)
+        // Validate the response data before using it
+        if (isGameCategoryArray(response.data)) {
+          setSearchResults(response.data)
+        } else {
+          logger.warn('Invalid game categories format received', { data: response.data })
+          setSearchResults([])
+        }
       } else {
         setSearchResults([])
       }

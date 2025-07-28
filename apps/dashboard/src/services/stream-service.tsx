@@ -397,14 +397,9 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     logger.info('Sending takeover', { metadata: { command } })
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Takeover command timeout'))
-      }, 10000)
-
       overlayChannel!
         .push('takeover', command)
         .receive('ok', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.info('Takeover sent successfully', { metadata: { response: resp } })
           resolve({
             status: 'ok',
@@ -413,13 +408,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
           })
         })
         .receive('error', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.error('Takeover send error', { metadata: { error: resp } })
           const error = resp as Record<string, unknown>
           reject(new Error(`Takeover failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
-          clearTimeout(timeout)
           reject(new Error('Takeover command timeout'))
         })
     })
@@ -433,14 +426,9 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     logger.info('Clearing takeover')
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Clear takeover timeout'))
-      }, 5000)
-
       overlayChannel!
         .push('takeover_clear', {})
         .receive('ok', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.info('Takeover cleared successfully', { metadata: { response: resp } })
           resolve({
             status: 'ok',
@@ -449,13 +437,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
           })
         })
         .receive('error', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.error('Clear takeover error', { metadata: { error: resp } })
           const error = resp as Record<string, unknown>
           reject(new Error(`Clear failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
-          clearTimeout(timeout)
           reject(new Error('Clear takeover timeout'))
         })
     })
@@ -469,14 +455,9 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     logger.info('Removing queue item', { metadata: { id } })
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Remove item timeout'))
-      }, 5000)
-
       queueChannel!
         .push('remove_queue_item', { id })
         .receive('ok', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.info('Item removed successfully', { metadata: { response: resp } })
           resolve({
             status: 'ok',
@@ -485,12 +466,10 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
           })
         })
         .receive('error', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.error('Remove item error', { metadata: { error: resp } })
           reject(new Error(`Remove failed: ${resp?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
-          clearTimeout(timeout)
           reject(new Error('Remove item timeout'))
         })
     })
@@ -530,14 +509,9 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     logger.info('Getting channel info')
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Get channel info timeout'))
-      }, 10000)
-
       overlayChannel!
         .push('get_channel_info', {})
         .receive('ok', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.info('Channel info retrieved successfully', { metadata: { response: resp } })
           resolve({
             status: 'ok',
@@ -546,13 +520,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
           })
         })
         .receive('error', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.error('Get channel info error', { metadata: { error: resp } })
           const error = resp as Record<string, unknown>
           reject(new Error(`Get channel info failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
-          clearTimeout(timeout)
           reject(new Error('Get channel info timeout'))
         })
     })
@@ -566,14 +538,9 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     logger.info('Searching categories', { metadata: { query } })
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Search categories timeout'))
-      }, 10000)
-
       overlayChannel!
         .push('search_categories', { query })
         .receive('ok', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.info('Categories search successful', { metadata: { response: resp } })
           resolve({
             status: 'ok',
@@ -582,13 +549,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
           })
         })
         .receive('error', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.error('Search categories error', { metadata: { error: resp } })
           const error = resp as Record<string, unknown>
           reject(new Error(`Search failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
-          clearTimeout(timeout)
           reject(new Error('Search categories timeout'))
         })
     })
@@ -602,14 +567,9 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     logger.info('Updating channel info', { metadata: { updates } })
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error('Update channel info timeout'))
-      }, 10000)
-
       overlayChannel!
         .push('update_channel_info', updates)
         .receive('ok', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.info('Channel info updated successfully', { metadata: { response: resp } })
           resolve({
             status: 'ok',
@@ -618,13 +578,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
           })
         })
         .receive('error', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           logger.error('Update channel info error', { metadata: { error: resp } })
           const error = resp as Record<string, unknown>
           reject(new Error(`Update failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`))
         })
         .receive('timeout', () => {
-          clearTimeout(timeout)
           reject(new Error('Update channel info timeout'))
         })
     })

@@ -49,18 +49,9 @@ export function DebugDrawer() {
     const channel = socket.channel('overlay:primary')
     
     return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        resolve({
-          status: 'error',
-          error: 'Command timeout',
-          timestamp: new Date().toISOString()
-        })
-      }, 10000)
-
       channel
         .push(command, data)
         .receive('ok', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           resolve({
             status: 'ok',
             data: { status: 'ok', ...resp },
@@ -68,7 +59,6 @@ export function DebugDrawer() {
           })
         })
         .receive('error', (resp: Record<string, unknown>) => {
-          clearTimeout(timeout)
           resolve({
             status: 'error',
             data: { error: (resp.message as string) || 'Command failed' },
@@ -77,7 +67,6 @@ export function DebugDrawer() {
           })
         })
         .receive('timeout', () => {
-          clearTimeout(timeout)
           resolve({
             status: 'error',
             error: 'Command timeout',
