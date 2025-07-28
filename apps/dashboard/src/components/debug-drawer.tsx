@@ -7,14 +7,12 @@
 
 import { createSignal, For, Show } from 'solid-js'
 import { useStreamService } from '@/services/stream-service'
-import { useStreamCommands } from '@/hooks/use-stream-commands'
 import { useLayerState } from '@/hooks/use-layer-state'
 import { Button } from './ui/button'
 import { handleAsyncOperation } from '@/services/error-handler'
 
 export function DebugDrawer() {
-  const { connectionState } = useStreamService()
-  const { sendCommand } = useStreamCommands()
+  const { connectionState, getSocket } = useStreamService()
   const { layerState } = useLayerState()
 
   const [isExpanded, setIsExpanded] = createSignal(false)
@@ -39,6 +37,37 @@ export function DebugDrawer() {
     { id: 'build_failure', label: 'Build Failure', description: 'CI/CD build failure' },
     { id: 'deployment_alert', label: 'Deployment', description: 'Deployment notification' }
   ]
+
+  // Helper function to send custom commands through the socket
+  const sendCommand = async (command: string, data: any): Promise<{ success: boolean; data: any }> => {
+    const socket = getSocket()
+    if (!socket) {
+      throw new Error('Socket not available')
+    }
+    
+    const channel = socket.channel('overlay:primary')
+    
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve({ success: false, data: { error: 'Command timeout' } })
+      }, 10000)
+
+      channel
+        .push(command, data)
+        .receive('ok', (resp: any) => {
+          clearTimeout(timeout)
+          resolve({ success: true, data: { status: 'ok', ...resp } })
+        })
+        .receive('error', (resp: any) => {
+          clearTimeout(timeout)
+          resolve({ success: false, data: { error: resp.message || 'Command failed' } })
+        })
+        .receive('timeout', () => {
+          clearTimeout(timeout)
+          resolve({ success: false, data: { error: 'Command timeout' } })
+        })
+    })
+  }
 
   const handleSendAlert = async (alertType: string) => {
     if (!isConnected() || !alertMessage().trim()) return
@@ -65,11 +94,13 @@ export function DebugDrawer() {
       }
     )
 
-    if (result.success && result.data.status === 'ok') {
+    if (result.success && result.data && (result.data as any).status === 'ok') {
       setLastAction(`Successfully sent ${alertType} alert`)
       setAlertMessage('')
     } else {
-      const errorMessage = result.success ? `Failed to send alert: ${result.data.error}` : result.error.userMessage
+      const errorMessage = result.success 
+        ? `Failed to send alert: ${(result.data as any)?.error || 'Unknown error'}` 
+        : (result as any).error?.userMessage || 'Operation failed'
       setLastAction(errorMessage)
     }
 
@@ -96,10 +127,10 @@ export function DebugDrawer() {
         duration: 300000 // 5 minutes
       })
 
-      if (response.status === 'ok') {
+      if ((response as any).status === 'ok') {
         setLastAction('Successfully started manual sub train')
       } else {
-        setLastAction(`Failed to start sub train: ${response.error}`)
+        setLastAction(`Failed to start sub train: ${(response as any).error || 'Unknown error'}`)
       }
     } catch (error) {
       setLastAction(`Error starting sub train: ${error}`)
@@ -121,10 +152,10 @@ export function DebugDrawer() {
         timestamp: new Date().toISOString()
       })
 
-      if (response.status === 'ok') {
+      if ((response as any).status === 'ok') {
         setLastAction('Successfully cleared all interrupts')
       } else {
-        setLastAction(`Failed to clear interrupts: ${response.error}`)
+        setLastAction(`Failed to clear interrupts: ${(response as any).error || 'Unknown error'}`)
       }
     } catch (error) {
       setLastAction(`Error clearing interrupts: ${error}`)
@@ -145,10 +176,10 @@ export function DebugDrawer() {
         timestamp: new Date().toISOString()
       })
 
-      if (response.status === 'ok') {
+      if ((response as any).status === 'ok') {
         setLastAction('Successfully triggered fallback mode')
       } else {
-        setLastAction(`Failed to trigger fallback: ${response.error}`)
+        setLastAction(`Failed to trigger fallback: ${(response as any).error || 'Unknown error'}`)
       }
     } catch (error) {
       setLastAction(`Error triggering fallback: ${error}`)

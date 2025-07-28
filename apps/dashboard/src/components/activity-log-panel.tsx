@@ -1,7 +1,7 @@
 import { Show, For, createMemo } from 'solid-js'
 import { Button } from './ui/button'
 import { useActivityLog } from '@/hooks/use-activity-log'
-import type { EventType, ActivityEvent } from '@/types/activity-log'
+import type { EventType, ActivityEvent, ChatMessageData, CheerData } from '@/types/activity-log'
 import { EVENT_TYPES, EVENT_TYPE_LABELS } from '@/types/activity-log'
 
 export function ActivityLogPanel() {
@@ -33,7 +33,7 @@ export function ActivityLogPanel() {
   const formatEventContent = (event: ActivityEvent) => {
     switch (event.event_type) {
       case EVENT_TYPES.CHAT_MESSAGE:
-        return `${event.user_name}: ${event.data.message}`
+        return `${event.user_name}: ${(event.data as ChatMessageData).message}`
       
       case EVENT_TYPES.FOLLOW:
         return `${event.user_name} followed`
@@ -42,7 +42,7 @@ export function ActivityLogPanel() {
         return `${event.user_name} subscribed`
       
       case EVENT_TYPES.CHEER:
-        return `${event.user_name} cheered ${event.data.bits} bits`
+        return `${event.user_name} cheered ${(event.data as CheerData).bits} bits`
       
       case EVENT_TYPES.STREAM_ONLINE:
         return 'Stream went online'

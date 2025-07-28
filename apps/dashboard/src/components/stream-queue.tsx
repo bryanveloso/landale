@@ -3,7 +3,7 @@ import { useStreamQueue } from '@/hooks/use-stream-queue'
 import { Button } from './ui/button'
 
 export function StreamQueue() {
-  const { queueState, clearQueue, removeQueueItem } = useStreamQueue()
+  const { queueState, removeQueueItem } = useStreamQueue()
   const [isVisible] = createSignal(true)
 
   return (
@@ -12,11 +12,6 @@ export function StreamQueue() {
         {/* Queue header with controls */}
         <div>
           <div>Stream Queue</div>
-          <div>
-            <Button onClick={() => clearQueue()} disabled={queueState().queue.length === 0}>
-              Clear Queue
-            </Button>
-          </div>
         </div>
 
         {/* Queue metrics */}

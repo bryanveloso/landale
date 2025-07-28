@@ -12,7 +12,10 @@ import type { TakeoverCommand } from '@/types/stream'
 import { Button } from './ui/button'
 import { createLogger } from '@landale/logger'
 
-const logger = createLogger({ service: 'dashboard', module: 'TakeoverPanel' })
+const logger = createLogger({ 
+  service: 'dashboard',
+  defaultMeta: { module: 'TakeoverPanel' }
+})
 
 export function TakeoverPanel() {
   const commands = useStreamCommands()
@@ -24,9 +27,7 @@ export function TakeoverPanel() {
 
   const sendTakeover = async () => {
     if (takeoverType() !== 'screen-cover' && !takeoverText().trim()) {
-      logger.error('No message provided for non-screen-cover takeover', {
-        takeoverType: takeoverType()
-      })
+      logger.error('No message provided for non-screen-cover takeover', {})
       return
     }
 
@@ -36,20 +37,18 @@ export function TakeoverPanel() {
       duration: duration() * 1000
     }
 
-    logger.info('Sending takeover data', {
-      takeoverData: {
-        type: takeoverData.type,
-        message: takeoverData.message,
-        duration: takeoverData.duration
-      }
-    })
+    logger.info(`Sending takeover: ${takeoverData.type}`, {})
 
     try {
       await commands.sendTakeover(takeoverData)
       setLastSent(new Date().toLocaleTimeString())
       setTakeoverText('')
     } catch (error) {
-      logger.error('Failed to send takeover', { error })
+      logger.error('Failed to send takeover', { 
+        error: error instanceof Error 
+          ? { message: error.message, stack: error.stack }
+          : { message: String(error) }
+      })
     }
   }
 
@@ -57,7 +56,11 @@ export function TakeoverPanel() {
     try {
       await commands.clearTakeover()
     } catch (error) {
-      logger.error('Failed to clear takeover', { error })
+      logger.error('Failed to clear takeover', { 
+        error: error instanceof Error 
+          ? { message: error.message, stack: error.stack }
+          : { message: String(error) }
+      })
     }
   }
 

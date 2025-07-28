@@ -6,8 +6,14 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 
 const host = process.env.TAURI_DEV_HOST || 'localhost'
 
-export default defineConfig(async () => ({
-  plugins: [tsconfigPaths(), tanstackRouter({ target: 'solid', autoCodeSplitting: true }), solid(), tailwindcss()],
+export default defineConfig({
+  plugins: [
+    tsconfigPaths(),
+    tanstackRouter({ target: 'solid', autoCodeSplitting: true }),
+    //@ts-expect-error vite-plugin-solid is fragile
+    solid(),
+    tailwindcss()
+  ],
   clearScreen: false,
   server: {
     host: host || false,
@@ -28,4 +34,4 @@ export default defineConfig(async () => ({
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG
   }
-}))
+})

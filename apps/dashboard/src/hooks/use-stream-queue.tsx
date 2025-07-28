@@ -61,9 +61,7 @@ export function useStreamQueue() {
     requestQueueState,
 
     // Queue commands with proper loading states
-    clearQueue: commands.clearQueue,
     removeQueueItem: commands.removeQueueItem,
-    reorderQueue: commands.reorderQueue,
     queueCommandState: commands.queueCommandState
   }
 }

@@ -56,7 +56,7 @@ export function handleError(error: unknown, context: ErrorContext = {}): ErrorRe
       type: error instanceof Error ? error.constructor.name : typeof error,
       stack: error instanceof Error ? error.stack : undefined
     },
-    context: errorInfo
+    ...errorInfo
   })
 
   return {

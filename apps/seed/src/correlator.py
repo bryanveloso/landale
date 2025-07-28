@@ -529,7 +529,17 @@ class StreamCorrelator:
         content_data = self._build_content_data(transcript)
         community_data = self._build_community_data()
         correlation_data = self._build_correlation_data()
-        ai_analysis = await self._build_ai_analysis()
+        
+        # Build full context for AI analysis
+        chat_context_for_ai = self._build_correlated_chat_context()
+        interaction_context_for_ai = self._build_interaction_context()
+        full_context_for_ai = (
+            f"{chat_context_for_ai} | Interactions: {interaction_context_for_ai}"
+            if interaction_context_for_ai
+            else chat_context_for_ai
+        )
+        
+        ai_analysis = await self._perform_context_ai_analysis(transcript, full_context_for_ai)
 
         return {
             "temporal_data": temporal_data,
@@ -636,27 +646,35 @@ class StreamCorrelator:
             "engagement_patterns": self._analyze_engagement_patterns(),
         }
 
-    async def _build_ai_analysis(self) -> dict[str, Any] | None:
-        """Build AI analysis data."""
-        analysis_result = await self.analyze(immediate=True)
-        if not analysis_result:
+    async def _perform_context_ai_analysis(self, transcript: str, full_context: str) -> dict[str, Any] | None:
+        """Perform AI analysis specifically for context creation."""
+        if not self.lms_client:
+            logger.warning("No LMS client available for context AI analysis")
             return None
 
-        return {
-            "patterns": analysis_result.patterns.dict() if analysis_result.patterns else None,
-            "dynamics": analysis_result.dynamics.dict() if analysis_result.dynamics else None,
-            "sentiment": analysis_result.sentiment,
-            "sentiment_trajectory": analysis_result.sentiment_trajectory,
-            "topics": analysis_result.topics,
-            "context": analysis_result.context,
-            "suggested_actions": analysis_result.suggested_actions,
-            "stream_momentum": analysis_result.stream_momentum,
-            "model_metadata": {
-                "model_used": "current_lms_model",  # TODO: get from config
-                "analysis_version": "1.0",
-                "timestamp": datetime.now().isoformat(),
-            },
-        }
+        try:
+            analysis_result = await self.lms_client.analyze_with_fallback(transcript, full_context)
+            if not analysis_result:
+                return None
+
+            return {
+                "patterns": analysis_result.patterns.dict() if analysis_result.patterns else None,
+                "dynamics": analysis_result.dynamics.dict() if analysis_result.dynamics else None,
+                "sentiment": analysis_result.sentiment,
+                "sentiment_trajectory": analysis_result.sentiment_trajectory,
+                "topics": analysis_result.topics,
+                "context": analysis_result.context,
+                "suggested_actions": analysis_result.suggested_actions,
+                "stream_momentum": analysis_result.stream_momentum,
+                "model_metadata": {
+                    "model_used": "current_lms_model",  # TODO: get from config
+                    "analysis_version": "1.0",
+                    "timestamp": datetime.now().isoformat(),
+                },
+            }
+        except Exception as e:
+            logger.error("Failed to perform context AI analysis", error=str(e), exc_info=True)
+            return None
 
     def _analyze_speaking_patterns(self) -> dict:
         """Analyze speaking patterns from transcription data."""

@@ -8,13 +8,13 @@
 import { useStreamService } from '@/services/stream-service'
 
 export function ConnectionStatus() {
-  const { connectionState, reconnect } = useStreamService()
+  const { connectionState, forceReconnect } = useStreamService()
 
   return (
     <div>
       <div>
         <span>{connectionState().connected ? 'Connected' : 'Disconnected'}</span>
-        {!connectionState().connected && <button onClick={reconnect}>Retry</button>}
+        {!connectionState().connected && <button onClick={forceReconnect}>Retry</button>}
       </div>
 
       {connectionState().reconnectAttempts > 0 && <div>Reconnect attempts: {connectionState().reconnectAttempts}</div>}

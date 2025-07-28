@@ -111,58 +111,6 @@ export function useStreamCommands() {
     }
   }
 
-  const clearQueue = async () => {
-    setQueueCommandState({
-      loading: true,
-      error: null,
-      lastExecuted: null
-    })
-
-    try {
-      const response = await streamService.clearQueue()
-      setQueueCommandState({
-        loading: false,
-        error: null,
-        lastExecuted: new Date().toISOString()
-      })
-      return response
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      setQueueCommandState({
-        loading: false,
-        error: errorMessage,
-        lastExecuted: null
-      })
-      throw error
-    }
-  }
-
-  const reorderQueue = async (id: string, position: number) => {
-    setQueueCommandState({
-      loading: true,
-      error: null,
-      lastExecuted: null
-    })
-
-    try {
-      const response = await streamService.reorderQueue(id, position)
-      setQueueCommandState({
-        loading: false,
-        error: null,
-        lastExecuted: new Date().toISOString()
-      })
-      return response
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      setQueueCommandState({
-        loading: false,
-        error: errorMessage,
-        lastExecuted: null
-      })
-      throw error
-    }
-  }
-
   // Utility functions
   const requestState = () => {
     streamService.requestState()
@@ -180,8 +128,6 @@ export function useStreamCommands() {
 
     // Queue commands
     removeQueueItem,
-    clearQueue,
-    reorderQueue,
     queueCommandState,
 
     // Utility

@@ -11,6 +11,7 @@ import { useStreamService } from '@/services/stream-service'
 import { useLayerState } from '@/hooks/use-layer-state'
 import { Button } from './ui/button'
 import { StreamValidationRules, validateForm, sanitizeFormData } from '@/services/form-validation'
+import type { ValidationRule } from '@/services/form-validation'
 
 interface ChannelInfo {
   broadcaster_id: string
@@ -49,7 +50,7 @@ export function StreamInformation() {
   const [categorySearch, setCategorySearch] = createSignal('')
   const [searchResults, setSearchResults] = createSignal<GameCategory[]>([])
   const [showSearch, setShowSearch] = createSignal(false)
-  const [searchTimeout, setSearchTimeout] = createSignal<number | null>(null)
+  const [searchTimeout, setSearchTimeout] = createSignal<ReturnType<typeof setTimeout> | null>(null)
 
   const isConnected = () => connectionState().connected
   const currentShow = () => layerState().current_show
@@ -63,8 +64,8 @@ export function StreamInformation() {
       // Channel info loading not implemented yet
       const result = { success: false, data: null }
 
-      if (result.success && result.data.status === 'ok') {
-        return result.data.data.data?.[0] as ChannelInfo // Twitch API returns array
+      if (result.success && result.data && (result.data as any).status === 'ok') {
+        return (result.data as any).data?.data?.[0] as ChannelInfo // Twitch API returns array
       }
       return null
     }
@@ -123,8 +124,8 @@ export function StreamInformation() {
     // Category search not implemented yet
     const result = { success: false, data: null }
 
-    if (result.success && result.data.status === 'ok') {
-      setSearchResults(result.data.data.data || [])
+    if (result.success && result.data && (result.data as any).status === 'ok') {
+      setSearchResults((result.data as any).data?.data || [])
     } else {
       setSearchResults([])
     }
@@ -152,9 +153,9 @@ export function StreamInformation() {
     })
 
     const validation = validateForm(formData, {
-      title: StreamValidationRules.streamTitle,
-      game_id: StreamValidationRules.gameCategory,
-      broadcaster_language: StreamValidationRules.language
+      title: StreamValidationRules.streamTitle as ValidationRule<unknown>[],
+      game_id: StreamValidationRules.gameCategory as ValidationRule<unknown>[],
+      broadcaster_language: StreamValidationRules.language as ValidationRule<unknown>[]
     })
 
     if (!validation.isValid) {
@@ -187,13 +188,15 @@ export function StreamInformation() {
     // Channel info updates not implemented yet
     const result = { success: false, data: null }
 
-    if (result.success && result.data.status === 'ok') {
+    if (result.success && result.data && (result.data as any).status === 'ok') {
       setLastAction('Channel information updated successfully')
       setIsEditing(false)
       // Refresh channel info after update
       setTimeout(() => refetchChannelInfo(), 1000)
     } else {
-      const errorMessage = result.success ? `Failed to update: ${result.data.error}` : result.error.userMessage
+      const errorMessage = result.success 
+        ? `Failed to update: ${(result.data as any)?.error || 'Unknown error'}` 
+        : (result as any).error?.userMessage || 'Operation failed'
       setLastAction(errorMessage)
     }
 
@@ -218,13 +221,13 @@ export function StreamInformation() {
     setSearchResults([])
   }
 
-  const commonGameCategories = [
-    { id: '509660', name: 'Just Chatting' },
-    { id: '509658', name: 'Software and Game Development' },
-    { id: '490100', name: 'Pokémon FireRed/LeafGreen' },
-    { id: '518203', name: 'Slots' },
-    { id: '509659', name: 'Art' },
-    { id: '509663', name: 'Special Events' }
+  const commonGameCategories: GameCategory[] = [
+    { id: '509660', name: 'Just Chatting', box_art_url: '', igdb_id: '' },
+    { id: '509658', name: 'Software and Game Development', box_art_url: '', igdb_id: '' },
+    { id: '490100', name: 'Pokémon FireRed/LeafGreen', box_art_url: '', igdb_id: '' },
+    { id: '518203', name: 'Slots', box_art_url: '', igdb_id: '' },
+    { id: '509659', name: 'Art', box_art_url: '', igdb_id: '' },
+    { id: '509663', name: 'Special Events', box_art_url: '', igdb_id: '' }
   ]
 
   return (

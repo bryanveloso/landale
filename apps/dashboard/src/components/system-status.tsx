@@ -60,7 +60,7 @@ export function SystemStatus() {
       <div class="show-indicator">Show: {formatShow(currentShow())}</div>
       <div class="priority-indicator">Priority: {formatPriority(priorityLevel())}</div>
       <div class="content-indicator">Content: {formatContent()}</div>
-      <FallbackIndicator content={layerState()} type="system" />
+      <FallbackIndicator content={null} type="system" />
     </div>
   )
 }

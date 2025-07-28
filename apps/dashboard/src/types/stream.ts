@@ -201,7 +201,8 @@ export function validateServerStreamState(state: unknown): state is ServerStream
     typeof (state as Record<string, unknown>).current_show === 'string' &&
     Array.isArray((state as Record<string, unknown>).interrupt_stack) &&
     Array.isArray((state as Record<string, unknown>).ticker_rotation) &&
-    (state as Record<string, unknown>).metadata &&
+    typeof (state as Record<string, unknown>).metadata === 'object' &&
+    (state as Record<string, unknown>).metadata !== null &&
     typeof ((state as Record<string, unknown>).metadata as Record<string, unknown>).last_updated === 'string' &&
     typeof ((state as Record<string, unknown>).metadata as Record<string, unknown>).state_version === 'number'
   )
@@ -213,7 +214,8 @@ export function validateServerQueueState(state: unknown): state is ServerQueueSt
     state !== null &&
     Array.isArray((state as Record<string, unknown>).queue) &&
     typeof (state as Record<string, unknown>).is_processing === 'boolean' &&
-    (state as Record<string, unknown>).metrics &&
+    typeof (state as Record<string, unknown>).metrics === 'object' &&
+    (state as Record<string, unknown>).metrics !== null &&
     typeof ((state as Record<string, unknown>).metrics as Record<string, unknown>).total_items === 'number'
   )
 }

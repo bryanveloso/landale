@@ -116,16 +116,16 @@ export const ValidationRules = {
 // Stream-specific validation rules
 export const StreamValidationRules = {
   streamTitle: [
-    ValidationRules.required('Stream title is required'),
+    ValidationRules.required<string>('Stream title is required'),
     ValidationRules.maxLength(140, 'Stream title must be 140 characters or less')
-  ],
+  ] as ValidationRule<string>[],
 
-  gameCategory: [ValidationRules.required('Game category is required')],
+  gameCategory: [ValidationRules.required<string>('Game category is required')] as ValidationRule<string>[],
 
   language: [
-    ValidationRules.required('Language is required'),
+    ValidationRules.required<string>('Language is required'),
     ValidationRules.pattern(/^[a-z]{2}$/, 'Language must be a valid 2-letter code')
-  ],
+  ] as ValidationRule<string>[],
 
   alertMessage: [
     ValidationRules.required('Alert message is required'),

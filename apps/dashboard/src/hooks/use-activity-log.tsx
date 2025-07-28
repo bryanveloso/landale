@@ -1,7 +1,7 @@
 import { createSignal, createEffect, onCleanup } from 'solid-js'
 import { Channel } from 'phoenix'
 import { useStreamService } from '@/services/stream-service'
-import type { ActivityEvent } from '@/types/activity-log'
+import type { ActivityEvent, ActivityLogFilters } from '@/types/activity-log'
 import { EVENT_TYPES } from '@/types/activity-log'
 
 interface EventPayload {
@@ -24,7 +24,7 @@ export function useActivityLog() {
   const [loading] = createSignal(false)
   const [error] = createSignal(null)
   const [hasMore] = createSignal(false)
-  const [filters, setFilters] = createSignal({ limit: 50 })
+  const [filters, setFilters] = createSignal<ActivityLogFilters>({ limit: 50 })
   const [eventsChannel, setEventsChannel] = createSignal<Channel | null>(null)
 
   const addEvent = (event: ActivityEvent) => {
