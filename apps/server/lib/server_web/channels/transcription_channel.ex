@@ -63,7 +63,9 @@ defmodule ServerWeb.TranscriptionChannel do
   def join("transcription:live", _payload, socket) do
     socket = setup_correlation_id(socket)
 
-    Logger.info("Transcription live channel joined", correlation_id: socket.assigns.correlation_id)
+    Logger.info("Transcription live channel joined",
+      correlation_id: socket.assigns.correlation_id
+    )
 
     # Subscribe to live transcription events
     Phoenix.PubSub.subscribe(Server.PubSub, "transcription:live")
@@ -100,7 +102,9 @@ defmodule ServerWeb.TranscriptionChannel do
     Logger.warning("Invalid transcription channel topic attempted")
 
     {:error,
-     %{reason: "Invalid transcription channel. Use 'transcription:live' or 'transcription:session:{session_id}'"}}
+     %{
+       reason: "Invalid transcription channel. Use 'transcription:live' or 'transcription:session:{session_id}'"
+     }}
   end
 
   # Handle ping for connection health
@@ -155,9 +159,88 @@ defmodule ServerWeb.TranscriptionChannel do
                 }}, socket}
 
             error ->
-              Logger.error("Failed to get session transcriptions", error: error, session_id: session_id)
+              Logger.error("Failed to get session transcriptions",
+                error: error,
+                session_id: session_id
+              )
+
               {:reply, {:error, %{message: "Failed to retrieve session transcriptions"}}, socket}
           end
+      end
+    end)
+  end
+
+  # Submit transcription via WebSocket
+  @impl true
+  def handle_in("submit_transcription", payload, socket) do
+    with_correlation_context(socket, fn ->
+      case Server.Transcription.Validation.validate(payload) do
+        {:ok, validated_attrs} ->
+          case Server.Transcription.create_transcription(validated_attrs) do
+            {:ok, transcription} ->
+              # Broadcast to live transcription subscribers
+              transcription_event = %{
+                id: transcription.id,
+                timestamp: transcription.timestamp,
+                duration: transcription.duration,
+                text: transcription.text,
+                source_id: transcription.source_id,
+                stream_session_id: transcription.stream_session_id,
+                confidence: transcription.confidence
+              }
+
+              # Broadcast to live channel
+              Phoenix.PubSub.broadcast(
+                Server.PubSub,
+                "transcription:live",
+                {:new_transcription, transcription_event}
+              )
+
+              # Also broadcast to session-specific channel if session_id exists
+              if transcription.stream_session_id do
+                Phoenix.PubSub.broadcast(
+                  Server.PubSub,
+                  "transcription:session:#{transcription.stream_session_id}",
+                  {:new_transcription, transcription_event}
+                )
+              end
+
+              Logger.info("Transcription submitted via WebSocket",
+                transcription_id: transcription.id,
+                source_id: transcription.source_id,
+                text_preview: String.slice(transcription.text || "", 0, 50),
+                correlation_id: socket.assigns.correlation_id
+              )
+
+              {:reply, {:ok, %{transcription_id: transcription.id}}, socket}
+
+            {:error, changeset} ->
+              formatted_errors =
+                Server.Transcription.Validation.format_errors(
+                  Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+                    Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
+                      opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+                    end)
+                  end)
+                )
+
+              Logger.warning("Transcription validation failed via WebSocket",
+                errors: formatted_errors,
+                correlation_id: socket.assigns.correlation_id
+              )
+
+              {:reply, {:error, %{errors: formatted_errors}}, socket}
+          end
+
+        {:error, validation_errors} ->
+          formatted_errors = Server.Transcription.Validation.format_errors(validation_errors)
+
+          Logger.warning("Transcription payload validation failed",
+            errors: formatted_errors,
+            correlation_id: socket.assigns.correlation_id
+          )
+
+          {:reply, {:error, %{errors: formatted_errors}}, socket}
       end
     end)
   end
