@@ -2,12 +2,34 @@
 
 import asyncio
 import logging
+import random
+import time
 import weakref
 from abc import ABC, abstractmethod
+from collections.abc import Callable
+from enum import Enum
 
 import websockets
 
 logger = logging.getLogger(__name__)
+
+
+class ConnectionState(Enum):
+    """WebSocket connection states."""
+    DISCONNECTED = "disconnected"
+    CONNECTING = "connecting"
+    CONNECTED = "connected"
+    RECONNECTING = "reconnecting"
+    FAILED = "failed"
+
+
+class ConnectionEvent:
+    """Connection state change event."""
+    def __init__(self, old_state: ConnectionState, new_state: ConnectionState, error: Exception | None = None):
+        self.old_state = old_state
+        self.new_state = new_state
+        self.error = error
+        self.timestamp = time.time()
 
 
 class BaseWebSocketClient(ABC):
@@ -19,25 +41,43 @@ class BaseWebSocketClient(ABC):
         max_reconnect_attempts: int = 10,
         reconnect_delay_base: float = 1.0,
         reconnect_delay_cap: float = 60.0,
+        heartbeat_interval: float = 30.0,
+        circuit_breaker_threshold: int = 5,
+        circuit_breaker_timeout: float = 300.0,
     ):
         self.url = url
         self.max_reconnect_attempts = max_reconnect_attempts
         self.reconnect_delay_base = reconnect_delay_base
         self.reconnect_delay_cap = reconnect_delay_cap
+        self.heartbeat_interval = heartbeat_interval
+        self.circuit_breaker_threshold = circuit_breaker_threshold
+        self.circuit_breaker_timeout = circuit_breaker_timeout
 
-        # State management
+        # Enhanced state management
+        self._connection_state = ConnectionState.DISCONNECTED
         self._reconnect_attempts = 0
         self._reconnect_delay = reconnect_delay_base
-        self._is_connected = False
         self._should_reconnect = True
+        self._connection_callbacks: list[Callable[[ConnectionEvent], None]] = []
+
+        # Health monitoring
+        self._last_heartbeat = 0.0
+        self._heartbeat_task: asyncio.Task | None = None
+        self._heartbeat_failures = 0
+
+        # Circuit breaker
+        self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
 
         # Task tracking using WeakSet pattern from Phase 1.1
         self._background_tasks: weakref.WeakSet[asyncio.Task] = weakref.WeakSet()
 
-        # Metrics
+        # Enhanced metrics
         self.total_reconnects = 0
         self.failed_reconnects = 0
         self.successful_connects = 0
+        self.heartbeat_failures = 0
+        self.circuit_breaker_trips = 0
 
         # Store main event loop for thread-safe operations
         self._main_loop: asyncio.AbstractEventLoop | None = None
@@ -71,12 +111,119 @@ class BaseWebSocketClient(ABC):
         """
         pass
 
+    def on_connection_change(self, callback: Callable[[ConnectionEvent], None]):
+        """Register a callback for connection state changes."""
+        self._connection_callbacks.append(callback)
+
+    def _emit_connection_event(self, new_state: ConnectionState, error: Exception | None = None):
+        """Emit a connection state change event."""
+        if new_state != self._connection_state:
+            event = ConnectionEvent(self._connection_state, new_state, error)
+            self._connection_state = new_state
+
+            for callback in self._connection_callbacks:
+                try:
+                    callback(event)
+                except Exception as e:
+                    logger.error(f"Error in connection callback: {e}")
+
+    def _is_circuit_open(self) -> bool:
+        """Check if circuit breaker is open."""
+        if self._circuit_open_until > time.time():
+            return True
+
+        # Reset if timeout passed
+        if self._circuit_open_until > 0:
+            logger.info("Circuit breaker timeout expired, attempting to close circuit")
+            self._circuit_open_until = 0.0
+            self._consecutive_failures = 0
+
+        return False
+
+    def _record_failure(self):
+        """Record a connection failure for circuit breaker."""
+        self._consecutive_failures += 1
+
+        if self._consecutive_failures >= self.circuit_breaker_threshold:
+            self._circuit_open_until = time.time() + self.circuit_breaker_timeout
+            self.circuit_breaker_trips += 1
+            logger.warning(
+                f"Circuit breaker opened after {self._consecutive_failures} failures. "
+                f"Will retry after {self.circuit_breaker_timeout}s"
+            )
+
+    def _record_success(self):
+        """Record a successful connection."""
+        self._consecutive_failures = 0
+        self._circuit_open_until = 0.0
+
+    async def _start_heartbeat(self):
+        """Start heartbeat monitoring."""
+        if self._heartbeat_task and not self._heartbeat_task.done():
+            self._heartbeat_task.cancel()
+
+        self._heartbeat_task = self.create_task(self._heartbeat_loop())
+
+    async def _stop_heartbeat(self):
+        """Stop heartbeat monitoring."""
+        if self._heartbeat_task and not self._heartbeat_task.done():
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass
+
+    async def _heartbeat_loop(self):
+        """Health monitoring loop with ping/pong."""
+        while self._connection_state == ConnectionState.CONNECTED:
+            try:
+                await asyncio.sleep(self.heartbeat_interval)
+
+                if self._connection_state != ConnectionState.CONNECTED:
+                    break
+
+                # Send heartbeat ping (subclasses can override)
+                success = await self._send_heartbeat()
+
+                if success:
+                    self._last_heartbeat = time.time()
+                    self._heartbeat_failures = 0
+                else:
+                    self._heartbeat_failures += 1
+                    self.heartbeat_failures += 1
+                    logger.warning(f"Heartbeat failed ({self._heartbeat_failures} consecutive failures)")
+
+                    # Force reconnection after multiple heartbeat failures
+                    if self._heartbeat_failures >= 3:
+                        logger.error("Multiple heartbeat failures, forcing reconnection")
+                        break
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in heartbeat loop: {e}")
+                break
+
+    async def _send_heartbeat(self) -> bool:
+        """
+        Send heartbeat ping. Subclasses can override for protocol-specific pings.
+        Default implementation always returns True (no-op).
+        """
+        return True
+
     async def connect(self) -> bool:
         """Connect to WebSocket with automatic retry logic."""
         async with self._connection_lock:
             # Store the main event loop
             self._main_loop = asyncio.get_running_loop()
 
+            # Check circuit breaker before attempting connection
+            if self._is_circuit_open():
+                logger.warning(f"Circuit breaker open, not attempting connection to {self.url}")
+                self._emit_connection_event(ConnectionState.FAILED)
+                return False
+
+            self._emit_connection_event(ConnectionState.CONNECTING)
             self._reconnect_attempts = 0
             self._reconnect_delay = self.reconnect_delay_base
 
@@ -93,13 +240,23 @@ class BaseWebSocketClient(ABC):
                         self._reconnect_attempts = 0
                         self._reconnect_delay = self.reconnect_delay_base
                         self.successful_connects += 1
+
+                        # Record success for circuit breaker
+                        self._record_success()
+                        self._emit_connection_event(ConnectionState.CONNECTED)
+
+                        # Start heartbeat monitoring
+                        await self._start_heartbeat()
+
                         return True
 
                 except asyncio.CancelledError:
                     logger.info("Connection attempt cancelled")
+                    self._emit_connection_event(ConnectionState.FAILED)
                     raise
                 except Exception as e:
                     logger.error(f"Connection attempt failed: {e}")
+                    self._record_failure()
 
                 self._reconnect_attempts += 1
 
@@ -107,10 +264,13 @@ class BaseWebSocketClient(ABC):
                     logger.error(f"Failed to connect after {self.max_reconnect_attempts} attempts. Giving up.")
                     self.failed_reconnects += 1
                     self._is_connected = False
+                    self._emit_connection_event(ConnectionState.FAILED)
                     return False
 
-                # Exponential backoff with cap
-                await asyncio.sleep(self._reconnect_delay)
+                # Exponential backoff with jitter
+                jitter = random.uniform(0, 0.1) * self._reconnect_delay
+                delay_with_jitter = self._reconnect_delay + jitter
+                await asyncio.sleep(delay_with_jitter)
                 self._reconnect_delay = min(self._reconnect_delay * 2, self.reconnect_delay_cap)
 
             return False
@@ -121,7 +281,7 @@ class BaseWebSocketClient(ABC):
             try:
                 if not self._is_connected:
                     if not await self.connect():
-                        # Max reconnection attempts reached
+                        # Max reconnection attempts reached or circuit breaker open
                         break
 
                 # Listen for messages
@@ -132,18 +292,27 @@ class BaseWebSocketClient(ABC):
                 self._is_connected = False
                 self.total_reconnects += 1
 
+                # Stop heartbeat monitoring
+                await self._stop_heartbeat()
+                self._emit_connection_event(ConnectionState.DISCONNECTED)
+
                 if self._should_reconnect:
                     logger.info("Attempting to reconnect...")
+                    self._emit_connection_event(ConnectionState.RECONNECTING)
                     continue
                 else:
                     break
 
             except asyncio.CancelledError:
                 logger.info("Listen loop cancelled")
+                await self._stop_heartbeat()
+                self._emit_connection_event(ConnectionState.DISCONNECTED)
                 break
             except Exception as e:
                 logger.error(f"Unexpected error in listen loop: {e}")
                 self._is_connected = False
+                await self._stop_heartbeat()
+                self._emit_connection_event(ConnectionState.DISCONNECTED)
 
                 if self._should_reconnect:
                     await asyncio.sleep(1)  # Brief pause before reconnecting
@@ -158,6 +327,9 @@ class BaseWebSocketClient(ABC):
             self._should_reconnect = False
             self._is_connected = False
 
+            # Stop heartbeat monitoring
+            await self._stop_heartbeat()
+
             # Cancel any background tasks
             if self._background_tasks:
                 tasks = list(self._background_tasks)
@@ -170,6 +342,7 @@ class BaseWebSocketClient(ABC):
             # Perform actual disconnection
             await self._do_disconnect()
 
+            self._emit_connection_event(ConnectionState.DISCONNECTED)
             logger.info(f"Disconnected from {self.url}")
 
     def create_task(self, coro) -> asyncio.Task:
@@ -183,10 +356,16 @@ class BaseWebSocketClient(ABC):
         """Get connection status and metrics."""
         return {
             "connected": self._is_connected,
+            "connection_state": self._connection_state.value,
             "url": self.url,
             "reconnect_attempts": self._reconnect_attempts,
             "total_reconnects": self.total_reconnects,
             "failed_reconnects": self.failed_reconnects,
             "successful_connects": self.successful_connects,
+            "heartbeat_failures": self.heartbeat_failures,
+            "circuit_breaker_trips": self.circuit_breaker_trips,
+            "last_heartbeat": self._last_heartbeat,
+            "circuit_open_until": self._circuit_open_until,
+            "consecutive_failures": self._consecutive_failures,
             "background_tasks": len(self._background_tasks),
         }

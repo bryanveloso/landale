@@ -6,7 +6,7 @@ from datetime import datetime
 
 import websockets
 from shared import safe_handler
-from shared.websockets import BaseWebSocketClient
+from shared.websockets import BaseWebSocketClient, ConnectionEvent, ConnectionState
 from websockets.client import WebSocketClientProtocol
 
 from .events import ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
@@ -19,9 +19,17 @@ class PhononmaserClient(BaseWebSocketClient):
     """WebSocket client for phononmaser audio events."""
 
     def __init__(self, url: str = "ws://localhost:8889"):
-        super().__init__(url)
+        super().__init__(
+            url,
+            heartbeat_interval=30.0,
+            circuit_breaker_threshold=3,
+            circuit_breaker_timeout=120.0
+        )
         self.ws: WebSocketClientProtocol | None = None
         self._handlers = {"audio:transcription": []}
+        
+        # Register for connection state changes
+        self.on_connection_change(self._handle_connection_change)
 
     def on_transcription(self, handler: Callable[[TranscriptionEvent], None]):
         """Register a handler for transcription events."""
@@ -77,6 +85,30 @@ class PhononmaserClient(BaseWebSocketClient):
         finally:
             clear_context()
 
+    def _handle_connection_change(self, event: ConnectionEvent):
+        """Handle connection state changes."""
+        logger.info(
+            f"Phononmaser connection state changed: {event.old_state.value} -> {event.new_state.value}",
+            error=str(event.error) if event.error else None
+        )
+        
+        if event.new_state == ConnectionState.DISCONNECTED and event.error:
+            # Log connection issues for debugging
+            logger.warning(f"Phononmaser disconnected due to: {event.error}")
+
+    async def _send_heartbeat(self) -> bool:
+        """Send heartbeat ping to phononmaser."""
+        if not self.ws:
+            return False
+            
+        try:
+            # Simple ping frame
+            await self.ws.ping()
+            return True
+        except Exception as e:
+            logger.warning(f"Phononmaser heartbeat failed: {e}")
+            return False
+
     async def _do_disconnect(self):
         """Disconnect from phononmaser."""
         if self.ws:
@@ -88,9 +120,18 @@ class ServerClient(BaseWebSocketClient):
     """WebSocket client for server chat/emote events."""
 
     def __init__(self, url: str = "ws://saya:7175/socket/websocket"):
-        super().__init__(url)
+        super().__init__(
+            url,
+            heartbeat_interval=45.0,  # Phoenix channels expect less frequent pings
+            circuit_breaker_threshold=5,
+            circuit_breaker_timeout=300.0
+        )
         self.ws: WebSocketClientProtocol | None = None
         self._handlers = {"chat_message": [], "chat_emote": [], "viewer_interaction": []}
+        self._phoenix_ref = 1
+        
+        # Register for connection state changes
+        self.on_connection_change(self._handle_connection_change)
 
     def on_chat_message(self, handler: Callable[[ChatMessage], None]):
         """Register a handler for chat messages."""
@@ -251,6 +292,41 @@ class ServerClient(BaseWebSocketClient):
         else:
             logger.warning(f"Unexpected timestamp format: {type(timestamp_raw)}")
             return 0
+
+    def _handle_connection_change(self, event: ConnectionEvent):
+        """Handle connection state changes."""
+        logger.info(
+            f"Server connection state changed: {event.old_state.value} -> {event.new_state.value}",
+            error=str(event.error) if event.error else None
+        )
+        
+        if event.new_state == ConnectionState.CONNECTED:
+            logger.info("Server connection established, ready for Phoenix channels")
+        elif event.new_state == ConnectionState.DISCONNECTED and event.error:
+            logger.warning(f"Server disconnected due to: {event.error}")
+            # Reset Phoenix ref counter on disconnect
+            self._phoenix_ref = 1
+
+    async def _send_heartbeat(self) -> bool:
+        """Send Phoenix channel heartbeat."""
+        if not self.ws:
+            return False
+            
+        try:
+            # Phoenix heartbeat message format
+            heartbeat_msg = {
+                "topic": "phoenix",
+                "event": "heartbeat",
+                "payload": {},
+                "ref": str(self._phoenix_ref)
+            }
+            self._phoenix_ref += 1
+            
+            await self.ws.send(json.dumps(heartbeat_msg))
+            return True
+        except Exception as e:
+            logger.warning(f"Server heartbeat failed: {e}")
+            return False
 
     async def _do_disconnect(self):
         """Disconnect from server."""
