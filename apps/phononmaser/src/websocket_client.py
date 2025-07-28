@@ -1,5 +1,6 @@
 """WebSocket client for sending transcriptions to Phoenix server."""
 
+import asyncio
 import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -33,6 +34,7 @@ class ServerWebSocketClient(BaseWebSocketClient):
 
         self.ws: WebSocketClientProtocol | None = None
         self._phoenix_ref = 1
+        self._listen_task: asyncio.Task | None = None
 
         # Generate daily session ID if not provided
         if stream_session_id is None:
@@ -54,8 +56,15 @@ class ServerWebSocketClient(BaseWebSocketClient):
             self.ws = await websockets.connect(self.url)
             logger.info(f"Connected to Phoenix server at {self.url}")
 
+            # Start listening for messages
+            self._listen_task = asyncio.create_task(self._do_listen())
+
             # Join transcription channel
             await self._join_transcription_channel()
+
+            # Wait a moment for join confirmation
+            await asyncio.sleep(0.5)
+
             return True
         except Exception as e:
             logger.error(f"Failed to connect to Phoenix server: {e}")
@@ -66,11 +75,8 @@ class ServerWebSocketClient(BaseWebSocketClient):
         join_message = {
             "topic": "transcription:live",
             "event": "phx_join",
-            "payload": {
-                "source": "phononmaser",
-                "stream_session_id": self.stream_session_id
-            },
-            "ref": str(self._phoenix_ref)
+            "payload": {"source": "phononmaser", "stream_session_id": self.stream_session_id},
+            "ref": str(self._phoenix_ref),
         }
         self._phoenix_ref += 1
 
@@ -91,6 +97,7 @@ class ServerWebSocketClient(BaseWebSocketClient):
         """Handle Phoenix channel messages."""
         try:
             data = json.loads(message)
+            logger.debug(f"Phoenix message received: {data}")
 
             # Handle Phoenix channel message format
             if isinstance(data, dict):
@@ -116,7 +123,7 @@ class ServerWebSocketClient(BaseWebSocketClient):
         """Handle connection state changes."""
         logger.info(
             f"Phoenix connection state changed: {event.old_state.value} -> {event.new_state.value}",
-            error=str(event.error) if event.error else None
+            error=str(event.error) if event.error else None,
         )
 
         if event.new_state == ConnectionState.CONNECTED:
@@ -133,12 +140,7 @@ class ServerWebSocketClient(BaseWebSocketClient):
             return False
 
         try:
-            heartbeat_msg = {
-                "topic": "phoenix",
-                "event": "heartbeat",
-                "payload": {},
-                "ref": str(self._phoenix_ref)
-            }
+            heartbeat_msg = {"topic": "phoenix", "event": "heartbeat", "payload": {}, "ref": str(self._phoenix_ref)}
             self._phoenix_ref += 1
 
             await self.ws.send(json.dumps(heartbeat_msg))
@@ -165,7 +167,7 @@ class ServerWebSocketClient(BaseWebSocketClient):
             # Format transcription data for Phoenix channel
             transcription_msg = {
                 "topic": "transcription:live",
-                "event": "new_transcription",
+                "event": "submit_transcription",
                 "payload": {
                     "timestamp": convert_timestamp_to_iso(event.timestamp),
                     "duration": event.duration,
@@ -173,13 +175,9 @@ class ServerWebSocketClient(BaseWebSocketClient):
                     "source_id": "phononmaser",
                     "stream_session_id": self.stream_session_id,
                     "confidence": None,  # whisper.cpp doesn't provide confidence scores
-                    "metadata": {
-                        "original_timestamp_us": event.timestamp,
-                        "source": "whisper_cpp",
-                        "language": "en"
-                    }
+                    "metadata": {"original_timestamp_us": event.timestamp, "source": "whisper_cpp", "language": "en"},
                 },
-                "ref": str(self._phoenix_ref)
+                "ref": str(self._phoenix_ref),
             }
             self._phoenix_ref += 1
 
@@ -193,6 +191,13 @@ class ServerWebSocketClient(BaseWebSocketClient):
 
     async def _do_disconnect(self):
         """Disconnect from Phoenix server."""
+        if self._listen_task and not self._listen_task.done():
+            self._listen_task.cancel()
+            try:
+                await self._listen_task
+            except asyncio.CancelledError:
+                pass
+
         if self.ws:
             await self.ws.close()
             self.ws = None
@@ -205,8 +210,4 @@ class ServerWebSocketClient(BaseWebSocketClient):
         Returns:
             bool: True if connection is healthy, False otherwise
         """
-        return (
-            self._connection_state == ConnectionState.CONNECTED
-            and self._channel_joined
-            and self.ws is not None
-        )
+        return self._connection_state == ConnectionState.CONNECTED and self._channel_joined and self.ws is not None
