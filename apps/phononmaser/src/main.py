@@ -25,9 +25,9 @@ class Phononmaser:
     """Main phononmaser service."""
 
     def __init__(self):
-        # Configuration - hardcoded ports for single-user setup
-        self.port = 8889  # Phononmaser WebSocket port
-        self.health_port = 8890  # Health check port
+        # Configuration from environment variables
+        self.port = int(os.getenv("PHONONMASER_PORT", "8889"))  # Phononmaser WebSocket port
+        self.health_port = int(os.getenv("PHONONMASER_HEALTH_PORT", "8890"))  # Health check port
         self.whisper_model_path = os.getenv("WHISPER_MODEL_PATH", "")
         self.whisper_threads = int(os.getenv("WHISPER_THREADS", "8"))
         self.whisper_language = os.getenv("WHISPER_LANGUAGE", "en")

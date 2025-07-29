@@ -116,7 +116,13 @@ defmodule ServerWeb.Telemetry do
       # Health Check Metrics
       counter("server.health.checks", tags: [:endpoint]),
       summary("server.health.response_time", tags: [:endpoint], unit: {:native, :millisecond}),
-      last_value("server.health.status", tags: [:service])
+      last_value("server.health.status", tags: [:service]),
+
+      # WebSocket Transcription Metrics
+      counter("server.transcription.submitted", tags: [:source]),
+      summary("server.transcription.submission_latency", unit: {:native, :millisecond}),
+      counter("server.transcription.submission_errors", tags: [:error_type]),
+      summary("server.transcription.text_length", unit: :byte)
     ]
   end
 

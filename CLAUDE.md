@@ -195,6 +195,25 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 
 **Remember**: Technical challenges are normal engineering work. Frame them as learning opportunities and process improvements, not crises.
 
+## Recent Improvements (2025-07-28)
+
+### WebSocket Migration Complete
+- **Removed**: HTTP transport for transcription submission (90.7% latency improvement)
+- **Added**: Comprehensive telemetry for WebSocket submissions
+  - `Server.Telemetry.transcription_submitted/1` - Count submissions by source
+  - `Server.Telemetry.transcription_submission_latency/1` - Track submission latency
+  - `Server.Telemetry.transcription_submission_error/1` - Track errors by type
+  - `Server.Telemetry.transcription_text_length/1` - Monitor text lengths
+- **Metrics**: All WebSocket transcription flows now have full observability
+
+### Configuration Centralization
+- **Phononmaser**: Ports now configurable via environment variables
+  - `PHONONMASER_PORT` (default: 8889)
+  - `PHONONMASER_HEALTH_PORT` (default: 8890)
+- **Seed**: Full Pydantic configuration with environment variable support
+  - All settings exposed via `SEED_*` prefixed variables
+  - Nested configs use `__` delimiter (e.g., `SEED_LMS__API_URL`)
+
 ## Commands Reference
 
 ```bash

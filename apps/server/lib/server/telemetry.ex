@@ -404,6 +404,34 @@ defmodule Server.Telemetry do
   end
 
   @doc """
+  Emits telemetry event for WebSocket transcription submissions.
+  """
+  def transcription_submitted(source_id) do
+    :telemetry.execute([:server, :transcription, :submitted], %{count: 1}, %{source: source_id})
+  end
+
+  @doc """
+  Emits telemetry event for WebSocket transcription submission latency.
+  """
+  def transcription_submission_latency(duration_ms) do
+    :telemetry.execute([:server, :transcription, :submission_latency], %{duration: duration_ms}, %{})
+  end
+
+  @doc """
+  Emits telemetry event for WebSocket transcription submission errors.
+  """
+  def transcription_submission_error(error_type) do
+    :telemetry.execute([:server, :transcription, :submission_errors], %{count: 1}, %{error_type: error_type})
+  end
+
+  @doc """
+  Emits telemetry event for transcription text length.
+  """
+  def transcription_text_length(length) do
+    :telemetry.execute([:server, :transcription, :text_length], %{length: length}, %{})
+  end
+
+  @doc """
   Initializes tprof profiler for performance analysis.
 
   Enables the new Elixir 1.18 tprof profiler to monitor function calls,
