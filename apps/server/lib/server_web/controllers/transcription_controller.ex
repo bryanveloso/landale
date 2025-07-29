@@ -9,68 +9,6 @@ defmodule ServerWeb.TranscriptionController do
   alias Server.Transcription
   alias ServerWeb.Schemas
 
-  operation(:create,
-    summary: "Create transcription",
-    description: "Creates a new transcription entry from the seed service",
-    request_body:
-      {"Transcription data", "application/json",
-       %OpenApiSpex.Schema{
-         type: :object,
-         required: [:timestamp, :duration, :text],
-         properties: %{
-           timestamp: %OpenApiSpex.Schema{type: :string, format: :"date-time"},
-           duration: %OpenApiSpex.Schema{type: :number, minimum: 0},
-           text: %OpenApiSpex.Schema{type: :string, minLength: 1, maxLength: 10_000},
-           source_id: %OpenApiSpex.Schema{type: :string},
-           stream_session_id: %OpenApiSpex.Schema{type: :string},
-           confidence: %OpenApiSpex.Schema{type: :number, minimum: 0, maximum: 1},
-           metadata: %OpenApiSpex.Schema{type: :object}
-         }
-       }},
-    responses: %{
-      201 => {"Created", "application/json", Schemas.SuccessResponse},
-      400 => {"Bad Request", "application/json", Schemas.ErrorResponse},
-      422 => {"Unprocessable Entity", "application/json", Schemas.ErrorResponse}
-    }
-  )
-
-  def create(conn, params) do
-    case Transcription.create_transcription(params) do
-      {:ok, transcription} ->
-        # Broadcast to live transcription subscribers
-        transcription_event = %{
-          id: transcription.id,
-          timestamp: transcription.timestamp,
-          duration: transcription.duration,
-          text: transcription.text,
-          source_id: transcription.source_id,
-          stream_session_id: transcription.stream_session_id,
-          confidence: transcription.confidence
-        }
-
-        # Broadcast to live channel
-        Phoenix.PubSub.broadcast(Server.PubSub, "transcription:live", {:new_transcription, transcription_event})
-
-        # Also broadcast to session-specific channel if session_id exists
-        if transcription.stream_session_id do
-          Phoenix.PubSub.broadcast(
-            Server.PubSub,
-            "transcription:session:#{transcription.stream_session_id}",
-            {:new_transcription, transcription_event}
-          )
-        end
-
-        conn
-        |> put_status(:created)
-        |> json(%{success: true, data: transcription})
-
-      {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{success: false, error: "Validation failed", details: changeset.errors})
-    end
-  end
-
   operation(:index,
     summary: "List recent transcriptions",
     description: "Returns recent transcriptions with optional filtering",

@@ -10,7 +10,6 @@ from shared import get_global_tracker
 from .audio_processor import AudioProcessor
 from .health import create_health_app
 from .logger import configure_json_logging, get_logger
-from .server_client import ServerTranscriptionClient
 from .websocket_client import ServerWebSocketClient
 from .websocket_server import PhononmaserServer
 
@@ -32,11 +31,7 @@ class Phononmaser:
         self.whisper_model_path = os.getenv("WHISPER_MODEL_PATH", "")
         self.whisper_threads = int(os.getenv("WHISPER_THREADS", "8"))
         self.whisper_language = os.getenv("WHISPER_LANGUAGE", "en")
-        self.server_url = os.getenv("SERVER_HTTP_URL", "http://saya:7175")
         self.server_websocket_url = os.getenv("SERVER_WS_URL", "ws://saya:7175/socket/websocket")
-
-        # Feature toggle for transport method
-        self.use_websocket = os.getenv("PHONONMASER_USE_WEBSOCKET", "false").lower() == "true"
 
         # Validate configuration
         if not self.whisper_model_path:
@@ -45,7 +40,7 @@ class Phononmaser:
         # Components
         self.audio_processor: AudioProcessor | None = None
         self.websocket_server: PhononmaserServer | None = None
-        self.transcription_client: ServerTranscriptionClient | ServerWebSocketClient | None = None
+        self.transcription_client: ServerWebSocketClient | None = None
         self.health_runner = None
 
         # State
@@ -55,15 +50,10 @@ class Phononmaser:
         """Start the phononmaser service."""
         logger.info("Starting phononmaser...")
 
-        # Initialize transcription client based on transport method
-        if self.use_websocket:
-            logger.info("Using WebSocket transport for transcription events")
-            self.transcription_client = ServerWebSocketClient(self.server_websocket_url)
-            await self.transcription_client.connect()
-        else:
-            logger.info("Using HTTP transport for transcription events")
-            self.transcription_client = ServerTranscriptionClient(self.server_url)
-            await self.transcription_client.__aenter__()
+        # Initialize WebSocket transcription client
+        logger.info("Using WebSocket transport for transcription events")
+        self.transcription_client = ServerWebSocketClient(self.server_websocket_url)
+        await self.transcription_client.connect()
 
         # Initialize audio processor
         self.audio_processor = AudioProcessor(
@@ -100,10 +90,7 @@ class Phononmaser:
             await self.websocket_server.stop()
 
         if self.transcription_client:
-            if self.use_websocket:
-                await self.transcription_client.disconnect()
-            else:
-                await self.transcription_client.__aexit__(None, None, None)
+            await self.transcription_client.disconnect()
 
         if self.health_runner:
             await self.health_runner.cleanup()
@@ -116,15 +103,14 @@ class Phononmaser:
 
         # Send to Phoenix server for storage and transcription:live channel broadcasting
         if self.transcription_client:
-            transport_type = "WebSocket" if self.use_websocket else "HTTP"
             try:
                 success = await self.transcription_client.send_transcription(event)
                 if success:
-                    logger.debug(f"Transcription sent via {transport_type} successfully")
+                    logger.debug("Transcription sent via WebSocket successfully")
                 else:
-                    logger.warning(f"Failed to send transcription via {transport_type}")
+                    logger.warning("Failed to send transcription via WebSocket")
             except Exception as e:
-                logger.error(f"Error sending transcription via {transport_type}: {e}")
+                logger.error(f"Error sending transcription via WebSocket: {e}")
 
         # Emit to local event stream clients for real-time dashboard updates
         if self.websocket_server:

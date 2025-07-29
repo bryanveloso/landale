@@ -93,7 +93,6 @@ defmodule ServerWeb.Router do
     get "/websocket/examples", WebSocketController, :examples
 
     # Transcription data and real-time events
-    post "/transcriptions", TranscriptionController, :create
     get "/transcriptions", TranscriptionController, :index
     get "/transcriptions/search", TranscriptionController, :search
     get "/transcriptions/time-range", TranscriptionController, :by_time_range
