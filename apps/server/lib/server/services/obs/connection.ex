@@ -26,8 +26,12 @@ defmodule Server.Services.OBS.Connection do
     :rpc_version,
     :auth_timer,
     pending_messages: [],
-    authentication_required: false
+    authentication_required: false,
+    consecutive_errors: 0
   ]
+
+  # Log suppression after this many consecutive errors
+  @max_logged_errors 5
 
   # Client API
 
@@ -122,13 +126,25 @@ defmodule Server.Services.OBS.Connection do
 
   @impl true
   def handle_info({WebSocketConnection, _pid, {:websocket_connected, _}}, state) do
+    # Log recovery if we were in error state
+    if state.consecutive_errors >= @max_logged_errors do
+      Logger.info("WebSocket connection recovered after #{state.consecutive_errors} failures",
+        service: "obs",
+        session_id: state.session_id
+      )
+    end
+
     Logger.info("WebSocket connection established, starting OBS authentication",
       service: "obs",
       session_id: state.session_id
     )
 
-    # Start authentication flow
-    state = start_authentication(state)
+    # Start authentication flow and reset error count
+    state =
+      state
+      |> Map.put(:consecutive_errors, 0)
+      |> start_authentication()
+
     {:noreply, state}
   end
 
@@ -154,28 +170,66 @@ defmodule Server.Services.OBS.Connection do
 
   @impl true
   def handle_info({WebSocketConnection, _pid, {:websocket_disconnected, %{reason: reason}}}, state) do
-    Logger.warning("WebSocket connection lost",
-      reason: inspect(reason),
-      service: "obs",
-      session_id: state.session_id
-    )
+    error_count = state.consecutive_errors + 1
+
+    cond do
+      error_count == @max_logged_errors ->
+        Logger.warning("WebSocket connection lost (suppressing further errors after #{@max_logged_errors} failures)",
+          reason: inspect(reason),
+          service: "obs",
+          session_id: state.session_id
+        )
+
+      error_count < @max_logged_errors ->
+        Logger.warning("WebSocket connection lost",
+          reason: inspect(reason),
+          service: "obs",
+          session_id: state.session_id,
+          error_count: error_count
+        )
+
+      true ->
+        # Silently track error without logging
+        :ok
+    end
 
     broadcast_event(state, :connection_lost, %{reason: reason})
 
     # Clean up and reset state
-    state = cleanup_state(state)
+    state =
+      state
+      |> cleanup_state()
+      |> Map.put(:consecutive_errors, error_count)
+
     {:noreply, state}
   end
 
   @impl true
   def handle_info({WebSocketConnection, _pid, {:websocket_error, %{reason: reason}}}, state) do
-    Logger.error("WebSocket error",
-      error: reason,
-      service: "obs",
-      session_id: state.session_id
-    )
+    error_count = state.consecutive_errors + 1
 
-    {:noreply, state}
+    cond do
+      error_count == @max_logged_errors ->
+        Logger.error("WebSocket error (suppressing further errors after #{@max_logged_errors} failures)",
+          error: reason,
+          service: "obs",
+          session_id: state.session_id
+        )
+
+      error_count < @max_logged_errors ->
+        Logger.error("WebSocket error",
+          error: reason,
+          service: "obs",
+          session_id: state.session_id,
+          error_count: error_count
+        )
+
+      true ->
+        # Silently track error without logging
+        :ok
+    end
+
+    {:noreply, %{state | consecutive_errors: error_count}}
   end
 
   @impl true

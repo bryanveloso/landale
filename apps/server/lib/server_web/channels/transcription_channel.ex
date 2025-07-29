@@ -176,23 +176,23 @@ defmodule ServerWeb.TranscriptionChannel do
     with_correlation_context(socket, fn ->
       # Track submission timing
       start_time = System.monotonic_time(:millisecond)
-      
+
       case Server.Transcription.Validation.validate(payload) do
         {:ok, validated_attrs} ->
           case Server.Transcription.create_transcription(validated_attrs) do
             {:ok, transcription} ->
               # Calculate submission latency
               duration_ms = System.monotonic_time(:millisecond) - start_time
-              
+
               # Emit telemetry metrics
               Server.Telemetry.transcription_submitted(transcription.source_id || "unknown")
               Server.Telemetry.transcription_submission_latency(duration_ms)
-              
+
               # Track text length if present
               if transcription.text do
                 Server.Telemetry.transcription_text_length(String.length(transcription.text))
               end
-              
+
               # Broadcast to live transcription subscribers
               transcription_event = %{
                 id: transcription.id,
@@ -233,7 +233,7 @@ defmodule ServerWeb.TranscriptionChannel do
             {:error, changeset} ->
               # Emit error telemetry
               Server.Telemetry.transcription_submission_error("database_error")
-              
+
               formatted_errors =
                 Server.Transcription.Validation.format_errors(
                   Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
@@ -254,7 +254,7 @@ defmodule ServerWeb.TranscriptionChannel do
         {:error, validation_errors} ->
           # Emit error telemetry
           Server.Telemetry.transcription_submission_error("validation_error")
-          
+
           formatted_errors = Server.Transcription.Validation.format_errors(validation_errors)
 
           Logger.warning("Transcription payload validation failed",

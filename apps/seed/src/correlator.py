@@ -529,7 +529,7 @@ class StreamCorrelator:
         content_data = self._build_content_data(transcript)
         community_data = self._build_community_data()
         correlation_data = self._build_correlation_data()
-        
+
         # Build full context for AI analysis
         chat_context_for_ai = self._build_correlated_chat_context()
         interaction_context_for_ai = self._build_interaction_context()
@@ -538,7 +538,7 @@ class StreamCorrelator:
             if interaction_context_for_ai
             else chat_context_for_ai
         )
-        
+
         ai_analysis = await self._perform_context_ai_analysis(transcript, full_context_for_ai)
 
         return {
