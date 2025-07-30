@@ -267,7 +267,7 @@ defmodule Server.Services.Twitch.ApiClient do
     Logger.info("Modifying channel information", opts: opts)
 
     # Validate required scopes
-    case validate_scopes do
+    case validate_scopes() do
       :ok ->
         make_api_request(state, :patch, "/channels", %{
           "broadcaster_id" => state.user_id,
