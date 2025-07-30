@@ -14,13 +14,14 @@ defmodule Server.Config do
   def twitch_client_id do
     Application.fetch_env!(:server, :twitch_client_id)
   rescue
-    e in ArgumentError ->
-      reraise e, """
-      Missing required environment variable: TWITCH_CLIENT_ID
+    _e in ArgumentError ->
+      reraise ArgumentError.exception("""
+              Missing required environment variable: TWITCH_CLIENT_ID
 
-      This is required for Twitch EventSub subscriptions to work.
-      Set it in your environment or config files.
-      """
+              This is required for Twitch EventSub subscriptions to work.
+              Set it in your environment or config files.
+              """),
+              __STACKTRACE__
   end
 
   @doc """
@@ -29,13 +30,14 @@ defmodule Server.Config do
   def twitch_client_secret do
     Application.fetch_env!(:server, :twitch_client_secret)
   rescue
-    e in ArgumentError ->
-      reraise e, """
-      Missing required environment variable: TWITCH_CLIENT_SECRET
+    _e in ArgumentError ->
+      reraise ArgumentError.exception("""
+              Missing required environment variable: TWITCH_CLIENT_SECRET
 
-      This is required for OAuth token refresh to work.
-      Set it in your environment or config files.
-      """
+              This is required for OAuth token refresh to work.
+              Set it in your environment or config files.
+              """),
+              __STACKTRACE__
   end
 
   @doc """
@@ -51,13 +53,14 @@ defmodule Server.Config do
   def database_url do
     Application.fetch_env!(:server, :database_url)
   rescue
-    e in ArgumentError ->
-      reraise e, """
-      Missing required environment variable: DATABASE_URL
+    _e in ArgumentError ->
+      reraise ArgumentError.exception("""
+              Missing required environment variable: DATABASE_URL
 
-      This is required for PostgreSQL database connection.
-      Example: postgres://user:password@localhost:5432/database
-      """
+              This is required for PostgreSQL database connection.
+              Example: postgres://user:password@localhost:5432/database
+              """),
+              __STACKTRACE__
   end
 
   # Optional configuration with sensible defaults
@@ -96,13 +99,14 @@ defmodule Server.Config do
   def secret_key_base do
     Application.fetch_env!(:server, ServerWeb.Endpoint)[:secret_key_base]
   rescue
-    e in ArgumentError ->
-      reraise e, """
-      Missing required configuration: secret_key_base
+    _e in ArgumentError ->
+      reraise ArgumentError.exception("""
+              Missing required configuration: secret_key_base
 
-      This is required for Phoenix session security.
-      Generate one with: mix phx.gen.secret
-      """
+              This is required for Phoenix session security.
+              Generate one with: mix phx.gen.secret
+              """),
+              __STACKTRACE__
   end
 
   @doc """

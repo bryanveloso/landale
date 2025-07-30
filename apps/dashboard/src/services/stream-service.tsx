@@ -620,9 +620,9 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
 
     // Distribute content across layers based on type and show
     const layers = {
-      foreground: extractLayerContent(allContent as StreamContent[], 'foreground', serverState.current_show),
-      midground: extractLayerContent(allContent as StreamContent[], 'midground', serverState.current_show),
-      background: extractLayerContent(allContent as StreamContent[], 'background', serverState.current_show)
+      foreground: extractLayerContent(allContent as StreamContent[], 'foreground'),
+      midground: extractLayerContent(allContent as StreamContent[], 'midground'),
+      background: extractLayerContent(allContent as StreamContent[], 'background')
     }
 
     return {
@@ -640,11 +640,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     }
   }
 
-  const extractLayerContent = (
-    allContent: StreamContent[],
-    targetLayer: 'foreground' | 'midground' | 'background',
-    show: string
-  ) => {
+  const extractLayerContent = (allContent: StreamContent[], targetLayer: 'foreground' | 'midground' | 'background') => {
     // Find highest priority content for this layer using server-provided layer information
     const layerContent = allContent
       .filter((content) => {
