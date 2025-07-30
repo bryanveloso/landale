@@ -43,7 +43,7 @@ interface GameCategory {
 // Type guard functions for safe type casting
 function isChannelInfo(data: unknown): data is ChannelInfo {
   if (typeof data !== 'object' || data === null) return false
-  
+
   const obj = data as Record<string, unknown>
   return (
     typeof obj.broadcaster_id === 'string' &&
@@ -61,7 +61,7 @@ function isChannelInfo(data: unknown): data is ChannelInfo {
 
 function isGameCategory(data: unknown): data is GameCategory {
   if (typeof data !== 'object' || data === null) return false
-  
+
   const obj = data as Record<string, unknown>
   return (
     typeof obj.id === 'string' &&
@@ -117,7 +117,12 @@ export function StreamInformation() {
         }
         return null
       } catch (error) {
-        logger.error('Failed to load channel info', { error: error instanceof Error ? { message: error.message, type: error.constructor.name } : { message: String(error) } })
+        logger.error('Failed to load channel info', {
+          error:
+            error instanceof Error
+              ? { message: error.message, type: error.constructor.name }
+              : { message: String(error) }
+        })
         setLastAction('Failed to load channel information')
         return null
       }
@@ -188,7 +193,13 @@ export function StreamInformation() {
         setSearchResults([])
       }
     } catch (error) {
-      logger.error('Failed to search categories', { error: error instanceof Error ? { message: error.message, type: error.constructor.name } : { message: String(error) }, metadata: { query } })
+      logger.error('Failed to search categories', {
+        error:
+          error instanceof Error
+            ? { message: error.message, type: error.constructor.name }
+            : { message: String(error) },
+        metadata: { query }
+      })
       setSearchResults([])
     }
   }
@@ -254,7 +265,13 @@ export function StreamInformation() {
         throw new Error('Update failed')
       }
     } catch (error) {
-      logger.error('Failed to update channel info', { error: error instanceof Error ? { message: error.message, type: error.constructor.name } : { message: String(error) }, metadata: { updates } })
+      logger.error('Failed to update channel info', {
+        error:
+          error instanceof Error
+            ? { message: error.message, type: error.constructor.name }
+            : { message: String(error) },
+        metadata: { updates }
+      })
       setLastAction('Failed to update channel information')
     }
 

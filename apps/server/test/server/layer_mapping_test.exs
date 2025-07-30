@@ -19,7 +19,6 @@ defmodule Server.LayerMappingTest do
     test "returns correct layer for coding show events" do
       assert LayerMapping.get_layer("build_failure", "coding") == "foreground"
       assert LayerMapping.get_layer("pr_merged", "coding") == "midground"
-      assert LayerMapping.get_layer("commit_stats", "coding") == "background"
     end
 
     test "handles atom show names" do

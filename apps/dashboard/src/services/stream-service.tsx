@@ -170,7 +170,10 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     })
 
     socket.onError((error: unknown) => {
-      logger.error('Socket error', { error: error instanceof Error ? { message: error.message, type: error.constructor.name } : { message: String(error) } })
+      logger.error('Socket error', {
+        error:
+          error instanceof Error ? { message: error.message, type: error.constructor.name } : { message: String(error) }
+      })
       setConnectionState((prev) => ({
         ...prev,
         connected: false,
@@ -410,7 +413,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         .receive('error', (resp: Record<string, unknown>) => {
           logger.error('Takeover send error', { metadata: { error: resp } })
           const error = resp as Record<string, unknown>
-          reject(new Error(`Takeover failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`))
+          reject(
+            new Error(
+              `Takeover failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`
+            )
+          )
         })
         .receive('timeout', () => {
           reject(new Error('Takeover command timeout'))
@@ -439,7 +446,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         .receive('error', (resp: Record<string, unknown>) => {
           logger.error('Clear takeover error', { metadata: { error: resp } })
           const error = resp as Record<string, unknown>
-          reject(new Error(`Clear failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`))
+          reject(
+            new Error(
+              `Clear failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`
+            )
+          )
         })
         .receive('timeout', () => {
           reject(new Error('Clear takeover timeout'))
@@ -522,7 +533,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         .receive('error', (resp: Record<string, unknown>) => {
           logger.error('Get channel info error', { metadata: { error: resp } })
           const error = resp as Record<string, unknown>
-          reject(new Error(`Get channel info failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`))
+          reject(
+            new Error(
+              `Get channel info failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`
+            )
+          )
         })
         .receive('timeout', () => {
           reject(new Error('Get channel info timeout'))
@@ -551,7 +566,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         .receive('error', (resp: Record<string, unknown>) => {
           logger.error('Search categories error', { metadata: { error: resp } })
           const error = resp as Record<string, unknown>
-          reject(new Error(`Search failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`))
+          reject(
+            new Error(
+              `Search failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`
+            )
+          )
         })
         .receive('timeout', () => {
           reject(new Error('Search categories timeout'))
@@ -580,7 +599,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         .receive('error', (resp: Record<string, unknown>) => {
           logger.error('Update channel info error', { metadata: { error: resp } })
           const error = resp as Record<string, unknown>
-          reject(new Error(`Update failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`))
+          reject(
+            new Error(
+              `Update failed: ${(error as PhoenixErrorResponse)?.error?.message || (error as PhoenixErrorResponse)?.reason || 'unknown'}`
+            )
+          )
         })
         .receive('timeout', () => {
           reject(new Error('Update channel info timeout'))
@@ -603,11 +626,15 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     }
 
     return {
-      current_show: (typeof serverState.current_show === 'string' ? serverState.current_show : 'variety') as OverlayLayerState['current_show'],
+      current_show: (typeof serverState.current_show === 'string'
+        ? serverState.current_show
+        : 'variety') as OverlayLayerState['current_show'],
       layers,
       active_content: serverState.active_content,
       interrupt_stack: serverState.interrupt_stack || [],
-      priority_level: (typeof serverState.priority_level === 'string' ? serverState.priority_level : 'ticker') as OverlayLayerState['priority_level'],
+      priority_level: (typeof serverState.priority_level === 'string'
+        ? serverState.priority_level
+        : 'ticker') as OverlayLayerState['priority_level'],
       version: serverState.metadata?.state_version || 0,
       last_updated: serverState.metadata?.last_updated || new Date().toISOString()
     }
@@ -637,16 +664,16 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     // Handle real-time updates like emote increments
     if (update.type === 'content_update' && update.data) {
       const { layer_id, content_id, updates } = update.data
-      
+
       if (!layer_id || !updates) {
         logger.warn('Invalid content update', { metadata: { data: update.data } })
         return currentState
       }
-      
+
       // Update content in the specified layer
       const newState = { ...currentState }
       const layer = newState.layers[layer_id as keyof typeof newState.layers]
-      
+
       if (layer && layer.content && (!content_id || layer.content.id === content_id)) {
         // Merge updates into existing content data
         layer.content = {
@@ -656,15 +683,15 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
             ...updates
           }
         }
-        
+
         newState.version = currentState.version + 1
         newState.last_updated = new Date().toISOString()
-        
+
         logger.debug('Content updated in layer', { metadata: { layer_id, updates } })
         return newState
       }
     }
-    
+
     return currentState
   }
 

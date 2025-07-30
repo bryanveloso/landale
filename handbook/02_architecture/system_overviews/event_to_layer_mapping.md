@@ -13,8 +13,9 @@ External System → Event Publisher → PubSub → Event Handler → StreamProdu
 ```
 
 **Too many transformation steps**:
+
 1. External event → Generic PubSub event
-2. Generic event → Specific alert type  
+2. Generic event → Specific alert type
 3. Alert type → Layer priority assignment
 4. Layer assignment → Overlay rendering
 
@@ -46,10 +47,11 @@ Server.Events.publish_system_event("build_failure", %{
 ### Step 2: StreamProducer Subscriptions
 
 **Missing subscriptions** (shows the incomplete nature):
+
 ```elixir
 # In StreamProducer.init/1
 Phoenix.PubSub.subscribe(Server.PubSub, "chat")
-Phoenix.PubSub.subscribe(Server.PubSub, "followers") 
+Phoenix.PubSub.subscribe(Server.PubSub, "followers")
 Phoenix.PubSub.subscribe(Server.PubSub, "subscriptions")
 Phoenix.PubSub.subscribe(Server.PubSub, "cheers")
 Phoenix.PubSub.subscribe(Server.PubSub, "ironmon:events")    # ← Missing
@@ -85,6 +87,7 @@ end
 ### Step 4: Layer Priority Assignment
 
 **Hidden in layer coordination logic:**
+
 - `:death_alert` → foreground layer (high priority)
 - `:shiny_encounter` → foreground layer (rare event)
 - `:build_failure` → midground layer (dev context)
@@ -93,16 +96,19 @@ end
 ## Why This Is Problematic
 
 **Too Many Manual Mappings**:
+
 - Every external event needs a specific `handle_info` function
 - Event type strings → Content type atoms conversion is manual
 - Layer assignment logic is scattered across multiple modules
 
 **Difficult to Extend**:
+
 - Adding new event types requires code changes in multiple places
 - No clear pattern for event → layer priority mapping
 - Debugging event flow requires tracing through multiple modules
 
 **Inconsistent Patterns**:
+
 - Some events use generic types, others use specific atoms
 - Priority assignment logic is not centralized
 - Error handling varies by event type
@@ -139,7 +145,7 @@ defmodule EventProcessor do
     source
     |> normalize_event(type, data)
     |> assign_content_type()
-    |> assign_layer_priority() 
+    |> assign_layer_priority()
     |> create_alert()
   end
 end
@@ -161,6 +167,7 @@ ironmon:
 ## Current Integration Examples
 
 ### Pokemon Death Alert
+
 ```elixir
 # Step 1: TCP receives "pokemon_death:charizard:45:critical_hit"
 # Step 2: Publishes {:ironmon_event, %{type: "pokemon_death", data: %{...}}}
@@ -169,7 +176,8 @@ ironmon:
 # Step 5: Overlay displays with death alert styling
 ```
 
-### Build Failure Alert  
+### Build Failure Alert
+
 ```elixir
 # Step 1: CI webhook POST /api/webhooks/ci
 # Step 2: Publishes {:system_event, %{type: "build_failure", data: %{...}}}
@@ -198,23 +206,25 @@ ironmon:
 ## Debugging Current System
 
 **Event Flow Tracing**:
+
 ```elixir
 # Add logging to StreamProducer
-Logger.info("Converting event to alert", 
-  event_type: event_type, 
+Logger.info("Converting event to alert",
+  event_type: event_type,
   content_type: content_type,
   data: data
 )
 ```
 
 **PubSub Testing**:
+
 ```elixir
 # Test events manually
-Phoenix.PubSub.broadcast(Server.PubSub, "ironmon:events", 
+Phoenix.PubSub.broadcast(Server.PubSub, "ironmon:events",
   {:ironmon_event, %{type: "pokemon_death", data: %{pokemon: "Pikachu"}}}
 )
 ```
 
 ---
 
-*This system works but is overly complex. The event → layer mapping should be simplified and centralized. Consider this a high-priority refactor candidate.*
+_This system works but is overly complex. The event → layer mapping should be simplified and centralized. Consider this a high-priority refactor candidate._

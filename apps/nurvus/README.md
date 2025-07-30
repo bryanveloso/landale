@@ -29,6 +29,7 @@ The HTTP API will be available at `http://localhost:4001`
 On macOS, you may see security warnings when running Nurvus since it's an unsigned binary. To bypass these:
 
 **Quick Fix (Terminal):**
+
 ```bash
 # Remove quarantine attributes
 xattr -c nurvus_macos
@@ -39,8 +40,9 @@ chmod +x nurvus_macos
 ```
 
 **GUI Method:**
+
 1. Try to run Nurvus (you'll see a security warning)
-2. Open **System Settings** → **Privacy & Security**  
+2. Open **System Settings** → **Privacy & Security**
 3. Scroll to **Security** section
 4. Click **"Allow Anyway"** next to the Nurvus warning
 5. Try running Nurvus again and click **"Open"**
@@ -52,11 +54,12 @@ For detailed macOS installation instructions, see [macOS Installation Guide](../
 Each package includes machine-specific configuration that's automatically copied to `~/.nurvus/processes.json` on first run.
 
 **Example configuration:**
+
 ```json
 [
   {
     "id": "phononmaser",
-    "name": "Phononmaser Audio Service", 
+    "name": "Phononmaser Audio Service",
     "command": "bun",
     "args": ["--hot", "./index.ts"],
     "cwd": "/opt/landale/apps/phononmaser",
@@ -102,7 +105,7 @@ Nurvus manages processes across multiple machines in the Landale streaming infra
 ### Components
 
 - **ProcessManager** - Main GenServer managing process configurations
-- **ProcessSupervisor** - Dynamic supervisor for external processes  
+- **ProcessSupervisor** - Dynamic supervisor for external processes
 - **ProcessRunner** - GenServer wrapping individual processes
 - **ProcessMonitor** - Health monitoring and metrics collection
 - **Platform** - Cross-platform process detection (Windows/macOS/Linux)

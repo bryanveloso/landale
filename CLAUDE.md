@@ -10,6 +10,7 @@
 **Stability**: Production-ready with resilient patterns for memory management, state handling, and security
 
 ### Key Features
+
 - Real-time WebSocket-based event distribution across multiple services
 - Multi-layered animation system with priority-based interruption handling
 - Live audio transcription and processing
@@ -20,6 +21,7 @@
 ## Tech Stack
 
 ### Core Technologies
+
 - **Runtime**: Bun (NOT Node.js) - use Bun APIs for everything
 - **Frontend**: SolidJS with GSAP animations
 - **Backend**: Elixir Phoenix with WebSocket channels
@@ -31,6 +33,7 @@
 - **UI Framework**: Tauri for dashboard app
 
 ### Key Dependencies
+
 - **Frontend**: SolidJS, GSAP, Phoenix JS client, Tailwind CSS
 - **Backend**: Phoenix Framework, Ecto, Oban, Phoenix PubSub
 - **Python**: aiohttp, websockets, numpy, shared utilities
@@ -54,6 +57,7 @@
 ```
 
 ### WebSocket Channels
+
 - `dashboard:*` - Control interface updates
 - `events:*` - General event stream
 - `overlay:*` - Overlay animations/state
@@ -61,6 +65,7 @@
 - `transcription:*` - Live transcription
 
 ### Key Ports
+
 - WebSocket Server: 7175
 - TCP Server: 8080
 - Phononmaser: 8889
@@ -70,6 +75,7 @@
 ## Established Patterns (CRITICAL)
 
 ### 1. WebSocket Resilience
+
 ```python
 # All Python services use shared ResilientWebSocketClient
 from shared.websockets import ResilientWebSocketClient
@@ -77,12 +83,14 @@ from shared.websockets import ResilientWebSocketClient
 ```
 
 ### 2. Memory Safety
+
 ```python
 # Bounded queues prevent exhaustion
 self.event_queue = asyncio.Queue(maxsize=200)  # ~20 seconds buffer
 ```
 
 ### 3. Event Batching
+
 ```elixir
 # 50ms batching with critical event bypass
 @batch_window_ms 50
@@ -90,12 +98,14 @@ self.event_queue = asyncio.Queue(maxsize=200)  # ~20 seconds buffer
 ```
 
 ### 4. State Management
+
 ```elixir
 # GenServer state > ETS tables (prevents race conditions)
 # Use :protected access when ETS is necessary
 ```
 
 ### 5. Layer Orchestration
+
 ```typescript
 // State machine for overlay animations
 type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
@@ -123,18 +133,21 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 ## Architecture Patterns
 
 ### Layer Orchestration
+
 - Three priority levels: foreground, midground, background
 - State machine: hidden → entering → active → interrupted → exiting
 - Higher priority layers interrupt lower ones
 - Use GSAP timelines for complex sequences
 
 ### Event System
+
 - Correlation IDs track events across services
 - Phoenix PubSub for real-time broadcasting
 - Circuit breakers protect external API calls (needs GenServer refactor)
 - Batch event publishing when possible
 
 ### Service Configuration
+
 - Environment variables for service URLs (avoid file path traversal)
 - Health checks on separate ports
 - Tailscale handles all networking security
@@ -162,24 +175,28 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 **When documenting any code issues, bugs, or technical challenges, use this structure:**
 
 ### 1. Incident (Factual & Neutral)
+
 - **What happened**: Specific, observable behavior
-- **When**: Timeline if relevant  
+- **When**: Timeline if relevant
 - **Impact**: Quantifiable effects
 - **Avoid**: Dramatic language, blame, emotional framing
 
 ### 2. Analysis (Technical Causality)
+
 - **Root cause**: Technical explanation of why it occurred
 - **Contributing factors**: System conditions that enabled the issue
 - **Evidence**: Code references, logs, reproduction steps
 - **Avoid**: "We messed up", "huge oversight", personal fault
 
 ### 3. Improvement (Systematic & Actionable)
+
 - **Immediate fix**: What resolved the issue
 - **Preventive measures**: System changes to prevent recurrence
 - **Process improvements**: Workflow updates
 - **Verification**: How to confirm the fix works
 
 **Example Template:**
+
 ```markdown
 ## Engineering Analysis: [Brief Description]
 
@@ -187,7 +204,8 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 
 **Analysis**: Root cause was [technical explanation]. This occurred because [system conditions].
 
-**Improvements**: 
+**Improvements**:
+
 - Fixed by [immediate resolution]
 - Prevented future occurrences with [systematic change]
 - Updated process to [workflow improvement]
@@ -198,6 +216,7 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 ## Recent Improvements (2025-07-28)
 
 ### WebSocket Migration Complete
+
 - **Removed**: HTTP transport for transcription submission (90.7% latency improvement)
 - **Added**: Comprehensive telemetry for WebSocket submissions
   - `Server.Telemetry.transcription_submitted/1` - Count submissions by source
@@ -207,6 +226,7 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 - **Metrics**: All WebSocket transcription flows now have full observability
 
 ### Configuration Centralization
+
 - **Phononmaser**: Ports now configurable via environment variables
   - `PHONONMASER_PORT` (default: 8889)
   - `PHONONMASER_HEALTH_PORT` (default: 8890)
@@ -256,7 +276,7 @@ mix release --overwrite
 
 - **UV Workspace**: Single .venv at root shared by all Python services
 - **Dependencies**: Run `uv sync` from root to update all packages
-- **Run Services**: 
+- **Run Services**:
   - From root: `cd apps/[service] && uv run python -m src.main`
   - Or use bun scripts: `bun run dev:phononmaser` or `bun run dev:seed`
 - **Editable Installs**: Changes to `packages/shared-python` reflect immediately
@@ -318,6 +338,7 @@ mix release --overwrite
 ```
 
 The Mix task automatically:
+
 - Detects today's date
 - Increments letter suffix if building multiple times per day
 - Updates only the release version (keeps project at 0.0.0)
@@ -352,18 +373,21 @@ landale/
 ## Integration Points
 
 ### Internal Services
+
 - **Phoenix WebSocket Hub**: Central event broker (port 7175)
 - **Health Check API**: Service monitoring endpoints (port 8890)
 - **PostgreSQL + TimescaleDB**: Time-series event storage (port 5433)
 - **Inter-service Communication**: All via Phoenix PubSub channels
 
 ### External Integrations
+
 - **OBS WebSocket**: Stream control and scene management
 - **AI/LLM APIs**: Context generation via Seed service
 - **Audio Pipeline**: Real-time transcription processing
 - **Seq Logging**: Centralized log aggregation
 
 ### Multi-Machine Architecture
+
 - **Zelan**: Primary development machine
 - **Demi**: Production streaming machine
 - **Saya**: Secondary services host
@@ -373,18 +397,21 @@ landale/
 ## Technical Architecture Notes
 
 ### Key Design Decisions
+
 - **Memory Protection**: Bounded queues (200 item limit) prevent exhaustion
 - **State Management**: GenServer state preferred over ETS tables to prevent race conditions
 - **Security**: ETS tables use `:protected` access (never `:public`)
 - **Connection Resilience**: WebSocket clients implement exponential backoff and auto-reconnect
 
 ### Architectural Limitations
+
 1. **Circuit Breaker**: Stateless implementation - GenServer would provide better fault isolation
 2. **Documentation**: Some guides in `docs/` may not reflect current patterns
 3. **Animation System**: Complex hook implementation - could benefit from GSAP master timeline
 4. **Test Coverage**: Python services lack comprehensive test suites
 
 ### Extension Points
+
 - **Observability**: Architecture supports OpenTelemetry integration
 - **State Persistence**: Could add persistent state across restarts if needed
 - **Event Sourcing**: Current design allows future event sourcing implementation

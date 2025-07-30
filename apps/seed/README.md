@@ -14,22 +14,26 @@ Phoenix Server Events ────────┘
 ## Core Components
 
 ### 1. Stream Correlator (`correlator.py`)
+
 - Aggregates 1.5-second audio fragments into 2-minute contexts
 - Correlates speech with chat activity and viewer interactions
 - Implements flexible pattern detection without rigid categorization
 - Automatically creates TimescaleDB contexts every 2 minutes
 
 ### 2. Training Pipeline (`training_pipeline.py`)
+
 - Prepares datasets from stored contexts for AI model training
 - Supports multiple dataset types: conversation, pattern, multimodal, temporal
 - Model-agnostic approach focusing on maximum data preservation
 
 ### 3. Dataset Exporter (`dataset_exporter.py`)
+
 - Exports training data in various formats (Hugging Face, OpenAI, CSV)
 - Handles train/validation splits and format conversion
 - Generates training recommendations based on data analysis
 
 ### 4. Command-Line Interface (`training_cli.py`)
+
 - Complete CLI for dataset preparation and export
 - Statistics and summary generation
 - Easy integration with AI training workflows
@@ -92,10 +96,10 @@ from src.context_client import ContextClient
 async with ContextClient("http://localhost:8080") as client:
     pipeline = TrainingDataPipeline(client)
     exporter = DatasetExporter(client)
-    
+
     # Prepare multimodal dataset
     dataset_file = await pipeline.prepare_multimodal_dataset(days_back=14)
-    
+
     # Export in Hugging Face format
     files = await exporter.export_huggingface_dataset("multimodal")
 ```
@@ -103,11 +107,13 @@ async with ContextClient("http://localhost:8080") as client:
 ## Setup
 
 1. Install dependencies:
+
    ```bash
    uv sync
    ```
 
 2. Copy environment configuration:
+
    ```bash
    cp .env.example .env
    ```
@@ -136,11 +142,13 @@ LMS_MODEL=dolphin-2.9.3-llama-3-8b
 ### PM2 Deployment
 
 Start with PM2:
+
 ```bash
 pm2 start start.py --name landale-seed --interpreter python3 --cwd /path/to/landale/apps/seed
 ```
 
 Set environment variables:
+
 ```bash
 pm2 set landale-seed:SERVER_URL "ws://localhost:7175/events"
 pm2 set landale-seed:PHONONMASER_URL "ws://localhost:8889"
@@ -175,6 +183,7 @@ SEED implements a training-first philosophy designed to capture maximum data for
 ## Integration
 
 SEED integrates seamlessly with the Landale ecosystem:
+
 - **Phoenix Server**: Receives chat, emote, and viewer interaction events
 - **Phononmaser**: Consumes real-time transcription fragments
 - **TimescaleDB**: Stores rich context data for long-term memory

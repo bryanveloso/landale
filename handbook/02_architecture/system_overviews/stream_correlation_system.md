@@ -5,6 +5,7 @@ The stream correlation system combines multiple real-time data streams - audio t
 ## Purpose & Vision
 
 Stream correlation is about connecting the dots between:
+
 - What you're saying (audio transcriptions from Phononmaser)
 - What viewers are saying (chat messages)
 - What viewers are doing (follows, subscriptions, cheers)
@@ -30,16 +31,19 @@ Viewer Actions → EventsChannel → Interaction ─┘
 The system correlates three primary data streams:
 
 #### Audio Transcriptions (from Phononmaser)
+
 - Real-time speech-to-text from your microphone
 - Timestamped segments with duration
 - Provides the "what you're saying" context
 
 #### Chat Messages (from Twitch)
+
 - Viewer messages with emote tracking
-- Special handling for community emotes (avalon*)
+- Special handling for community emotes (avalon\*)
 - Provides the "audience reaction" context
 
 #### Viewer Interactions (from Twitch)
+
 - Follows, subscriptions, gift subs, cheers
 - Timestamped events with user details
 - Provides the "audience support" context
@@ -54,23 +58,24 @@ class StreamCorrelator:
     audio_buffer: deque     # Recent transcriptions
     chat_buffer: deque      # Recent chat messages
     interaction_buffer: deque  # Recent viewer actions
-    
+
     def correlate_at_timestamp(self, timestamp):
         # Find what was being said
         audio_context = self.get_audio_around(timestamp)
-        
+
         # Find chat activity
         chat_context = self.get_chat_around(timestamp)
-        
+
         # Find viewer actions
         interaction_context = self.get_interactions_around(timestamp)
-        
+
         return combined_context
 ```
 
 ### 3. Temporal Windows
 
 The system uses sliding time windows to correlate events:
+
 - **Immediate window**: ±10 seconds for tight correlation
 - **Context window**: ±60 seconds for broader patterns
 - **Session window**: Entire stream for long-term patterns
@@ -95,6 +100,7 @@ end
 ### 2. Buffer Management
 
 Each data stream maintains its own buffer with:
+
 - Size limits to prevent memory exhaustion
 - Time-based expiration for old events
 - Efficient lookup by timestamp
@@ -102,6 +108,7 @@ Each data stream maintains its own buffer with:
 ### 3. Correlation Triggers
 
 Correlation analysis can be triggered by:
+
 - **High-value interactions**: Subscriptions, large cheers
 - **Chat velocity spikes**: Sudden increase in messages
 - **Keyword detection**: Specific emotes or phrases
@@ -124,17 +131,21 @@ context = {
 ## Use Cases
 
 ### Real-time Insights
+
 - "Three people subscribed while you were explaining that feature"
 - "Chat went wild with avalonPOG when you fixed that bug"
 - "Your debugging session attracted 5 new followers"
 
 ### Pattern Recognition
+
 - "Subscriptions tend to come during your code explanations"
 - "Chat engagement peaks when you're problem-solving"
 - "Your community uses avalonThink most during architecture discussions"
 
 ### AI Companion Context
+
 The correlated data enables your AI companion to understand:
+
 - Stream momentum and energy levels
 - What content resonates with your community
 - The relationship between your content and viewer actions
@@ -143,16 +154,19 @@ The correlated data enables your AI companion to understand:
 ## Technical Considerations
 
 ### Memory Management
+
 - Bounded buffers prevent memory exhaustion
 - Old events are pruned based on time windows
 - High-frequency events (chat) use sampling if needed
 
 ### Performance
+
 - Correlation happens asynchronously
 - Non-blocking event collection
 - Efficient timestamp-based lookups
 
 ### Data Privacy
+
 - All correlation happens locally
 - No external services receive correlated data
 - Temporary buffers, not permanent storage
@@ -160,16 +174,19 @@ The correlated data enables your AI companion to understand:
 ## Integration Points
 
 ### With Phononmaser
+
 - Receives transcription events via WebSocket
 - Maintains audio context buffer
 - Timestamps aligned with stream time
 
 ### With Phoenix EventsChannel
+
 - Subscribes to chat, follower, subscription events
 - Receives normalized event data
 - Real-time push via WebSocket
 
 ### With Analysis Service (Seed)
+
 - Performs correlation logic
 - Builds LLM context
 - Triggers analysis based on patterns

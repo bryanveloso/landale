@@ -108,12 +108,7 @@ export interface InitialStateEvent extends PhoenixEvent {
   }
 }
 
-export type StreamServiceEvent = 
-  | StreamStateEvent 
-  | QueueStateEvent 
-  | LayerStateEvent 
-  | InitialStateEvent
-  | PhoenixEvent
+export type StreamServiceEvent = StreamStateEvent | QueueStateEvent | LayerStateEvent | InitialStateEvent | PhoenixEvent
 
 export interface EventHandler<T extends PhoenixEvent = PhoenixEvent> {
   (event: T): void

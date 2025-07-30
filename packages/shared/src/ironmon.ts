@@ -8,7 +8,7 @@ export const Game = {
   FireRedLeafGreen: 3
 } as const
 
-export type Game = typeof Game[keyof typeof Game]
+export type Game = (typeof Game)[keyof typeof Game]
 
 export interface InitMessage {
   type: 'init'

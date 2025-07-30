@@ -320,7 +320,7 @@ The server automatically aggregates:
 ### Coding Show
 
 - **Game**: Software and Game Development (category_id: "509658")
-- **Content**: `[:commit_stats, :build_status, :emote_stats, :recent_follows]`
+- **Content**: `[:emote_stats, :recent_follows]`
 - **Theme**: Terminal/developer aesthetic (suggested: greens, monospace)
 
 ## Best Practices

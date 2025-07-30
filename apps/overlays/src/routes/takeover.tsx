@@ -25,10 +25,10 @@ function TakeoverOverlay() {
   const [takeoverState, setTakeoverState] = createSignal<TakeoverState>(DEFAULT_TAKEOVER_STATE)
   const [socket, setSocket] = createSignal<Socket | null>(null)
   const [isConnected, setIsConnected] = createSignal(false)
-  
+
   let channel: Channel | null = null
   let hideTimer: ReturnType<typeof setTimeout> | null = null
-  
+
   // Initialize logger with correlation ID
   const correlationId = `overlay-takeover-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
   const logger = createLogger({
@@ -42,12 +42,12 @@ function TakeoverOverlay() {
     const getServerUrl = () => {
       return window.location.hostname === 'localhost' ? 'ws://localhost:7175/socket' : 'ws://zelan:7175/socket'
     }
-    
+
     const serverUrl = getServerUrl()
     logger.info('Initializing WebSocket connection', {
       metadata: { serverUrl }
     })
-    
+
     const phoenixSocket = new Socket(serverUrl, {
       logger: (kind: string, msg: string, data: unknown) => {
         logger.debug('Phoenix WebSocket event', {
@@ -84,7 +84,7 @@ function TakeoverOverlay() {
     if (!currentSocket) return
 
     channel = currentSocket.channel('stream:overlays', {})
-    
+
     // Handle takeover events
     channel.on('takeover', (payload: unknown) => {
       logger.info('Takeover received', {
@@ -94,7 +94,7 @@ function TakeoverOverlay() {
           hasMessage: !!payload.message
         }
       })
-      
+
       const newState: TakeoverState = {
         active: true,
         type: payload.type || 'custom',
@@ -102,9 +102,9 @@ function TakeoverOverlay() {
         duration: payload.duration,
         activatedAt: new Date().toISOString()
       }
-      
+
       setTakeoverState(newState)
-      
+
       // Auto-hide after duration if specified
       if (payload.duration) {
         if (hideTimer) clearTimeout(hideTimer)
@@ -120,7 +120,8 @@ function TakeoverOverlay() {
       hideTakeover()
     })
 
-    channel.join()
+    channel
+      .join()
       .receive('ok', () => {
         logger.info('Channel joined successfully', {
           metadata: { channel: 'stream:overlays' }
@@ -155,12 +156,11 @@ function TakeoverOverlay() {
   })
 
   return (
-    <div 
+    <div
       class="takeover-overlay"
       data-active={takeoverState().active}
       data-type={takeoverState().type}
-      data-connected={isConnected()}
-    >
+      data-connected={isConnected()}>
       <Show when={takeoverState().active}>
         <TakeoverContent state={takeoverState()} onHide={hideTakeover} />
       </Show>
@@ -188,25 +188,22 @@ function TakeoverContent(props: TakeoverContentProps) {
       <Show when={props.state.type === 'technical-difficulties'}>
         <TechnicalDifficulties message={props.state.message} />
       </Show>
-      
+
       <Show when={props.state.type === 'screen-cover'}>
         <ScreenCover message={props.state.message} />
       </Show>
-      
+
       <Show when={props.state.type === 'please-stand-by'}>
         <PleaseStandBy message={props.state.message} />
       </Show>
-      
+
       <Show when={props.state.type === 'custom'}>
         <CustomMessage message={props.state.message} />
       </Show>
 
       {/* Takeover close button (development only) */}
       {import.meta.env.DEV && (
-        <button 
-          class="takeover-close" 
-          onClick={props.onHide}
-        >
+        <button class="takeover-close" onClick={props.onHide}>
           Close Takeover
         </button>
       )}
@@ -219,12 +216,8 @@ function TechnicalDifficulties(props: { message: string }) {
   return (
     <div class="takeover technical-difficulties">
       <div class="takeover-title">Technical Difficulties</div>
-      <div class="takeover-subtitle">
-        {props.message || 'We\'ll be right back!'}
-      </div>
-      <div class="takeover-logo">
-        {/* Logo/branding would go here */}
-      </div>
+      <div class="takeover-subtitle">{props.message || "We'll be right back!"}</div>
+      <div class="takeover-logo">{/* Logo/branding would go here */}</div>
     </div>
   )
 }
@@ -232,11 +225,7 @@ function TechnicalDifficulties(props: { message: string }) {
 function ScreenCover(props: { message: string }) {
   return (
     <div class="takeover screen-cover">
-      <div class="cover-content">
-        {props.message && (
-          <div class="cover-message">{props.message}</div>
-        )}
-      </div>
+      <div class="cover-content">{props.message && <div class="cover-message">{props.message}</div>}</div>
     </div>
   )
 }
@@ -245,9 +234,7 @@ function PleaseStandBy(props: { message: string }) {
   return (
     <div class="takeover please-stand-by">
       <div class="standby-title">Please Stand By</div>
-      {props.message && (
-        <div class="standby-message">{props.message}</div>
-      )}
+      {props.message && <div class="standby-message">{props.message}</div>}
     </div>
   )
 }
@@ -255,9 +242,7 @@ function PleaseStandBy(props: { message: string }) {
 function CustomMessage(props: { message: string }) {
   return (
     <div class="takeover custom">
-      <div class="custom-message">
-        {props.message || 'Takeover Active'}
-      </div>
+      <div class="custom-message">{props.message || 'Takeover Active'}</div>
     </div>
   )
 }

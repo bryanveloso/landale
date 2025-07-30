@@ -28,7 +28,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
   const [socket, setSocket] = createSignal<Socket | null>(null)
   const [isConnected, setIsConnected] = createSignal(false)
   const [reconnectAttempts, setReconnectAttempts] = createSignal(0)
-  
+
   // Initialize logger
   const correlationId = `overlay-socket-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
   const logger = createLogger({
@@ -38,11 +38,9 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
 
   const getServerUrl = () => {
     if (props.serverUrl) return props.serverUrl
-    
+
     // Auto-detect based on environment
-    return window.location.hostname === 'localhost' 
-      ? 'ws://localhost:7175/socket' 
-      : 'ws://zelan:7175/socket'
+    return window.location.hostname === 'localhost' ? 'ws://localhost:7175/socket' : 'ws://zelan:7175/socket'
   }
 
   onMount(() => {
@@ -50,7 +48,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
     logger.info('Initializing socket provider', {
       metadata: { serverUrl }
     })
-    
+
     const phoenixSocket = new Socket(serverUrl, {
       reconnectAfterMs: (tries: number) => {
         setReconnectAttempts(tries)
@@ -101,11 +99,12 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
   })
 
   return (
-    <SocketContext.Provider value={{
-      socket,
-      isConnected,
-      reconnectAttempts
-    }}>
+    <SocketContext.Provider
+      value={{
+        socket,
+        isConnected,
+        reconnectAttempts
+      }}>
       {props.children}
     </SocketContext.Provider>
   )

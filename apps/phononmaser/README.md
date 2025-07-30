@@ -15,6 +15,7 @@ Phononmaser receives audio from OBS via WebSocket, transcribes it using Whisper,
 Receives audio data from OBS WebSocket Audio plugin. Accepts both binary and JSON formats.
 
 #### Binary Format (Recommended)
+
 ```
 Header (28 bytes):
 - timestamp_ns: uint64 (8 bytes) - Timestamp in nanoseconds
@@ -31,6 +32,7 @@ Followed by:
 ```
 
 #### JSON Format
+
 ```json
 {
   "type": "audio_data",
@@ -55,6 +57,7 @@ General-purpose event stream for all phononmaser events.
 #### Events
 
 **Audio Transcription**
+
 ```json
 {
   "type": "audio:transcription",
@@ -65,6 +68,7 @@ General-purpose event stream for all phononmaser events.
 ```
 
 **Audio Chunk** (metadata only)
+
 ```json
 {
   "type": "audio:chunk",
@@ -82,6 +86,7 @@ General-purpose event stream for all phononmaser events.
 Dedicated endpoint for OBS caption plugin. Sends transcriptions in the exact format required by the plugin.
 
 #### Format
+
 ```json
 {
   "type": "audio:transcription",
@@ -92,6 +97,7 @@ Dedicated endpoint for OBS caption plugin. Sends transcriptions in the exact for
 ```
 
 Fields:
+
 - `type`: Always "audio:transcription"
 - `timestamp`: Unix timestamp in milliseconds
 - `text`: The transcribed text
@@ -112,11 +118,13 @@ Set via environment variables:
 ## Running
 
 ### With Supervisor (Recommended)
+
 ```bash
 supervisorctl start phononmaser
 ```
 
 ### Standalone
+
 ```bash
 cd apps/phononmaser
 source .venv/bin/activate

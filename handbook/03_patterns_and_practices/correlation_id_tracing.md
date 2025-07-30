@@ -5,6 +5,7 @@ Correlation IDs provide request tracing across services in the Landale system, e
 ## Purpose
 
 Correlation IDs solve the distributed tracing problem:
+
 - Track a single request as it flows through multiple services
 - Debug issues by following the correlation ID in logs
 - Understand request flow and timing across service boundaries
@@ -58,13 +59,17 @@ end
 ### Design Decisions
 
 #### 8-Character IDs
+
 For a personal-scale system, full UUIDs are overkill. 8 characters provide:
+
 - Sufficient uniqueness for single-user context
 - Readable logs without excessive verbosity
 - Easy to grep and search in terminals
 
 #### Automatic Propagation
+
 The module checks multiple sources to find existing IDs:
+
 1. **Phoenix assigns** - For WebSocket/HTTP contexts
 2. **HTTP headers** - For service-to-service calls
 3. **Logger metadata** - For async operations
@@ -78,12 +83,12 @@ The module checks multiple sources to find existing IDs:
 def join("events:all", _payload, socket) do
   correlation_id = Server.CorrelationId.generate()
   socket = assign(socket, :correlation_id, correlation_id)
-  
+
   Logger.info("Events channel joined",
     topic: "all",
     correlation_id: correlation_id
   )
-  
+
   {:ok, socket}
 end
 ```
@@ -95,12 +100,12 @@ def create(conn, params) do
   correlation_id = Server.CorrelationId.from_context(
     headers: conn.req_headers
   )
-  
+
   Server.CorrelationId.put_logger_metadata(correlation_id)
-  
+
   # All subsequent logs will include correlation_id
   Logger.info("Processing request")
-  
+
   # Pass to other services
   OtherService.call(params, correlation_id: correlation_id)
 end
@@ -112,16 +117,16 @@ end
 def process_event_async(event_attrs, event_type) do
   # Capture correlation ID in closure
   correlation_id = event_attrs[:correlation_id]
-  
+
   Task.start(fn ->
     # Re-establish in new process
     Server.CorrelationId.put_logger_metadata(correlation_id)
-    
+
     Logger.debug("Processing event",
       event_type: event_type,
       correlation_id: correlation_id
     )
-    
+
     # Do work...
   end)
 end
@@ -130,6 +135,7 @@ end
 ### Cross-Service Propagation
 
 #### HTTP Headers
+
 When making HTTP requests between services:
 
 ```elixir
@@ -138,6 +144,7 @@ HTTPoison.post(url, body, headers)
 ```
 
 #### WebSocket Messages
+
 Include in message payloads:
 
 ```elixir
@@ -149,6 +156,7 @@ push(socket, "event", %{
 ```
 
 #### Phoenix PubSub
+
 Include in broadcast metadata:
 
 ```elixir
@@ -196,6 +204,7 @@ The codebase includes `correlation_id_pool.ex` which isn't currently used:
 ```
 
 For personal scale, generating new IDs is fine. The pool could be activated if:
+
 - ID generation becomes a bottleneck
 - You want to limit the ID space for easier searching
 - You need deterministic IDs for testing
@@ -211,16 +220,19 @@ For personal scale, generating new IDs is fine. The pool could be activated if:
 ## Debugging with Correlation IDs
 
 ### Find all logs for a request
+
 ```bash
 grep "a1b2c3d4" logs/*.log
 ```
 
 ### Follow request flow
+
 ```bash
 grep "a1b2c3d4" logs/*.log | sort -k2,2
 ```
 
 ### Find failed requests
+
 ```bash
 grep -B2 -A2 "error.*correlation_id" logs/*.log
 ```
@@ -230,7 +242,7 @@ grep -B2 -A2 "error.*correlation_id" logs/*.log
 When adding new services or features:
 
 1. **Accept correlation IDs** in your service interface
-2. **Extract or generate** IDs at service boundaries  
+2. **Extract or generate** IDs at service boundaries
 3. **Include in all logs** via Logger metadata
 4. **Pass to dependencies** when making calls
 5. **Document the flow** for complex operations

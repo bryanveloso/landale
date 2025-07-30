@@ -4,7 +4,7 @@
 
 ## The Big Picture
 
-Building the foundation for a sci-fi AI companion (HAL, C3PO, Marvin, R2-D2 style) that remembers everything about my 11-year streaming community and acts as an intelligent foil. Not "Hey Siri" - more like HAL saying *"Bryan, you've missed this skip 15 times this year"* with personality.
+Building the foundation for a sci-fi AI companion (HAL, C3PO, Marvin, R2-D2 style) that remembers everything about my 11-year streaming community and acts as an intelligent foil. Not "Hey Siri" - more like HAL saying _"Bryan, you've missed this skip 15 times this year"_ with personality.
 
 **Core Goal**: Move beyond generic AI to personality-driven interaction that knows YOU.
 
@@ -15,16 +15,19 @@ This vision drives every architectural decision in Landale. It's not about real-
 ## System Philosophy
 
 ### Memory Over Detection
+
 - Build comprehensive correlation datasets, let LLMs find patterns naturally
 - No trigger keywords or immediate analysis
 - Historical context storage for complex queries
 
-### Community-Centric Design  
+### Community-Centric Design
+
 - Designed for established 11-year community of friends, not random viewers
 - `avalon*` emotes as primary engagement indicators
 - Re-subscriptions = community support, not hype events
 
 ### Pattern Discovery
+
 - Enable questions like "when do I do X?" rather than real-time event detection
 - Support "you always do this" companion comments
 - Foundation for foil-like interactions and gentle ribbing
@@ -34,18 +37,22 @@ This vision drives every architectural decision in Landale. It's not about real-
 ### Core Components
 
 **Stream Memory System**
+
 - Complete transcription + chat + viewer interactions capture
 - Rich context for pattern analysis over time
 
-**Pattern Recognition Engine**  
+**Pattern Recognition Engine**
+
 - My specific behaviors and community responses mapped
 - Historical referencing for companion personality
 
 **Historical Query System**
+
 - Complex time-series analysis over months/years
 - Support for questions like "15 times this year, but who's counting?"
 
 **AI Companion Foundation**
+
 - Data structures enabling personality-based interactions
 - Historical context retrieval for foil-like responses
 
@@ -66,19 +73,21 @@ Interactions → Twitch EventSub → EventsChannel → TimescaleDB
 ### Stack Alignment
 
 - **TimescaleDB**: Long-term memory storage for complex historical queries
-- **Phoenix WebSocket**: Real-time event distribution to analysis systems  
+- **Phoenix WebSocket**: Real-time event distribution to analysis systems
 - **Phononmaser**: Real-time audio transcription with precise timestamps
 - **LM Studio**: AI companion interface for pattern queries
 
 ## Anti-Patterns Eliminated
 
 **No More Generic AI:**
+
 - ❌ Trigger keywords ("gg", "let's go", "finally")
-- ❌ Immediate analysis on subs/cheers/follows  
+- ❌ Immediate analysis on subs/cheers/follows
 - ❌ "High-value interaction" concepts
 - ❌ Gaming/hype streamer patterns
 
 **Instead:**
+
 - ✅ Comprehensive correlation capture
 - ✅ Periodic analysis for pattern building
 - ✅ Natural pattern emergence through LLM analysis
@@ -88,11 +97,11 @@ Interactions → Twitch EventSub → EventsChannel → TimescaleDB
 
 What this foundation enables:
 
-- *"Bryan, you've missed this skip 15 times in the last year"*
-- *"Remember when you tried this approach last month? avalonHYPE usage was through the roof"*  
-- *"Your community laughs most when you pause mid-explanation"*
-- *"This debugging pattern worked better on Tuesday streams"*
-- *"You always say 'interesting' when you're about to pivot to a different approach"*
+- _"Bryan, you've missed this skip 15 times in the last year"_
+- _"Remember when you tried this approach last month? avalonHYPE usage was through the roof"_
+- _"Your community laughs most when you pause mid-explanation"_
+- _"This debugging pattern worked better on Tuesday streams"_
+- _"You always say 'interesting' when you're about to pivot to a different approach"_
 
 ## Implementation Status
 
@@ -112,4 +121,4 @@ This vision is actively driving current development:
 
 ---
 
-*This vision document should be consulted whenever making architectural decisions to ensure alignment with the AI companion goal.*
+_This vision document should be consulted whenever making architectural decisions to ensure alignment with the AI companion goal._

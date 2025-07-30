@@ -11,6 +11,7 @@ Pokemon ROM → Bizhawk Emulator → IronMON Tracker → IronMON Connect Plugin 
 ## Component Breakdown
 
 ### IronMON Tracker (Core System)
+
 **Repository**: `besteon/Ironmon-Tracker`  
 **Purpose**: Main Lua application running in the emulator
 
@@ -21,6 +22,7 @@ Pokemon ROM → Bizhawk Emulator → IronMON Tracker → IronMON Connect Plugin 
 - Provides event hooks for plugins to access game data
 
 ### IronMON Connect (Our Plugin)
+
 **Repository**: `omnypro/ironmon-connect`  
 **Purpose**: Bridge between tracker and external systems
 
@@ -32,6 +34,7 @@ Pokemon ROM → Bizhawk Emulator → IronMON Tracker → IronMON Connect Plugin 
 ## Plugin Integration Process
 
 **Configuration**:
+
 ```ini
 # Settings.ini in IronMON Tracker
 [EXTENSIONS]
@@ -39,6 +42,7 @@ IronmonConnect=true
 ```
 
 **Event Flow**:
+
 1. User enables IronMON Connect in tracker settings
 2. Tracker loads Connect plugin on startup
 3. Plugin hooks into tracker events (checkpoint cleared, location changed, etc.)
@@ -58,38 +62,44 @@ IronmonConnect=true
 The plugin has access to full game state but selectively sends:
 
 - **Init**: When tracker starts/resets
-- **Seed**: New attempt/run started  
+- **Seed**: New attempt/run started
 - **Checkpoint**: Major progress milestones (gym leaders, etc.)
 - **Location**: Map/area changes
 
 ## Why This Architecture Works
 
 **Separation of Concerns**:
+
 - Main tracker = Rich UI and complete game tracking
 - Connect plugin = Lightweight external data export
 - Tracker focuses on gameplay, plugin on streaming/external tools
 
 **Extensibility**:
+
 - Other plugins could export different data sets
 - Our streaming needs don't interfere with core tracker functionality
 
 **Reliability**:
+
 - Plugin failure doesn't break the main tracker
 - TCP connection issues don't affect gameplay tracking
 
 ## Our Integration Points
 
 **TCP Server**: `apps/server/lib/server/services/ironmon_tcp.ex`
+
 - Receives JSON messages from Connect plugin
 - Parses and validates incoming data
 - Forwards to Phoenix channels for real-time updates
 
 **Data Models**: `apps/server/lib/server/ironmon/`
+
 - Challenge, Checkpoint, Result, Seed structs
 - Database persistence for historical tracking
 - Pattern matching for different message types
 
 **Channel Broadcasting**: `overlay:ironmon`, `dashboard:main`
+
 - Real-time updates to streaming overlays
 - Dashboard display of current run status
 - Historical analysis and pattern recognition
@@ -97,11 +107,13 @@ The plugin has access to full game state but selectively sends:
 ## Configuration Notes
 
 **Plugin Setup**:
+
 - Must be enabled in IronMON Tracker settings
 - TCP port configured to match our server (8080)
 - JSON message format is standardized by the plugin
 
 **Our Server Setup**:
+
 - TCP listener on port 8080
 - JSON parsing with error handling
 - Database persistence for run history
@@ -116,6 +128,7 @@ When working with IronMON integration:
 4. **Check database** for historical run data
 
 **Debug Commands**:
+
 ```bash
 # Check TCP connection
 lsof -i :8080
@@ -130,4 +143,4 @@ This architecture explains why our TCP server implementation works correctly - w
 
 ---
 
-*This integration is foundational for IronMON streaming content. The plugin architecture keeps our concerns separate while providing the data we need for overlays and analysis.*
+_This integration is foundational for IronMON streaming content. The plugin architecture keeps our concerns separate while providing the data we need for overlays and analysis._

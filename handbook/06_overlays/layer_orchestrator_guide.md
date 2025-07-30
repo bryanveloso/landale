@@ -144,7 +144,7 @@ interface StreamContent {
   type: string
   data: unknown
   priority: number
-  layer?: 'foreground' | 'midground' | 'background'  // Server-provided
+  layer?: 'foreground' | 'midground' | 'background' // Server-provided
 }
 ```
 

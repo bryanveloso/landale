@@ -11,11 +11,7 @@ export const Route = createRootRoute({
     <div class="p-4 text-red-500">
       <h2 class="text-lg font-bold">Application Error</h2>
       <p>{error?.message || 'An unexpected error occurred'}</p>
-      {import.meta.env.DEV && (
-        <pre class="mt-2 text-xs bg-red-50 p-2 rounded">
-          {error?.stack}
-        </pre>
-      )}
+      {import.meta.env.DEV && <pre class="mt-2 rounded bg-red-50 p-2 text-xs">{error?.stack}</pre>}
     </div>
   )
 })

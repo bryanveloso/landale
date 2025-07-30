@@ -2,11 +2,11 @@ name: Server CI
 
 on:
   push:
-    branches: [ main, feature/* ]
+    branches: [main, feature/*]
     paths:
       - 'apps/server/**'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'apps/server/**'
 
@@ -17,10 +17,10 @@ jobs:
   test:
     name: Test and Lint Server
     runs-on: ubuntu-latest
-    
+
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/server_test
-    
+
     services:
       postgres:
         image: postgres:16

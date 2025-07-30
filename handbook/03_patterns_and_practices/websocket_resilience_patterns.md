@@ -9,7 +9,7 @@ All Phoenix channels inherit from `ServerWeb.ChannelBase`, which provides:
 ```elixir
 defmodule ServerWeb.MyChannel do
   use ServerWeb.ChannelBase
-  
+
   @impl true
   def join(topic, payload, socket) do
     socket = setup_correlation_id(socket)
@@ -34,6 +34,7 @@ end
 ```
 
 This enables tracking requests across services in logs:
+
 ```
 [info] correlation_id=a1b2c3d4 Channel joined channel=DashboardChannel topic=dashboard:lobby
 ```
@@ -119,26 +120,31 @@ ChannelBase.EventBatcher.add_event(batcher, event_data)
 ## Channel Implementations
 
 ### Dashboard Channel
+
 - **Purpose**: Control interface updates
 - **Topics**: `dashboard:lobby`
 - **Special patterns**: Request/response for control operations
 
-### Events Channel  
+### Events Channel
+
 - **Purpose**: Real-time event streaming
 - **Topics**: `events:all`, `events:chat`, `events:twitch`, etc.
 - **Special patterns**: Topic-based filtering of event subscriptions
 
 ### Stream Channel
+
 - **Purpose**: Overlay state management
 - **Topics**: `stream:overlays`, `stream:queue`
 - **Special patterns**: Fallback states when StreamProducer fails
 
 ### Overlay Channel
+
 - **Purpose**: Overlay communication with HTTP API parity
 - **Topics**: `overlay:obs`, `overlay:twitch`, `overlay:system`, etc.
 - **Special patterns**: Service command execution with consistent error handling
 
 ### Transcription Channel
+
 - **Purpose**: Real-time transcription broadcasting
 - **Topics**: `transcription:live`, `transcription:session:{id}`
 - **Special patterns**: Session-specific channels
@@ -155,6 +161,7 @@ ChannelBase.EventBatcher.add_event(batcher, event_data)
 ## Personal Scale Considerations
 
 These patterns are designed for a single-user system on Tailscale:
+
 - No complex authentication needed (Tailscale handles security)
 - Correlation IDs for debugging, not multi-tenant isolation
 - Batching tuned for single client, not thousands

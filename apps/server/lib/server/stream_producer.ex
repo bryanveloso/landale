@@ -750,14 +750,6 @@ defmodule Server.StreamProducer do
           :ironmon_progression
         )
 
-      :commit_stats ->
-        # TODO: Get from git integration
-        Server.ContentFallbacks.get_fallback_content(:commit_stats)
-
-      :build_status ->
-        # TODO: Get from CI integration
-        Server.ContentFallbacks.get_fallback_content(:build_status)
-
       :stream_goals ->
         # TODO: Get from goals tracking
         Server.ContentFallbacks.get_fallback_content(:stream_goals)

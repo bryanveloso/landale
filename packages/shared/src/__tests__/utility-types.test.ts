@@ -1,8 +1,8 @@
-import { describe, test, expect } from "bun:test"
-import type { DeepPartial, Nullable } from "../index"
+import { describe, test, expect } from 'bun:test'
+import type { DeepPartial, Nullable } from '../index'
 
-describe("Utility Types", () => {
-  describe("DeepPartial", () => {
+describe('Utility Types', () => {
+  describe('DeepPartial', () => {
     interface TestInterface {
       name: string
       settings: {
@@ -15,15 +15,15 @@ describe("Utility Types", () => {
       tags: string[]
     }
 
-    test("DeepPartial makes all properties optional", () => {
+    test('DeepPartial makes all properties optional', () => {
       // This test validates type behavior at compile time
       const partial: DeepPartial<TestInterface> = {}
       expect(partial).toBeDefined()
 
       const partialWithSome: DeepPartial<TestInterface> = {
-        name: "test"
+        name: 'test'
       }
-      expect(partialWithSome.name).toBe("test")
+      expect(partialWithSome.name).toBe('test')
 
       const partialNested: DeepPartial<TestInterface> = {
         settings: {
@@ -42,7 +42,7 @@ describe("Utility Types", () => {
       expect(partialDeepNested.settings?.config?.timeout).toBe(5000)
     })
 
-    test("DeepPartial preserves primitive types", () => {
+    test('DeepPartial preserves primitive types', () => {
       interface PrimitiveTest {
         str: string
         num: number
@@ -51,17 +51,17 @@ describe("Utility Types", () => {
       }
 
       const partial: DeepPartial<PrimitiveTest> = {
-        str: "test",
+        str: 'test',
         num: 42
       }
 
-      expect(typeof partial.str).toBe("string")
-      expect(typeof partial.num).toBe("number")
+      expect(typeof partial.str).toBe('string')
+      expect(typeof partial.num).toBe('number')
       expect(partial.bool).toBeUndefined()
       expect(partial.date).toBeUndefined()
     })
 
-    test("DeepPartial works with arrays", () => {
+    test('DeepPartial works with arrays', () => {
       interface ArrayTest {
         items: Array<{
           id: number
@@ -79,18 +79,18 @@ describe("Utility Types", () => {
     })
   })
 
-  describe("Nullable", () => {
-    test("Nullable allows null and undefined", () => {
+  describe('Nullable', () => {
+    test('Nullable allows null and undefined', () => {
       const nullableString: Nullable<string> = null
       const undefinedString: Nullable<string> = undefined
-      const validString: Nullable<string> = "hello"
+      const validString: Nullable<string> = 'hello'
 
       expect(nullableString).toBeNull()
       expect(undefinedString).toBeUndefined()
-      expect(validString).toBe("hello")
+      expect(validString).toBe('hello')
     })
 
-    test("Nullable works with complex types", () => {
+    test('Nullable works with complex types', () => {
       interface ComplexType {
         data: {
           value: number
@@ -106,19 +106,19 @@ describe("Utility Types", () => {
       expect(validComplex?.data.value).toBe(42)
     })
 
-    test("Nullable preserves type checking", () => {
+    test('Nullable preserves type checking', () => {
       const nullableNumber: Nullable<number> = 42
-      
+
       if (nullableNumber !== null && nullableNumber !== undefined) {
         // TypeScript should know this is a number now
-        expect(typeof nullableNumber).toBe("number")
+        expect(typeof nullableNumber).toBe('number')
         expect(nullableNumber.toFixed).toBeDefined()
       }
     })
   })
 
-  describe("Type Integration", () => {
-    test("DeepPartial and Nullable can be combined", () => {
+  describe('Type Integration', () => {
+    test('DeepPartial and Nullable can be combined', () => {
       interface TestType {
         config: {
           setting: string
@@ -134,7 +134,7 @@ describe("Utility Types", () => {
       expect(combined?.config?.setting).toBeUndefined()
     })
 
-    test("Types work with real-world usage patterns", () => {
+    test('Types work with real-world usage patterns', () => {
       interface StreamConfig {
         server: {
           host: string
@@ -174,7 +174,7 @@ describe("Utility Types", () => {
 
       const initializedState: Nullable<StreamConfig> = {
         server: {
-          host: "localhost",
+          host: 'localhost',
           port: 7175,
           ssl: false
         },
@@ -183,13 +183,13 @@ describe("Utility Types", () => {
           emotes: true,
           alerts: {
             enabled: true,
-            types: ["follow", "sub", "cheer"]
+            types: ['follow', 'sub', 'cheer']
           }
         }
       }
 
-      expect(initializedState?.server.host).toBe("localhost")
-      expect(initializedState?.features.alerts.types).toContain("follow")
+      expect(initializedState?.server.host).toBe('localhost')
+      expect(initializedState?.features.alerts.types).toContain('follow')
     })
   })
 })

@@ -1,12 +1,13 @@
 # Task Concurrency Patterns
 
-*Last Updated: 2025-07-22*
+_Last Updated: 2025-07-22_
 
 This document describes the task concurrency patterns used in Landale to prevent resource exhaustion and ensure system stability.
 
 ## Overview
 
 Unbounded concurrent operations can exhaust system resources, especially when dealing with:
+
 - Database writes
 - External API calls
 - File system operations
@@ -20,9 +21,9 @@ Unbounded concurrent operations can exhaust system resources, especially when de
 
 ```elixir
 # Configuration in application.ex
-{DynamicSupervisor, 
-  name: Server.DBTaskSupervisor, 
-  strategy: :one_for_one, 
+{DynamicSupervisor,
+  name: Server.DBTaskSupervisor,
+  strategy: :one_for_one,
   max_children: 10}
 ```
 
@@ -42,6 +43,7 @@ end
 ```
 
 **Benefits**:
+
 - Limits concurrent database operations to 10
 - Prevents database connection pool exhaustion
 - Provides clear feedback when limit is reached
@@ -66,6 +68,7 @@ connections_list
 ```
 
 **Benefits**:
+
 - Limits parallelism to available CPU cores
 - Prevents process explosion during cleanup
 - Includes timeout protection
@@ -81,6 +84,7 @@ end)
 ```
 
 **Benefits**:
+
 - Supervised async operations
 - Crash isolation from main service
 - Proper cleanup on termination
@@ -102,6 +106,7 @@ end)
    - No retry complexity
 
 2. **Queue and retry** (future enhancement if needed):
+
    ```elixir
    # Could use GenServer with queue
    # Or persistent job queue like Oban
@@ -119,7 +124,7 @@ test "respects max_children limit" do
   results = for i <- 1..15 do
     DynamicSupervisor.start_child(Server.DBTaskSupervisor, task_spec)
   end
-  
+
   successful = Enum.count(results, &match?({:ok, _}, &1))
   assert successful <= 10
 end
@@ -128,6 +133,7 @@ end
 ## When to Add Concurrency Controls
 
 Add controls when you see:
+
 - Unbounded `Task.async` or `Task.start` calls
 - Loops creating tasks without limits
 - Event handlers spawning processes per event
@@ -136,6 +142,7 @@ Add controls when you see:
 ## Monitoring
 
 Monitor these metrics:
+
 - `DynamicSupervisor.count_children(Server.DBTaskSupervisor)`
 - Frequency of `:max_children` errors in logs
 - Database connection pool usage

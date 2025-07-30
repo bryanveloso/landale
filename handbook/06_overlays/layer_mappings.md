@@ -37,10 +37,10 @@ The `Server.LayerMapping` module serves as the single source of truth for all la
 ```elixir
 # In Server.StreamProducer
 defp enrich_state_with_layers(state) do
-  enriched_active_content = 
+  enriched_active_content =
     if state.active_content do
       content_type = to_string(state.active_content.type)
-      Map.put(state.active_content, :layer, 
+      Map.put(state.active_content, :layer,
         Server.LayerMapping.get_layer(content_type, Atom.to_string(state.current_show)))
     else
       nil
@@ -114,9 +114,7 @@ Layer mappings are context-aware and change based on the current show type:
 "pr_merged" => "midground"             # Pull request merged
 "sub_train" => "midground"             # Subscription train
 
-# Background - Development stats
-"commit_stats" => "background"         # Commit statistics
-"build_status" => "background"         # Build status information
+# Background - Stream stats
 "recent_follows" => "background"       # Recent follower list
 "emote_stats" => "background"          # Emote usage statistics
 ```
@@ -239,10 +237,10 @@ The overlay components now use the server-provided layer field:
 
 ```typescript
 // In omnibar.tsx
-allContent.forEach(content => {
+allContent.forEach((content) => {
   if (content && content.type && content.layer) {
     const targetLayer = content.layer as 'foreground' | 'midground' | 'background'
-    
+
     // Assign to layer if higher priority than existing
     if (!layerContent[targetLayer] || content.priority > layerContent[targetLayer].priority) {
       layerContent[targetLayer] = content
@@ -258,7 +256,7 @@ interface StreamContent {
   type: string
   data: unknown
   priority: number
-  layer?: 'foreground' | 'midground' | 'background'  // Server-provided
+  layer?: 'foreground' | 'midground' | 'background' // Server-provided
   // ... other fields
 }
 ```
@@ -268,18 +266,21 @@ interface StreamContent {
 ### Layer Selection Guidelines
 
 **Choose Foreground for:**
+
 - Critical interrupts requiring immediate attention
 - Time-sensitive alerts that cannot be missed
 - Breaking news or emergency notifications
 - Game-over scenarios or major failures
 
 **Choose Midground for:**
+
 - Celebrations and achievements
 - Community interactions (subs, cheers, follows)
 - Milestone notifications
 - Non-critical but important updates
 
 **Choose Background for:**
+
 - Ambient information and statistics
 - Ticker content that rotates
 - Persistent data displays
@@ -296,16 +297,19 @@ interface StreamContent {
 
 ### Common Issues
 
-**Content Not Appearing**: 
+**Content Not Appearing**:
+
 - Check that the content type is mapped in `Server.LayerMapping`
 - Verify the show context is correct
 - Ensure event enrichment is happening in `StreamProducer`
 
-**Wrong Layer Assignment**: 
+**Wrong Layer Assignment**:
+
 - Check the mapping in the server module
 - Verify the content type string matches exactly
 
-**Missing Layer Field**: 
+**Missing Layer Field**:
+
 - Ensure you're using the enriched state from broadcasts
 - Check that `enrich_state_with_layers/1` is being called
 

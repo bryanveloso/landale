@@ -16,6 +16,7 @@ All services, regardless of pattern, implement the `Server.ServiceBehaviour` int
 ### When to Use
 
 Use the Simple Service pattern when:
+
 - Service has a single, well-defined responsibility
 - State management is straightforward
 - No complex process coordination required
@@ -28,11 +29,11 @@ defmodule Server.Services.MyService do
   use Server.Service,
     service_name: "my-service",
     behaviour: Server.Services.MyServiceBehaviour
-    
+
   use Server.Service.StatusReporter
-  
+
   @behaviour Server.ServiceBehaviour
-  
+
   # Service implementation...
 end
 ```
@@ -40,11 +41,13 @@ end
 ### Examples
 
 **Rainwave Service**
+
 - Single responsibility: Poll music API and broadcast updates
 - Simple state: current song, API credentials, health metrics
 - Uses `Server.Service` abstraction for common functionality
 
 **IronmonTCP Service**
+
 - Single responsibility: TCP server for game state updates
 - Simple state: connections, listen socket
 - Handles TCP protocol and broadcasts events
@@ -62,6 +65,7 @@ end
 ### When to Use
 
 Use the Complex Service pattern when:
+
 - Service requires multiple coordinated processes
 - Complex state machines are needed (gen_statem)
 - Service manages sub-services or child processes
@@ -91,12 +95,14 @@ Use the Complex Service pattern when:
 ### Examples
 
 **OBS Service**
+
 - Multiple responsibilities: WebSocket connection, scene management, stream control
 - Complex state machine: Uses gen_statem for connection states
 - Sub-services: Connection, SceneManager, StreamManager, EventHandler
 - Facade provides unified interface while delegating to specialists
 
 **Twitch Service**
+
 - Multiple responsibilities: WebSocket, OAuth, EventSub subscriptions
 - Decomposed architecture: Separate processes for each concern
 - Complex initialization: OAuth flow before WebSocket connection
@@ -107,23 +113,23 @@ Use the Complex Service pattern when:
 ```elixir
 defmodule Server.Services.ComplexService do
   @behaviour Server.ServiceBehaviour
-  
+
   # Facade implementation
   def start_link(opts) do
     children = [
       {Registry, keys: :unique, name: __MODULE__.Registry},
       {__MODULE__.Supervisor, opts}
     ]
-    
+
     Supervisor.start_link(children, strategy: :one_for_one)
   end
-  
+
   # ServiceBehaviour implementation
   @impl Server.ServiceBehaviour
   def get_health do
     # Aggregate health from all sub-components
   end
-  
+
   @impl Server.ServiceBehaviour
   def get_info do
     %{
@@ -250,7 +256,7 @@ test "service handles API errors gracefully" do
   expect(MyServiceClientMock, :fetch_data, fn ->
     {:error, :timeout}
   end)
-  
+
   assert {:ok, %{status: :degraded}} = MyService.get_health()
 end
 ```

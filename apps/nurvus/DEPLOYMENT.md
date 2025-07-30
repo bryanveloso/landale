@@ -6,7 +6,7 @@ Complete deployment guide for Nurvus single-executable process manager.
 
 Nurvus is deployed as single executables to each machine in your streaming setup:
 
-- **Zelan (Mac Studio)** - AI services (Phononmaser, Analysis, LM Studio)  
+- **Zelan (Mac Studio)** - AI services (Phononmaser, Analysis, LM Studio)
 - **Demi (Windows PC)** - Streaming apps (OBS, VTube Studio, TITS)
 - **Saya (Mac Mini)** - Docker services (Landale stack)
 - **Alys (Windows VM)** - Automation (Streamer.Bot)
@@ -18,7 +18,7 @@ Nurvus is deployed as single executables to each machine in your streaming setup
 Download the appropriate package for your machine from GitHub Actions artifacts:
 
 - `nurvus-zelan.tar.gz` - Mac Studio
-- `nurvus-saya.tar.gz` - Mac Mini  
+- `nurvus-saya.tar.gz` - Mac Mini
 - `nurvus-demi.tar.gz` - Windows PC
 - `nurvus-alys.tar.gz` - Windows VM
 
@@ -48,8 +48,9 @@ chmod +x nurvus_macos
 ```
 
 **Alternative (GUI method):**
+
 1. Try to run Nurvus (you'll see a security warning)
-2. Go to **System Settings** → **Privacy & Security** 
+2. Go to **System Settings** → **Privacy & Security**
 3. Click **"Allow Anyway"** in the Security section
 4. Try running again and click **"Open"**
 
@@ -119,8 +120,9 @@ curl http://zelan.local:4001/health
 ```
 
 **Managed Processes:**
+
 - Phononmaser (Python audio service)
-- Analysis (Python ML service) 
+- Analysis (Python ML service)
 - LM Studio (Local language model server)
 
 ### Saya (Mac Mini) - Docker Services
@@ -142,6 +144,7 @@ curl http://saya.local:4001/health
 ```
 
 **Managed Processes:**
+
 - Landale Docker Stack (Main application)
 
 ### Demi (Windows PC) - Streaming
@@ -162,6 +165,7 @@ curl http://demi.local:4001/health
 ```
 
 **Managed Processes:**
+
 - OBS Studio (Streaming software)
 - VTube Studio (Avatar software)
 - TITS Launcher (Text-to-speech)
@@ -184,6 +188,7 @@ curl http://alys.local:4001/health
 ```
 
 **Managed Processes:**
+
 - Streamer.Bot (Stream automation)
 
 ## Configuration
@@ -204,11 +209,13 @@ export MIX_ENV=prod
 ### Config File Locations
 
 **Default locations by priority:**
+
 1. `NURVUS_CONFIG_FILE` environment variable
 2. Application config `:nurvus, :config_file`
 3. `~/.nurvus/processes.json` (default)
 
 **Auto-initialization:**
+
 - On first run, if `~/.nurvus/` doesn't exist, Nurvus will copy `./processes.json` to `~/.nurvus/processes.json`
 
 ### Network Configuration
@@ -234,7 +241,7 @@ New-NetFirewallRule -DisplayName "Nurvus" -Direction Inbound -Port 4001 -Protoco
 # Basic health
 curl http://localhost:4001/health
 
-# Detailed status  
+# Detailed status
 curl http://localhost:4001/api/health/detailed
 
 # Platform info
@@ -251,7 +258,7 @@ Nurvus.TelemetryExample.attach_handlers()
 
 # Available events:
 # - [:nurvus, :process, :started|:stopped|:crashed]
-# - [:nurvus, :http, :request] 
+# - [:nurvus, :http, :request]
 # - [:nurvus, :metrics, :collected]
 # - [:nurvus, :alert, :generated]
 ```
@@ -259,14 +266,17 @@ Nurvus.TelemetryExample.attach_handlers()
 ### Log Locations
 
 **Development:**
+
 - Console output
 
 **Systemd:**
+
 ```bash
 sudo journalctl -u nurvus -f
 ```
 
 **Windows Service:**
+
 - Windows Event Viewer → Applications
 - Or redirect to file with NSSM
 
@@ -275,6 +285,7 @@ sudo journalctl -u nurvus -f
 ### Common Issues
 
 **Port already in use:**
+
 ```bash
 # Find process using port 4001
 lsof -i :4001              # macOS/Linux
@@ -285,6 +296,7 @@ export NURVUS_PORT=4002
 ```
 
 **Permission denied:**
+
 ```bash
 # Fix ownership (Unix)
 sudo chown -R $USER:$USER /opt/nurvus
@@ -293,6 +305,7 @@ sudo chown -R $USER:$USER /opt/nurvus
 ```
 
 **Process won't start:**
+
 ```bash
 # Check logs for errors
 tail -f nurvus.log
@@ -306,6 +319,7 @@ python --version  # For Python processes
 ```
 
 **Network connectivity:**
+
 ```bash
 # Test from another machine
 curl -v http://machine.local:4001/health
@@ -385,6 +399,7 @@ echo "+P 1048576" >> /opt/nurvus/releases/0.1.0/vm.args
 ## Support
 
 For issues or questions:
+
 1. Check logs first
 2. Verify network connectivity
 3. Test individual process commands manually

@@ -28,7 +28,7 @@ export function useActivityLog() {
   const [eventsChannel, setEventsChannel] = createSignal<Channel | null>(null)
 
   const addEvent = (event: ActivityEvent) => {
-    setEvents(prev => [event, ...prev].slice(0, 1000))
+    setEvents((prev) => [event, ...prev].slice(0, 1000))
   }
 
   const transformEvent = (type: string, payload: EventPayload): ActivityEvent | null => {
@@ -73,22 +73,22 @@ export function useActivityLog() {
       const socket = streamService.getSocket()
       if (socket) {
         const channel = socket.channel('events:all', {})
-        
+
         channel.on('chat_message', (payload: EventPayload) => {
           const event = transformEvent('chat_message', payload)
           if (event) addEvent(event)
         })
-        
+
         channel.on('follower', (payload: EventPayload) => {
           const event = transformEvent('follower', payload)
           if (event) addEvent(event)
         })
-        
+
         channel.on('subscription', (payload: EventPayload) => {
           const event = transformEvent('subscription', payload)
           if (event) addEvent(event)
         })
-        
+
         channel.on('cheer', (payload: EventPayload) => {
           const event = transformEvent('cheer', payload)
           if (event) addEvent(event)
@@ -113,7 +113,7 @@ export function useActivityLog() {
     error,
     hasMore,
     filters,
-    applyFilters: (newFilters: Partial<ActivityLogFilters>) => setFilters(prev => ({ ...prev, ...newFilters })),
+    applyFilters: (newFilters: Partial<ActivityLogFilters>) => setFilters((prev) => ({ ...prev, ...newFilters })),
     clearFilters: () => setFilters({ limit: 50 }),
     loadMore: () => {}
   }

@@ -3,6 +3,7 @@
 ## WebSocket Testing (Browser Console)
 
 ### Check Connection Status
+
 ```javascript
 // Check if socket is connected
 window.phoenixSocket.connectionState()
@@ -15,9 +16,10 @@ window.layerState()
 ```
 
 ### Test Channel Communication
+
 ```javascript
 // Get the stream channel (if connected)
-const channel = window.phoenixSocket.channels.find(c => c.topic === 'stream:overlays')
+const channel = window.phoenixSocket.channels.find((c) => c.topic === 'stream:overlays')
 
 // Request fresh state from server
 channel.push('request_state', {})
@@ -30,9 +32,10 @@ channel.push('request_state', {})
 ```
 
 ### Test Layer State Transformation
+
 ```javascript
 // View raw server state vs transformed client state
-console.log('Server state:', window.phoenixSocket.channels.find(c => c.topic === 'stream:overlays').state)
+console.log('Server state:', window.phoenixSocket.channels.find((c) => c.topic === 'stream:overlays').state)
 console.log('Client layer state:', window.layerState())
 ```
 

@@ -2,8 +2,8 @@ name: TypeScript CI
 
 on:
   push:
-    branches: [ main, feature/* ]
-    paths: 
+    branches: [main, feature/*]
+    paths:
       - 'apps/overlays/**'
       - 'apps/dashboard/**'
       - 'packages/**'
@@ -11,10 +11,10 @@ on:
       - 'package.json'
       - 'bun.lock'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'apps/overlays/**'
-      - 'apps/dashboard/**' 
+      - 'apps/dashboard/**'
       - 'packages/**'
       - 'turbo.json'
       - 'package.json'
@@ -24,7 +24,7 @@ jobs:
   test:
     name: Test and Lint TypeScript
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

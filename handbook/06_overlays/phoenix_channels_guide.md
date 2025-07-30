@@ -20,7 +20,8 @@ socket.connect()
 
 // Join a channel
 const channel = socket.channel('overlay:obs')
-channel.join()
+channel
+  .join()
   .receive('ok', () => console.log('Connected to OBS overlay'))
   .receive('error', (error) => console.error('Failed to join:', error))
 ```
@@ -35,6 +36,7 @@ channel.join()
 #### Commands (Request/Response)
 
 ##### OBS Commands
+
 - `obs:status` - Current OBS connection and streaming status
 - `obs:scenes` - Scene list and current scene
 - `obs:stream_status` - Streaming status (bitrate, duration, frames)
@@ -46,32 +48,31 @@ channel.join()
 
 ```typescript
 // Get OBS status
-channel.push('obs:status', {})
-  .receive('ok', (response) => {
-    console.log('OBS Status:', response)
-    // Response: { connected: boolean, streaming: boolean, recording: boolean, ... }
-  })
+channel.push('obs:status', {}).receive('ok', (response) => {
+  console.log('OBS Status:', response)
+  // Response: { connected: boolean, streaming: boolean, recording: boolean, ... }
+})
 
 // Get current scene
-channel.push('obs:scenes', {})
-  .receive('ok', (response) => {
-    console.log('Current Scene:', response.currentProgramSceneName)
-    console.log('Available Scenes:', response.scenes)
-  })
+channel.push('obs:scenes', {}).receive('ok', (response) => {
+  console.log('Current Scene:', response.currentProgramSceneName)
+  console.log('Available Scenes:', response.scenes)
+})
 ```
 
 ##### Twitch Commands
+
 - `twitch:status` - EventSub connection status and subscription health
 
 ```typescript
-channel.push('twitch:status', {})
-  .receive('ok', (response) => {
-    console.log('Twitch Status:', response)
-    // Response: { connected: boolean, subscriptions: {...}, webhook_url: string }
-  })
+channel.push('twitch:status', {}).receive('ok', (response) => {
+  console.log('Twitch Status:', response)
+  // Response: { connected: boolean, subscriptions: {...}, webhook_url: string }
+})
 ```
 
 ##### IronMON Commands
+
 - `ironmon:challenges` - List available challenges
 - `ironmon:checkpoints` - Get checkpoints for a challenge (requires `challenge_id`)
 - `ironmon:checkpoint_stats` - Get statistics for a checkpoint (requires `checkpoint_id`)
@@ -80,32 +81,30 @@ channel.push('twitch:status', {})
 
 ```typescript
 // Get challenges list
-channel.push('ironmon:challenges', {})
-  .receive('ok', (challenges) => console.log(challenges))
+channel.push('ironmon:challenges', {}).receive('ok', (challenges) => console.log(challenges))
 
 // Get checkpoints for challenge ID 1
-channel.push('ironmon:checkpoints', { challenge_id: 1 })
-  .receive('ok', (checkpoints) => console.log(checkpoints))
+channel.push('ironmon:checkpoints', { challenge_id: 1 }).receive('ok', (checkpoints) => console.log(checkpoints))
 
 // Get recent results (last 10)
-channel.push('ironmon:recent_results', { limit: 10 })
-  .receive('ok', (results) => console.log(results))
+channel.push('ironmon:recent_results', { limit: 10 }).receive('ok', (results) => console.log(results))
 ```
 
 ##### Music Commands
+
 - `rainwave:status` - Current music status and station info
 
 ##### System Commands
+
 - `system:status` - Overall system health and service status
 - `system:services` - Detailed service information
 
 ```typescript
 // Get system health overview
-channel.push('system:status', {})
-  .receive('ok', (status) => {
-    console.log('System Health:', status.summary.health_percentage)
-    console.log('Services:', status.services)
-  })
+channel.push('system:status', {}).receive('ok', (status) => {
+  console.log('System Health:', status.summary.health_percentage)
+  console.log('Services:', status.services)
+})
 ```
 
 #### Events (Server → Client)
@@ -152,11 +151,13 @@ channel.on('initial_state', (state) => {
 #### Commands
 
 ##### State Management
+
 - `ping` - Connection health check
 - `request_state` - Get current overlay state
 - `request_queue_state` - Get current queue state
 
 ##### Queue Management
+
 - `remove_queue_item` - Remove item from queue (requires `id`)
 - `force_content` - Force takeover content (requires `type`, `data`, `duration`)
 
@@ -167,14 +168,15 @@ const streamChannel = socket.channel('stream:overlays')
 streamChannel.push('request_state', {})
 
 // Remove queue item
-streamChannel.push('remove_queue_item', { id: 'alert_123' })
+streamChannel
+  .push('remove_queue_item', { id: 'alert_123' })
   .receive('ok', (response) => console.log('Item removed:', response))
 
 // Force takeover content
 streamChannel.push('force_content', {
   type: 'technical-difficulties',
   data: { message: 'Stream will return shortly' },
-  duration: 30000  // 30 seconds
+  duration: 30000 // 30 seconds
 })
 ```
 
@@ -204,6 +206,7 @@ streamChannel.on('queue_state', (queue) => {
 #### Available Commands
 
 ##### OBS Control
+
 - `obs:get_status` - Request current OBS status
 - `obs:start_streaming` - Start streaming
 - `obs:stop_streaming` - Stop streaming
@@ -212,6 +215,7 @@ streamChannel.on('queue_state', (queue) => {
 - `obs:set_current_scene` - Change scene (requires `scene_name`)
 
 ##### Rainwave Control
+
 - `rainwave:get_status` - Get music service status
 - `rainwave:set_enabled` - Enable/disable service (requires `enabled: boolean`)
 - `rainwave:set_station` - Change station (requires `station_id`)
@@ -220,7 +224,8 @@ streamChannel.on('queue_state', (queue) => {
 const dashboardChannel = socket.channel('dashboard:main')
 
 // Start streaming
-dashboardChannel.push('obs:start_streaming', {})
+dashboardChannel
+  .push('obs:start_streaming', {})
   .receive('ok', () => console.log('Streaming started'))
   .receive('error', (error) => console.error('Failed to start:', error))
 
@@ -278,11 +283,10 @@ Real-time transcription updates for speech-to-text overlays.
 All channels use consistent error response format:
 
 ```typescript
-channel.push('some:command', {})
-  .receive('error', (error) => {
-    console.error('Command failed:', error.message)
-    // Error object: { message: string }
-  })
+channel.push('some:command', {}).receive('error', (error) => {
+  console.error('Command failed:', error.message)
+  // Error object: { message: string }
+})
 ```
 
 ## Connection Health
@@ -292,10 +296,9 @@ Use ping/pong for connection monitoring:
 ```typescript
 // Send ping every 30 seconds
 setInterval(() => {
-  channel.push('ping', { timestamp: Date.now() })
-    .receive('ok', (response) => {
-      console.log('Pong received:', response.timestamp)
-    })
+  channel.push('ping', { timestamp: Date.now() }).receive('ok', (response) => {
+    console.log('Pong received:', response.timestamp)
+  })
 }, 30000)
 ```
 
@@ -308,11 +311,10 @@ setInterval(() => {
 const overlayChannel = socket.channel('overlay:obs')
 
 // 1. Join channel
-overlayChannel.join()
-  .receive('ok', () => {
-    // 2. Get initial state
-    overlayChannel.push('obs:status', {})
-  })
+overlayChannel.join().receive('ok', () => {
+  // 2. Get initial state
+  overlayChannel.push('obs:status', {})
+})
 
 // 3. Listen for real-time updates
 overlayChannel.on('obs_event', (event) => {
@@ -330,15 +332,13 @@ overlayChannel.on('initial_state', (state) => {
 ```typescript
 const systemChannel = socket.channel('overlay:system')
 
-systemChannel.join()
-  .receive('ok', () => {
-    // Get overall system status
-    systemChannel.push('system:status', {})
-      .receive('ok', (status) => {
-        console.log(`System Health: ${status.summary.health_percentage}%`)
-        console.log(`Services: ${status.summary.healthy_services}/${status.summary.total_services}`)
-      })
+systemChannel.join().receive('ok', () => {
+  // Get overall system status
+  systemChannel.push('system:status', {}).receive('ok', (status) => {
+    console.log(`System Health: ${status.summary.health_percentage}%`)
+    console.log(`Services: ${status.summary.healthy_services}/${status.summary.total_services}`)
   })
+})
 
 // Monitor health changes
 systemChannel.on('health_update', (data) => {
@@ -359,7 +359,8 @@ queueChannel.on('queue_state', (queue) => {
 
 // Remove items from queue
 function removeQueueItem(itemId) {
-  queueChannel.push('remove_queue_item', { id: itemId })
+  queueChannel
+    .push('remove_queue_item', { id: itemId })
     .receive('ok', () => console.log('Item removed'))
     .receive('error', (error) => console.error('Remove failed:', error))
 }

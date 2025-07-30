@@ -1,7 +1,7 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test } from 'bun:test'
 
-describe("Dashboard Setup", () => {
-  test("should pass basic setup check", () => {
+describe('Dashboard Setup', () => {
+  test('should pass basic setup check', () => {
     expect(true).toBe(true)
   })
 })

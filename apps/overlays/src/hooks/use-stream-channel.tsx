@@ -25,10 +25,13 @@ export interface StreamState {
     duration?: number
     layer?: 'foreground' | 'midground' | 'background'
   }>
-  ticker_rotation: Array<string | {
-    type: string
-    layer: 'foreground' | 'midground' | 'background'
-  }>
+  ticker_rotation: Array<
+    | string
+    | {
+        type: string
+        layer: 'foreground' | 'midground' | 'background'
+      }
+  >
   metadata: {
     last_updated: string
     state_version: number
@@ -65,23 +68,23 @@ const DEFAULT_STATE: StreamState = {
 export function useStreamChannel() {
   const { socket, isConnected } = useSocket()
   const [streamState, setStreamState] = createSignal<StreamState>(DEFAULT_STATE)
-  
+
   let channel: Channel | null = null
-  
+
   // Initialize logger
   const correlationId = `overlay-stream-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
   const logger = createLogger({
     service: 'landale-overlays',
     level: 'debug'
   }).child({ module: 'stream-channel', correlationId })
-  
+
   const joinChannel = () => {
     const currentSocket = socket()
     if (!currentSocket) return
-    
+
     // Join the stream channel
     channel = currentSocket.channel('stream:overlays', {})
-    
+
     // Handle channel events
     channel.on('stream_state', (payload: StreamState) => {
       logger.info('Stream state received', {
@@ -94,7 +97,7 @@ export function useStreamChannel() {
       })
       setStreamState(payload)
     })
-    
+
     channel.on('show_changed', (payload: ShowChange) => {
       logger.info('Show changed', {
         metadata: {
@@ -104,7 +107,7 @@ export function useStreamChannel() {
       })
       // Handle show changes for theme switching
     })
-    
+
     channel.on('interrupt', (payload: unknown) => {
       logger.info('Priority interrupt received', {
         metadata: {
@@ -115,7 +118,7 @@ export function useStreamChannel() {
       })
       // Handle priority interrupts
     })
-    
+
     channel.on('content_update', (payload: ContentUpdate) => {
       logger.debug('Content update received', {
         metadata: {
@@ -125,9 +128,10 @@ export function useStreamChannel() {
       })
       // Handle real-time content updates
     })
-    
+
     // Join channel with error handling
-    channel.join()
+    channel
+      .join()
       .receive('ok', (resp: PhoenixResponse) => {
         logger.info('Channel joined successfully', {
           operation: 'channel_join',
@@ -151,17 +155,18 @@ export function useStreamChannel() {
         })
       })
   }
-  
+
   const leaveChannel = () => {
     if (channel) {
       channel.leave()
       channel = null
     }
   }
-  
+
   const sendMessage = (event: string, payload: unknown = {}) => {
     if (channel && isConnected()) {
-      channel.push(event, payload)
+      channel
+        .push(event, payload)
         .receive('ok', (resp: PhoenixResponse) => {
           logger.debug('Message sent successfully', {
             operation: event,
@@ -182,7 +187,7 @@ export function useStreamChannel() {
       })
     }
   }
-  
+
   // Watch for socket connection changes and auto-join channel
   createEffect(() => {
     const connected = isConnected()
@@ -192,12 +197,12 @@ export function useStreamChannel() {
       leaveChannel()
     }
   })
-  
+
   // Cleanup on unmount
   onCleanup(() => {
     leaveChannel()
   })
-  
+
   return {
     streamState,
     isConnected,

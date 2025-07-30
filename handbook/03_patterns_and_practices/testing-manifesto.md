@@ -1,6 +1,6 @@
 # The Landale Testing Manifesto
 
-*Last Updated: 2025-07-24*
+_Last Updated: 2025-07-24_
 
 After fixing 45+ test failures and deleting all property-based tests, we've learned critical lessons about what makes tests valuable versus worthless. This manifesto captures those hard-won insights to ensure we never write bad tests again.
 
@@ -30,6 +30,7 @@ assert :sys.get_state(pid).timer_ref != nil
 If you can't explain what user-facing behavior breaks when this test fails, delete it.
 
 **Questions to ask:**
+
 - What feature stops working if this test fails?
 - Does this test give me confidence to refactor?
 - Would a user notice if this behavior changed?
@@ -77,10 +78,10 @@ Each test should tell a clear story about expected behavior.
 test "disconnects cleanly when owner process terminates" do
   # Given: A connection with an owner
   {:ok, conn} = start_connection(owner: self())
-  
+
   # When: The owner terminates
   Process.exit(self(), :normal)
-  
+
   # Then: The connection shuts down
   refute Process.alive?(conn)
 end
@@ -139,14 +140,18 @@ end
 ## Anti-Patterns We've Eliminated
 
 ### 1. Log Testing
+
 **Never test log output.** We removed dozens of these:
+
 ```elixir
 # ❌ DELETED
 assert capture_log(fn -> ... end) =~ "some log message"
 ```
 
 ### 2. Property Testing Without Purpose
+
 **We deleted ALL property tests** because they were testing meaningless scenarios:
+
 ```elixir
 # ❌ DELETED - What value did this provide?
 property "handles arbitrary request IDs" do
@@ -157,7 +162,9 @@ end
 ```
 
 ### 3. External API Calls in Tests
+
 **Never make real HTTP requests:**
+
 ```elixir
 # ❌ BEFORE - Caused timeouts and flakiness
 test "creates Twitch subscription" do
@@ -166,7 +173,7 @@ end
 
 # ✅ AFTER - Fast and reliable
 test "creates Twitch subscription" do
-  expect(TwitchClient.Mock, :post, fn _, _, _ -> 
+  expect(TwitchClient.Mock, :post, fn _, _, _ ->
     {:ok, %{status: 202}}
   end)
 end
@@ -179,7 +186,7 @@ We follow the Testing Trophy model (not pyramid):
 ```
         🏆 E2E Tests (Few)
       /    \
-    /  Integration  \  
+    /  Integration  \
   /    Tests (Some)   \
  /  Unit Tests (Many)  \
 /______________________\
@@ -201,6 +208,7 @@ We follow the Testing Trophy model (not pyramid):
 > "Every bad test we write is technical debt that compounds. A bad test is worse than no test because it gives false confidence and breaks when you need it least."
 
 When in doubt:
+
 - Test behavior, not implementation
 - Delete tests that test nothing
 - Make tests tell a story

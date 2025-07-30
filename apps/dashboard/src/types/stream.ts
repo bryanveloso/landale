@@ -81,10 +81,13 @@ export interface ServerStreamState {
   active_content: StreamContent | null
   priority_level: string
   interrupt_stack: StreamContent[]
-  ticker_rotation: Array<string | {
-    type: string
-    layer: 'foreground' | 'midground' | 'background'
-  }>
+  ticker_rotation: Array<
+    | string
+    | {
+        type: string
+        layer: 'foreground' | 'midground' | 'background'
+      }
+  >
   metadata: {
     last_updated: string
     state_version: number
@@ -202,7 +205,8 @@ export function validateTakeoverCommand(cmd: unknown): cmd is TakeoverCommand {
     cmd !== null &&
     isValidTakeoverType((cmd as Record<string, unknown>).type as string) &&
     typeof (cmd as Record<string, unknown>).message === 'string' &&
-    ((cmd as Record<string, unknown>).duration === undefined || typeof (cmd as Record<string, unknown>).duration === 'number')
+    ((cmd as Record<string, unknown>).duration === undefined ||
+      typeof (cmd as Record<string, unknown>).duration === 'number')
   )
 }
 

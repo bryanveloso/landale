@@ -31,6 +31,7 @@ All endpoints return consistent error responses in JSON format:
 ```
 
 HTTP status codes used:
+
 - `200` - Success
 - `201` - Created
 - `400` - Bad Request (validation errors)
@@ -46,6 +47,7 @@ HTTP status codes used:
 Health check endpoint for service monitoring.
 
 **Response:**
+
 ```json
 {
   "status": "ok",
@@ -62,6 +64,7 @@ Health check endpoint for service monitoring.
 Get overall system status including process counts and health metrics.
 
 **Response:**
+
 ```json
 {
   "total_processes": 3,
@@ -84,6 +87,7 @@ Get overall system status including process counts and health metrics.
 List all configured processes with their current status.
 
 **Response:**
+
 ```json
 {
   "processes": [
@@ -94,7 +98,7 @@ List all configured processes with their current status.
     },
     {
       "id": "worker",
-      "name": "Background Worker", 
+      "name": "Background Worker",
       "status": "stopped"
     }
   ]
@@ -108,9 +112,11 @@ List all configured processes with their current status.
 Get detailed information about a specific process.
 
 **Parameters:**
+
 - `id` (string, required) - Process identifier
 
 **Response:**
+
 ```json
 {
   "id": "my_app",
@@ -136,6 +142,7 @@ Get detailed information about a specific process.
 Add a new process configuration.
 
 **Request Body:**
+
 ```json
 {
   "id": "my_app",
@@ -154,11 +161,13 @@ Add a new process configuration.
 ```
 
 **Required Fields:**
+
 - `id` (string) - Unique process identifier
-- `name` (string) - Human-readable process name  
+- `name` (string) - Human-readable process name
 - `command` (string) - Executable command
 
 **Optional Fields:**
+
 - `args` (array) - Command arguments (default: `[]`)
 - `cwd` (string) - Working directory (default: `null`)
 - `env` (object) - Environment variables (default: `{}`)
@@ -167,6 +176,7 @@ Add a new process configuration.
 - `restart_window` (integer) - Restart window in seconds (default: `60`)
 
 **Response:**
+
 ```json
 {
   "status": "created",
@@ -181,9 +191,11 @@ Add a new process configuration.
 Remove a process configuration and stop it if running.
 
 **Parameters:**
+
 - `id` (string, required) - Process identifier
 
 **Response:**
+
 ```json
 {
   "status": "removed",
@@ -202,9 +214,11 @@ Remove a process configuration and stop it if running.
 Start a configured process.
 
 **Parameters:**
+
 - `id` (string, required) - Process identifier
 
 **Response:**
+
 ```json
 {
   "status": "started",
@@ -219,12 +233,14 @@ Start a configured process.
 Stop a running process.
 
 **Parameters:**
+
 - `id` (string, required) - Process identifier
 
 **Response:**
+
 ```json
 {
-  "status": "stopped", 
+  "status": "stopped",
   "process_id": "my_app"
 }
 ```
@@ -236,9 +252,11 @@ Stop a running process.
 Restart a process (stop then start).
 
 **Parameters:**
+
 - `id` (string, required) - Process identifier
 
 **Response:**
+
 ```json
 {
   "status": "restarted",
@@ -257,9 +275,11 @@ Restart a process (stop then start).
 Get performance metrics for a specific process.
 
 **Parameters:**
+
 - `id` (string, required) - Process identifier
 
 **Response:**
+
 ```json
 {
   "current": {
@@ -290,6 +310,7 @@ Get performance metrics for a specific process.
 Get performance metrics for all processes.
 
 **Response:**
+
 ```json
 {
   "my_app": {
@@ -317,6 +338,7 @@ Get performance metrics for all processes.
 Get current system alerts for unhealthy processes.
 
 **Response:**
+
 ```json
 {
   "alerts": [
@@ -332,10 +354,12 @@ Get current system alerts for unhealthy processes.
 ```
 
 **Alert Types:**
+
 - `high_cpu` - CPU usage above 80%
 - `high_memory` - Memory usage above 500MB
 
 **Severity Levels:**
+
 - `warning` - Requires attention
 - `critical` - Immediate action needed
 
@@ -346,6 +370,7 @@ Get current system alerts for unhealthy processes.
 Clear all current alerts.
 
 **Response:**
+
 ```json
 {
   "status": "cleared"
@@ -363,6 +388,7 @@ Clear all current alerts.
 Gets platform information for the current machine.
 
 **Response:**
+
 ```json
 {
   "platform": "darwin",
@@ -381,6 +407,7 @@ Gets platform information for the current machine.
 Gets all running processes on the system (for debugging/monitoring).
 
 **Response:**
+
 ```json
 {
   "processes": [
@@ -402,9 +429,11 @@ Gets all running processes on the system (for debugging/monitoring).
 Checks if a specific process is running and gets its information.
 
 **URL Parameters:**
+
 - `name` (string): Process name to search for (URL encoded)
 
 **Response (Found):**
+
 ```json
 {
   "pid": 1234,
@@ -416,6 +445,7 @@ Checks if a specific process is running and gets its information.
 ```
 
 **Response (Not Found):**
+
 ```json
 {
   "error": "Process not found",
@@ -430,6 +460,7 @@ Checks if a specific process is running and gets its information.
 Loads machine-specific configuration and adds all processes to management.
 
 **Request Body:**
+
 ```json
 {
   "machine": "zelan"
@@ -437,6 +468,7 @@ Loads machine-specific configuration and adds all processes to management.
 ```
 
 **Response:**
+
 ```json
 {
   "status": "loaded",
@@ -452,6 +484,7 @@ Loads machine-specific configuration and adds all processes to management.
 Gets comprehensive health information for cross-machine monitoring.
 
 **Response:**
+
 ```json
 {
   "service": "nurvus",
@@ -528,17 +561,17 @@ Configuration can be overridden with environment variables:
 
 ```javascript
 // Fetch process list
-const response = await fetch('http://localhost:4001/api/processes');
-const { processes } = await response.json();
+const response = await fetch('http://localhost:4001/api/processes')
+const { processes } = await response.json()
 
 // Start a process
 await fetch(`http://localhost:4001/api/processes/my_app/start`, {
   method: 'POST'
-});
+})
 
 // Get real-time metrics
-const metrics = await fetch('http://localhost:4001/api/metrics');
-const processMetrics = await metrics.json();
+const metrics = await fetch('http://localhost:4001/api/metrics')
+const processMetrics = await metrics.json()
 ```
 
 ---
@@ -546,6 +579,7 @@ const processMetrics = await metrics.json();
 ## Error Examples
 
 **Validation Error:**
+
 ```json
 {
   "error": "\"name\" is required and must be a non-empty string"
@@ -553,6 +587,7 @@ const processMetrics = await metrics.json();
 ```
 
 **Process Not Found:**
+
 ```json
 {
   "error": "Process not found"
@@ -560,6 +595,7 @@ const processMetrics = await metrics.json();
 ```
 
 **Start Failure:**
+
 ```json
 {
   "error": "Failed to start process: command not found"

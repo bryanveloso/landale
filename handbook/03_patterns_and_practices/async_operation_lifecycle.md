@@ -15,7 +15,7 @@ let hideTimer: ReturnType<typeof setTimeout> | null = null
 
 // Setting timer with cleanup of previous timer
 if (payload.duration) {
-  if (hideTimer) clearTimeout(hideTimer)  // Clear existing timer first
+  if (hideTimer) clearTimeout(hideTimer) // Clear existing timer first
   hideTimer = setTimeout(() => {
     hideTakeover()
   }, payload.duration)
@@ -24,13 +24,14 @@ if (payload.duration) {
 // Component cleanup
 onCleanup(() => {
   if (hideTimer) {
-    clearTimeout(hideTimer)  // Clean up on unmount
-    hideTimer = null         // Clear reference for GC
+    clearTimeout(hideTimer) // Clean up on unmount
+    hideTimer = null // Clear reference for GC
   }
 })
 ```
 
 **Key principles:**
+
 - Store timer references with proper TypeScript typing
 - Clear existing timers before setting new ones (prevents accumulation)
 - Always clean up in `onCleanup()` for SolidJS components
@@ -51,7 +52,7 @@ const joinChannel = () => {
 
 const leaveChannel = () => {
   if (channel) {
-    channel.leave()  // Cancels all pending operations automatically
+    channel.leave() // Cancels all pending operations automatically
     channel = null
   }
 }
@@ -63,6 +64,7 @@ onCleanup(() => {
 ```
 
 **Phoenix benefits:**
+
 - `channel.leave()` automatically cancels all pending channel operations
 - Phoenix handles reconnection and queuing during disconnects
 - Socket disconnection automatically cleans up all associated channels
@@ -75,7 +77,7 @@ onCleanup(() => {
 onCleanup(() => {
   const currentSocket = socket()
   if (currentSocket) {
-    currentSocket.disconnect()  // Closes socket and ALL channels
+    currentSocket.disconnect() // Closes socket and ALL channels
   }
 })
 ```
@@ -90,12 +92,13 @@ createEffect(() => {
   if (connected && !channel) {
     joinChannel()
   } else if (!connected && channel) {
-    leaveChannel()  // Clean up when disconnected
+    leaveChannel() // Clean up when disconnected
   }
 })
 ```
 
 **Key principles:**
+
 - Use `createEffect()` to reactively manage async operations
 - Always provide cleanup logic for state changes
 - Handle both connection and disconnection scenarios
@@ -125,7 +128,9 @@ Comprehensive codebase audit found excellent async management:
 When adding new async operations:
 
 ### For Timers
+
 Follow the `takeover.tsx` pattern:
+
 ```typescript
 let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -143,7 +148,9 @@ onCleanup(() => {
 ```
 
 ### For Phoenix Channels
+
 Follow the `use-stream-channel.tsx` pattern:
+
 ```typescript
 let channel: Channel | null = null
 
@@ -158,7 +165,9 @@ onCleanup(cleanup)
 ```
 
 ### For Socket Connections
+
 Follow the `socket-provider.tsx` pattern:
+
 ```typescript
 onCleanup(() => {
   if (socket) {
@@ -168,11 +177,13 @@ onCleanup(() => {
 ```
 
 ### For SolidJS Effects
+
 Always include cleanup logic:
+
 ```typescript
 createEffect(() => {
   const resource = createResource()
-  
+
   onCleanup(() => {
     resource.cleanup()
   })
@@ -194,4 +205,4 @@ createEffect(() => {
 
 ---
 
-*These patterns ensure operations are properly cancelled when components unmount or connections terminate. The WebSocket-first architecture makes async lifecycle management much simpler than traditional HTTP-based systems.*
+_These patterns ensure operations are properly cancelled when components unmount or connections terminate. The WebSocket-first architecture makes async lifecycle management much simpler than traditional HTTP-based systems._

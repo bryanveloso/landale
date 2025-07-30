@@ -2,11 +2,11 @@ name: Dashboard CI
 
 on:
   push:
-    branches: [ main, feature/* ]
+    branches: [main, feature/*]
     paths:
       - 'apps/dashboard/**'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
       - 'apps/dashboard/**'
   workflow_dispatch:
@@ -15,7 +15,7 @@ jobs:
   test:
     name: Test & Lint
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -120,19 +120,19 @@ jobs:
       - name: Organize release assets
         run: |
           mkdir -p release-assets
-          
+
           # Find and copy macOS DMG
           find artifacts/dashboard-macos-latest -name "*.dmg" -exec cp {} release-assets/landale-dashboard-macos.dmg \;
-          
+
           # Find and copy Windows installer
           find artifacts/dashboard-windows-latest -name "*.exe" -exec cp {} release-assets/landale-dashboard-windows.exe \;
-          
+
           # Find and copy Linux AppImage
           find artifacts/dashboard-ubuntu-22.04 -name "*.AppImage" -exec cp {} release-assets/landale-dashboard-linux.AppImage \;
-          
+
           echo "📦 Release assets prepared:"
           ls -la release-assets/
-          
+
           echo "📏 Asset sizes:"
           du -h release-assets/* | sort -h
 
@@ -140,22 +140,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: dashboard-latest
-          name: "Landale Dashboard Latest Build"
+          name: 'Landale Dashboard Latest Build'
           body: |
             ## 🖥️ Landale Dashboard - Latest Build
-            
+
             **Note: These are development builds. Assets are automatically created and replaced on every new commit.**
-            
+
             ### 📦 Platform Packages:
             - **landale-dashboard-macos.dmg** - macOS Universal Binary (Apple Silicon + Intel)
             - **landale-dashboard-windows.exe** - Windows x64 Installer
             - **landale-dashboard-linux.AppImage** - Linux x64 Portable Executable
-            
+
             ### 🔧 System Requirements:
             - **macOS**: 10.15+ (Catalina or later)
-            - **Windows**: Windows 10+ (64-bit)  
+            - **Windows**: Windows 10+ (64-bit)
             - **Linux**: x64 systems with GTK3 support
-            
+
             Built from commit: ${{ github.sha }}
           files: |
             release-assets/*

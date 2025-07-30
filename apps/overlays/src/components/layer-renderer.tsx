@@ -9,16 +9,8 @@ export interface LayerRendererProps {
 export function LayerRenderer(props: LayerRendererProps) {
   return (
     <Show when={props.content}>
-      <div 
-        class="content-renderer"
-        data-content={props.contentType}
-        data-show-context={props.show}
-      >
-        <ContentComponent 
-          type={props.contentType} 
-          data={props.content} 
-          show={props.show}
-        />
+      <div class="content-renderer" data-content={props.contentType} data-show-context={props.show}>
+        <ContentComponent type={props.contentType} data={props.content} show={props.show} />
       </div>
     </Show>
   )
@@ -29,31 +21,31 @@ function ContentComponent(props: { type: string; data: unknown; show?: string })
   switch (props.type) {
     case 'alert':
       return <AlertContent data={props.data} show={props.show} />
-    
+
     case 'sub_train':
       return <SubTrainContent data={props.data} show={props.show} />
-    
+
     case 'emote_stats':
       return <EmoteStatsContent data={props.data} show={props.show} />
-    
+
     case 'recent_follows':
       return <FollowsContent data={props.data} show={props.show} />
-    
+
     case 'ironmon_run_stats':
       return <IronmonStatsContent data={props.data} show={props.show} />
-    
+
     case 'daily_stats':
       return <DailyStatsContent data={props.data} show={props.show} />
-    
+
     case 'commit_stats':
       return <CommitStatsContent data={props.data} show={props.show} />
-    
+
     case 'build_status':
       return <BuildStatusContent data={props.data} show={props.show} />
-    
+
     case 'stream_goals':
       return <StreamGoalsContent data={props.data} show={props.show} />
-    
+
     default:
       return <DefaultContent type={props.type} data={props.data} show={props.show} />
   }
@@ -81,7 +73,7 @@ function SubTrainContent(props: { data: unknown; show?: string }) {
 function EmoteStatsContent(props: { data: unknown; show?: string }) {
   const emotes = () => props.data?.regular_emotes || props.data?.emotes || {}
   const topEmotes = () => Object.entries(emotes()).slice(0, 3)
-  
+
   return (
     <div class="content-emote-stats">
       <div class="emote-list">
@@ -98,13 +90,15 @@ function EmoteStatsContent(props: { data: unknown; show?: string }) {
 
 function FollowsContent(props: { data: unknown; show?: string }) {
   const followers = () => props.data?.recent_followers || []
-  
+
   return (
     <div class="content-follows">
       <div class="follow-list">
-        {followers().slice(0, 3).map((follower: string) => (
-          <div class="follower">{follower}</div>
-        ))}
+        {followers()
+          .slice(0, 3)
+          .map((follower: string) => (
+            <div class="follower">{follower}</div>
+          ))}
       </div>
     </div>
   )
@@ -153,7 +147,7 @@ function BuildStatusContent(props: { data: unknown; show?: string }) {
 function StreamGoalsContent(props: { data: unknown; show?: string }) {
   const followerGoal = () => props.data?.follower_goal || { current: 0, target: 0 }
   const subGoal = () => props.data?.sub_goal || { current: 0, target: 0 }
-  
+
   return (
     <div class="content-stream-goals">
       <div class="goal-followers">

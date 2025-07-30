@@ -12,7 +12,7 @@ import type { TakeoverCommand } from '@/types/stream'
 import { Button } from './ui/button'
 import { createLogger } from '@landale/logger'
 
-const logger = createLogger({ 
+const logger = createLogger({
   service: 'dashboard',
   defaultMeta: { module: 'TakeoverPanel' }
 })
@@ -44,10 +44,8 @@ export function TakeoverPanel() {
       setLastSent(new Date().toLocaleTimeString())
       setTakeoverText('')
     } catch (error) {
-      logger.error('Failed to send takeover', { 
-        error: error instanceof Error 
-          ? { message: error.message, stack: error.stack }
-          : { message: String(error) }
+      logger.error('Failed to send takeover', {
+        error: error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) }
       })
     }
   }
@@ -56,10 +54,8 @@ export function TakeoverPanel() {
     try {
       await commands.clearTakeover()
     } catch (error) {
-      logger.error('Failed to clear takeover', { 
-        error: error instanceof Error 
-          ? { message: error.message, stack: error.stack }
-          : { message: String(error) }
+      logger.error('Failed to clear takeover', {
+        error: error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) }
       })
     }
   }

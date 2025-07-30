@@ -17,28 +17,30 @@ import { gsap } from 'gsap'
 export function useLayerOrchestrator(config = {}) {
   // Create GSAP context for managing all animations
   const ctx = gsap.context(() => {})
-  
+
   // Per-layer contexts for fine-grained control
   const layerContexts: Record<LayerPriority, gsap.Context | null> = {
     foreground: null,
     midground: null,
     background: null
   }
-  
+
   // CRITICAL: Clean up all animations when hook is disposed
   onCleanup(() => {
     // Clean up individual layer contexts first
-    Object.values(layerContexts).forEach(layerCtx => {
+    Object.values(layerContexts).forEach((layerCtx) => {
       if (layerCtx) {
         layerCtx.revert()
       }
     })
-    
+
     // Clean up main context
     ctx.revert()
   })
-  
-  return { /* ... */ }
+
+  return {
+    /* ... */
+  }
 }
 ```
 
@@ -50,10 +52,10 @@ For complex animation systems like our layer orchestrator:
 // Create per-layer context when registering element
 const registerLayer = (priority: LayerPriority, element: HTMLElement) => {
   layerElements[priority] = element
-  
+
   // Create context scoped to this element
   layerContexts[priority] = gsap.context(() => {}, element)
-  
+
   // Set initial state within main context
   ctx.add(() => {
     gsap.set(element, {
@@ -68,18 +70,18 @@ const registerLayer = (priority: LayerPriority, element: HTMLElement) => {
 const animateEnter = (element: HTMLElement, priority: LayerPriority) => {
   const layerCtx = layerContexts[priority]
   if (!layerCtx) return
-  
+
   layerCtx.add(() => {
     const timeline = gsap.timeline({
       onComplete: () => updateLayerState(priority, 'active')
     })
-    
+
     timeline.to(element, {
       opacity: 1,
       y: 0,
       scale: 1,
       duration: animConfig.enterDuration,
-      ease: "power2.out"
+      ease: 'power2.out'
     })
   })
 }
@@ -92,21 +94,21 @@ For SolidJS components with GSAP animations:
 ```typescript
 export function AnimatedLayer(props) {
   let layerRef: HTMLDivElement | undefined
-  
+
   // Register element and set up cleanup
   onMount(() => {
     if (props.onRegister && layerRef) {
       props.onRegister(props.priority, layerRef)
     }
   })
-  
+
   // CRITICAL: Unregister on cleanup
   onCleanup(() => {
     if (props.onUnregister) {
       props.onUnregister(props.priority)
     }
   })
-  
+
   return <div ref={layerRef}>{props.children}</div>
 }
 ```
@@ -138,7 +140,7 @@ const updateLayerState = (priority: LayerPriority, newState: LayerState) => {
   if (layerCtx) {
     layerCtx.revert() // This clears all animations in this context
   }
-  
+
   switch (newState) {
     case 'entering':
       animateEnter(element, priority)
@@ -177,9 +179,9 @@ describe('Memory Management', () => {
   test('unregisterLayer cleans up layer state', () => {
     orchestrator.registerLayer('background', mockElement)
     orchestrator.showLayer('background', { test: 'data' })
-    
+
     expect(orchestrator.getLayerState('background')).toBe('entering')
-    
+
     orchestrator.unregisterLayer('background')
     expect(orchestrator.getLayerState('background')).toBe('hidden')
   })
@@ -189,7 +191,7 @@ describe('Memory Management', () => {
 ## Why This Approach Works
 
 - **`gsap.context()`** provides automatic cleanup of all animations created within it
-- **Per-layer contexts** allow fine-grained control and prevent cross-layer interference  
+- **Per-layer contexts** allow fine-grained control and prevent cross-layer interference
 - **`onCleanup()` integration** ensures SolidJS lifecycle properly cleans up GSAP
 - **Memoization** prevents performance regressions from reactive recalculations
 
@@ -208,4 +210,4 @@ describe('Memory Management', () => {
 
 ---
 
-*This pattern is essential for any GSAP usage in SolidJS. Memory leaks in animation systems compound quickly during long streaming sessions.*
+_This pattern is essential for any GSAP usage in SolidJS. Memory leaks in animation systems compound quickly during long streaming sessions._

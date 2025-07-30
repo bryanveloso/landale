@@ -53,9 +53,9 @@ export interface StreamStatusData {
   started_at?: string
 }
 
-export type ActivityEventData = 
+export type ActivityEventData =
   | ChatMessageData
-  | FollowData  
+  | FollowData
   | SubscriptionData
   | CheerData
   | ChannelUpdateData
@@ -146,7 +146,7 @@ export const EVENT_TYPES = {
   STREAM_OFFLINE: 'stream.offline'
 } as const
 
-export type EventType = typeof EVENT_TYPES[keyof typeof EVENT_TYPES]
+export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES]
 
 // Event type display names for UI
 export const EVENT_TYPE_LABELS: Record<EventType, string> = {

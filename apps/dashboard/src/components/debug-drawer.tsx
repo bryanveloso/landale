@@ -45,9 +45,9 @@ export function DebugDrawer() {
     if (!socket) {
       throw new Error('Socket not available')
     }
-    
+
     const channel = socket.channel('overlay:primary')
-    
+
     return new Promise((resolve) => {
       channel
         .push(command, data)
@@ -105,8 +105,8 @@ export function DebugDrawer() {
       setLastAction(`Successfully sent ${alertType} alert`)
       setAlertMessage('')
     } else {
-      const errorMessage = result.success 
-        ? `Failed to send alert: ${result.data?.error || 'Unknown error'}` 
+      const errorMessage = result.success
+        ? `Failed to send alert: ${result.data?.error || 'Unknown error'}`
         : result.error.userMessage || 'Operation failed'
       setLastAction(errorMessage)
     }

@@ -5,16 +5,7 @@ import type { EventType, ActivityEvent, ChatMessageData, CheerData } from '@/typ
 import { EVENT_TYPES, EVENT_TYPE_LABELS } from '@/types/activity-log'
 
 export function ActivityLogPanel() {
-  const {
-    events,
-    loading,
-    error,
-    filters,
-    hasMore,
-    applyFilters,
-    clearFilters,
-    loadMore
-  } = useActivityLog()
+  const { events, loading, error, filters, hasMore, applyFilters, clearFilters, loadMore } = useActivityLog()
 
   const handleFilterChange = (eventType?: EventType) => {
     applyFilters({
@@ -24,9 +15,9 @@ export function ActivityLogPanel() {
   }
 
   const formatEventTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
     })
   }
 
@@ -34,22 +25,22 @@ export function ActivityLogPanel() {
     switch (event.event_type) {
       case EVENT_TYPES.CHAT_MESSAGE:
         return `${event.user_name}: ${(event.data as ChatMessageData).message}`
-      
+
       case EVENT_TYPES.FOLLOW:
         return `${event.user_name} followed`
-      
+
       case EVENT_TYPES.SUBSCRIBE:
         return `${event.user_name} subscribed`
-      
+
       case EVENT_TYPES.CHEER:
         return `${event.user_name} cheered ${(event.data as CheerData).bits} bits`
-      
+
       case EVENT_TYPES.STREAM_ONLINE:
         return 'Stream went online'
-      
+
       case EVENT_TYPES.STREAM_OFFLINE:
         return 'Stream went offline'
-      
+
       default:
         return `${event.event_type} event`
     }
@@ -64,7 +55,7 @@ export function ActivityLogPanel() {
     }
 
     return eventList
-      .filter(event => event.event_type === currentFilters.event_type)
+      .filter((event) => event.event_type === currentFilters.event_type)
       .slice(0, currentFilters.limit || 50)
   })
 
@@ -72,28 +63,18 @@ export function ActivityLogPanel() {
     <section>
       <header>
         <h2>Activity Log</h2>
-        
+
         <div>
           <Button onClick={clearFilters}>All Events</Button>
-          <Button onClick={() => handleFilterChange(EVENT_TYPES.CHAT_MESSAGE)}>
-            Chat
-          </Button>
-          <Button onClick={() => handleFilterChange(EVENT_TYPES.FOLLOW)}>
-            Follows
-          </Button>
-          <Button onClick={() => handleFilterChange(EVENT_TYPES.SUBSCRIBE)}>
-            Subscriptions
-          </Button>
-          <Button onClick={() => handleFilterChange(EVENT_TYPES.CHEER)}>
-            Cheers
-          </Button>
+          <Button onClick={() => handleFilterChange(EVENT_TYPES.CHAT_MESSAGE)}>Chat</Button>
+          <Button onClick={() => handleFilterChange(EVENT_TYPES.FOLLOW)}>Follows</Button>
+          <Button onClick={() => handleFilterChange(EVENT_TYPES.SUBSCRIBE)}>Subscriptions</Button>
+          <Button onClick={() => handleFilterChange(EVENT_TYPES.CHEER)}>Cheers</Button>
         </div>
       </header>
 
       <Show when={error()}>
-        <div>
-          Error: {error()}
-        </div>
+        <div>Error: {error()}</div>
       </Show>
 
       <Show when={loading()}>

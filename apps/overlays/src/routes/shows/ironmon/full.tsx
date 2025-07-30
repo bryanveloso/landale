@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/solid-router'
 
 export const Route = createFileRoute('/shows/ironmon/full')({
-  component: RouteComponent,
+  component: RouteComponent
 })
 
 function RouteComponent() {

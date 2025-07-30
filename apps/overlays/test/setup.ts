@@ -87,14 +87,14 @@ globalThis.testUtils = {
    */
   async waitFor(callback: () => boolean, timeout = 1000): Promise<void> {
     const start = Date.now()
-    
+
     while (Date.now() - start < timeout) {
       if (callback()) {
         return
       }
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
     }
-    
+
     throw new Error(`Condition not met within ${timeout}ms`)
   }
 }

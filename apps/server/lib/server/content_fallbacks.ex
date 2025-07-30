@@ -56,24 +56,6 @@ defmodule Server.ContentFallbacks do
     }
   end
 
-  def get_fallback_content(:commit_stats) do
-    %{
-      commits_today: 0,
-      lines_added: 0,
-      lines_removed: 0,
-      message: "Git stats temporarily unavailable"
-    }
-  end
-
-  def get_fallback_content(:build_status) do
-    %{
-      status: "unknown",
-      last_build: "Unknown",
-      coverage: "Unknown",
-      message: "Build status temporarily unavailable"
-    }
-  end
-
   def get_fallback_content(:stream_goals) do
     %{
       follower_goal: %{current: 0, target: 0},

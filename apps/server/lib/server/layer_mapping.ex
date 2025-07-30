@@ -55,9 +55,7 @@ defmodule Server.LayerMapping do
       "pr_merged" => "midground",
       "sub_train" => "midground",
 
-      # Background - Development stats
-      "commit_stats" => "background",
-      "build_status" => "background",
+      # Background - Stream stats
       "recent_follows" => "background",
       "emote_stats" => "background"
     }
@@ -77,7 +75,7 @@ defmodule Server.LayerMapping do
   ## Examples
       iex> Server.LayerMapping.get_layer("death_alert", "ironmon")
       "foreground"
-      
+
       iex> Server.LayerMapping.get_layer("unknown_type", "variety")
       "background"
   """
