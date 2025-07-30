@@ -62,6 +62,11 @@ defmodule Server.Application do
             # Services
             Server.Services.OBS,
             Server.Services.Twitch,
+            # Twitch API client (requires OAuth to be started first)
+            {Server.Services.Twitch.ApiClient,
+             [
+               user_id: System.get_env("TWITCH_USER_ID") || Application.get_env(:server, :twitch_user_id)
+             ]},
             {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]},
             Server.Services.Rainwave
           ]

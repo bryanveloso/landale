@@ -661,102 +661,122 @@ defmodule Server.StreamProducer do
 
   defp get_content_data(content_type) do
     case content_type do
-      :emote_stats ->
-        safe_service_call_with_fallback(
-          fn -> Server.ContentAggregator.get_emote_stats() end,
-          :emote_stats
-        )
-
-      :recent_follows ->
-        safe_service_call_with_fallback(
-          fn ->
-            recent_followers = Server.ContentAggregator.get_recent_followers(5)
-            %{recent_followers: recent_followers}
-          end,
-          :recent_follows
-        )
-
-      :daily_stats ->
-        safe_service_call_with_fallback(
-          fn -> Server.ContentAggregator.get_daily_stats() end,
-          :daily_stats
-        )
-
-      :ironmon_run_stats ->
-        safe_service_call_with_fallback(
-          fn ->
-            case Server.Ironmon.get_current_seed() do
-              nil ->
-                # No active run
-                %{
-                  run_number: nil,
-                  checkpoints_cleared: 0,
-                  current_checkpoint: "No active run",
-                  clear_rate: 0.0,
-                  message: "Start a new IronMON run!"
-                }
-
-              current_seed ->
-                stats = Server.Ironmon.get_run_statistics(current_seed.id)
-                checkpoint_progress = Server.Ironmon.get_current_checkpoint_progress()
-
-                %{
-                  run_number: current_seed.id,
-                  checkpoints_cleared: stats.checkpoints_cleared,
-                  total_checkpoints: stats.total_checkpoints,
-                  progress_percentage: stats.progress_percentage,
-                  current_checkpoint: checkpoint_progress[:current_checkpoint] || "Unknown",
-                  trainer: checkpoint_progress[:trainer],
-                  clear_rate: Float.round((checkpoint_progress[:clear_rate] || 0.0) * 100, 1)
-                }
-            end
-          end,
-          :ironmon_run_stats
-        )
-
-      :ironmon_progression ->
-        safe_service_call_with_fallback(
-          fn ->
-            case Server.Ironmon.get_current_checkpoint_progress() do
-              nil ->
-                # No active run
-                %{
-                  has_active_run: false,
-                  message: "No active IronMON run"
-                }
-
-              checkpoint_progress ->
-                # Find when we last beat this checkpoint
-                recent_clears = Server.Ironmon.get_recent_checkpoint_clears(100)
-
-                last_clear =
-                  Enum.find(recent_clears, fn clear ->
-                    clear.checkpoint_name == checkpoint_progress.current_checkpoint
-                  end)
-
-                %{
-                  has_active_run: true,
-                  current_checkpoint: checkpoint_progress.current_checkpoint,
-                  trainer: checkpoint_progress.trainer,
-                  clear_rate: checkpoint_progress.clear_rate,
-                  clear_rate_percentage: Float.round(checkpoint_progress.clear_rate * 100, 1),
-                  last_cleared_seed: last_clear && last_clear.seed_id,
-                  attempts_on_record: checkpoint_progress.attempts,
-                  checkpoints_cleared: checkpoint_progress.checkpoints_cleared,
-                  total_checkpoints: checkpoint_progress.total_checkpoints
-                }
-            end
-          end,
-          :ironmon_progression
-        )
-
-      :stream_goals ->
-        # TODO: Get from goals tracking
-        Server.ContentFallbacks.get_fallback_content(:stream_goals)
-
-      _ ->
-        Server.ContentFallbacks.get_fallback_content(content_type)
+      :emote_stats -> get_emote_stats_data()
+      :recent_follows -> get_recent_follows_data()
+      :daily_stats -> get_daily_stats_data()
+      :ironmon_run_stats -> get_ironmon_run_stats_data()
+      :ironmon_progression -> get_ironmon_progression_data()
+      :stream_goals -> get_stream_goals_data()
+      _ -> Server.ContentFallbacks.get_fallback_content(content_type)
     end
+  end
+
+  defp get_emote_stats_data do
+    safe_service_call_with_fallback(
+      fn -> Server.ContentAggregator.get_emote_stats() end,
+      :emote_stats
+    )
+  end
+
+  defp get_recent_follows_data do
+    safe_service_call_with_fallback(
+      fn ->
+        recent_followers = Server.ContentAggregator.get_recent_followers(5)
+        %{recent_followers: recent_followers}
+      end,
+      :recent_follows
+    )
+  end
+
+  defp get_daily_stats_data do
+    safe_service_call_with_fallback(
+      fn -> Server.ContentAggregator.get_daily_stats() end,
+      :daily_stats
+    )
+  end
+
+  defp get_stream_goals_data do
+    safe_service_call_with_fallback(
+      fn -> Server.ContentAggregator.get_stream_goals() end,
+      :stream_goals
+    )
+  end
+
+  defp get_ironmon_run_stats_data do
+    safe_service_call_with_fallback(
+      fn ->
+        case Server.Ironmon.get_current_seed() do
+          nil -> get_no_active_run_stats()
+          current_seed -> get_active_run_stats(current_seed)
+        end
+      end,
+      :ironmon_run_stats
+    )
+  end
+
+  defp get_no_active_run_stats do
+    %{
+      run_number: nil,
+      checkpoints_cleared: 0,
+      current_checkpoint: "No active run",
+      clear_rate: 0.0,
+      message: "Start a new IronMON run!"
+    }
+  end
+
+  defp get_active_run_stats(current_seed) do
+    stats = Server.Ironmon.get_run_statistics(current_seed.id)
+    checkpoint_progress = Server.Ironmon.get_current_checkpoint_progress()
+
+    %{
+      run_number: current_seed.id,
+      checkpoints_cleared: stats.checkpoints_cleared,
+      total_checkpoints: stats.total_checkpoints,
+      progress_percentage: stats.progress_percentage,
+      current_checkpoint: checkpoint_progress[:current_checkpoint] || "Unknown",
+      trainer: checkpoint_progress[:trainer],
+      clear_rate: Float.round((checkpoint_progress[:clear_rate] || 0.0) * 100, 1)
+    }
+  end
+
+  defp get_ironmon_progression_data do
+    safe_service_call_with_fallback(
+      fn ->
+        case Server.Ironmon.get_current_checkpoint_progress() do
+          nil -> get_no_active_progression()
+          checkpoint_progress -> get_active_progression(checkpoint_progress)
+        end
+      end,
+      :ironmon_progression
+    )
+  end
+
+  defp get_no_active_progression do
+    %{
+      has_active_run: false,
+      message: "No active IronMON run"
+    }
+  end
+
+  defp get_active_progression(checkpoint_progress) do
+    recent_clears = Server.Ironmon.get_recent_checkpoint_clears(100)
+
+    last_clear =
+      Enum.find(recent_clears, fn clear ->
+        clear.checkpoint_name == checkpoint_progress.current_checkpoint
+      end)
+
+    %{
+      has_active_run: true,
+      current_checkpoint: checkpoint_progress.current_checkpoint,
+      trainer: checkpoint_progress.trainer,
+      clear_rate: checkpoint_progress.clear_rate,
+      clear_rate_percentage: Float.round(checkpoint_progress.clear_rate * 100, 1),
+      last_cleared_seed: last_clear && last_clear.seed_id,
+      attempts_on_record: checkpoint_progress.attempts,
+      checkpoints_cleared: checkpoint_progress.checkpoints_cleared,
+      total_checkpoints: checkpoint_progress.total_checkpoints
+    }
   end
 
   defp enrich_state_with_layers(state) do

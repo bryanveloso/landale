@@ -29,7 +29,7 @@ defmodule Server.Services.Twitch.ApiClient do
   @user_agent "Landale/1.0 (https://github.com/bryanveloso/landale)"
 
   # Required scopes for channel management
-  @required_scopes ["channel:manage:broadcast"]
+  @required_scopes ["channel:manage:broadcast", "channel:read:goals"]
 
   defstruct [
     :token_manager,
@@ -74,7 +74,7 @@ defmodule Server.Services.Twitch.ApiClient do
 
       # Change game to Pokemon FireRed/LeafGreen
       ApiClient.modify_channel_information(game_id: "490100")
-      
+
       # Change title and game
       ApiClient.modify_channel_information(
         title: "IronMON attempt #42",
@@ -96,6 +96,33 @@ defmodule Server.Services.Twitch.ApiClient do
   @spec get_channel_information() :: {:ok, map()} | {:error, term()}
   def get_channel_information do
     GenServer.call(__MODULE__, :get_channel_information)
+  end
+
+  @doc """
+  Gets creator goals for the broadcaster.
+
+  ## Returns
+  - `{:ok, goals}` on success with list of active goals
+  - `{:error, reason}` on failure
+
+  ## Examples
+
+      ApiClient.get_creator_goals()
+      # => {:ok, %{"data" => [%{
+      #      "id" => "12345",
+      #      "broadcaster_id" => "141981764",
+      #      "broadcaster_name" => "avalonstar",
+      #      "broadcaster_login" => "avalonstar",
+      #      "type" => "follower",
+      #      "description" => "500 followers by end of stream!",
+      #      "current_amount" => 476,
+      #      "target_amount" => 500,
+      #      "created_at" => "2024-01-15T10:30:00Z"
+      #    }]}}
+  """
+  @spec get_creator_goals() :: {:ok, map()} | {:error, term()}
+  def get_creator_goals do
+    GenServer.call(__MODULE__, :get_creator_goals)
   end
 
   @doc """
@@ -128,34 +155,36 @@ defmodule Server.Services.Twitch.ApiClient do
 
   @impl GenServer
   def init(opts) do
-    token_manager = Keyword.get(opts, :token_manager)
     user_id = Keyword.get(opts, :user_id)
-
-    unless token_manager do
-      {:stop, "token_manager is required"}
-    end
 
     unless user_id do
       {:stop, "user_id is required"}
     end
 
-    # Initialize circuit breaker for API resilience
-    circuit_breaker = %{
-      failures: 0,
-      last_failure: nil,
-      # :closed, :open, :half_open
-      state: :closed
-    }
+    # Get token manager from OAuthService
+    case Server.OAuthService.get_manager(:twitch) do
+      {:ok, token_manager} ->
+        # Initialize circuit breaker for API resilience
+        circuit_breaker = %{
+          failures: 0,
+          last_failure: nil,
+          # :closed, :open, :half_open
+          state: :closed
+        }
 
-    state = %__MODULE__{
-      token_manager: token_manager,
-      user_id: user_id,
-      circuit_breaker: circuit_breaker
-    }
+        state = %__MODULE__{
+          token_manager: token_manager,
+          user_id: user_id,
+          circuit_breaker: circuit_breaker
+        }
 
-    Logger.info("Twitch API client started", user_id: user_id)
+        Logger.info("Twitch API client started", user_id: user_id)
 
-    {:ok, state}
+        {:ok, state}
+
+      {:error, reason} ->
+        {:stop, "Failed to get Twitch token manager: #{inspect(reason)}"}
+    end
   end
 
   @impl GenServer
@@ -176,6 +205,19 @@ defmodule Server.Services.Twitch.ApiClient do
     case check_circuit_breaker(state.circuit_breaker) do
       :ok ->
         result = do_get_channel_information(state)
+        new_state = update_circuit_breaker(state, result)
+        {:reply, result, new_state}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_call(:get_creator_goals, _from, state) do
+    case check_circuit_breaker(state.circuit_breaker) do
+      :ok ->
+        result = do_get_creator_goals(state)
         new_state = update_circuit_breaker(state, result)
         {:reply, result, new_state}
 
@@ -241,6 +283,14 @@ defmodule Server.Services.Twitch.ApiClient do
     Logger.debug("Getting channel information", user_id: state.user_id)
 
     make_api_request(state, :get, "/channels", %{
+      "broadcaster_id" => state.user_id
+    })
+  end
+
+  defp do_get_creator_goals(state) do
+    Logger.debug("Getting creator goals", user_id: state.user_id)
+
+    make_api_request(state, :get, "/goals", %{
       "broadcaster_id" => state.user_id
     })
   end

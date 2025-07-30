@@ -47,6 +47,11 @@ defmodule Server.ContentAggregator do
     GenServer.call(__MODULE__, :get_daily_stats)
   end
 
+  @doc "Get stream goals from Twitch API"
+  def get_stream_goals do
+    GenServer.call(__MODULE__, :get_stream_goals)
+  end
+
   @doc "Record emote usage from chat event"
   def record_emote_usage(emotes, native_emotes, username) do
     GenServer.cast(__MODULE__, {:record_emote_usage, emotes, native_emotes, username})
@@ -104,6 +109,12 @@ defmodule Server.ContentAggregator do
   def handle_call(:get_daily_stats, _from, state) do
     stats = get_current_daily_stats()
     {:reply, stats, state}
+  end
+
+  @impl true
+  def handle_call(:get_stream_goals, _from, state) do
+    goals = fetch_creator_goals()
+    {:reply, goals, state}
   end
 
   @impl true
@@ -409,5 +420,76 @@ defmodule Server.ContentAggregator do
     milliseconds_until_midnight = DateTime.diff(midnight_tomorrow, now, :millisecond)
 
     Process.send_after(self(), :daily_reset, milliseconds_until_midnight)
+  end
+
+  defp fetch_creator_goals do
+    case Server.Services.Twitch.ApiClient.get_creator_goals() do
+      {:ok, %{"data" => goals}} when is_list(goals) ->
+        # Transform Twitch API response to our format
+        transformed_goals =
+          Enum.map(goals, fn goal ->
+            %{
+              type: goal["type"],
+              description: goal["description"],
+              current_amount: goal["current_amount"],
+              target_amount: goal["target_amount"],
+              created_at: goal["created_at"]
+            }
+          end)
+
+        # Convert to the format expected by overlays
+        goal_map =
+          Enum.reduce(transformed_goals, %{}, fn goal, acc ->
+            case goal.type do
+              "follower" ->
+                Map.put(acc, :follower_goal, %{
+                  current: goal.current_amount,
+                  target: goal.target_amount,
+                  description: goal.description
+                })
+
+              "subscription" ->
+                Map.put(acc, :sub_goal, %{
+                  current: goal.current_amount,
+                  target: goal.target_amount,
+                  description: goal.description
+                })
+
+              "new_subscription" ->
+                Map.put(acc, :new_sub_goal, %{
+                  current: goal.current_amount,
+                  target: goal.target_amount,
+                  description: goal.description
+                })
+
+              _ ->
+                acc
+            end
+          end)
+
+        # Return with defaults if no goals are set
+        %{
+          follower_goal: Map.get(goal_map, :follower_goal, %{current: 0, target: 0}),
+          sub_goal: Map.get(goal_map, :sub_goal, %{current: 0, target: 0})
+        }
+
+      {:ok, _} ->
+        # No goals set
+        Logger.debug("No creator goals configured")
+
+        %{
+          follower_goal: %{current: 0, target: 0},
+          sub_goal: %{current: 0, target: 0}
+        }
+
+      {:error, reason} ->
+        Logger.warning("Failed to fetch creator goals", error: reason)
+
+        %{
+          follower_goal: %{current: 0, target: 0},
+          sub_goal: %{current: 0, target: 0},
+          error: reason
+        }
+    end
   end
 end
