@@ -22,7 +22,7 @@ defmodule Server.Services.Twitch.ApiClient do
   use GenServer
   require Logger
 
-  alias Server.{OAuthTokenManager, Telemetry}
+  alias Server.Telemetry
 
   # Twitch API constants
   @api_base_url "https://api.twitch.tv/helix"
@@ -32,7 +32,6 @@ defmodule Server.Services.Twitch.ApiClient do
   @required_scopes ["channel:manage:broadcast", "channel:read:goals"]
 
   defstruct [
-    :token_manager,
     :user_id,
     :circuit_breaker,
     last_api_call: nil,
@@ -46,7 +45,6 @@ defmodule Server.Services.Twitch.ApiClient do
   Starts the Twitch API client GenServer.
 
   ## Options
-  - `:token_manager` - OAuthTokenManager instance (required)
   - `:user_id` - Twitch user ID for API calls (required)
   """
   @spec start_link(keyword()) :: GenServer.on_start()
@@ -161,29 +159,36 @@ defmodule Server.Services.Twitch.ApiClient do
       {:stop, "user_id is required"}
     end
 
-    # Get token manager from OAuthService
-    case Server.OAuthService.get_manager(:twitch) do
-      {:ok, token_manager} ->
-        # Initialize circuit breaker for API resilience
-        circuit_breaker = %{
-          failures: 0,
-          last_failure: nil,
-          # :closed, :open, :half_open
-          state: :closed
-        }
+    # Initialize circuit breaker for API resilience
+    circuit_breaker = %{
+      failures: 0,
+      last_failure: nil,
+      # :closed, :open, :half_open
+      state: :closed
+    }
 
-        state = %__MODULE__{
-          token_manager: token_manager,
-          user_id: user_id,
-          circuit_breaker: circuit_breaker
-        }
+    state = %__MODULE__{
+      user_id: user_id,
+      circuit_breaker: circuit_breaker
+    }
 
+    # Verify OAuth service is registered
+    case Server.OAuthService.get_token_info(:twitch) do
+      {:ok, _} ->
         Logger.info("Twitch API client started", user_id: user_id)
-
         {:ok, state}
 
-      {:error, reason} ->
-        {:stop, "Failed to get Twitch token manager: #{inspect(reason)}"}
+      {:error, :service_not_registered} ->
+        Logger.error("Twitch OAuth service not registered",
+          service: "twitch_api"
+        )
+
+        {:stop, "Twitch OAuth service not registered"}
+
+      {:error, :no_tokens} ->
+        # No tokens yet, but service is registered - that's OK
+        Logger.info("Twitch API client started (no tokens yet)", user_id: user_id)
+        {:ok, state}
     end
   end
 
@@ -262,7 +267,7 @@ defmodule Server.Services.Twitch.ApiClient do
     Logger.info("Modifying channel information", opts: opts)
 
     # Validate required scopes
-    case validate_scopes(state.token_manager) do
+    case validate_scopes do
       :ok ->
         make_api_request(state, :patch, "/channels", %{
           "broadcaster_id" => state.user_id,
@@ -345,10 +350,9 @@ defmodule Server.Services.Twitch.ApiClient do
 
   defp make_api_request(state, method, path, params) do
     with :ok <- check_rate_limit(state),
-         {:ok, token, updated_manager} <- OAuthTokenManager.get_valid_token(state.token_manager),
+         {:ok, token} <- Server.OAuthService.get_valid_token(:twitch),
          {:ok, response} <- send_http_request(method, path, params, token) do
-      # Update token manager and last API call time
-      send(self(), {:update_token_manager, updated_manager})
+      # Update last API call time
       send(self(), {:update_last_api_call, DateTime.utc_now()})
 
       # Parse response
@@ -437,9 +441,9 @@ defmodule Server.Services.Twitch.ApiClient do
     end
   end
 
-  defp validate_scopes(token_manager) do
-    case OAuthTokenManager.get_valid_token(token_manager) do
-      {:ok, token, _updated_manager} ->
+  defp validate_scopes do
+    case Server.OAuthService.get_valid_token(:twitch) do
+      {:ok, token} ->
         token_scopes = MapSet.new(token.scopes || [])
         required_scopes = MapSet.new(@required_scopes)
 
@@ -516,10 +520,7 @@ defmodule Server.Services.Twitch.ApiClient do
 
   ## GenServer Info Handlers
 
-  @impl GenServer
-  def handle_info({:update_token_manager, updated_manager}, state) do
-    {:noreply, %{state | token_manager: updated_manager}}
-  end
+  # Token manager updates are now handled by OAuthService internally
 
   @impl GenServer
   def handle_info({:update_last_api_call, timestamp}, state) do

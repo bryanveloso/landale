@@ -498,6 +498,16 @@ defmodule Server.Services.IronmonTCP do
     end
   end
 
+  defp validate_message_by_type(type, data, _json) when is_non_struct_map(data) do
+    validator = get_message_validator(type)
+
+    if validator do
+      validator.(data)
+    else
+      {:error, "Unknown message type: #{type}"}
+    end
+  end
+
   @message_validators %{
     "init" => &validate_init_data/1,
     "seed" => &validate_seed_data/1,
@@ -512,14 +522,8 @@ defmodule Server.Services.IronmonTCP do
     "heartbeat" => &validate_heartbeat_data/1
   }
 
-  defp validate_message_by_type(type, data, _json) when is_non_struct_map(data) do
-    case Map.get(@message_validators, type) do
-      nil ->
-        {:error, "Unknown message type: #{type}"}
-
-      validator ->
-        validator.(data)
-    end
+  defp get_message_validator(type) do
+    Map.get(@message_validators, type)
   end
 
   defp validate_init_data(%{"version" => version, "game" => game})
