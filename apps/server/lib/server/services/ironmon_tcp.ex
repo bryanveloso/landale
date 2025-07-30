@@ -508,23 +508,18 @@ defmodule Server.Services.IronmonTCP do
     end
   end
 
-  @message_validators %{
-    "init" => &validate_init_data/1,
-    "seed" => &validate_seed_data/1,
-    "checkpoint" => &validate_checkpoint_data/1,
-    "location" => &validate_location_data/1,
-    "battle_start" => &validate_battle_start_data/1,
-    "battle_end" => &validate_battle_end_data/1,
-    "pokemon_update" => &validate_pokemon_update_data/1,
-    "item_update" => &validate_item_update_data/1,
-    "stats_update" => &validate_stats_update_data/1,
-    "error" => &validate_error_data/1,
-    "heartbeat" => &validate_heartbeat_data/1
-  }
-
-  defp get_message_validator(type) do
-    Map.get(@message_validators, type)
-  end
+  defp get_message_validator("init"), do: &validate_init_data/1
+  defp get_message_validator("seed"), do: &validate_seed_data/1
+  defp get_message_validator("checkpoint"), do: &validate_checkpoint_data/1
+  defp get_message_validator("location"), do: &validate_location_data/1
+  defp get_message_validator("battle_start"), do: &validate_battle_start_data/1
+  defp get_message_validator("battle_end"), do: &validate_battle_end_data/1
+  defp get_message_validator("pokemon_update"), do: &validate_pokemon_update_data/1
+  defp get_message_validator("item_update"), do: &validate_item_update_data/1
+  defp get_message_validator("stats_update"), do: &validate_stats_update_data/1
+  defp get_message_validator("error"), do: &validate_error_data/1
+  defp get_message_validator("heartbeat"), do: &validate_heartbeat_data/1
+  defp get_message_validator(_), do: nil
 
   defp validate_init_data(%{"version" => version, "game" => game})
        when is_binary(version) and is_integer(game) do
