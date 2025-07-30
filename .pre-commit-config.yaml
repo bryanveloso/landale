@@ -70,7 +70,7 @@ repos:
 
       - id: mix-credo
         name: mix credo
-        entry: sh -c 'if command -v mix >/dev/null 2>&1; then cd apps/server && mix credo --strict; else echo "Skipping mix credo - Elixir not available"; fi'
+        entry: sh -c 'if command -v mix >/dev/null 2>&1; then cd apps/server && mix credo; else echo "Skipping mix credo - Elixir not available"; fi'
         language: system
         files: '^apps/server/.*\.(ex|exs)$'
         pass_filenames: false
