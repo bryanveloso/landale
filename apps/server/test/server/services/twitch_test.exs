@@ -23,44 +23,31 @@ defmodule Server.Services.TwitchTest do
     # Set test config for client_id
     Application.put_env(:server, Server.Services.Twitch, client_id: "test_client_id")
 
-    # Start PubSub only if not already started
-    case Process.whereis(Server.PubSub) do
-      nil -> start_supervised!({Phoenix.PubSub, name: Server.PubSub})
+    # Start all required services
+    ensure_service_started(Server.PubSub, {Phoenix.PubSub, name: Server.PubSub})
+    ensure_service_started(Server.CircuitBreakerServer, Server.CircuitBreakerServer)
+    ensure_service_started(Server.TaskSupervisor, {Task.Supervisor, name: Server.TaskSupervisor})
+    dynamic_sup_spec = {DynamicSupervisor, name: Server.DynamicSupervisor, strategy: :one_for_one}
+    ensure_service_started(Server.DynamicSupervisor, dynamic_sup_spec)
+
+    # Create ETS tables
+    ensure_ets_table(:server_cache)
+    ensure_ets_table(:twitch_service)
+
+    # Start OAuth service
+    ensure_service_started(Server.OAuthService, Server.OAuthService)
+  end
+
+  defp ensure_service_started(name, spec) do
+    case Process.whereis(name) do
+      nil -> start_supervised!(spec)
       _pid -> :ok
     end
+  end
 
-    # Start CircuitBreakerServer if not already started
-    case Process.whereis(Server.CircuitBreakerServer) do
-      nil -> start_supervised!(Server.CircuitBreakerServer)
-      _pid -> :ok
-    end
-
-    # Start TaskSupervisor if not already started
-    case Process.whereis(Server.TaskSupervisor) do
-      nil -> start_supervised!({Task.Supervisor, name: Server.TaskSupervisor})
-      _pid -> :ok
-    end
-
-    # Start DynamicSupervisor if not already started
-    case Process.whereis(Server.DynamicSupervisor) do
-      nil -> start_supervised!({DynamicSupervisor, name: Server.DynamicSupervisor, strategy: :one_for_one})
-      _pid -> :ok
-    end
-
-    # Create cache table if not exists
-    if :ets.info(:server_cache) == :undefined do
-      :ets.new(:server_cache, [:set, :public, :named_table])
-    end
-
-    # Create a test cache table if not exists
-    if :ets.info(:twitch_service) == :undefined do
-      :ets.new(:twitch_service, [:set, :public, :named_table])
-    end
-
-    # Start OAuth service if not already started
-    case Process.whereis(Server.OAuthService) do
-      nil -> start_supervised!(Server.OAuthService)
-      _pid -> :ok
+  defp ensure_ets_table(name) do
+    if :ets.info(name) == :undefined do
+      :ets.new(name, [:set, :public, :named_table])
     end
   end
 

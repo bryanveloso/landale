@@ -2,7 +2,7 @@ defmodule ServerWeb.TranscriptionChannel do
   @moduledoc """
   Phoenix channel for real-time transcription broadcasting to obs-entei plugin.
 
-  This channel provides live transcription data for OBS caption overlays and 
+  This channel provides live transcription data for OBS caption overlays and
   real-time streaming applications. The channel is optimized for low-latency
   delivery of transcription events from the AI analysis pipeline.
 
@@ -22,17 +22,17 @@ defmodule ServerWeb.TranscriptionChannel do
       // Connect to WebSocket
       const socket = new Phoenix.Socket("/socket")
       socket.connect()
-      
+
       // Join live transcription channel
       const channel = socket.channel("transcription:live")
       channel.join()
-      
+
       // Listen for new transcriptions
       channel.on("new_transcription", (data) => {
         console.log("New transcription:", data.text)
         updateCaptions(data.text, data.confidence)
       })
-      
+
       // Join session-specific channel
       const sessionChannel = socket.channel("transcription:session:stream_2024_01_15")
       sessionChannel.join()
@@ -194,31 +194,7 @@ defmodule ServerWeb.TranscriptionChannel do
               end
 
               # Broadcast to live transcription subscribers
-              transcription_event = %{
-                id: transcription.id,
-                timestamp: transcription.timestamp,
-                duration: transcription.duration,
-                text: transcription.text,
-                source_id: transcription.source_id,
-                stream_session_id: transcription.stream_session_id,
-                confidence: transcription.confidence
-              }
-
-              # Broadcast to live channel
-              Phoenix.PubSub.broadcast(
-                Server.PubSub,
-                "transcription:live",
-                {:new_transcription, transcription_event}
-              )
-
-              # Also broadcast to session-specific channel if session_id exists
-              if transcription.stream_session_id do
-                Phoenix.PubSub.broadcast(
-                  Server.PubSub,
-                  "transcription:session:#{transcription.stream_session_id}",
-                  {:new_transcription, transcription_event}
-                )
-              end
+              broadcast_transcription(transcription)
 
               Logger.info("Transcription submitted via WebSocket",
                 transcription_id: transcription.id,
@@ -231,24 +207,7 @@ defmodule ServerWeb.TranscriptionChannel do
               {:reply, {:ok, %{transcription_id: transcription.id}}, socket}
 
             {:error, changeset} ->
-              # Emit error telemetry
-              Server.Telemetry.transcription_submission_error("database_error")
-
-              formatted_errors =
-                Server.Transcription.Validation.format_errors(
-                  Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-                    Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
-                      opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
-                    end)
-                  end)
-                )
-
-              Logger.warning("Transcription validation failed via WebSocket",
-                errors: formatted_errors,
-                correlation_id: socket.assigns.correlation_id
-              )
-
-              {:reply, {:error, %{errors: formatted_errors}}, socket}
+              handle_database_error(changeset, socket)
           end
 
         {:error, validation_errors} ->
@@ -349,5 +308,56 @@ defmodule ServerWeb.TranscriptionChannel do
   defp with_correlation_context(socket, fun) do
     correlation_id = socket.assigns.correlation_id
     CorrelationId.with_context(correlation_id, fun)
+  end
+
+  defp handle_database_error(changeset, socket) do
+    # Emit error telemetry
+    Server.Telemetry.transcription_submission_error("database_error")
+
+    formatted_errors =
+      Server.Transcription.Validation.format_errors(traverse_changeset_errors(changeset))
+
+    Logger.warning("Transcription validation failed via WebSocket",
+      errors: formatted_errors,
+      correlation_id: socket.assigns.correlation_id
+    )
+
+    {:reply, {:error, %{errors: formatted_errors}}, socket}
+  end
+
+  defp traverse_changeset_errors(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+      Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
+        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+      end)
+    end)
+  end
+
+  defp broadcast_transcription(transcription) do
+    transcription_event = %{
+      id: transcription.id,
+      timestamp: transcription.timestamp,
+      duration: transcription.duration,
+      text: transcription.text,
+      source_id: transcription.source_id,
+      stream_session_id: transcription.stream_session_id,
+      confidence: transcription.confidence
+    }
+
+    # Broadcast to live channel
+    Phoenix.PubSub.broadcast(
+      Server.PubSub,
+      "transcription:live",
+      {:new_transcription, transcription_event}
+    )
+
+    # Also broadcast to session-specific channel if session_id exists
+    if transcription.stream_session_id do
+      Phoenix.PubSub.broadcast(
+        Server.PubSub,
+        "transcription:session:#{transcription.stream_session_id}",
+        {:new_transcription, transcription_event}
+      )
+    end
   end
 end

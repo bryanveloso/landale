@@ -498,43 +498,27 @@ defmodule Server.Services.IronmonTCP do
     end
   end
 
+  @message_validators %{
+    "init" => &validate_init_data/1,
+    "seed" => &validate_seed_data/1,
+    "checkpoint" => &validate_checkpoint_data/1,
+    "location" => &validate_location_data/1,
+    "battle_start" => &validate_battle_start_data/1,
+    "battle_end" => &validate_battle_end_data/1,
+    "pokemon_update" => &validate_pokemon_update_data/1,
+    "item_update" => &validate_item_update_data/1,
+    "stats_update" => &validate_stats_update_data/1,
+    "error" => &validate_error_data/1,
+    "heartbeat" => &validate_heartbeat_data/1
+  }
+
   defp validate_message_by_type(type, data, _json) when is_non_struct_map(data) do
-    case type do
-      "init" ->
-        validate_init_data(data)
-
-      "seed" ->
-        validate_seed_data(data)
-
-      "checkpoint" ->
-        validate_checkpoint_data(data)
-
-      "location" ->
-        validate_location_data(data)
-
-      "battle_start" ->
-        validate_battle_start_data(data)
-
-      "battle_end" ->
-        validate_battle_end_data(data)
-
-      "pokemon_update" ->
-        validate_pokemon_update_data(data)
-
-      "item_update" ->
-        validate_item_update_data(data)
-
-      "stats_update" ->
-        validate_stats_update_data(data)
-
-      "error" ->
-        validate_error_data(data)
-
-      "heartbeat" ->
-        validate_heartbeat_data(data)
-
-      _ ->
+    case Map.get(@message_validators, type) do
+      nil ->
         {:error, "Unknown message type: #{type}"}
+
+      validator ->
+        validator.(data)
     end
   end
 
@@ -662,168 +646,183 @@ defmodule Server.Services.IronmonTCP do
       frame: Map.get(message, :frame)
     )
 
-    case type do
-      "init" ->
-        game_name = Map.get(@games, metadata.game, "Unknown")
-
-        Logger.info("IronMON game initialized",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id,
-          version: metadata.version,
-          game: game_name
-        )
-
-        Events.publish_ironmon_event(type, event_data, batch: false)
-
-      "seed" ->
-        Logger.info("IronMON seed updated",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id,
-          seed_count: metadata.count
-        )
-
-        # Create new seed in database (new attempt started)
-        # Get the first (and currently only) challenge
-        challenge_id =
-          case Server.Ironmon.list_challenges() do
-            [challenge | _] ->
-              challenge.id
-
-            [] ->
-              Logger.error("No IronMON challenges found",
-                service: "ironmon_tcp",
-                correlation_id: correlation_id
-              )
-
-              nil
-          end
-
-        if challenge_id do
-          # Use the seed count from IronMON as the seed ID
-          case Server.Ironmon.RunTracker.new_seed(challenge_id, metadata.count) do
-            {:ok, seed_id} ->
-              Logger.info("IronMON attempt started",
-                service: "ironmon_tcp",
-                correlation_id: correlation_id,
-                seed_id: seed_id,
-                seed_count: metadata.count
-              )
-
-            {:error, reason} ->
-              Logger.error("Failed to create IronMON seed",
-                service: "ironmon_tcp",
-                correlation_id: correlation_id,
-                error: inspect(reason)
-              )
-          end
-        end
-
-        Events.publish_ironmon_event(type, event_data, batch: false)
-
-      "checkpoint" ->
-        Logger.info("IronMON checkpoint cleared",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id,
-          checkpoint_id: metadata.id,
-          checkpoint_name: metadata.name,
-          seed: Map.get(metadata, :seed)
-        )
-
-        # Record checkpoint result (always true since we only get notified when cleared)
-        case Server.Ironmon.RunTracker.record_checkpoint(metadata.name, true) do
-          :ok ->
-            Logger.debug("Checkpoint recorded",
-              service: "ironmon_tcp",
-              correlation_id: correlation_id,
-              checkpoint_name: metadata.name
-            )
-
-          {:error, reason} ->
-            Logger.error("Failed to record checkpoint",
-              service: "ironmon_tcp",
-              correlation_id: correlation_id,
-              checkpoint_name: metadata.name,
-              error: inspect(reason)
-            )
-        end
-
-        Events.publish_ironmon_event(type, event_data, batch: false)
-
-      "location" ->
-        Logger.debug("IronMON location changed",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id,
-          location_id: metadata.id
-        )
-
-        Events.publish_ironmon_event(type, event_data, batch: false)
-
-      "battle_start" ->
-        Logger.info("IronMON battle started",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id,
-          trainer: metadata.trainer,
-          pokemon_count: length(metadata.pokemon)
-        )
-
-        Events.publish_ironmon_event(type, event_data, batch: false)
-
-      "battle_end" ->
-        Logger.info("IronMON battle ended",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id,
-          result: metadata.result,
-          pokemon_count: length(metadata.pokemon)
-        )
-
-        Events.publish_ironmon_event(type, event_data, batch: false)
-
-      "pokemon_update" ->
-        Logger.debug("IronMON team updated",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id,
-          team_size: length(metadata.team)
-        )
-
-        Events.publish_ironmon_event(type, event_data, batch: false)
-
-      "item_update" ->
-        Logger.debug("IronMON inventory updated",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id,
-          item_count: length(metadata.items)
-        )
-
-        Events.publish_ironmon_event(type, event_data, batch: false)
-
-      "stats_update" ->
-        Logger.debug("IronMON stats updated",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id
-        )
-
-        Events.publish_ironmon_event(type, event_data, batch: false)
-
-      "error" ->
-        Logger.warning("IronMON error received",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id,
-          error_code: metadata.code,
-          error_message: metadata.message
-        )
-
-        Events.publish_ironmon_event(type, event_data, batch: false)
-
-      "heartbeat" ->
-        Logger.debug("IronMON heartbeat",
-          service: "ironmon_tcp",
-          correlation_id: correlation_id
-        )
-
-        # Don't publish heartbeats to avoid flooding the event stream
-        :ok
-    end
-
+    handle_event_by_type(type, event_data, metadata, correlation_id)
     :ok
+  end
+
+  defp handle_event_by_type("init", event_data, metadata, correlation_id) do
+    game_name = Map.get(@games, metadata.game, "Unknown")
+
+    Logger.info("IronMON game initialized",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id,
+      version: metadata.version,
+      game: game_name
+    )
+
+    Events.publish_ironmon_event("init", event_data, batch: false)
+  end
+
+  defp handle_event_by_type("seed", event_data, metadata, correlation_id) do
+    Logger.info("IronMON seed updated",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id,
+      seed_count: metadata.count
+    )
+
+    handle_seed_creation(metadata, correlation_id)
+    Events.publish_ironmon_event("seed", event_data, batch: false)
+  end
+
+  defp handle_event_by_type("checkpoint", event_data, metadata, correlation_id) do
+    Logger.info("IronMON checkpoint cleared",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id,
+      checkpoint_id: metadata.id,
+      checkpoint_name: metadata.name,
+      seed: Map.get(metadata, :seed)
+    )
+
+    handle_checkpoint_recording(metadata, correlation_id)
+    Events.publish_ironmon_event("checkpoint", event_data, batch: false)
+  end
+
+  defp handle_event_by_type("location", event_data, metadata, correlation_id) do
+    Logger.debug("IronMON location changed",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id,
+      location_id: metadata.id
+    )
+
+    Events.publish_ironmon_event("location", event_data, batch: false)
+  end
+
+  defp handle_event_by_type("battle_start", event_data, metadata, correlation_id) do
+    Logger.info("IronMON battle started",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id,
+      trainer: metadata.trainer,
+      pokemon_count: length(metadata.pokemon)
+    )
+
+    Events.publish_ironmon_event("battle_start", event_data, batch: false)
+  end
+
+  defp handle_event_by_type("battle_end", event_data, metadata, correlation_id) do
+    Logger.info("IronMON battle ended",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id,
+      result: metadata.result,
+      pokemon_count: length(metadata.pokemon)
+    )
+
+    Events.publish_ironmon_event("battle_end", event_data, batch: false)
+  end
+
+  defp handle_event_by_type("pokemon_update", event_data, metadata, correlation_id) do
+    Logger.debug("IronMON team updated",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id,
+      team_size: length(metadata.team)
+    )
+
+    Events.publish_ironmon_event("pokemon_update", event_data, batch: false)
+  end
+
+  defp handle_event_by_type("item_update", event_data, metadata, correlation_id) do
+    Logger.debug("IronMON inventory updated",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id,
+      item_count: length(metadata.items)
+    )
+
+    Events.publish_ironmon_event("item_update", event_data, batch: false)
+  end
+
+  defp handle_event_by_type("stats_update", event_data, _metadata, correlation_id) do
+    Logger.debug("IronMON stats updated",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id
+    )
+
+    Events.publish_ironmon_event("stats_update", event_data, batch: false)
+  end
+
+  defp handle_event_by_type("error", event_data, metadata, correlation_id) do
+    Logger.warning("IronMON error received",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id,
+      error_code: metadata.code,
+      error_message: metadata.message
+    )
+
+    Events.publish_ironmon_event("error", event_data, batch: false)
+  end
+
+  defp handle_event_by_type("heartbeat", _event_data, _metadata, correlation_id) do
+    Logger.debug("IronMON heartbeat",
+      service: "ironmon_tcp",
+      correlation_id: correlation_id
+    )
+
+    # Don't publish heartbeats to avoid flooding the event stream
+    :ok
+  end
+
+  defp handle_seed_creation(metadata, correlation_id) do
+    # Get the first (and currently only) challenge
+    challenge_id =
+      case Server.Ironmon.list_challenges() do
+        [challenge | _] ->
+          challenge.id
+
+        [] ->
+          Logger.error("No IronMON challenges found",
+            service: "ironmon_tcp",
+            correlation_id: correlation_id
+          )
+
+          nil
+      end
+
+    if challenge_id do
+      # Use the seed count from IronMON as the seed ID
+      case Server.Ironmon.RunTracker.new_seed(challenge_id, metadata.count) do
+        {:ok, seed_id} ->
+          Logger.info("IronMON attempt started",
+            service: "ironmon_tcp",
+            correlation_id: correlation_id,
+            seed_id: seed_id,
+            seed_count: metadata.count
+          )
+
+        {:error, reason} ->
+          Logger.error("Failed to create IronMON seed",
+            service: "ironmon_tcp",
+            correlation_id: correlation_id,
+            error: inspect(reason)
+          )
+      end
+    end
+  end
+
+  defp handle_checkpoint_recording(metadata, correlation_id) do
+    # Record checkpoint result (always true since we only get notified when cleared)
+    case Server.Ironmon.RunTracker.record_checkpoint(metadata.name, true) do
+      :ok ->
+        Logger.debug("Checkpoint recorded",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          checkpoint_name: metadata.name
+        )
+
+      {:error, reason} ->
+        Logger.error("Failed to record checkpoint",
+          service: "ironmon_tcp",
+          correlation_id: correlation_id,
+          checkpoint_name: metadata.name,
+          error: inspect(reason)
+        )
+    end
   end
 end

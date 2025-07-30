@@ -1,7 +1,7 @@
 defmodule ServerWeb.TranscriptionChannelSubmitTest do
   use ServerWeb.ChannelCase, async: true
-  alias ServerWeb.TranscriptionChannel
   alias Server.Transcription
+  alias ServerWeb.TranscriptionChannel
 
   setup do
     # Create a test socket and join the channel

@@ -715,78 +715,12 @@ defmodule Server.Services.Twitch do
     # Token validation task completed
     case result do
       {:ok, token_info} ->
-        scopes_list = token_info[:scopes] || token_info["scopes"] || []
-        has_user_read_chat = "user:read:chat" in scopes_list
-
-        Logger.info("Token validation completed",
-          user_id: token_info[:user_id] || token_info["user_id"],
-          client_id: token_info[:client_id] || token_info["client_id"],
-          scopes: length(scopes_list),
-          has_chat_scope: has_user_read_chat
-        )
-
-        # Log missing chat scope as error since it's critical for the data loss issue
-        unless has_user_read_chat do
-          Logger.error("Missing required chat scope",
-            user_id: token_info[:user_id] || token_info["user_id"],
-            missing_scope: "user:read:chat",
-            available_scopes: scopes_list
-          )
-        end
-
-        # Store user ID and scopes in state
-        user_id = token_info[:user_id] || token_info["user_id"]
-        # Convert scopes to MapSet if they're a list
-        scopes =
-          case token_info[:scopes] || token_info["scopes"] do
-            list when is_list(list) -> MapSet.new(list)
-            set -> set || MapSet.new()
-          end
-
-        # Update logging context immediately with user_id
-        Logging.set_service_context(:twitch, user_id: user_id)
-
-        state = %{
-          state
-          | user_id: user_id,
-            scopes: scopes,
-            token_validation_task: nil
-        }
-
-        Logger.info("State updated with user_id after token validation",
-          user_id: state.user_id,
-          has_session: state.session_id != nil
-        )
-
-        # API client start removed - OAuth service handles token management
-
-        # If we already have a session established but deferred subscriptions, trigger them now
-        if state.session_id do
-          Logger.info("Token validation completed with active session",
-            user_id: state.user_id,
-            session_id: state.session_id
-          )
-
-          # Trigger immediately - no delay for critical timing
-          send(self(), {:create_subscriptions_with_validated_token, state.session_id})
-        else
-          # Token validation completed, now start WebSocket connection
-          Logger.info("Token validation completed, starting WebSocket connection",
-            user_id: state.user_id
-          )
-
-          send(self(), :connect)
-        end
-
-        {:noreply, state}
+        new_state = handle_successful_token_validation(state, token_info)
+        {:noreply, new_state}
 
       {:error, reason} ->
-        Logging.log_error("Token validation failed", reason)
-
-        # Try to refresh the token first
-        state = %{state | token_validation_task: nil}
-        send(self(), :refresh_token)
-        {:noreply, state}
+        new_state = handle_failed_token_validation(state, reason)
+        {:noreply, new_state}
     end
   end
 
@@ -1660,4 +1594,85 @@ defmodule Server.Services.Twitch do
   defp message_type(atom) when is_atom(atom), do: to_string(atom)
   defp message_type(tuple) when is_tuple(tuple), do: "tuple(#{tuple_size(tuple)})"
   defp message_type(other), do: "#{inspect(other.__struct__ || :unknown)}"
+
+  defp handle_successful_token_validation(state, token_info) do
+    scopes_list = token_info[:scopes] || token_info["scopes"] || []
+    has_user_read_chat = "user:read:chat" in scopes_list
+    user_id = token_info[:user_id] || token_info["user_id"]
+
+    log_token_validation_success(token_info, has_user_read_chat)
+    check_chat_scope(has_user_read_chat, user_id, scopes_list)
+
+    # Convert scopes to MapSet if they're a list
+    scopes = normalize_scopes(token_info[:scopes] || token_info["scopes"])
+
+    # Update logging context immediately with user_id
+    Logging.set_service_context(:twitch, user_id: user_id)
+
+    updated_state = %{
+      state
+      | user_id: user_id,
+        scopes: scopes,
+        token_validation_task: nil
+    }
+
+    Logger.info("State updated with user_id after token validation",
+      user_id: updated_state.user_id,
+      has_session: updated_state.session_id != nil
+    )
+
+    trigger_post_validation_actions(updated_state)
+    updated_state
+  end
+
+  defp handle_failed_token_validation(state, reason) do
+    Logging.log_error("Token validation failed", reason)
+
+    # Try to refresh the token first
+    send(self(), :refresh_token)
+    %{state | token_validation_task: nil}
+  end
+
+  defp log_token_validation_success(token_info, has_user_read_chat) do
+    scopes_list = token_info[:scopes] || token_info["scopes"] || []
+
+    Logger.info("Token validation completed",
+      user_id: token_info[:user_id] || token_info["user_id"],
+      client_id: token_info[:client_id] || token_info["client_id"],
+      scopes: length(scopes_list),
+      has_chat_scope: has_user_read_chat
+    )
+  end
+
+  defp check_chat_scope(false, user_id, scopes_list) do
+    Logger.error("Missing required chat scope",
+      user_id: user_id,
+      missing_scope: "user:read:chat",
+      available_scopes: scopes_list
+    )
+  end
+
+  defp check_chat_scope(true, _user_id, _scopes_list), do: :ok
+
+  defp normalize_scopes(list) when is_list(list), do: MapSet.new(list)
+  defp normalize_scopes(set), do: set || MapSet.new()
+
+  defp trigger_post_validation_actions(%{session_id: session_id} = state) when not is_nil(session_id) do
+    Logger.info("Token validation completed with active session",
+      user_id: state.user_id,
+      session_id: state.session_id
+    )
+
+    # Trigger immediately - no delay for critical timing
+    send(self(), {:create_subscriptions_with_validated_token, state.session_id})
+  end
+
+  defp trigger_post_validation_actions(state) do
+    # Token validation completed, now start WebSocket connection
+    Logger.info("Token validation completed, starting WebSocket connection",
+      user_id: state.user_id
+    )
+
+    send(self(), :connect)
+  end
 end

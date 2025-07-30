@@ -20,7 +20,7 @@ defmodule Server.Transcription.Validation do
 
       iex> validate(%{"timestamp" => "2024-01-01T00:00:00Z", "duration" => 1.5, "text" => "Hello"})
       {:ok, %{timestamp: ~U[2024-01-01 00:00:00Z], duration: 1.5, text: "Hello"}}
-      
+
       iex> validate(%{"text" => ""})
       {:error, %{timestamp: ["is required"], duration: ["is required"], text: ["can't be blank"]}}
   """
@@ -178,9 +178,10 @@ defmodule Server.Transcription.Validation do
   defp validate_constraint(:text, value) when is_binary(value) do
     length = String.length(value)
 
-    cond do
-      length > 10_000 -> {:error, "is too long (maximum is 10000 characters)"}
-      true -> :ok
+    if length > 10_000 do
+      {:error, "is too long (maximum is 10000 characters)"}
+    else
+      :ok
     end
   end
 
