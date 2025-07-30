@@ -12,41 +12,62 @@ defmodule Nurvus.CLI do
   Main entrypoint for the CLI. Called by the custom release command.
   """
   def main(args) do
-    case args do
-      [] ->
-        print_help()
+    args
+    |> parse_command()
+    |> execute_command()
+  end
 
-      ["--help"] ->
-        print_help()
+  defp parse_command([]), do: {:help, []}
+  defp parse_command(["--help"]), do: {:help, []}
+  defp parse_command(["status"]), do: {:status, []}
+  defp parse_command(["list"]), do: {:list, []}
+  defp parse_command(["start", process_id]), do: {:start, [process_id]}
+  defp parse_command(["stop", process_id]), do: {:stop, [process_id]}
+  defp parse_command(["restart", process_id]), do: {:restart, [process_id]}
+  defp parse_command(["config", "get", key]), do: {:config_get, [key]}
+  defp parse_command(["config", "list"]), do: {:config_list, []}
+  defp parse_command(["cluster", "info"]), do: {:cluster_info, []}
+  defp parse_command(_), do: {:unknown, []}
 
-      ["status"] ->
-        execute_remote_command(&get_status/1)
+  defp execute_command({:help, _}) do
+    print_help()
+  end
 
-      ["list"] ->
-        execute_remote_command(&list_processes/1)
+  defp execute_command({:status, _}) do
+    execute_remote_command(&get_status/1)
+  end
 
-      ["start", process_id] ->
-        execute_remote_command(&start_process/2, [process_id])
+  defp execute_command({:list, _}) do
+    execute_remote_command(&list_processes/1)
+  end
 
-      ["stop", process_id] ->
-        execute_remote_command(&stop_process/2, [process_id])
+  defp execute_command({:start, [process_id]}) do
+    execute_remote_command(&start_process/2, [process_id])
+  end
 
-      ["restart", process_id] ->
-        execute_remote_command(&restart_process/2, [process_id])
+  defp execute_command({:stop, [process_id]}) do
+    execute_remote_command(&stop_process/2, [process_id])
+  end
 
-      ["config", "get", key] ->
-        execute_remote_command(&get_config/2, [key])
+  defp execute_command({:restart, [process_id]}) do
+    execute_remote_command(&restart_process/2, [process_id])
+  end
 
-      ["config", "list"] ->
-        execute_remote_command(&list_config/1)
+  defp execute_command({:config_get, [key]}) do
+    execute_remote_command(&get_config/2, [key])
+  end
 
-      ["cluster", "info"] ->
-        execute_remote_command(&cluster_info/1)
+  defp execute_command({:config_list, _}) do
+    execute_remote_command(&list_config/1)
+  end
 
-      _ ->
-        IO.puts("Unknown command. Use --help for usage information.")
-        System.halt(1)
-    end
+  defp execute_command({:cluster_info, _}) do
+    execute_remote_command(&cluster_info/1)
+  end
+
+  defp execute_command({:unknown, _}) do
+    Logger.error("Unknown command. Use --help for usage information.")
+    System.halt(1)
   end
 
   ## Command Functions (executed on remote node via RPC)
@@ -174,12 +195,12 @@ defmodule Nurvus.CLI do
             System.halt(0)
 
           {:error, message} ->
-            IO.puts("Error: #{message}")
+            Logger.error("Error: #{message}")
             System.halt(1)
         end
 
       {:error, reason} ->
-        IO.puts("Failed to connect to node #{target_node}: #{reason}")
+        Logger.error("Failed to connect to node #{target_node}: #{reason}")
         System.halt(1)
     end
   end
@@ -215,21 +236,28 @@ defmodule Nurvus.CLI do
   defp print_result(result) when is_map(result) do
     result
     |> Jason.encode!(pretty: true)
-    |> IO.puts()
+    |> write_output()
   end
 
   defp print_result(result) when is_list(result) do
     result
     |> Jason.encode!(pretty: true)
-    |> IO.puts()
+    |> write_output()
   end
 
   defp print_result(result) do
-    IO.puts(inspect(result, pretty: true))
+    result
+    |> inspect(pretty: true)
+    |> write_output()
+  end
+
+  defp write_output(text) do
+    :ok = IO.write(text)
+    :ok = IO.write("\n")
   end
 
   defp print_help do
-    IO.puts("""
+    """
     Nurvus CLI - Distributed Process Manager
 
     Usage:
@@ -255,6 +283,7 @@ defmodule Nurvus.CLI do
       nurvus_cli start my_app
       nurvus_cli config get processes.my_app
       NURVUS_TARGET_NODE=nurvus@demi.local nurvus_cli cluster info
-    """)
+    """
+    |> write_output()
   end
 end

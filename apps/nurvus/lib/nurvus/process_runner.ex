@@ -154,6 +154,26 @@ defmodule Nurvus.ProcessRunner do
     {:noreply, state}
   end
 
+  def handle_info({port, {:exit_status, status}}, %{port: port} = state) do
+    Logger.warning("Process #{state.config.name} exited with status: #{status}")
+
+    new_state = %{state | port: nil, os_pid: nil}
+
+    {:stop, {:shutdown, {:exit_status, status}}, new_state}
+  end
+
+  def handle_info({:EXIT, port, reason}, %{port: port} = state) do
+    Logger.warning("Port for #{state.config.name} exited: #{inspect(reason)}")
+
+    new_state = %{state | port: nil, os_pid: nil}
+    {:stop, {:shutdown, reason}, new_state}
+  end
+
+  def handle_info(msg, state) do
+    Logger.debug("Unexpected message in ProcessRunner: #{inspect(msg)}")
+    {:noreply, state}
+  end
+
   defp format_process_output(data) do
     case data do
       {:eol, msg} when is_binary(msg) -> String.trim(msg)
@@ -170,29 +190,6 @@ defmodule Nurvus.ProcessRunner do
       clean_output = output |> String.replace(~r/\n+/, " ") |> String.trim()
       Logger.info("[#{process_name}] #{clean_output}")
     end
-  end
-
-  @impl true
-  def handle_info({port, {:exit_status, status}}, %{port: port} = state) do
-    Logger.warning("Process #{state.config.name} exited with status: #{status}")
-
-    new_state = %{state | port: nil, os_pid: nil}
-
-    {:stop, {:shutdown, {:exit_status, status}}, new_state}
-  end
-
-  @impl true
-  def handle_info({:EXIT, port, reason}, %{port: port} = state) do
-    Logger.warning("Port for #{state.config.name} exited: #{inspect(reason)}")
-
-    new_state = %{state | port: nil, os_pid: nil}
-    {:stop, {:shutdown, reason}, new_state}
-  end
-
-  @impl true
-  def handle_info(msg, state) do
-    Logger.debug("Unexpected message in ProcessRunner: #{inspect(msg)}")
-    {:noreply, state}
   end
 
   @impl true
