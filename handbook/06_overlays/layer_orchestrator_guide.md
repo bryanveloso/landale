@@ -21,9 +21,10 @@ src/
 ├── hooks/use-layer-orchestrator.tsx    # Main orchestration logic
 ├── components/animated-layer.tsx       # Layer registration wrapper
 ├── components/layer-renderer.tsx       # Content type rendering
-├── components/omnibar.tsx             # Integration example
-└── config/layer-mappings.ts           # Content → layer mappings
+└── components/omnibar.tsx             # Integration example
 ```
+
+> **Note**: Layer mappings are now provided by the server via the `layer` field in events. The frontend no longer maintains its own mapping configuration.
 
 ## How It Works
 
@@ -116,8 +117,8 @@ function Omnibar() {
     const content = streamState().active_content
     if (!content) return
 
-    // Map content to appropriate layer
-    const layer = getLayerForContent(content.type, streamState().current_show)
+    // Use server-provided layer information
+    const layer = content.layer || 'background' // Server enriches events with layer
     showLayer(layer, content)
   })
 
@@ -133,38 +134,37 @@ function Omnibar() {
 
 ## Content Type Mapping
 
-### Show-Specific Mappings
+### Server-Side Layer Assignment
 
-The system automatically maps content types to layers based on the current show:
+As of January 2025, layer mappings are centralized on the Phoenix server. Events broadcast from the server include a `layer` field that specifies which visual layer should display the content:
 
 ```typescript
-// config/layer-mappings.ts
-const ironmonMappings = {
-  // Critical alerts - Foreground
-  death_alert: 'foreground',
-  elite_four_alert: 'foreground',
-  shiny_encounter: 'foreground',
-
-  // Celebrations - Midground
-  level_up: 'midground',
-  gym_badge: 'midground',
-  sub_train: 'midground',
-
-  // Stats - Background
-  ironmon_run_stats: 'background',
-  ironmon_deaths: 'background',
-  recent_follows: 'background'
+// Events now include layer information
+interface StreamContent {
+  type: string
+  data: unknown
+  priority: number
+  layer?: 'foreground' | 'midground' | 'background'  // Server-provided
 }
 ```
 
-### Dynamic Layer Assignment
+### Show-Specific Behavior
+
+The server determines layer assignments based on the current show context:
+
+- **Ironmon**: Game-specific alerts (death_alert → foreground)
+- **Variety**: Community focus (raid_alert → foreground, emote_stats → background)
+- **Coding**: Development alerts (build_failure → foreground)
+
+### Using Server-Provided Layers
 
 ```typescript
-import { getLayerForContent } from '@/config/layer-mappings'
+// Old way (removed):
+// const layer = getLayerForContent(content.type, show)
 
-// Automatically determines the right layer
-const layer = getLayerForContent('death_alert', 'ironmon') // → 'foreground'
-const layer = getLayerForContent('recent_follows', 'variety') // → 'background'
+// New way - use server-provided layer:
+const layer = content.layer || 'background'
+showLayer(layer, content)
 ```
 
 ## Advanced Usage Patterns

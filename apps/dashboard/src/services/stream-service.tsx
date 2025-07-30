@@ -618,48 +618,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     targetLayer: 'foreground' | 'midground' | 'background',
     show: string
   ) => {
-    // Layer assignment logic (same as overlay system)
-    const layerMapping: Record<string, Record<string, string>> = {
-      ironmon: {
-        alert: 'foreground',
-        death_alert: 'foreground',
-        elite_four_alert: 'foreground',
-        shiny_encounter: 'foreground',
-        sub_train: 'midground',
-        level_up: 'midground',
-        gym_badge: 'midground',
-        ironmon_run_stats: 'background',
-        recent_follows: 'background',
-        emote_stats: 'background'
-      },
-      variety: {
-        alert: 'foreground',
-        raid_alert: 'foreground',
-        host_alert: 'foreground',
-        sub_train: 'midground',
-        cheer_celebration: 'midground',
-        emote_stats: 'background',
-        recent_follows: 'background',
-        stream_goals: 'background',
-        daily_stats: 'background'
-      },
-      coding: {
-        alert: 'foreground',
-        build_failure: 'foreground',
-        deployment_alert: 'foreground',
-        sub_train: 'midground',
-        commit_celebration: 'midground',
-        commit_stats: 'background',
-        build_status: 'background',
-        recent_follows: 'background'
-      }
-    }
-
-    // Find highest priority content for this layer
+    // Find highest priority content for this layer using server-provided layer information
     const layerContent = allContent
       .filter((content) => {
-        const mapping = layerMapping[show] || layerMapping.variety
-        return mapping[content.type] === targetLayer
+        // Use the layer field if available (server provides it), otherwise default to background
+        return (content.layer || 'background') === targetLayer
       })
       .sort((a, b) => (b.priority || 0) - (a.priority || 0))[0]
 

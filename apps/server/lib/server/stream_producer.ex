@@ -767,6 +767,59 @@ defmodule Server.StreamProducer do
     end
   end
 
+  defp enrich_state_with_layers(state) do
+    # Enrich active content with layer
+    enriched_active_content =
+      if state.active_content do
+        content_type = to_string(state.active_content.type)
+
+        Map.put(
+          state.active_content,
+          :layer,
+          Server.LayerMapping.get_layer(content_type, Atom.to_string(state.current_show))
+        )
+      else
+        nil
+      end
+
+    # Enrich interrupt stack with layers
+    enriched_interrupt_stack =
+      Enum.map(state.interrupt_stack, fn interrupt ->
+        content_type = to_string(interrupt.type)
+        Map.put(interrupt, :layer, Server.LayerMapping.get_layer(content_type, Atom.to_string(state.current_show)))
+      end)
+
+    # Enrich ticker rotation with layers
+    enriched_ticker_rotation =
+      Enum.map(state.ticker_rotation, fn ticker_type ->
+        cond do
+          is_binary(ticker_type) ->
+            %{
+              type: ticker_type,
+              layer: Server.LayerMapping.get_layer(ticker_type, Atom.to_string(state.current_show))
+            }
+
+          is_atom(ticker_type) ->
+            ticker_type_string = to_string(ticker_type)
+
+            %{
+              type: ticker_type_string,
+              layer: Server.LayerMapping.get_layer(ticker_type_string, Atom.to_string(state.current_show))
+            }
+
+          true ->
+            ticker_type
+        end
+      end)
+
+    %{
+      state
+      | active_content: enriched_active_content,
+        interrupt_stack: enriched_interrupt_stack,
+        ticker_rotation: enriched_ticker_rotation
+    }
+  end
+
   defp broadcast_state_update(state) do
     # Emit telemetry for state updates
     :telemetry.execute(
@@ -782,9 +835,12 @@ defmodule Server.StreamProducer do
       }
     )
 
+    # Enrich state with layer information before broadcasting
+    enriched_state = enrich_state_with_layers(state)
+
     # Persist state whenever we broadcast it
     persist_state(state)
-    Phoenix.PubSub.broadcast(Server.PubSub, "stream:updates", {:stream_update, state})
+    Phoenix.PubSub.broadcast(Server.PubSub, "stream:updates", {:stream_update, enriched_state})
   end
 
   defp schedule_cleanup do

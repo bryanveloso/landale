@@ -362,6 +362,28 @@ defmodule ServerWeb.OverlayChannel do
   end
 
   @impl true
+  def handle_in("get_layer_mappings", _payload, socket) do
+    with_correlation_context(socket, fn ->
+      current_show =
+        case Server.StreamProducer.get_current_state() do
+          %{current_show: show} -> Atom.to_string(show)
+          _ -> "variety"
+        end
+
+      mappings = Server.LayerMapping.get_mappings_for_show(current_show)
+      show_types = Server.LayerMapping.get_show_types()
+
+      {:reply,
+       {:ok,
+        %{
+          current_show: current_show,
+          mappings: mappings,
+          available_shows: show_types
+        }}, socket}
+    end)
+  end
+
+  @impl true
   def handle_in("system:services", _payload, socket) do
     with_correlation_context(socket, fn ->
       services = %{

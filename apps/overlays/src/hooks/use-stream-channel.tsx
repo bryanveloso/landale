@@ -14,6 +14,7 @@ export interface StreamState {
     priority: number
     duration?: number
     started_at: string
+    layer?: 'foreground' | 'midground' | 'background'
   } | null
   priority_level: 'alert' | 'sub_train' | 'ticker'
   interrupt_stack: Array<{
@@ -22,8 +23,12 @@ export interface StreamState {
     id: string
     started_at: string
     duration?: number
+    layer?: 'foreground' | 'midground' | 'background'
   }>
-  ticker_rotation: string[]
+  ticker_rotation: Array<string | {
+    type: string
+    layer: 'foreground' | 'midground' | 'background'
+  }>
   metadata: {
     last_updated: string
     state_version: number

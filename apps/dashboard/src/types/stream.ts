@@ -22,6 +22,7 @@ export interface StreamContent {
   duration?: number
   started_at: string
   id?: string
+  layer?: 'foreground' | 'midground' | 'background'
 }
 
 // Layer-specific interfaces
@@ -80,7 +81,10 @@ export interface ServerStreamState {
   active_content: StreamContent | null
   priority_level: string
   interrupt_stack: StreamContent[]
-  ticker_rotation: string[]
+  ticker_rotation: Array<string | {
+    type: string
+    layer: 'foreground' | 'midground' | 'background'
+  }>
   metadata: {
     last_updated: string
     state_version: number

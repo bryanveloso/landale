@@ -3,8 +3,6 @@ import { useStreamChannel } from '../hooks/use-stream-channel'
 import { useLayerOrchestrator } from '../hooks/use-layer-orchestrator'
 import { AnimatedLayer } from './animated-layer'
 import { LayerRenderer } from './layer-renderer'
-import { getLayerForContent, shouldDisplayOnLayer } from '../config/layer-mappings'
-import type { ShowType } from '../config/layer-mappings'
 
 export function Omnibar() {
   const { streamState, isConnected } = useStreamChannel()
@@ -33,7 +31,6 @@ export function Omnibar() {
   // React to stream state changes and orchestrate layer visibility
   createEffect(() => {
     const state = streamState()
-    const currentShow = state.current_show as ShowType
     
     // Process all content in interrupt stack + active content
     const allContent = [
@@ -48,10 +45,10 @@ export function Omnibar() {
       background: null
     }
     
-    // Assign content to appropriate layers
+    // Assign content to appropriate layers using server-provided layer field
     allContent.forEach(content => {
-      if (content && content.type) {
-        const targetLayer = getLayerForContent(content.type, currentShow)
+      if (content && content.type && content.layer) {
+        const targetLayer = content.layer as 'foreground' | 'midground' | 'background'
         
         // Only assign if this layer doesn't already have higher priority content
         if (!layerContent[targetLayer] || content.priority > layerContent[targetLayer].priority) {
@@ -76,7 +73,6 @@ export function Omnibar() {
   // Get content for specific layer
   const getLayerContent = (layer: 'foreground' | 'midground' | 'background') => {
     const state = streamState()
-    const currentShow = state.current_show as ShowType
     
     // Find the highest priority content that should display on this layer
     const allContent = [
@@ -85,7 +81,7 @@ export function Omnibar() {
     ]
     
     return allContent
-      .filter(content => content && shouldDisplayOnLayer(content.type, layer, currentShow))
+      .filter(content => content && content.layer === layer)
       .sort((a, b) => (b.priority || 0) - (a.priority || 0))[0] || null
   }
   

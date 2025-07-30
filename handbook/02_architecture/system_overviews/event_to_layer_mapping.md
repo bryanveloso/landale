@@ -109,24 +109,26 @@ end
 
 ## Refactor Opportunities
 
-### Option 1: Event → Content Type Registry
+### Option 1: Event → Content Type Registry ✅ IMPLEMENTED
 
 ```elixir
-# Centralized mapping configuration
-@event_mappings %{
-  # IronMON events
-  {"ironmon", "pokemon_death"} => {:death_alert, :foreground},
-  {"ironmon", "shiny_encounter"} => {:shiny_encounter, :foreground},
-  {"ironmon", "checkpoint_cleared"} => {:progress_update, :background},
-  
-  # System events
-  {"system", "build_failure"} => {:build_failure, :midground},
-  {"system", "deployment_success"} => {:deployment_notice, :background},
-  
-  # Twitch events (existing)
-  {"twitch", "channel.subscribe"} => {:sub_train, :background}
+# Centralized mapping configuration (NOW IN Server.LayerMapping)
+@layer_mappings %{
+  "ironmon" => %{
+    "death_alert" => "foreground",
+    "shiny_encounter" => "foreground",
+    "checkpoint_cleared" => "background",
+    # ... more mappings
+  },
+  "variety" => %{
+    "raid_alert" => "foreground",
+    "sub_train" => "midground",
+    # ... more mappings
+  }
 }
 ```
+
+> **Implemented**: Layer mappings are now centralized in `Server.LayerMapping` module. The StreamProducer enriches all events with a `layer` field before broadcasting.
 
 ### Option 2: Event Processing Pipeline
 
@@ -180,8 +182,10 @@ ironmon:
 
 **Event Publishers**: `apps/server/lib/server/events.ex`
 **StreamProducer**: `apps/server/lib/server/stream_producer.ex`
-**Layer Coordination**: `apps/overlays/src/config/layer-mappings.ts`
+**Layer Coordination**: `apps/server/lib/server/layer_mapping.ex`
 **PubSub Topics**: Throughout various service modules
+
+> **Update**: Layer mappings have been centralized to the server as of January 2025. Events now include a `layer` field enriched by the StreamProducer before broadcasting.
 
 ## Why This Needs Refactoring
 
