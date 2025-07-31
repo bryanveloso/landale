@@ -127,6 +127,16 @@ export function useStreamChannel() {
         }
       })
       // Handle real-time content updates
+      if (payload.type === 'goals_update') {
+        // Update the stream state with new goals data
+        setStreamState((prev) => ({
+          ...prev,
+          active_content:
+            prev.active_content?.type === 'stream_goals'
+              ? { ...prev.active_content, data: payload.data }
+              : prev.active_content
+        }))
+      }
     })
 
     // Join channel with error handling

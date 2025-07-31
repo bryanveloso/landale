@@ -25,6 +25,9 @@ defmodule Server.Services.Twitch.EventHandler do
   - `channel.chat.message` - Chat messages for correlation analysis
   - `channel.chat.clear` - Chat clearing events
   - `channel.chat.message_delete` - Message deletion events
+  - `channel.goal.begin` - Goal creation
+  - `channel.goal.progress` - Goal progress updates
+  - `channel.goal.end` - Goal completion
   """
 
   require Logger
@@ -256,6 +259,50 @@ defmodule Server.Services.Twitch.EventHandler do
     }
   end
 
+  defp get_event_specific_data("channel.goal.begin", event_data) do
+    %{
+      id: event_data["id"],
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      type: event_data["type"],
+      description: event_data["description"],
+      current_amount: event_data["current_amount"] || 0,
+      target_amount: event_data["target_amount"],
+      started_at: parse_datetime(event_data["started_at"])
+    }
+  end
+
+  defp get_event_specific_data("channel.goal.progress", event_data) do
+    %{
+      id: event_data["id"],
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      type: event_data["type"],
+      description: event_data["description"],
+      current_amount: event_data["current_amount"],
+      target_amount: event_data["target_amount"],
+      started_at: parse_datetime(event_data["started_at"])
+    }
+  end
+
+  defp get_event_specific_data("channel.goal.end", event_data) do
+    %{
+      id: event_data["id"],
+      broadcaster_user_id: event_data["broadcaster_user_id"],
+      broadcaster_user_login: event_data["broadcaster_user_login"],
+      broadcaster_user_name: event_data["broadcaster_user_name"],
+      type: event_data["type"],
+      description: event_data["description"],
+      is_achieved: event_data["is_achieved"] || false,
+      current_amount: event_data["current_amount"],
+      target_amount: event_data["target_amount"],
+      started_at: parse_datetime(event_data["started_at"]),
+      ended_at: parse_datetime(event_data["ended_at"])
+    }
+  end
+
   defp get_event_specific_data(_event_type, event_data) do
     # For unknown event types, include all original data
     %{raw_data: event_data}
@@ -280,44 +327,35 @@ defmodule Server.Services.Twitch.EventHandler do
     Phoenix.PubSub.broadcast(Server.PubSub, "twitch:#{event_type}", {:event, normalized_event})
 
     # Publish to legacy topic structure for backward compatibility
-    case event_type do
-      "stream.online" ->
-        Phoenix.PubSub.broadcast(Server.PubSub, "stream_status", {:stream_online, normalized_event})
-
-      "stream.offline" ->
-        Phoenix.PubSub.broadcast(Server.PubSub, "stream_status", {:stream_offline, normalized_event})
-
-      "channel.follow" ->
-        Phoenix.PubSub.broadcast(Server.PubSub, "followers", {:new_follower, normalized_event})
-
-      "channel.subscribe" ->
-        Phoenix.PubSub.broadcast(Server.PubSub, "subscriptions", {:new_subscription, normalized_event})
-
-      "channel.subscription.gift" ->
-        Phoenix.PubSub.broadcast(Server.PubSub, "subscriptions", {:gift_subscription, normalized_event})
-
-      "channel.cheer" ->
-        Phoenix.PubSub.broadcast(Server.PubSub, "cheers", {:new_cheer, normalized_event})
-
-      "channel.chat.message" ->
-        Phoenix.PubSub.broadcast(Server.PubSub, "chat", {:chat_message, normalized_event})
-
-      "channel.chat.clear" ->
-        Phoenix.PubSub.broadcast(Server.PubSub, "chat", {:chat_clear, normalized_event})
-
-      "channel.chat.message_delete" ->
-        Phoenix.PubSub.broadcast(Server.PubSub, "chat", {:message_delete, normalized_event})
-
-      "channel.update" ->
-        Phoenix.PubSub.broadcast(Server.PubSub, "channel:updates", {:channel_update, normalized_event})
-
-      _ ->
-        # For other events, just use the general topic
-        :ok
-    end
+    publish_legacy_event(event_type, normalized_event)
 
     :ok
   end
+
+  defp publish_legacy_event(event_type, normalized_event) do
+    case legacy_event_mapping(event_type) do
+      {topic, event_name} ->
+        Phoenix.PubSub.broadcast(Server.PubSub, topic, {event_name, normalized_event})
+
+      nil ->
+        :ok
+    end
+  end
+
+  defp legacy_event_mapping("stream.online"), do: {"stream_status", :stream_online}
+  defp legacy_event_mapping("stream.offline"), do: {"stream_status", :stream_offline}
+  defp legacy_event_mapping("channel.follow"), do: {"followers", :new_follower}
+  defp legacy_event_mapping("channel.subscribe"), do: {"subscriptions", :new_subscription}
+  defp legacy_event_mapping("channel.subscription.gift"), do: {"subscriptions", :gift_subscription}
+  defp legacy_event_mapping("channel.cheer"), do: {"cheers", :new_cheer}
+  defp legacy_event_mapping("channel.chat.message"), do: {"chat", :chat_message}
+  defp legacy_event_mapping("channel.chat.clear"), do: {"chat", :chat_clear}
+  defp legacy_event_mapping("channel.chat.message_delete"), do: {"chat", :message_delete}
+  defp legacy_event_mapping("channel.update"), do: {"channel:updates", :channel_update}
+  defp legacy_event_mapping("channel.goal.begin"), do: {"goals", :goal_begin}
+  defp legacy_event_mapping("channel.goal.progress"), do: {"goals", :goal_progress}
+  defp legacy_event_mapping("channel.goal.end"), do: {"goals", :goal_end}
+  defp legacy_event_mapping(_), do: nil
 
   @doc """
   Emits telemetry events for monitoring.
@@ -334,67 +372,107 @@ defmodule Server.Services.Twitch.EventHandler do
     Server.Telemetry.twitch_event_received(event_type)
 
     # Emit specific telemetry for important events
-    case event_type do
-      "stream.online" ->
-        :telemetry.execute([:server, :twitch, :stream, :online], %{count: 1}, %{
-          broadcaster_id: normalized_event.broadcaster_user_id,
-          stream_type: normalized_event.stream_type
-        })
-
-      "stream.offline" ->
-        :telemetry.execute([:server, :twitch, :stream, :offline], %{count: 1}, %{
-          broadcaster_id: normalized_event.broadcaster_user_id
-        })
-
-      "channel.follow" ->
-        :telemetry.execute([:server, :twitch, :follow], %{count: 1}, %{
-          broadcaster_id: normalized_event.broadcaster_user_id,
-          follower_id: normalized_event.user_id
-        })
-
-      "channel.subscribe" ->
-        :telemetry.execute([:server, :twitch, :subscription], %{count: 1}, %{
-          broadcaster_id: normalized_event.broadcaster_user_id,
-          subscriber_id: normalized_event.user_id,
-          tier: normalized_event.tier,
-          is_gift: normalized_event.is_gift
-        })
-
-      "channel.cheer" ->
-        :telemetry.execute([:server, :twitch, :cheer], %{bits: normalized_event.bits}, %{
-          broadcaster_id: normalized_event.broadcaster_user_id,
-          user_id: normalized_event.user_id,
-          is_anonymous: normalized_event.is_anonymous
-        })
-
-      "channel.chat.message" ->
-        :telemetry.execute([:server, :twitch, :chat, :message], %{count: 1}, %{
-          broadcaster_id: normalized_event.broadcaster_user_id,
-          user_id: normalized_event.user_id,
-          message_type: normalized_event.message_type,
-          has_cheer: not is_nil(normalized_event.cheer),
-          has_reply: not is_nil(normalized_event.reply)
-        })
-
-      "channel.chat.clear" ->
-        :telemetry.execute([:server, :twitch, :chat, :clear], %{count: 1}, %{
-          broadcaster_id: normalized_event.broadcaster_user_id
-        })
-
-      "channel.chat.message_delete" ->
-        :telemetry.execute([:server, :twitch, :chat, :delete], %{count: 1}, %{
-          broadcaster_id: normalized_event.broadcaster_user_id,
-          target_user_id: normalized_event.target_user_id
-        })
-
-      _ ->
-        :telemetry.execute([:server, :twitch, :event, :other], %{count: 1}, %{
-          event_type: event_type,
-          broadcaster_id: normalized_event.broadcaster_user_id
-        })
-    end
+    emit_event_specific_telemetry(event_type, normalized_event)
 
     :ok
+  end
+
+  defp emit_event_specific_telemetry("stream.online", event) do
+    :telemetry.execute([:server, :twitch, :stream, :online], %{count: 1}, %{
+      broadcaster_id: event.broadcaster_user_id,
+      stream_type: event.stream_type
+    })
+  end
+
+  defp emit_event_specific_telemetry("stream.offline", event) do
+    :telemetry.execute([:server, :twitch, :stream, :offline], %{count: 1}, %{
+      broadcaster_id: event.broadcaster_user_id
+    })
+  end
+
+  defp emit_event_specific_telemetry("channel.follow", event) do
+    :telemetry.execute([:server, :twitch, :follow], %{count: 1}, %{
+      broadcaster_id: event.broadcaster_user_id,
+      follower_id: event.user_id
+    })
+  end
+
+  defp emit_event_specific_telemetry("channel.subscribe", event) do
+    :telemetry.execute([:server, :twitch, :subscription], %{count: 1}, %{
+      broadcaster_id: event.broadcaster_user_id,
+      subscriber_id: event.user_id,
+      tier: event.tier,
+      is_gift: event.is_gift
+    })
+  end
+
+  defp emit_event_specific_telemetry("channel.cheer", event) do
+    :telemetry.execute([:server, :twitch, :cheer], %{bits: event.bits}, %{
+      broadcaster_id: event.broadcaster_user_id,
+      user_id: event.user_id,
+      is_anonymous: event.is_anonymous
+    })
+  end
+
+  defp emit_event_specific_telemetry("channel.chat.message", event) do
+    :telemetry.execute([:server, :twitch, :chat, :message], %{count: 1}, %{
+      broadcaster_id: event.broadcaster_user_id,
+      user_id: event.user_id,
+      message_type: event.message_type,
+      has_cheer: not is_nil(event.cheer),
+      has_reply: not is_nil(event.reply)
+    })
+  end
+
+  defp emit_event_specific_telemetry("channel.chat.clear", event) do
+    :telemetry.execute([:server, :twitch, :chat, :clear], %{count: 1}, %{
+      broadcaster_id: event.broadcaster_user_id
+    })
+  end
+
+  defp emit_event_specific_telemetry("channel.chat.message_delete", event) do
+    :telemetry.execute([:server, :twitch, :chat, :delete], %{count: 1}, %{
+      broadcaster_id: event.broadcaster_user_id,
+      target_user_id: event.target_user_id
+    })
+  end
+
+  defp emit_event_specific_telemetry("channel.goal.begin", event) do
+    :telemetry.execute([:server, :twitch, :goal, :begin], %{count: 1}, %{
+      broadcaster_id: event.broadcaster_user_id,
+      goal_type: event.type,
+      target_amount: event.target_amount
+    })
+  end
+
+  defp emit_event_specific_telemetry("channel.goal.progress", event) do
+    :telemetry.execute(
+      [:server, :twitch, :goal, :progress],
+      %{
+        current_amount: event.current_amount,
+        target_amount: event.target_amount
+      },
+      %{
+        broadcaster_id: event.broadcaster_user_id,
+        goal_type: event.type,
+        goal_id: event.id
+      }
+    )
+  end
+
+  defp emit_event_specific_telemetry("channel.goal.end", event) do
+    :telemetry.execute([:server, :twitch, :goal, :end], %{count: 1}, %{
+      broadcaster_id: event.broadcaster_user_id,
+      goal_type: event.type,
+      is_achieved: event.is_achieved
+    })
+  end
+
+  defp emit_event_specific_telemetry(event_type, event) do
+    :telemetry.execute([:server, :twitch, :event, :other], %{count: 1}, %{
+      event_type: event_type,
+      broadcaster_id: event.broadcaster_user_id
+    })
   end
 
   # Private helper functions
@@ -521,7 +599,10 @@ defmodule Server.Services.Twitch.EventHandler do
       "channel.cheer",
       "channel.update",
       "stream.online",
-      "stream.offline"
+      "stream.offline",
+      "channel.goal.begin",
+      "channel.goal.progress",
+      "channel.goal.end"
     ]
 
     event_type in valuable_events

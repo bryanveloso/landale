@@ -76,6 +76,7 @@ defmodule Server.ContentAggregator do
     # Subscribe to relevant events
     Phoenix.PubSub.subscribe(Server.PubSub, "chat")
     Phoenix.PubSub.subscribe(Server.PubSub, "followers")
+    Phoenix.PubSub.subscribe(Server.PubSub, "goals")
 
     # Initialize daily stats
     reset_daily_stats()
@@ -113,7 +114,19 @@ defmodule Server.ContentAggregator do
 
   @impl true
   def handle_call(:get_stream_goals, _from, state) do
-    goals = fetch_creator_goals()
+    # Return cached goals if available, otherwise fetch from API
+    goals =
+      case Map.get(state, :cached_goals) do
+        nil ->
+          fetched_goals = fetch_creator_goals()
+          # Cache the fetched goals
+          Process.put(:cached_goals, fetched_goals)
+          fetched_goals
+
+        cached ->
+          cached
+      end
+
     {:reply, goals, state}
   end
 
@@ -173,6 +186,86 @@ defmodule Server.ContentAggregator do
     end
 
     {:noreply, state}
+  end
+
+  # Handle goal events
+  @impl true
+  def handle_info({:goal_begin, event}, state) do
+    Logger.info("Goal started", goal_type: event.type, target: event.target_amount)
+
+    # Update cached goals
+    updated_goals = update_goal_cache(event)
+    new_state = Map.put(state, :cached_goals, updated_goals)
+
+    # Broadcast updated goals to overlays
+    Phoenix.PubSub.broadcast(
+      Server.PubSub,
+      "stream:updates",
+      {:content_update,
+       %{
+         type: "goals_update",
+         data: updated_goals,
+         timestamp: DateTime.utc_now()
+       }}
+    )
+
+    {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_info({:goal_progress, event}, state) do
+    Logger.debug("Goal progress",
+      goal_type: event.type,
+      current: event.current_amount,
+      target: event.target_amount
+    )
+
+    # Update cached goals
+    updated_goals = update_goal_cache(event)
+    new_state = Map.put(state, :cached_goals, updated_goals)
+
+    # Broadcast updated goals to overlays
+    Phoenix.PubSub.broadcast(
+      Server.PubSub,
+      "stream:updates",
+      {:content_update,
+       %{
+         type: "goals_update",
+         data: updated_goals,
+         timestamp: DateTime.utc_now()
+       }}
+    )
+
+    {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_info({:goal_end, event}, state) do
+    Logger.info("Goal ended",
+      goal_type: event.type,
+      achieved: event.is_achieved,
+      final_amount: event.current_amount
+    )
+
+    # Remove from cached goals
+    cached_goals = Map.get(state, :cached_goals, %{})
+    goal_key = goal_type_to_key(event.type)
+    updated_goals = Map.delete(cached_goals, goal_key)
+    new_state = Map.put(state, :cached_goals, updated_goals)
+
+    # Broadcast updated goals to overlays
+    Phoenix.PubSub.broadcast(
+      Server.PubSub,
+      "stream:updates",
+      {:content_update,
+       %{
+         type: "goals_update",
+         data: updated_goals,
+         timestamp: DateTime.utc_now()
+       }}
+    )
+
+    {:noreply, new_state}
   end
 
   # Handle daily reset
@@ -492,4 +585,39 @@ defmodule Server.ContentAggregator do
         }
     end
   end
+
+  defp update_goal_cache(event) do
+    # Get current cached goals or empty map
+    cached_goals = Process.get(:cached_goals, %{})
+
+    # Determine goal key based on type
+    goal_key = goal_type_to_key(event.type)
+
+    # Update the specific goal
+    goal_data = %{
+      type: event.type,
+      description: event.description,
+      current: event.current_amount,
+      target: event.target_amount,
+      percentage: calculate_percentage(event.current_amount, event.target_amount)
+    }
+
+    updated_goals = Map.put(cached_goals, goal_key, goal_data)
+
+    # Store in process dictionary for quick access
+    Process.put(:cached_goals, updated_goals)
+
+    updated_goals
+  end
+
+  defp goal_type_to_key("follower"), do: :follower_goal
+  defp goal_type_to_key("subscription"), do: :subscription_goal
+  defp goal_type_to_key("new_subscription"), do: :new_subscription_goal
+  defp goal_type_to_key(_), do: :unknown_goal
+
+  defp calculate_percentage(current, target) when target > 0 do
+    Float.round(current / target * 100, 1)
+  end
+
+  defp calculate_percentage(_, _), do: 0.0
 end
