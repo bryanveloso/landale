@@ -22,7 +22,7 @@ async def health_check(request):
     health_data = {
         "status": "healthy",
         "service": "landale-seed",
-        "uptime_seconds": int(time.time() - app["start_time"]),
+        "uptime_seconds": int(time.monotonic() - app["start_time"]),
         "timestamp": int(time.time()),
     }
 
@@ -60,7 +60,7 @@ async def detailed_status(request):
     status = {
         "service": "landale-seed",
         "version": "0.1.0",
-        "uptime_seconds": int(time.time() - app["start_time"]),
+        "uptime_seconds": int(time.monotonic() - app["start_time"]),
         "timestamp": int(time.time()),
         "components": {},
     }
@@ -70,18 +70,38 @@ async def detailed_status(request):
         service = app["service"]
 
         # Transcription client status
-        status["components"]["transcription_client"] = {
-            "connected": service.transcription_client.connected
-            if hasattr(service.transcription_client, "connected")
-            else False,
-            "url": service.transcription_client.url if hasattr(service.transcription_client, "url") else "unknown",
-        }
+        if hasattr(service.transcription_client, "get_status"):
+            trans_status = service.transcription_client.get_status()
+            status["components"]["transcription_client"] = {
+                "connected": trans_status.get("connected", False),
+                "state": trans_status.get("connection_state", "unknown"),
+                "url": trans_status.get("url", "unknown"),
+                "reconnect_attempts": trans_status.get("reconnect_attempts", 0),
+                "circuit_breaker_trips": trans_status.get("circuit_breaker_trips", 0),
+            }
+        else:
+            status["components"]["transcription_client"] = {
+                "connected": service.transcription_client.is_connected
+                if hasattr(service.transcription_client, "is_connected")
+                else False,
+                "url": service.transcription_client.url if hasattr(service.transcription_client, "url") else "unknown",
+            }
 
         # Server client status
-        status["components"]["server_client"] = {
-            "connected": service.server_client.connected if hasattr(service.server_client, "connected") else False,
-            "url": service.server_client.url if hasattr(service.server_client, "url") else "unknown",
-        }
+        if hasattr(service.server_client, "get_status"):
+            server_status = service.server_client.get_status()
+            status["components"]["server_client"] = {
+                "connected": server_status.get("connected", False),
+                "state": server_status.get("connection_state", "unknown"),
+                "url": server_status.get("url", "unknown"),
+                "reconnect_attempts": server_status.get("reconnect_attempts", 0),
+                "circuit_breaker_trips": server_status.get("circuit_breaker_trips", 0),
+            }
+        else:
+            status["components"]["server_client"] = {
+                "connected": service.server_client.connected if hasattr(service.server_client, "connected") else False,
+                "url": service.server_client.url if hasattr(service.server_client, "url") else "unknown",
+            }
 
         # LMS client status
         lms_status = {
@@ -133,7 +153,7 @@ async def detailed_status(request):
 async def create_health_app(port: int = 8891, service=None, correlator: "StreamCorrelator | None" = None):
     """Create health check web app."""
     app = web.Application()
-    app["start_time"] = int(time.time())
+    app["start_time"] = time.monotonic()
     app["service"] = service
     app["correlator"] = correlator
     app["connections"] = {}

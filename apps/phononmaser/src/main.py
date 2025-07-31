@@ -72,7 +72,7 @@ class Phononmaser:
         await self.websocket_server.start()
 
         # Start health check endpoint
-        self.health_runner = await create_health_app(self.health_port)
+        self.health_runner = await create_health_app(self.health_port, self.transcription_client)
 
         self.running = True
         logger.info(f"Phononmaser started on port {self.port}")

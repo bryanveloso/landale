@@ -258,6 +258,18 @@ docker compose up          # Run services
 cd apps/nurvus
 mix increment_version      # ALWAYS run before release
 mix release --overwrite
+
+# WebSocket Resilience Testing
+# Test automatic reconnection:
+cd apps/server && mix phx.server  # Start Phoenix (Ctrl+C to stop)
+# In another terminal:
+cd apps/seed && uv run python -m src.main
+# Check health endpoint:
+curl http://localhost:8891/health
+curl http://localhost:8891/status
+# For phononmaser:
+curl http://localhost:8890/health
+# Services should reconnect within 3 seconds after Phoenix restart
 ```
 
 ## Bun Development
