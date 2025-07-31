@@ -7,8 +7,9 @@
 
 import { createContext, useContext, createSignal, onCleanup, onMount } from 'solid-js'
 import type { Component, JSX } from 'solid-js'
-import { Socket, Channel } from 'phoenix'
+import { Channel } from 'phoenix'
 import { createLogger } from '@landale/logger'
+import { ResilientPhoenixSocket, ConnectionState as ResilientConnectionState, type ConnectionEvent, type HealthMetrics } from '@landale/shared/websocket'
 import type {
   OverlayLayerState,
   LayerState,
@@ -86,7 +87,10 @@ interface StreamServiceContext {
   forceReconnect: () => void
 
   // Internal socket access for activity log
-  getSocket: () => Socket | null
+  getSocket: () => ResilientPhoenixSocket | null
+  
+  // Health monitoring
+  getHealthMetrics: () => HealthMetrics | null
 }
 
 // Channel info update type
@@ -126,7 +130,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   const [connectionState, setConnectionState] = createSignal<ConnectionState>(DEFAULT_CONNECTION_STATE)
 
   // Connection management
-  let socket: Socket | null = null
+  let socket: ResilientPhoenixSocket | null = null
   let overlayChannel: Channel | null = null
   let queueChannel: Channel | null = null
   let reconnectTimer: number | null = null
@@ -147,47 +151,44 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
 
     logger.info('Connecting to server...')
 
-    socket = new Socket(getServerUrl(), {
-      reconnectAfterMs: (tries: number) => {
-        setConnectionState((prev) => ({ ...prev, reconnectAttempts: tries }))
-        return Math.min(1000 * Math.pow(2, tries), 30000)
-      },
-      logger: (kind: string, msg: string, data: Record<string, unknown>) => {
+    socket = new ResilientPhoenixSocket({
+      url: getServerUrl(),
+      maxReconnectAttempts: 10,
+      reconnectDelayBase: 1000,
+      reconnectDelayCap: 30000,
+      heartbeatInterval: 30000,
+      circuitBreakerThreshold: 5,
+      circuitBreakerTimeout: 300000,
+      logger: (kind: string, msg: string, data?: unknown) => {
         logger.debug(`Phoenix ${kind}: ${msg}`, data)
       }
     })
 
-    // Socket event handlers
-    socket.onOpen(() => {
-      logger.info('Connected to server')
+    // Subscribe to connection state changes
+    socket.onConnectionChange((event: ConnectionEvent) => {
+      logger.info('Connection state changed', {
+        metadata: {
+          oldState: event.oldState,
+          newState: event.newState,
+          error: event.error?.message
+        }
+      })
+
+      const isConnected = event.newState === ResilientConnectionState.CONNECTED
+      const metrics = socket.getHealthMetrics()
+      
       setConnectionState({
-        connected: true,
-        reconnectAttempts: 0,
-        lastConnected: new Date().toISOString(),
-        error: null
+        connected: isConnected,
+        reconnectAttempts: metrics.reconnectAttempts,
+        lastConnected: isConnected ? new Date().toISOString() : connectionState().lastConnected,
+        error: event.error?.message ?? null
       })
-      joinChannels()
-    })
-
-    socket.onError((error: unknown) => {
-      logger.error('Socket error', {
-        error:
-          error instanceof Error ? { message: error.message, type: error.constructor.name } : { message: String(error) }
-      })
-      setConnectionState((prev) => ({
-        ...prev,
-        connected: false,
-        error: error instanceof Error ? error.message : String(error)
-      }))
-    })
-
-    socket.onClose(() => {
-      logger.info('Socket closed')
-      setConnectionState((prev) => ({
-        ...prev,
-        connected: false
-      }))
-      cleanup()
+      
+      if (isConnected) {
+        joinChannels()
+      } else if (event.newState === ResilientConnectionState.DISCONNECTED) {
+        cleanup()
+      }
     })
 
     socket.connect()
@@ -382,7 +383,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   const disconnect = () => {
     cleanup()
     if (socket) {
-      socket.disconnect()
+      socket.shutdown()
       socket = null
     }
   }
@@ -714,7 +715,8 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     requestState,
     requestQueueState,
     forceReconnect,
-    getSocket: () => socket
+    getSocket: () => socket,
+    getHealthMetrics: () => socket?.getHealthMetrics() ?? null
   }
 
   return <StreamServiceContext.Provider value={contextValue}>{props.children}</StreamServiceContext.Provider>
