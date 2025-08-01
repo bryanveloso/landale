@@ -37,16 +37,24 @@ defmodule Server.CorrelationIdPool do
   """
   @spec get() :: binary()
   def get do
-    case :ets.lookup(@pool_table_name, :pool) do
-      [{:pool, id} | _] ->
-        # Remove the used ID and trigger async refill if needed
-        :ets.delete_object(@pool_table_name, {:pool, id})
-        maybe_refill_pool()
-        id
-
-      [] ->
+    # Use :ets.first to get any available key, then atomically take it
+    case :ets.first(@pool_table_name) do
+      :"$end_of_table" ->
         # Pool empty, generate on demand
         Server.CorrelationId.generate()
+
+      key ->
+        # Atomically take the entry with this key
+        case :ets.take(@pool_table_name, key) do
+          [{^key, id}] ->
+            # Successfully took an ID, trigger async refill if needed
+            maybe_refill_pool()
+            id
+
+          [] ->
+            # Race condition: another process took it first, retry
+            get()
+        end
     end
   end
 
@@ -69,7 +77,9 @@ defmodule Server.CorrelationIdPool do
   @impl true
   def init(_opts) do
     # Create ETS table for the pool
-    :ets.new(@pool_table_name, [:named_table, :protected, :bag])
+    # Using :public to allow atomic take operations from any process
+    # Using :set table type for unique keys per ID
+    :ets.new(@pool_table_name, [:named_table, :public, :set])
 
     # Pre-fill the pool
     fill_pool()
@@ -103,7 +113,13 @@ defmodule Server.CorrelationIdPool do
   end
 
   defp add_ids_to_pool(count) when count > 0 do
-    ids = for _ <- 1..count//1, do: {:pool, Server.CorrelationId.generate()}
+    # Generate unique key-value pairs where key is the ID itself
+    ids =
+      for _ <- 1..count//1 do
+        id = Server.CorrelationId.generate()
+        {id, id}
+      end
+
     :ets.insert(@pool_table_name, ids)
   end
 
