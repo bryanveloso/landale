@@ -34,3 +34,44 @@ In Docker, emotes are stored in a named volume (`emotes_cache`) so they persist 
 - Losing emotes when containers restart
 
 The volume is automatically created by Docker Compose and mounted to the overlays container.
+
+## Test Validation
+
+### check-critical-tests.sh
+
+Ensures critical protocol tests are present and not skipped. This script is run in CI to prevent accidental disabling of important tests.
+
+**Usage:**
+
+```bash
+./scripts/check-critical-tests.sh
+```
+
+**What it checks:**
+
+1. Critical test files exist
+2. Test modules are properly defined
+3. No critical tests are marked with `@moduletag :skip`
+4. Warns about individually skipped tests
+5. Ensures minimum test coverage for critical modules
+
+**Critical tests monitored:**
+
+- OBS WebSocket Protocol Tests (supervisor, connections, connection)
+- OAuth Token Manager Tests
+- EventSub Manager Tests
+
+**Exit codes:**
+
+- 0: All checks passed
+- 1: Critical tests missing or skipped
+
+## Other Scripts
+
+### analyze-logs.ts
+
+Tool for analyzing application logs (location TBD).
+
+### manual-tests/
+
+Directory for manual testing scripts and utilities (gitignored).

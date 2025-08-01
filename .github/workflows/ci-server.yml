@@ -82,6 +82,40 @@ jobs:
         working-directory: apps/server
         run: mix ecto.migrate
 
-      - name: Run tests
+      - name: Verify critical tests
         working-directory: apps/server
-        run: mix test
+        run: ../../scripts/check-critical-tests.sh
+
+      - name: Run tests with coverage
+        working-directory: apps/server
+        run: |
+          mix test --cover | tee test_results.txt
+          echo ""
+          echo "📊 Test Coverage Summary:"
+          mix test --cover --export-coverage default
+          mix test.coverage || true
+
+      - name: Generate test summary
+        if: always()
+        working-directory: apps/server
+        run: |
+          echo "## 🧪 Server Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Extract test counts
+          if [ -f test_results.txt ]; then
+            if grep -q "tests, 0 failures" test_results.txt; then
+              echo "✅ **All tests passed!**" >> $GITHUB_STEP_SUMMARY
+              grep -E "[0-9]+ tests, [0-9]+ failures" test_results.txt >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ **Some tests failed**" >> $GITHUB_STEP_SUMMARY
+              grep -E "[0-9]+ tests, [0-9]+ failures" test_results.txt >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Critical Protocol Tests" >> $GITHUB_STEP_SUMMARY
+          echo "The following critical tests are monitored to ensure protocol compliance:" >> $GITHUB_STEP_SUMMARY
+          echo "- OBS WebSocket Protocol Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- OAuth Token Manager Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- EventSub Manager Tests" >> $GITHUB_STEP_SUMMARY
