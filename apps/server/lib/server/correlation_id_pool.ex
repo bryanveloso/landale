@@ -7,6 +7,14 @@ defmodule Server.CorrelationIdPool do
   Falls back to on-demand generation when pool is empty.
 
   Optimized for single-user streaming system with moderate event throughput.
+
+  ## Implementation Note
+
+  This module uses a `:public` ETS table instead of the standard `:protected` access.
+  This is an intentional design decision to enable atomic `take` operations from any
+  process without going through the GenServer, preventing it from becoming a bottleneck.
+  The table is only used for ID storage with no sensitive data, making public access
+  safe in this specific use case.
   """
 
   use GenServer
@@ -52,8 +60,9 @@ defmodule Server.CorrelationIdPool do
             id
 
           [] ->
-            # Race condition: another process took it first, retry
-            get()
+            # Race condition: another process took it first
+            # Fall back to generation to avoid unbounded recursion
+            Server.CorrelationId.generate()
         end
     end
   end

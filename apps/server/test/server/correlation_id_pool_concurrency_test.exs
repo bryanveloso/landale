@@ -2,9 +2,6 @@ defmodule Server.CorrelationIdPoolConcurrencyTest do
   use ExUnit.Case, async: false
   require Logger
 
-  @pool_table_name :correlation_id_pool
-  @test_pool_size 10
-
   describe "concurrent access" do
     setup do
       # Ensure pool is not running
@@ -38,7 +35,7 @@ defmodule Server.CorrelationIdPoolConcurrencyTest do
       ids = Enum.map(tasks, &Task.await(&1, 5000))
 
       # Also collect via messages for verification
-      received_ids =
+      _received_ids =
         for _ <- 1..num_processes do
           receive do
             {:got_id, id} -> id
