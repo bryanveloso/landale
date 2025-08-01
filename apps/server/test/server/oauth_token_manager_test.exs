@@ -206,12 +206,15 @@ defmodule Server.OAuthTokenManagerTest do
         refresh_token: "refresh_token",
         expires_at: expires_at,
         scopes: MapSet.new(["read"]),
-        user_id: "user123"
+        user_id: "user123",
+        client_id: "test_client_id"
       }
 
       manager = %{manager | token_info: token_info}
 
-      assert {:ok, "valid_token", updated_manager} = OAuthTokenManager.get_valid_token(manager)
+      assert {:ok, token_info, updated_manager} = OAuthTokenManager.get_valid_token(manager)
+      assert token_info.access_token == "valid_token"
+      assert token_info.client_id == "test_client_id"
       assert updated_manager.token_info.access_token == "valid_token"
     end
 
@@ -221,12 +224,15 @@ defmodule Server.OAuthTokenManagerTest do
         refresh_token: "refresh_token",
         expires_at: nil,
         scopes: MapSet.new(["read"]),
-        user_id: "user123"
+        user_id: "user123",
+        client_id: "test_client_id"
       }
 
       manager = %{manager | token_info: token_info}
 
-      assert {:ok, "valid_token", updated_manager} = OAuthTokenManager.get_valid_token(manager)
+      assert {:ok, token_info, updated_manager} = OAuthTokenManager.get_valid_token(manager)
+      assert token_info.access_token == "valid_token"
+      assert token_info.client_id == "test_client_id"
       assert updated_manager.token_info.access_token == "valid_token"
     end
   end

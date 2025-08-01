@@ -26,23 +26,23 @@ defmodule Server.OAuthTokenManager do
         validate_url: "https://id.twitch.tv/oauth2/validate",
         telemetry_prefix: [:server, :twitch, :oauth]
       )
-      
+
       # Load existing tokens
       manager = OAuthTokenManager.load_tokens(manager)
-      
+
       # Get current valid token (auto-refreshes if needed)
       case OAuthTokenManager.get_valid_token(manager) do
-        {:ok, token, updated_manager} -> 
+        {:ok, token, updated_manager} ->
           # Use token for API calls
-        {:error, reason} -> 
+        {:error, reason} ->
           # Handle token unavailable
       end
-      
+
       # Manually refresh token
       case OAuthTokenManager.refresh_token(manager) do
-        {:ok, updated_manager} -> 
+        {:ok, updated_manager} ->
           # Token refreshed successfully
-        {:error, reason} -> 
+        {:error, reason} ->
           # Refresh failed
       end
   """
@@ -220,7 +220,8 @@ defmodule Server.OAuthTokenManager do
       refresh_token: Map.get(token_info, :refresh_token) || Map.get(token_info, "refresh_token"),
       expires_at: parse_expires_at(token_info),
       scopes: parse_scopes(token_info),
-      user_id: Map.get(token_info, :user_id) || Map.get(token_info, "user_id")
+      user_id: Map.get(token_info, :user_id) || Map.get(token_info, "user_id"),
+      client_id: manager.oauth2_client.client_id
     }
 
     updated_manager = %{manager | token_info: processed_token}
@@ -238,7 +239,7 @@ defmodule Server.OAuthTokenManager do
   - `{:ok, token, updated_manager}` - Valid token retrieved
   - `{:error, reason}` - No valid token available
   """
-  @spec get_valid_token(manager_state()) :: {:ok, binary(), manager_state()} | {:error, term()}
+  @spec get_valid_token(manager_state()) :: {:ok, map(), manager_state()} | {:error, term()}
   def get_valid_token(manager) do
     case manager.token_info do
       nil ->
@@ -293,7 +294,8 @@ defmodule Server.OAuthTokenManager do
               refresh_token: new_tokens.refresh_token || refresh_token,
               expires_at: calculate_expires_in(new_tokens.expires_in),
               scopes: manager.token_info.scopes,
-              user_id: manager.token_info.user_id
+              user_id: manager.token_info.user_id,
+              client_id: manager.oauth2_client.client_id
             }
 
             updated_manager = %{manager | token_info: new_token_info}
@@ -406,7 +408,7 @@ defmodule Server.OAuthTokenManager do
           new_expires_at: updated_manager.token_info.expires_at
         )
 
-        {:ok, updated_manager.token_info.access_token, updated_manager}
+        {:ok, updated_manager.token_info, updated_manager}
 
       {:error, reason} ->
         handle_failed_refresh(manager, token_info, reason)
@@ -423,7 +425,7 @@ defmodule Server.OAuthTokenManager do
     # Return existing token if refresh fails but token is still valid
     if DateTime.compare(token_info.expires_at, DateTime.utc_now()) == :gt do
       Logger.info("Using existing valid token despite refresh failure", storage_key: manager.storage_key)
-      {:ok, token_info.access_token, manager}
+      {:ok, token_info, manager}
     else
       {:error, reason}
     end
@@ -435,7 +437,8 @@ defmodule Server.OAuthTokenManager do
       time_until_expiry: time_until_expiry(token_info.expires_at)
     )
 
-    {:ok, token_info.access_token, manager}
+    # Return the full token info, not just the access token
+    {:ok, token_info, manager}
   end
 
   defp validate_required_opt(opts, key) do
