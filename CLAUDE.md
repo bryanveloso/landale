@@ -301,6 +301,22 @@ curl http://localhost:8890/health
 2. **Animation Hook**: Complex implementation - GSAP master timeline could simplify
 3. **Documentation**: Guides in `docs/` may be outdated - `.claude/handoffs/implementation-roadmap.md` has latest patterns
 
+## Architecture Assessment Summary
+
+### Strengths
+
+- **Appropriate Scale**: Correctly sized for personal use without over-engineering
+- **Resilience Patterns**: Professional-grade WebSocket handling, circuit breakers, memory protection
+- **Clean Separation**: Clear service boundaries with defined responsibilities
+- **Developer Experience**: Comprehensive documentation, refactoring protocols, configuration management
+
+### Quick Wins
+
+1. Add debug mode to overlays: `window.debug = { follow: (username) => ... }`
+2. Implement notification queue with audio feedback
+3. Create broadcast-only WebSocket endpoint for simple events
+4. Add GSAP master timeline for complex animations
+
 ## Development Workflow
 
 1. **Check Patterns**: Review established patterns above before implementing
@@ -428,3 +444,273 @@ landale/
 - **State Persistence**: Could add persistent state across restarts if needed
 - **Event Sourcing**: Current design allows future event sourcing implementation
 - **Performance Metrics**: Can add animation frame rate and latency monitoring
+
+---
+
+## Zen MCP Integration
+
+### Overview
+
+Landale integrates with Zen MCP (Model Context Protocol) for enhanced multi-model AI assistance. This enables:
+
+- Comprehensive code analysis across multiple AI models
+- Persistent conversation memory
+- Structured debugging and refactoring workflows
+- Context-aware development assistance
+
+### Available Zen Commands
+
+```bash
+# Analysis and Investigation
+/zen:analyze      # Architecture analysis with chosen model
+/zen:debug        # Debug complex issues with systematic approach
+/zen:refactor     # Identify refactoring opportunities
+/zen:thinkdeep    # Deep reasoning for complex problems
+
+# Planning and Documentation
+/zen:planner      # Create structured development plans
+/zen:consensus    # Get multi-model perspectives on decisions
+/zen:codereview   # Comprehensive code review workflow
+/zen:testgen      # Generate comprehensive test suites
+
+# Specialized Workflows
+/zen:precommit    # Pre-commit validation across repositories
+/zen:secaudit     # Security audit with OWASP analysis
+/zen:docgen       # Generate/update code documentation
+/zen:tracer       # Trace execution flow and dependencies
+
+# General Chat
+/zen:chat         # Collaborative thinking with any model
+/zen:challenge    # Critical analysis of your assumptions
+/zen:listmodels   # See available AI models
+```
+
+### Multi-Model Strategy
+
+Choose models based on task requirements:
+
+#### For Landale Development
+
+**Architecture & Design** (Use Gemini Pro or Claude)
+
+- System design decisions
+- Architecture analysis
+- Performance optimization strategies
+- Integration planning
+
+**Debugging & Investigation** (Use local Llama for privacy)
+
+- Runtime issue analysis
+- Memory leak detection
+- Race condition investigation
+- Keep code analysis private
+
+**Refactoring & Code Quality** (Use Gemini Flash)
+
+- Quick refactoring suggestions
+- Code smell detection
+- Pattern improvements
+- Fast iteration
+
+**Documentation & Planning** (Use Claude or Gemini Pro)
+
+- Comprehensive documentation
+- Development roadmaps
+- Technical specifications
+- API documentation
+
+**Security Analysis** (Use multiple models)
+
+- Get perspectives from different models
+- Cross-validate security findings
+- Comprehensive vulnerability assessment
+
+### Enhanced Handoff System
+
+Zen-enhanced analysis results are stored in `.claude/handoffs/`:
+
+```
+.claude/handoffs/
+├── landale-analysis-summary.md      # Architecture analysis
+├── zen-development-plan.md          # Structured roadmap
+├── debug-analysis.md                # Runtime issues found
+├── refactor-roadmap.md              # Refactoring opportunities
+├── landale-development-constitution.md
+├── code-reality-documentation-templates.md
+├── integration-playbook.md
+├── quality-gates.md
+├── documentation-modernization-plan.md
+└── technical-debt-management-strategy.md
+```
+
+Reference these in development:
+
+- Check analysis before major changes
+- Follow development plan priorities
+- Use templates for consistency
+- Apply quality gates in reviews
+
+### Development Workflow with Zen
+
+#### 1. Starting New Features
+
+```bash
+# Get architecture perspective
+/zen:analyze Review how [feature] fits into Landale architecture
+
+# Create implementation plan
+/zen:planner Create step-by-step plan for implementing [feature]
+
+# Check integration points
+/zen:chat How should [feature] integrate with existing Phoenix channels?
+```
+
+#### 2. Debugging Issues
+
+```bash
+# Private code analysis (uses local model)
+/zen:debug Investigate why [component] is failing
+
+# Trace execution flow
+/zen:tracer Trace how events flow from [source] to [destination]
+
+# Get fresh perspective
+/zen:challenge My assumption is [X]. What am I missing?
+```
+
+#### 3. Code Review Process
+
+```bash
+# Before committing
+/zen:precommit Check my changes for issues
+
+# Comprehensive review
+/zen:codereview Review [component] for quality and security
+
+# Security check
+/zen:secaudit Quick security check of authentication flow
+```
+
+#### 4. Improving Code Quality
+
+```bash
+# Find refactoring opportunities
+/zen:refactor Identify improvements in [service]
+
+# Generate tests
+/zen:testgen Create tests for [component] critical paths
+
+# Update documentation
+/zen:docgen Update docs for [module]
+```
+
+### Context Management
+
+#### When to Use /clear
+
+- Starting completely new task
+- Context getting confused
+- Need fresh perspective
+- After major refactoring
+
+#### When to Use Zen Memory
+
+- Building on previous analysis
+- Continuing development plan
+- Iterating on same feature
+- Maintaining conversation thread
+
+#### Continuation IDs
+
+```python
+# Continue previous analysis
+continuation_id: "your-previous-id"
+
+# This maintains context across:
+- Different Zen tools
+- Multiple work sessions
+- Team handoffs
+```
+
+### Best Practices
+
+1. **Start with Analysis**: Use `/zen:analyze` before major changes
+2. **Plan Before Coding**: Use `/zen:planner` for complex features
+3. **Debug Systematically**: Use `/zen:debug` for tough bugs
+4. **Review Regularly**: Use `/zen:codereview` before merging
+5. **Document Reality**: Use `/zen:docgen` to keep docs current
+
+### Integration Examples
+
+#### Example 1: Adding New Service
+
+```bash
+# 1. Analyze architecture fit
+/zen:analyze How should a metrics collection service integrate with Landale?
+
+# 2. Plan implementation
+/zen:planner Create plan for metrics service with Phoenix integration
+
+# 3. Generate scaffolding
+/zen:chat Show WebSocket client template for new Python service
+
+# 4. Create tests
+/zen:testgen Generate tests for metrics event handling
+```
+
+#### Example 2: Performance Investigation
+
+```bash
+# 1. Debug performance issue
+/zen:debug Memory usage growing in overlay animations
+
+# 2. Trace problem flow
+/zen:tracer Trace GSAP animation lifecycle in layer orchestrator
+
+# 3. Get refactoring suggestions
+/zen:refactor Optimize memory usage in animation system
+
+# 4. Validate fix
+/zen:precommit Verify memory leak fixes before commit
+```
+
+### Model Selection Guide
+
+| Task Type      | Recommended Model | Why                  |
+| -------------- | ----------------- | -------------------- |
+| Architecture   | Gemini Pro        | Deep reasoning       |
+| Quick Analysis | Gemini Flash      | Fast iteration       |
+| Private Debug  | Local Llama       | Code stays local     |
+| Documentation  | Claude/Gemini Pro | Comprehensive output |
+| Security       | Multiple Models   | Cross-validation     |
+| Planning       | Gemini Pro        | Structured thinking  |
+
+### Tips for Effective Use
+
+1. **Be Specific**: "Debug WebSocket reconnection" > "Debug network issues"
+2. **Provide Context**: Include file paths, error messages, logs
+3. **Use Continuation**: Build on previous analysis with continuation_id
+4. **Choose Right Model**: Match model capabilities to task needs
+5. **Save Important Results**: Handoff files preserve analysis
+
+### Common Landale + Zen Patterns
+
+```bash
+# When starting a coding session
+/zen:chat What's the best approach for [today's task]?
+/zen:analyze Quick review of [component] before diving in
+
+# When stuck or frustrated
+/zen:debug Why is [feature] not working as expected?
+/zen:challenge I think [X] but it's not working
+
+# Before pushing changes
+/zen:precommit Validate changes before pushing
+/zen:codereview Quick review of changes
+
+# When considering big changes
+/zen:consensus Should we implement [architectural change]?
+/zen:planner Break down [complex feature] into manageable steps
+```
+
+Remember: Zen MCP enhances Landale development by providing structured, multi-model analysis while maintaining our personal-scale, pragmatic approach.
