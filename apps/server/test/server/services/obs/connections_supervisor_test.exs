@@ -13,15 +13,35 @@ defmodule Server.Services.OBS.ConnectionsSupervisorTest do
 
   alias Server.Services.OBS.ConnectionsSupervisor
 
-  # We'll skip most tests since they require OBS.Supervisor to exist
-  @moduletag :skip
+  # OBS.Supervisor now exists
 
   def test_session_id, do: "test_connections_sup_#{:rand.uniform(100_000)}_#{System.unique_integer([:positive])}"
 
+  setup do
+    # Ensure PubSub is started
+    case Process.whereis(Server.PubSub) do
+      nil -> start_supervised!({Phoenix.PubSub, name: Server.PubSub})
+      _pid -> :ok
+    end
+
+    # Ensure Registry is started for OBS sessions
+    case Process.whereis(Server.Services.OBS.SessionRegistry) do
+      nil -> start_supervised!({Registry, keys: :unique, name: Server.Services.OBS.SessionRegistry})
+      _ -> :ok
+    end
+
+    # Start ConnectionsSupervisor if not already started
+    case Process.whereis(ConnectionsSupervisor) do
+      nil -> start_supervised!({Server.Services.OBS.ConnectionsSupervisor, []})
+      _ -> :ok
+    end
+
+    :ok
+  end
+
   describe "start_link/1 and initialization" do
     test "starts DynamicSupervisor" do
-      # ConnectionsSupervisor is already started by the application
-      # We'll test that it exists
+      # ConnectionsSupervisor should be started in setup
       assert Process.whereis(ConnectionsSupervisor) != nil
     end
   end
@@ -30,7 +50,7 @@ defmodule Server.Services.OBS.ConnectionsSupervisorTest do
     test "starts a new OBS session" do
       session_id = test_session_id()
 
-      assert {:ok, pid} = ConnectionsSupervisor.start_session(session_id)
+      assert {:ok, pid} = ConnectionsSupervisor.start_session(session_id, uri: "ws://localhost:4455")
       assert is_pid(pid)
       assert Process.alive?(pid)
 
@@ -42,10 +62,10 @@ defmodule Server.Services.OBS.ConnectionsSupervisorTest do
       session_id = test_session_id()
 
       # Start first session
-      assert {:ok, pid1} = ConnectionsSupervisor.start_session(session_id)
+      assert {:ok, pid1} = ConnectionsSupervisor.start_session(session_id, uri: "ws://localhost:4455")
 
       # Try to start again with same ID
-      assert {:ok, pid2} = ConnectionsSupervisor.start_session(session_id)
+      assert {:ok, pid2} = ConnectionsSupervisor.start_session(session_id, uri: "ws://localhost:4455")
       assert pid1 == pid2
 
       # Clean up
@@ -56,8 +76,8 @@ defmodule Server.Services.OBS.ConnectionsSupervisorTest do
       session_id1 = test_session_id()
       session_id2 = test_session_id()
 
-      assert {:ok, pid1} = ConnectionsSupervisor.start_session(session_id1)
-      assert {:ok, pid2} = ConnectionsSupervisor.start_session(session_id2)
+      assert {:ok, pid1} = ConnectionsSupervisor.start_session(session_id1, uri: "ws://localhost:4455")
+      assert {:ok, pid2} = ConnectionsSupervisor.start_session(session_id2, uri: "ws://localhost:4455")
 
       assert pid1 != pid2
       assert Process.alive?(pid1)
@@ -70,7 +90,7 @@ defmodule Server.Services.OBS.ConnectionsSupervisorTest do
 
     test "passes options to child supervisor" do
       session_id = test_session_id()
-      opts = [custom_option: :test_value]
+      opts = [uri: "ws://localhost:4455", custom_option: :test_value]
 
       assert {:ok, pid} = ConnectionsSupervisor.start_session(session_id, opts)
       assert is_pid(pid)
@@ -85,7 +105,7 @@ defmodule Server.Services.OBS.ConnectionsSupervisorTest do
       session_id = test_session_id()
 
       # Start session
-      {:ok, pid} = ConnectionsSupervisor.start_session(session_id)
+      {:ok, pid} = ConnectionsSupervisor.start_session(session_id, uri: "ws://localhost:4455")
       assert Process.alive?(pid)
 
       # Stop session
@@ -103,11 +123,11 @@ defmodule Server.Services.OBS.ConnectionsSupervisorTest do
       session_id = test_session_id()
 
       # Start, stop, then restart
-      {:ok, pid1} = ConnectionsSupervisor.start_session(session_id)
+      {:ok, pid1} = ConnectionsSupervisor.start_session(session_id, uri: "ws://localhost:4455")
       :ok = ConnectionsSupervisor.stop_session(session_id)
       Process.sleep(10)
 
-      {:ok, pid2} = ConnectionsSupervisor.start_session(session_id)
+      {:ok, pid2} = ConnectionsSupervisor.start_session(session_id, uri: "ws://localhost:4455")
       assert pid1 != pid2
       assert Process.alive?(pid2)
 
@@ -136,7 +156,7 @@ defmodule Server.Services.OBS.ConnectionsSupervisorTest do
       # Start sessions
       pids =
         for id <- session_ids do
-          {:ok, pid} = ConnectionsSupervisor.start_session(id)
+          {:ok, pid} = ConnectionsSupervisor.start_session(id, uri: "ws://localhost:4455")
           pid
         end
 
@@ -159,7 +179,7 @@ defmodule Server.Services.OBS.ConnectionsSupervisorTest do
     test "supervisor restarts crashed sessions" do
       session_id = test_session_id()
 
-      {:ok, pid} = ConnectionsSupervisor.start_session(session_id)
+      {:ok, pid} = ConnectionsSupervisor.start_session(session_id, uri: "ws://localhost:4455")
 
       # Crash the session
       Process.exit(pid, :kill)
@@ -183,7 +203,7 @@ defmodule Server.Services.OBS.ConnectionsSupervisorTest do
         for i <- 1..10 do
           Task.async(fn ->
             session_id = "concurrent_#{i}_#{:rand.uniform(10000)}"
-            {:ok, pid} = ConnectionsSupervisor.start_session(session_id)
+            {:ok, _pid} = ConnectionsSupervisor.start_session(session_id, uri: "ws://localhost:4455")
             Process.sleep(:rand.uniform(20))
             :ok = ConnectionsSupervisor.stop_session(session_id)
             :ok

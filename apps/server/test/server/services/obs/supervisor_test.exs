@@ -11,6 +11,7 @@ defmodule Server.Services.OBS.SupervisorTest do
   - Graceful shutdown
   """
   use ExUnit.Case, async: false
+  import ExUnit.CaptureLog
 
   alias Server.Services.OBS.SessionRegistry
   alias Server.Services.OBS.Supervisor, as: OBSSupervisor
@@ -18,26 +19,47 @@ defmodule Server.Services.OBS.SupervisorTest do
   @test_session_id "test_session_#{:rand.uniform(10000)}"
   @test_uri "ws://localhost:4455"
 
-  # Skip these tests until child modules are implemented
-  @moduletag :skip
+  # All child modules are now implemented
 
   setup do
-    # Ensure Registry is started (usually done in application supervision tree)
-    # In tests, we might need to start it manually
-    case Registry.start_link(keys: :unique, name: SessionRegistry) do
-      {:ok, registry} ->
-        on_exit(fn -> Process.exit(registry, :shutdown) end)
-        :ok
+    # Start all required services
+    # PubSub might already be started
+    case Process.whereis(Server.PubSub) do
+      nil -> start_supervised!({Phoenix.PubSub, name: Server.PubSub})
+      _ -> :ok
+    end
 
-      {:error, {:already_started, _}} ->
-        :ok
+    # Registry is less likely to be started
+    case Process.whereis(SessionRegistry) do
+      nil -> start_supervised!({Registry, keys: :unique, name: SessionRegistry})
+      _ -> :ok
+    end
+
+    # ConnectionsSupervisor definitely needs to be started
+    case Process.whereis(Server.Services.OBS.ConnectionsSupervisor) do
+      nil -> start_supervised!({Server.Services.OBS.ConnectionsSupervisor, []})
+      _ -> :ok
     end
 
     on_exit(fn ->
       # Clean up any test supervisor that might be running
-      if pid = OBSSupervisor.whereis(@test_session_id) do
-        Supervisor.stop(pid, :shutdown)
-      end
+      # Use capture_log to suppress warnings during cleanup
+      capture_log(fn ->
+        # Clean up the specific test session
+        try do
+          if pid = OBSSupervisor.whereis(@test_session_id) do
+            Supervisor.stop(pid, :shutdown)
+          end
+        catch
+          :exit, _ ->
+            :ok
+
+          error, reason ->
+            # Ignore errors during cleanup
+            _ = {error, reason}
+            :ok
+        end
+      end)
     end)
 
     :ok
@@ -61,7 +83,11 @@ defmodule Server.Services.OBS.SupervisorTest do
       assert Server.Services.OBS.SceneManager in child_ids
       assert Server.Services.OBS.StreamManager in child_ids
       assert Server.Services.OBS.StatsCollector in child_ids
-      assert Task.Supervisor in child_ids
+      # Task.Supervisor is registered with a via tuple, not the module name
+      assert Enum.any?(child_ids, fn
+               {Server.Services.OBS.SessionRegistry, {_, :task_supervisor}} -> true
+               _ -> false
+             end)
     end
 
     test "registers supervisor in Registry with session_id" do
@@ -207,12 +233,18 @@ defmodule Server.Services.OBS.SupervisorTest do
 
   describe "graceful shutdown" do
     test "stops all children when supervisor stops" do
-      {:ok, sup_pid} = OBSSupervisor.start_link({@test_session_id, uri: @test_uri})
+      # Use a unique session ID to avoid conflicts
+      session_id = "shutdown_test_#{System.unique_integer()}"
+
+      # Use trap_exit to catch the shutdown
+      Process.flag(:trap_exit, true)
+
+      {:ok, sup_pid} = OBSSupervisor.start_link({session_id, uri: @test_uri})
 
       # Get all child PIDs
-      {:ok, conn_pid} = OBSSupervisor.get_process(@test_session_id, :connection)
-      {:ok, event_pid} = OBSSupervisor.get_process(@test_session_id, :event_handler)
-      {:ok, scene_pid} = OBSSupervisor.get_process(@test_session_id, :scene_manager)
+      {:ok, conn_pid} = OBSSupervisor.get_process(session_id, :connection)
+      {:ok, event_pid} = OBSSupervisor.get_process(session_id, :event_handler)
+      {:ok, scene_pid} = OBSSupervisor.get_process(session_id, :scene_manager)
 
       # Monitor children
       conn_ref = Process.monitor(conn_pid)
@@ -226,14 +258,23 @@ defmodule Server.Services.OBS.SupervisorTest do
       assert_receive {:DOWN, ^conn_ref, :process, ^conn_pid, :shutdown}
       assert_receive {:DOWN, ^event_ref, :process, ^event_pid, :shutdown}
       assert_receive {:DOWN, ^scene_ref, :process, ^scene_pid, :shutdown}
+
+      # Clear the exit message
+      assert_receive {:EXIT, ^sup_pid, :shutdown}
     end
 
     test "cleans up Registry entries on shutdown" do
-      {:ok, sup_pid} = OBSSupervisor.start_link({@test_session_id, uri: @test_uri})
+      # Use a unique session ID to avoid conflicts
+      session_id = "cleanup_test_#{System.unique_integer()}"
+
+      # Use trap_exit to catch the shutdown
+      Process.flag(:trap_exit, true)
+
+      {:ok, sup_pid} = OBSSupervisor.start_link({session_id, uri: @test_uri})
 
       # Verify entries exist
-      assert [{^sup_pid, _}] = Registry.lookup(SessionRegistry, @test_session_id)
-      assert {:ok, _} = OBSSupervisor.get_process(@test_session_id, :connection)
+      assert [{^sup_pid, _}] = Registry.lookup(SessionRegistry, session_id)
+      assert {:ok, _} = OBSSupervisor.get_process(session_id, :connection)
 
       # Stop supervisor
       Supervisor.stop(sup_pid, :shutdown)
@@ -242,8 +283,11 @@ defmodule Server.Services.OBS.SupervisorTest do
       Process.sleep(50)
 
       # All entries should be gone
-      assert [] = Registry.lookup(SessionRegistry, @test_session_id)
-      assert {:error, :not_found} = OBSSupervisor.get_process(@test_session_id, :connection)
+      assert [] = Registry.lookup(SessionRegistry, session_id)
+      assert {:error, :not_found} = OBSSupervisor.get_process(session_id, :connection)
+
+      # Clear the exit message
+      assert_receive {:EXIT, ^sup_pid, :shutdown}
     end
   end
 
@@ -256,7 +300,8 @@ defmodule Server.Services.OBS.SupervisorTest do
       # All children should be permanent workers (except Task.Supervisor)
       for {id, _pid, type, modules} <- children do
         case id do
-          Task.Supervisor ->
+          # Task.Supervisor is registered with a via tuple
+          {Server.Services.OBS.SessionRegistry, {_, :task_supervisor}} ->
             assert type == :supervisor
             assert modules == [Task.Supervisor]
 
