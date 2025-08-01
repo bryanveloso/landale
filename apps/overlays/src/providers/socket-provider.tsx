@@ -123,7 +123,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
 
     // Update health metrics every 5 seconds
     metricsInterval = setInterval(() => {
-      const metrics = resilientSocket.getHealthMetrics()
+      const metrics = socket.getHealthMetrics()
       setHealthMetrics(metrics)
 
       // Log health status if there are issues

@@ -200,6 +200,17 @@ defmodule Server.Services.OBS.Protocol do
   def unrecoverable_close_code?(4008), do: true
   def unrecoverable_close_code?(_), do: false
 
+  @doc """
+  Generate authentication response for OBS WebSocket v5.
+  """
+  def generate_auth_response(password, salt, challenge) do
+    # OBS v5 auth: base64(sha256(base64(sha256(password + salt)) + challenge))
+    password_salt = :crypto.hash(:sha256, password <> salt) |> Base.encode64()
+    password_salt_challenge = :crypto.hash(:sha256, password_salt <> challenge) |> Base.encode64()
+
+    password_salt_challenge
+  end
+
   # Private functions
 
   defp event_type_to_flag(event_type) do

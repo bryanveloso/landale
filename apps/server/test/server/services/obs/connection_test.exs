@@ -74,6 +74,20 @@ defmodule Server.Services.OBS.ConnectionTest do
 
       send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, hello_response}}})
 
+      # Connection should now send Identify, we need to respond with Identified
+      Process.sleep(50)
+
+      # Send Identified response
+      identified_response =
+        Jason.encode!(%{
+          "op" => 2,
+          "d" => %{
+            "negotiatedRpcVersion" => 1
+          }
+        })
+
+      send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, identified_response}}})
+
       # Should receive connection established event
       assert_receive {:connection_established, %{session_id: ^session_id, rpc_version: 1}}, 1000
 
@@ -90,6 +104,20 @@ defmodule Server.Services.OBS.ConnectionTest do
 
       # Simulate connection to trigger auth
       send(conn, {WebSocketConnection, self(), {:websocket_connected, %{}}})
+
+      # Send Hello to trigger authentication state
+      hello_response =
+        Jason.encode!(%{
+          "op" => 0,
+          "d" => %{
+            "rpcVersion" => 1
+          }
+        })
+
+      send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, hello_response}}})
+
+      # Wait for state to change to authenticating
+      Process.sleep(50)
 
       # Send auth timeout message
       send(conn, :auth_timeout)
@@ -116,6 +144,11 @@ defmodule Server.Services.OBS.ConnectionTest do
       send(conn, {WebSocketConnection, self(), {:websocket_connected, %{}}})
       hello_response = Jason.encode!(%{"op" => 0, "d" => %{"rpcVersion" => 1}})
       send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, hello_response}}})
+
+      # Send Identified response to complete auth
+      Process.sleep(50)
+      identified_response = Jason.encode!(%{"op" => 2, "d" => %{"negotiatedRpcVersion" => 1}})
+      send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, identified_response}}})
 
       # Wait for ready state
       assert_receive {:connection_established, _}, 1000
@@ -169,6 +202,11 @@ defmodule Server.Services.OBS.ConnectionTest do
       hello_response = Jason.encode!(%{"op" => 0, "d" => %{"rpcVersion" => 1}})
       send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, hello_response}}})
 
+      # Send Identified to complete auth
+      Process.sleep(50)
+      identified_response = Jason.encode!(%{"op" => 2, "d" => %{"negotiatedRpcVersion" => 1}})
+      send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, identified_response}}})
+
       # Wait for ready
       Process.sleep(50)
 
@@ -219,6 +257,11 @@ defmodule Server.Services.OBS.ConnectionTest do
       hello_response = Jason.encode!(%{"op" => 0, "d" => %{"rpcVersion" => 1}})
       send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, hello_response}}})
 
+      # Send Identified to complete auth
+      Process.sleep(50)
+      identified_response = Jason.encode!(%{"op" => 2, "d" => %{"negotiatedRpcVersion" => 1}})
+      send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, identified_response}}})
+
       # Request should eventually complete (error because no RequestTracker in test)
       assert {:error, :tracker_not_found} = Task.await(task)
     end
@@ -238,6 +281,11 @@ defmodule Server.Services.OBS.ConnectionTest do
       send(conn, {WebSocketConnection, self(), {:websocket_connected, %{}}})
       hello_response = Jason.encode!(%{"op" => 0, "d" => %{"rpcVersion" => 1}})
       send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, hello_response}}})
+
+      # Send Identified to complete auth
+      Process.sleep(50)
+      identified_response = Jason.encode!(%{"op" => 2, "d" => %{"negotiatedRpcVersion" => 1}})
+      send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, identified_response}}})
 
       # Wait for ready
       Process.sleep(50)

@@ -114,6 +114,19 @@ defmodule Server.Services.OBS.Connection do
   # WebSocketConnection events
 
   @impl true
+  def handle_info({WebSocketConnection, _pid, {:websocket_frame, {:close, code, reason}}}, state) do
+    Logger.warning("WebSocket close frame received",
+      code: code,
+      reason: reason,
+      service: "obs",
+      session_id: state.session_id
+    )
+
+    # Let the disconnected handler deal with cleanup
+    {:noreply, state}
+  end
+
+  @impl true
   def handle_info({WebSocketConnection, _pid, {:websocket_connecting, %{uri: uri}}}, state) do
     Logger.info("Connecting to OBS WebSocket",
       uri: uri,
@@ -134,16 +147,14 @@ defmodule Server.Services.OBS.Connection do
       )
     end
 
-    Logger.info("WebSocket connection established, starting OBS authentication",
+    Logger.info("WebSocket connection established, waiting for OBS Hello",
       service: "obs",
       session_id: state.session_id
     )
 
-    # Start authentication flow and reset error count
-    state =
-      state
-      |> Map.put(:consecutive_errors, 0)
-      |> start_authentication()
+    # Reset error count and wait for server Hello
+    # Don't send anything yet - OBS v5 sends Hello first
+    state = %{state | consecutive_errors: 0, state: :connected}
 
     {:noreply, state}
   end
@@ -151,6 +162,10 @@ defmodule Server.Services.OBS.Connection do
   @impl true
   def handle_info({WebSocketConnection, _pid, {:websocket_frame, {:text, frame}}}, state) do
     case state.state do
+      :connected ->
+        # Expecting server Hello
+        handle_initial_hello(frame, state)
+
       :authenticating ->
         handle_auth_message(frame, state)
 
@@ -251,35 +266,83 @@ defmodule Server.Services.OBS.Connection do
 
   # Private functions
 
-  defp start_authentication(state) do
-    # Send Hello message (OpCode 0)
-    hello_msg =
-      Protocol.encode_hello(%{
-        rpcVersion: 1,
+  defp handle_initial_hello(frame, state) do
+    case Protocol.decode_message(frame) do
+      {:ok, %{op: 0, d: %{rpcVersion: version} = hello_data}} ->
+        # Server Hello received
+        Logger.info("OBS Hello received, rpcVersion: #{version}",
+          service: "obs",
+          session_id: state.session_id
+        )
+
+        state = %{state | rpc_version: version}
+
+        # Now send Identify message
+        if hello_data[:authentication] do
+          send_identify_with_auth(hello_data.authentication, state)
+        else
+          send_identify_no_auth(state)
+        end
+
+      _ ->
+        Logger.warning("Expected Hello message but got something else",
+          service: "obs",
+          session_id: state.session_id
+        )
+
+        {:noreply, state}
+    end
+  end
+
+  defp send_identify_no_auth(state) do
+    # Send Identify message without authentication
+    identify_msg =
+      Protocol.encode_identify(%{
+        rpcVersion: state.rpc_version,
         eventSubscriptions: Protocol.event_subscription_all()
       })
 
-    WebSocketConnection.send_data(state.ws_conn, hello_msg)
+    WebSocketConnection.send_data(state.ws_conn, identify_msg)
 
     # Set authentication timeout
     auth_timer = Process.send_after(self(), :auth_timeout, @auth_timeout)
 
-    %{state | state: :authenticating, auth_timer: auth_timer}
+    {:noreply, %{state | state: :authenticating, auth_timer: auth_timer}}
+  end
+
+  defp send_identify_with_auth(auth_data, state) do
+    # Calculate authentication response if needed
+    password = Application.get_env(:server, :obs_websocket_password)
+
+    auth_response =
+      if password do
+        Protocol.generate_auth_response(
+          password,
+          auth_data["salt"],
+          auth_data["challenge"]
+        )
+      else
+        nil
+      end
+
+    # Send Identify message with authentication
+    identify_msg =
+      Protocol.encode_identify(%{
+        rpcVersion: state.rpc_version,
+        authentication: auth_response,
+        eventSubscriptions: Protocol.event_subscription_all()
+      })
+
+    WebSocketConnection.send_data(state.ws_conn, identify_msg)
+
+    # Set authentication timeout
+    auth_timer = Process.send_after(self(), :auth_timeout, @auth_timeout)
+
+    {:noreply, %{state | state: :authenticating, auth_timer: auth_timer, authentication_required: true}}
   end
 
   defp handle_auth_message(frame, state) do
     case Protocol.decode_message(frame) do
-      {:ok, %{op: 0, d: %{rpcVersion: version} = hello_data}} ->
-        # Hello response received
-        state = %{state | rpc_version: version}
-
-        if hello_data[:authentication] do
-          handle_authentication_required(hello_data.authentication, state)
-        else
-          # No auth required, move to ready
-          complete_authentication(state)
-        end
-
       {:ok, %{op: 2, d: identified_data}} ->
         # Identified response - authentication successful
         Logger.info("OBS authentication successful",
@@ -290,6 +353,16 @@ defmodule Server.Services.OBS.Connection do
         state = %{state | rpc_version: identified_data.negotiatedRpcVersion}
         complete_authentication(state)
 
+      {:ok, msg} ->
+        # Ignore other messages during auth
+        Logger.debug("Received unexpected message during auth",
+          op: msg.op,
+          service: "obs",
+          session_id: state.session_id
+        )
+
+        {:noreply, state}
+
       {:error, reason} ->
         Logger.error("Failed to decode message during auth",
           reason: inspect(reason),
@@ -298,60 +371,6 @@ defmodule Server.Services.OBS.Connection do
         )
 
         {:noreply, state}
-    end
-  end
-
-  defp handle_authentication_required(auth_data, state) do
-    Logger.info("OBS requires authentication",
-      challenge: auth_data.challenge,
-      salt: auth_data.salt,
-      service: "obs",
-      session_id: state.session_id
-    )
-
-    # Get password from environment or configuration
-    password = System.get_env("OBS_WEBSOCKET_PASSWORD", "")
-
-    if password == "" do
-      Logger.error("OBS requires authentication but OBS_WEBSOCKET_PASSWORD not set",
-        service: "obs",
-        session_id: state.session_id
-      )
-
-      WebSocketConnection.disconnect(state.ws_conn)
-      state = cleanup_state(state)
-      {:noreply, state}
-    else
-      # Generate authentication string
-      # OBS uses: base64(sha256(password + salt) + challenge)
-      import Base, only: [encode64: 1]
-
-      secret = :crypto.hash(:sha256, password <> auth_data.salt)
-      auth_string = encode64(:crypto.hash(:sha256, secret <> auth_data.challenge))
-
-      # Send Identify message
-      identify_msg =
-        Protocol.encode_identify(%{
-          rpcVersion: state.rpc_version,
-          authentication: auth_string,
-          eventSubscriptions: Protocol.event_subscription_all()
-        })
-
-      case WebSocketConnection.send_data(state.ws_conn, identify_msg) do
-        :ok ->
-          # Stay in authenticating state, waiting for Identified response
-          {:noreply, state}
-
-        {:error, reason} ->
-          Logger.error("Failed to send Identify message: #{inspect(reason)}",
-            service: "obs",
-            session_id: state.session_id
-          )
-
-          WebSocketConnection.disconnect(state.ws_conn)
-          state = cleanup_state(state)
-          {:noreply, state}
-      end
     end
   end
 
