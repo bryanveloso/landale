@@ -96,7 +96,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
 
       setConnectionState(event.newState)
       setIsConnected(event.newState === ConnectionState.CONNECTED)
-      
+
       // Update reconnect attempts when reconnecting
       if (event.newState === ConnectionState.RECONNECTING) {
         const metrics = socket.getHealthMetrics()
@@ -106,13 +106,15 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
       }
 
       // Emit browser event for debugging
-      window.dispatchEvent(new CustomEvent('landale:socket:state', {
-        detail: {
-          state: event.newState,
-          error: event.error?.message,
-          metrics: socket.getHealthMetrics()
-        }
-      }))
+      window.dispatchEvent(
+        new CustomEvent('landale:socket:state', {
+          detail: {
+            state: event.newState,
+            error: event.error?.message,
+            metrics: socket.getHealthMetrics()
+          }
+        })
+      )
     })
 
     // Start connection
@@ -123,7 +125,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
     metricsInterval = setInterval(() => {
       const metrics = resilientSocket.getHealthMetrics()
       setHealthMetrics(metrics)
-      
+
       // Log health status if there are issues
       if (metrics.heartbeatFailures > 0 || metrics.isCircuitOpen) {
         logger.warn('Health check warning', { metadata: metrics })
@@ -132,7 +134,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
 
     // Debug helper for browser console
     if (typeof window !== 'undefined') {
-      (window as Window & { landale_socket?: unknown }).landale_socket = {
+      ;(window as Window & { landale_socket?: unknown }).landale_socket = {
         getMetrics: () => socket.getHealthMetrics(),
         getState: () => connectionState(),
         reconnect: () => {
@@ -142,7 +144,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
         disconnect: () => socket.disconnect(),
         connect: () => socket.connect()
       }
-      
+
       logger.info('Debug helper available at window.landale_socket')
     }
   })
@@ -153,7 +155,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
       logger.info('Shutting down socket connection')
       currentSocket.shutdown()
     }
-    
+
     if (metricsInterval) {
       clearInterval(metricsInterval)
     }

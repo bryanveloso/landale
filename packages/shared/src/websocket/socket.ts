@@ -1,6 +1,6 @@
 /**
  * Resilient WebSocket Client for Phoenix Channels
- * 
+ *
  * Implements the same resilience patterns as the Python services:
  * - Exponential backoff with jitter
  * - Circuit breaker pattern
@@ -53,22 +53,22 @@ export interface HealthMetrics {
 export class Socket {
   private socket: PhoenixSocket | null = null
   private options: Required<SocketOptions>
-  
+
   // State management
   private connectionState = ConnectionState.DISCONNECTED
   private reconnectAttempts = 0
   private shouldReconnect = true
   private connectionCallbacks: Array<(event: ConnectionEvent) => void> = []
-  
+
   // Health monitoring
   private lastHeartbeat = 0
   private heartbeatTimer: NodeJS.Timeout | null = null
   private heartbeatFailures = 0
-  
+
   // Circuit breaker
   private consecutiveFailures = 0
   private circuitOpenUntil = 0
-  
+
   // Metrics
   private metrics = {
     totalReconnects: 0,
@@ -77,10 +77,10 @@ export class Socket {
     heartbeatFailures: 0,
     circuitBreakerTrips: 0
   }
-  
+
   // Connection lock to prevent concurrent attempts
   private isConnecting = false
-  
+
   constructor(options: SocketOptions) {
     this.options = {
       url: options.url,
@@ -94,7 +94,7 @@ export class Socket {
       params: options.params ?? {}
     }
   }
-  
+
   // Connection state management
   private emitConnectionEvent(newState: ConnectionState, error?: Error) {
     if (newState !== this.connectionState) {
@@ -104,10 +104,10 @@ export class Socket {
         error: error ?? undefined,
         timestamp: Date.now()
       }
-      
+
       this.connectionState = newState
-      
-      this.connectionCallbacks.forEach(callback => {
+
+      this.connectionCallbacks.forEach((callback) => {
         try {
           callback(event)
         } catch (e) {
@@ -116,30 +116,30 @@ export class Socket {
       })
     }
   }
-  
+
   onConnectionChange(callback: (event: ConnectionEvent) => void) {
     this.connectionCallbacks.push(callback)
   }
-  
+
   // Circuit breaker
   private isCircuitOpen(): boolean {
     if (this.circuitOpenUntil > Date.now()) {
       return true
     }
-    
+
     // Reset if timeout passed
     if (this.circuitOpenUntil > 0) {
       this.options.logger('info', 'Circuit breaker timeout expired, attempting to close circuit')
       this.circuitOpenUntil = 0
       this.consecutiveFailures = 0
     }
-    
+
     return false
   }
-  
+
   private recordFailure() {
     this.consecutiveFailures++
-    
+
     if (this.consecutiveFailures >= this.options.circuitBreakerThreshold) {
       this.circuitOpenUntil = Date.now() + this.options.circuitBreakerTimeout
       this.metrics.circuitBreakerTrips++
@@ -149,38 +149,38 @@ export class Socket {
       )
     }
   }
-  
+
   private recordSuccess() {
     this.consecutiveFailures = 0
     this.circuitOpenUntil = 0
   }
-  
+
   // Exponential backoff with jitter
   private calculateReconnectDelay(): number {
     const baseDelay = Math.min(
       this.options.reconnectDelayBase * Math.pow(2, this.reconnectAttempts),
       this.options.reconnectDelayCap
     )
-    
+
     // Add jitter (±25%)
     const jitter = baseDelay * 0.25 * (Math.random() * 2 - 1)
     return Math.max(0, baseDelay + jitter)
   }
-  
+
   // Health monitoring
   private startHeartbeat() {
     this.stopHeartbeat()
-    
+
     this.heartbeatTimer = setInterval(() => {
       if (this.connectionState === ConnectionState.CONNECTED && this.socket) {
         // Phoenix already handles heartbeats, but we monitor them
         const timeSinceLastHeartbeat = Date.now() - this.lastHeartbeat
-        
+
         if (timeSinceLastHeartbeat > this.options.heartbeatInterval * 2) {
           this.heartbeatFailures++
           this.metrics.heartbeatFailures++
           this.options.logger('warn', `Heartbeat stale (${this.heartbeatFailures} failures)`)
-          
+
           // Force reconnection after multiple heartbeat failures
           if (this.heartbeatFailures >= 3) {
             this.options.logger('error', 'Multiple heartbeat failures, forcing reconnection')
@@ -191,28 +191,28 @@ export class Socket {
       }
     }, this.options.heartbeatInterval)
   }
-  
+
   private stopHeartbeat() {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer)
       this.heartbeatTimer = null
     }
   }
-  
+
   // Connection management
   async connect(): Promise<void> {
     if (this.isConnecting || this.connectionState === ConnectionState.CONNECTED) {
       return
     }
-    
+
     if (this.isCircuitOpen()) {
       this.emitConnectionEvent(ConnectionState.FAILED, new Error('Circuit breaker is open'))
       return
     }
-    
+
     this.isConnecting = true
     this.emitConnectionEvent(ConnectionState.CONNECTING)
-    
+
     try {
       this.socket = new PhoenixSocket(this.options.url, {
         params: this.options.params,
@@ -223,7 +223,7 @@ export class Socket {
         logger: this.options.logger,
         heartbeatIntervalMs: this.options.heartbeatInterval
       })
-      
+
       // Set up event handlers
       this.socket.onOpen(() => {
         this.options.logger('info', 'Socket connected')
@@ -235,19 +235,19 @@ export class Socket {
         this.heartbeatFailures = 0
         this.startHeartbeat()
       })
-      
+
       this.socket.onError((error) => {
         this.options.logger('error', 'Socket error', error)
         this.recordFailure()
       })
-      
+
       this.socket.onClose(() => {
         this.options.logger('info', 'Socket closed')
         this.stopHeartbeat()
-        
+
         if (this.connectionState !== ConnectionState.DISCONNECTED) {
           this.emitConnectionEvent(ConnectionState.DISCONNECTED)
-          
+
           if (this.shouldReconnect && this.reconnectAttempts < this.options.maxReconnectAttempts) {
             this.scheduleReconnect()
           } else if (this.reconnectAttempts >= this.options.maxReconnectAttempts) {
@@ -256,11 +256,11 @@ export class Socket {
           }
         }
       })
-      
+
       // Track successful connections for heartbeat monitoring
       // Phoenix handles heartbeats internally, we just track the timing
       this.lastHeartbeat = Date.now()
-      
+
       this.socket.connect()
     } catch (error) {
       this.options.logger('error', 'Failed to create socket', error)
@@ -271,48 +271,48 @@ export class Socket {
       this.isConnecting = false
     }
   }
-  
+
   private scheduleReconnect() {
     if (!this.shouldReconnect || this.isCircuitOpen()) {
       return
     }
-    
+
     this.reconnectAttempts++
     this.metrics.totalReconnects++
     const delay = this.calculateReconnectDelay()
-    
+
     this.emitConnectionEvent(ConnectionState.RECONNECTING)
     this.options.logger('info', `Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`)
-    
+
     setTimeout(() => {
       if (this.shouldReconnect) {
         this.connect()
       }
     }, delay)
   }
-  
+
   disconnect() {
     this.shouldReconnect = false
     this.stopHeartbeat()
-    
+
     if (this.socket) {
       this.socket.disconnect()
       this.socket = null
     }
-    
+
     this.emitConnectionEvent(ConnectionState.DISCONNECTED)
   }
-  
+
   // Channel management
   channel(topic: string, params?: Record<string, unknown>): Channel | null {
     if (!this.socket) {
       this.options.logger('warn', 'Cannot create channel - socket not connected')
       return null
     }
-    
+
     return this.socket.channel(topic, params)
   }
-  
+
   // Health metrics
   getHealthMetrics(): HealthMetrics {
     return {
@@ -327,19 +327,19 @@ export class Socket {
       isCircuitOpen: this.isCircuitOpen()
     }
   }
-  
+
   // Graceful shutdown
   async shutdown() {
     this.shouldReconnect = false
     this.disconnect()
     this.connectionCallbacks = []
   }
-  
+
   // Access to underlying Phoenix socket (use with caution)
   getSocket(): PhoenixSocket | null {
     return this.socket
   }
-  
+
   isConnected(): boolean {
     return this.connectionState === ConnectionState.CONNECTED && this.socket?.isConnected() === true
   }

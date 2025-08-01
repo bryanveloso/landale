@@ -1,6 +1,6 @@
 /**
  * Connection Health Indicator
- * 
+ *
  * Shows WebSocket connection status with resilience metrics.
  * Only visible when debugging or when there are connection issues.
  */
@@ -11,26 +11,26 @@ import { ConnectionState } from '@landale/shared/websocket'
 
 export const ConnectionIndicator = () => {
   const { connectionState, healthMetrics, isConnected } = useSocket()
-  
+
   // Show indicator if debugging or having issues
   const shouldShow = createMemo(() => {
     const searchParams = new URLSearchParams(window.location.search)
     const debugMode = searchParams.get('debug') === 'true'
     const metrics = healthMetrics()
-    
-    return debugMode || !isConnected() || (metrics && (
-      metrics.heartbeatFailures > 0 ||
-      metrics.isCircuitOpen ||
-      metrics.reconnectAttempts > 0
-    ))
+
+    return (
+      debugMode ||
+      !isConnected() ||
+      (metrics && (metrics.heartbeatFailures > 0 || metrics.isCircuitOpen || metrics.reconnectAttempts > 0))
+    )
   })
-  
+
   const statusColor = createMemo(() => {
     const state = connectionState()
     const metrics = healthMetrics()
-    
+
     if (metrics?.isCircuitOpen) return 'bg-red-500'
-    
+
     switch (state) {
       case ConnectionState.CONNECTED:
         return 'bg-green-500'
@@ -44,15 +44,15 @@ export const ConnectionIndicator = () => {
         return 'bg-gray-500'
     }
   })
-  
+
   const statusText = createMemo(() => {
     const state = connectionState()
     const metrics = healthMetrics()
-    
+
     if (metrics?.isCircuitOpen) {
       return 'Circuit Breaker Open'
     }
-    
+
     switch (state) {
       case ConnectionState.CONNECTED:
         return 'Connected'
@@ -68,15 +68,15 @@ export const ConnectionIndicator = () => {
         return 'Unknown'
     }
   })
-  
+
   return (
     <Show when={shouldShow()}>
-      <div class="fixed bottom-4 right-4 z-50 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-xs font-mono">
-        <div class="flex items-center gap-2 mb-2">
-          <div class={`w-2 h-2 rounded-full ${statusColor()} animate-pulse`} />
+      <div class="fixed right-4 bottom-4 z-50 rounded-lg bg-black/80 p-3 font-mono text-xs backdrop-blur-sm">
+        <div class="mb-2 flex items-center gap-2">
+          <div class={`h-2 w-2 rounded-full ${statusColor()} animate-pulse`} />
           <span class="text-white">{statusText()}</span>
         </div>
-        
+
         <Show when={healthMetrics()}>
           {(metrics) => (
             <div class="space-y-1 text-gray-400">

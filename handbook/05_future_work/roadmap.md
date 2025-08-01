@@ -76,6 +76,78 @@ See also:
 
 - [Event to Layer Mapping](../02_architecture/system_overviews/event_to_layer_mapping.md) - High priority refactor
 
+## Ideas from Other Overlay Systems (January 2025)
+
+Based on analysis of two popular overlay systems, these features could enhance Landale:
+
+### From overlay-main (DoceAzedo's System)
+
+- **Alert Queue System**: Prevents notification overlap by processing alerts sequentially with configurable durations. Uses simple array with sleep-based timing. Critical for professional viewer experience.
+
+  ```typescript
+  // Example: Each alert type has different duration
+  const ALERT_DURATION_MAP = {
+    follow: 5000,
+    sub: 8000,
+    raid: 10000
+  }
+  ```
+
+- **Debug Console Functions**: Expose `window.landale_debug` object for instant testing without backend events
+
+  ```javascript
+  window.debug = (username) => queueAlert({ type: 'follow', username })
+  window.debug2() // Triggers multiple test events at once
+  ```
+
+- **Audio Feedback System**: Different preloaded sounds per event type (follow, sub, raid) creating information hierarchy through audio
+
+- **Ultra-Simple WebSocket Broker**: 10-line broadcast-everything pattern for non-critical events
+
+  ```typescript
+  socket.onAny((event, ...args) => io.emit(event, ...args))
+  ```
+
+- **Shell Script Integration**: Bridge to OS-level automation (Spotify control, system notifications)
+
+### From overlays-main (Next.js System)
+
+- **Parametric Stinger Animations**: Community-contributable transition animations as pure functions
+
+  ```typescript
+  export const animation: StingerAnimation = {
+    initFn: () => ({ duration: 2000 }),
+    stateFn: ({ x, y, time }) => calculateDotState(x, y, time),
+    fps: 10
+  }
+  ```
+
+  - No pre-rendered assets needed
+  - FPS control per animation
+  - Debug mode with `?debug=true` query param
+
+- **Audio Spectrum Visualizer**: Real-time frequency analysis using Canvas API
+  - Targets specific audio device ("Stream Audio")
+  - Creates ambient visuals synchronized to audio
+  - Efficient canvas-based rendering
+
+- **Creative Particle Systems**: Confetti and visual celebrations (though their 30+ element approach is performance-heavy)
+
+### Architectural Patterns Worth Considering
+
+- **Broadcast-Only Mode**: Add `overlay:broadcast` Phoenix topic for simple fire-and-forget events, keeping complex channels only for interactive features
+
+- **Debug Query Parameters**: `?debug=true` enables visual debugging aids (borders, state info)
+
+- **Simplicity Layer**: Maintain enterprise-grade core for critical features but add simple patterns for rapid creative development
+
+### What NOT to Copy
+
+- Face detection/NSFW filtering (overengineering for personal use)
+- Custom HTTP proxy (Phoenix handles this already)
+- Server-side controller pattern (unnecessary abstraction)
+- 30+ particle animations (use GSAP instead)
+
 ## Implementation Notes
 
 When implementing these features:

@@ -35,17 +35,20 @@ interface HealthMetrics {
 ### 3. Updated Components
 
 #### Overlays (`apps/overlays`)
+
 - `src/providers/socket-provider.tsx`: Now uses Socket
 - `src/components/connection-indicator.tsx`: Visual health indicator (shows in debug mode or when issues occur)
 - Added debug helpers at `window.landale_socket` for testing
 
 #### Dashboard (`apps/dashboard`)
+
 - `src/services/stream-service.tsx`: Updated to use resilient patterns
 - Health metrics available via `getHealthMetrics()`
 
 ## Configuration
 
 Default settings (all configurable):
+
 - Max reconnect attempts: 10
 - Base reconnect delay: 1 second
 - Max reconnect delay: 60 seconds (30s for overlays)
@@ -58,6 +61,7 @@ Default settings (all configurable):
 ### Browser Console Helpers
 
 In overlays, access `window.landale_socket`:
+
 ```javascript
 // Get current health metrics
 window.landale_socket.getMetrics()
@@ -79,11 +83,13 @@ Add `?debug=true` to overlay URLs to always show connection health.
 ## Testing
 
 Run the test script:
+
 ```bash
 bun run scripts/test-resilient-websocket.ts
 ```
 
 This tests:
+
 - Connection establishment
 - Automatic reconnection
 - Circuit breaker activation
@@ -92,6 +98,7 @@ This tests:
 ## Migration Notes
 
 The resilient client maintains backward compatibility with Phoenix channels. Existing code using channels continues to work, but now benefits from:
+
 - Automatic reconnection
 - Better error handling
 - Connection state visibility

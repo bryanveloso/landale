@@ -9,7 +9,12 @@ import { createContext, useContext, createSignal, onCleanup, onMount } from 'sol
 import type { Component, JSX } from 'solid-js'
 import { Channel } from 'phoenix'
 import { createLogger } from '@landale/logger'
-import { ResilientPhoenixSocket, ConnectionState as ResilientConnectionState, type ConnectionEvent, type HealthMetrics } from '@landale/shared/websocket'
+import {
+  Socket,
+  ConnectionState as SocketConnectionState,
+  type ConnectionEvent,
+  type HealthMetrics
+} from '@landale/shared/websocket'
 import type {
   OverlayLayerState,
   LayerState,
@@ -87,8 +92,8 @@ interface StreamServiceContext {
   forceReconnect: () => void
 
   // Internal socket access for activity log
-  getSocket: () => ResilientPhoenixSocket | null
-  
+  getSocket: () => Socket | null
+
   // Health monitoring
   getHealthMetrics: () => HealthMetrics | null
 }
@@ -130,7 +135,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   const [connectionState, setConnectionState] = createSignal<ConnectionState>(DEFAULT_CONNECTION_STATE)
 
   // Connection management
-  let socket: ResilientPhoenixSocket | null = null
+  let socket: Socket | null = null
   let overlayChannel: Channel | null = null
   let queueChannel: Channel | null = null
   let reconnectTimer: number | null = null
@@ -151,7 +156,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
 
     logger.info('Connecting to server...')
 
-    socket = new ResilientPhoenixSocket({
+    socket = new Socket({
       url: getServerUrl(),
       maxReconnectAttempts: 10,
       reconnectDelayBase: 1000,
@@ -174,19 +179,19 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
         }
       })
 
-      const isConnected = event.newState === ResilientConnectionState.CONNECTED
+      const isConnected = event.newState === SocketConnectionState.CONNECTED
       const metrics = socket.getHealthMetrics()
-      
+
       setConnectionState({
         connected: isConnected,
         reconnectAttempts: metrics.reconnectAttempts,
         lastConnected: isConnected ? new Date().toISOString() : connectionState().lastConnected,
         error: event.error?.message ?? null
       })
-      
+
       if (isConnected) {
         joinChannels()
-      } else if (event.newState === ResilientConnectionState.DISCONNECTED) {
+      } else if (event.newState === SocketConnectionState.DISCONNECTED) {
         cleanup()
       }
     })
