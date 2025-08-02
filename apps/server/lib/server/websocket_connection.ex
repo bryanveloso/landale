@@ -299,12 +299,13 @@ defmodule Server.WebSocketConnection do
   end
 
   defp do_send_data(%{conn_pid: conn_pid, stream_ref: stream_ref}, data) when is_binary(data) do
-    Logger.info("WebSocketConnection sending: #{data}",
+    Logger.info("WebSocketConnection sending TEXT frame: #{data}",
       data_length: String.length(data),
       conn_pid: inspect(conn_pid),
       stream_ref: inspect(stream_ref)
     )
 
+    # Explicitly send as text frame
     result = :gun.ws_send(conn_pid, stream_ref, {:text, data})
     Logger.info("Gun ws_send result: #{inspect(result)}")
     result

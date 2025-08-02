@@ -76,8 +76,8 @@ defmodule Server.Services.OBS.StatsCollector do
         )
 
         Task.start(fn ->
-          # Try GetVersion first to test basic connectivity
-          case Server.Services.OBS.Connection.send_request(conn, "GetVersion", %{}) do
+          # Try GetSceneList first - this is a basic OBS v5 request
+          case Server.Services.OBS.Connection.send_request(conn, "GetSceneList", %{}) do
             {:ok, version_data} ->
               Logger.info("StatsCollector received version response",
                 service: "obs",

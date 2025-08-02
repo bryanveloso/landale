@@ -395,6 +395,24 @@ defmodule Server.Services.OBS.Connection do
       pending_count: length(state.pending_messages)
     )
 
+    # TEST: Send a simple GetVersion request immediately
+    test_request =
+      Jason.encode!(%{
+        "op" => 6,
+        "d" => %{
+          "requestType" => "GetVersion",
+          "requestId" => "test-immediate",
+          "requestData" => %{}
+        }
+      })
+
+    Logger.info("TEST: Sending immediate GetVersion request after auth: #{test_request}",
+      service: "obs",
+      session_id: state.session_id
+    )
+
+    WebSocketConnection.send_data(state.ws_conn, test_request)
+
     # Broadcast connection established
     broadcast_event(state, :connection_established, %{
       session_id: state.session_id,
