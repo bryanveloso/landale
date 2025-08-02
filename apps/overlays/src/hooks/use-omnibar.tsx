@@ -47,6 +47,11 @@ export type OmnibarData = {
   // Actions
   registerLayer: (priority: LayerPriority, element: HTMLElement) => void
   unregisterLayer: (priority: LayerPriority) => void
+
+  // Orchestrator methods for debug interface
+  showLayer: (priority: LayerPriority, content: unknown) => void
+  hideLayer: (priority: LayerPriority) => void
+  getLayerState: (priority: LayerPriority) => string
 }
 
 export function useOmnibar(): OmnibarData {
@@ -153,6 +158,10 @@ export function useOmnibar(): OmnibarData {
     isConnected,
     debug,
     registerLayer: orchestrator.registerLayer,
-    unregisterLayer: orchestrator.unregisterLayer
+    unregisterLayer: orchestrator.unregisterLayer,
+    // Expose orchestrator methods for debug interface
+    showLayer: orchestrator.showLayer,
+    hideLayer: orchestrator.hideLayer,
+    getLayerState: orchestrator.getLayerState
   }
 }

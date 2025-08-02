@@ -18,6 +18,13 @@ declare module '@tanstack/solid-router' {
   }
 }
 
+// Extend window type for debug interface
+declare global {
+  interface Window {
+    debug?: import('./debug/debug-interface').DebugInterface
+  }
+}
+
 const rootElement = document.getElementById('app')!
 
 if (!rootElement.innerHTML) {
