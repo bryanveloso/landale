@@ -70,9 +70,13 @@ defmodule Server.Services.OBS.RequestTracker do
 
     case Map.get(state.requests, request_id) do
       nil ->
+        # Log more details about the unknown response
         Logger.warning("Received response for unknown request ID: #{request_id}",
           service: "obs",
-          session_id: state.session_id
+          session_id: state.session_id,
+          response_type: response_data[:requestType],
+          response_status: response_data[:requestStatus],
+          tracked_ids: Map.keys(state.requests) |> Enum.sort() |> Enum.take(10)
         )
 
         {:noreply, state}

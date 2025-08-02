@@ -422,32 +422,12 @@ defmodule Server.Services.OBS.Connection do
     {:noreply, state}
   end
 
-  defp send_obs_request(state, request_type, request_data, _from) do
+  defp send_obs_request(state, request_type, request_data, from) do
     case get_request_tracker(state.session_id) do
-      {:ok, _tracker} ->
-        # Get connection state to verify we're connected
-        ws_state = WebSocketConnection.get_state(state.ws_conn)
-
-        if ws_state.connected do
-          # Since RequestTracker expects Gun directly, we'll handle it inline
-          # Generate request ID here
-          request_id = generate_request_id()
-
-          # Create request message
-          request_msg = Protocol.encode_request(request_id, request_type, request_data)
-
-          # Send through WebSocketConnection
-          case WebSocketConnection.send_data(state.ws_conn, request_msg) do
-            :ok ->
-              # Return success with the request_id for tracking
-              {:reply, {:ok, request_id}, state}
-
-            {:error, reason} ->
-              {:reply, {:error, reason}, state}
-          end
-        else
-          {:reply, {:error, :not_connected}, state}
-        end
+      {:ok, tracker} ->
+        # Delegate to RequestTracker for proper tracking
+        GenServer.call(tracker, {:send_request, request_type, request_data, from, state.ws_conn})
+        {:noreply, state}
 
       {:error, reason} ->
         {:reply, {:error, reason}, state}
