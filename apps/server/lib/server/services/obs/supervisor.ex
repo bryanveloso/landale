@@ -43,8 +43,8 @@ defmodule Server.Services.OBS.Supervisor do
       # Stream and recording state
       {Server.Services.OBS.StreamManager, name: via_tuple(session_id, :stream_manager), session_id: session_id},
 
-      # Performance metrics collection (disabled due to timeout issues)
-      # {Server.Services.OBS.StatsCollector, name: via_tuple(session_id, :stats_collector), session_id: session_id},
+      # Performance metrics collection (re-enabled temporarily for debugging)
+      {Server.Services.OBS.StatsCollector, name: via_tuple(session_id, :stats_collector), session_id: session_id},
 
       # Task supervisor for async operations
       {Task.Supervisor, name: via_tuple(session_id, :task_supervisor)}

@@ -395,6 +395,12 @@ defmodule Server.Services.OBS.Connection do
   end
 
   defp handle_obs_message(frame, state) do
+    Logger.debug("Connection processing OBS message",
+      service: "obs",
+      session_id: state.session_id,
+      frame_preview: String.slice(frame, 0, 200)
+    )
+
     case Protocol.decode_message(frame) do
       {:ok, %{op: 5} = event} ->
         # Event from OBS - broadcast it
@@ -402,6 +408,13 @@ defmodule Server.Services.OBS.Connection do
 
       {:ok, %{op: 7} = response} ->
         # Request response - forward to RequestTracker
+        Logger.info("Connection received OBS response",
+          service: "obs",
+          session_id: state.session_id,
+          request_id: response.d[:requestId],
+          request_type: response.d[:requestType]
+        )
+
         forward_response(state, response.d)
 
       {:ok, msg} ->

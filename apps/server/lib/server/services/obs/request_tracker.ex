@@ -37,12 +37,33 @@ defmodule Server.Services.OBS.RequestTracker do
     # Generate request ID
     request_id = to_string(state.next_id)
 
+    Logger.info("RequestTracker sending request",
+      service: "obs",
+      session_id: state.session_id,
+      request_type: request_type,
+      request_id: request_id,
+      request_data: request_data
+    )
+
     # Create request message
     request_msg = Protocol.encode_request(request_id, request_type, request_data)
+
+    Logger.debug("RequestTracker encoded message",
+      service: "obs",
+      session_id: state.session_id,
+      request_id: request_id,
+      encoded_msg: request_msg
+    )
 
     # Send through WebSocketConnection
     case WebSocketConnection.send_data(ws_conn, request_msg) do
       :ok ->
+        Logger.info("RequestTracker successfully sent to WebSocket",
+          service: "obs",
+          session_id: state.session_id,
+          request_id: request_id
+        )
+
         # Track the request
         timer_ref = Process.send_after(self(), {:request_timeout, request_id}, @request_timeout)
 
@@ -61,6 +82,13 @@ defmodule Server.Services.OBS.RequestTracker do
         {:noreply, state}
 
       {:error, reason} ->
+        Logger.error("RequestTracker failed to send to WebSocket",
+          service: "obs",
+          session_id: state.session_id,
+          request_id: request_id,
+          reason: reason
+        )
+
         {:reply, {:error, reason}, state}
     end
   end
@@ -68,6 +96,14 @@ defmodule Server.Services.OBS.RequestTracker do
   @impl true
   def handle_cast({:response_received, response_data}, state) do
     request_id = response_data[:requestId]
+
+    Logger.info("RequestTracker received response",
+      service: "obs",
+      session_id: state.session_id,
+      request_id: request_id,
+      response_type: response_data[:requestType],
+      response_status: response_data[:requestStatus]
+    )
 
     case Map.get(state.requests, request_id) do
       nil ->
