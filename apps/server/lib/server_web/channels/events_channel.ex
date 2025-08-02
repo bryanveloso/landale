@@ -80,6 +80,28 @@ defmodule ServerWeb.EventsChannel do
   end
 
   @impl true
+  def handle_info({:twitch_connected, event}, socket) do
+    push(socket, "event", %{
+      type: "twitch_connected",
+      data: event,
+      timestamp: System.system_time(:second)
+    })
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:twitch_disconnected, event}, socket) do
+    push(socket, "event", %{
+      type: "twitch_disconnected",
+      data: event,
+      timestamp: System.system_time(:second)
+    })
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_info({:twitch_connection_changed, event}, socket) do
     push(socket, "event", %{
       type: "twitch_connection",
