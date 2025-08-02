@@ -33,7 +33,11 @@ defmodule Server.Services.OBS.RequestTracker do
   end
 
   @impl true
-  def handle_call({:send_request, request_type, request_data, original_from, ws_conn}, from, state) do
+  def handle_call(
+        {:send_request, request_type, request_data, original_from, ws_conn},
+        from,
+        state
+      ) do
     # Generate request ID
     request_id = to_string(state.next_id)
 
@@ -48,23 +52,9 @@ defmodule Server.Services.OBS.RequestTracker do
     # Create request message
     request_msg = Protocol.encode_request(request_id, request_type, request_data)
 
-    # Log the actual message content
-    Logger.info("RequestTracker encoded message: #{request_msg}",
-      service: "obs",
-      session_id: state.session_id,
-      request_id: request_id,
-      message_length: String.length(request_msg)
-    )
-
     # Send through WebSocketConnection
     case WebSocketConnection.send_data(ws_conn, request_msg) do
       :ok ->
-        Logger.info("RequestTracker successfully sent to WebSocket",
-          service: "obs",
-          session_id: state.session_id,
-          request_id: request_id
-        )
-
         # Track the request
         timer_ref = Process.send_after(self(), {:request_timeout, request_id}, @request_timeout)
 
@@ -77,7 +67,11 @@ defmodule Server.Services.OBS.RequestTracker do
           sent_at: System.monotonic_time(:millisecond)
         }
 
-        state = %{state | requests: Map.put(state.requests, request_id, request_info), next_id: state.next_id + 1}
+        state = %{
+          state
+          | requests: Map.put(state.requests, request_id, request_info),
+            next_id: state.next_id + 1
+        }
 
         # Don't reply yet - will reply when response arrives
         {:noreply, state}

@@ -82,7 +82,11 @@ defmodule Server.Services.OBS.EventHandler do
     scene_name = event[:eventData][:sceneName]
 
     # Update state
-    new_state = %{state | current_scene: scene_name, last_event_type: "CurrentProgramSceneChanged"}
+    new_state = %{
+      state
+      | current_scene: scene_name,
+        last_event_type: "CurrentProgramSceneChanged"
+    }
 
     # Publish scene change event
     Phoenix.PubSub.broadcast(Server.PubSub, "overlay:scene_changed", %{

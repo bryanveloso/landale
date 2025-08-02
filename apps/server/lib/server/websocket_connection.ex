@@ -176,10 +176,14 @@ defmodule Server.WebSocketConnection do
   end
 
   @impl true
-  def handle_info({:gun_upgrade, conn_pid, stream_ref, ["websocket"], headers}, %{conn_pid: conn_pid} = state) do
+  def handle_info(
+        {:gun_upgrade, conn_pid, stream_ref, ["websocket"], headers},
+        %{conn_pid: conn_pid} = state
+      ) do
     Logger.info("WebSocket upgraded successfully", uri: state.uri)
 
-    conn_manager = ConnectionManager.add_connection(state.conn_manager, conn_pid, stream_ref, :websocket)
+    conn_manager =
+      ConnectionManager.add_connection(state.conn_manager, conn_pid, stream_ref, :websocket)
 
     state = %{
       state
@@ -196,7 +200,10 @@ defmodule Server.WebSocketConnection do
   end
 
   @impl true
-  def handle_info({:gun_ws, conn_pid, stream_ref, frame}, %{conn_pid: conn_pid, stream_ref: stream_ref} = state) do
+  def handle_info(
+        {:gun_ws, conn_pid, stream_ref, frame},
+        %{conn_pid: conn_pid, stream_ref: stream_ref} = state
+      ) do
     notify_owner(state, {:websocket_frame, frame})
     {:noreply, state}
   end
@@ -218,8 +225,15 @@ defmodule Server.WebSocketConnection do
   end
 
   @impl true
-  def handle_info({:gun_response, conn_pid, _stream_ref, _is_fin, status, headers}, %{conn_pid: conn_pid} = state) do
-    Logger.warning("WebSocket upgrade failed", uri: state.uri, status: status, headers: inspect(headers))
+  def handle_info(
+        {:gun_response, conn_pid, _stream_ref, _is_fin, status, headers},
+        %{conn_pid: conn_pid} = state
+      ) do
+    Logger.warning("WebSocket upgrade failed",
+      uri: state.uri,
+      status: status,
+      headers: inspect(headers)
+    )
 
     state =
       if should_retry_cloudfront?(status, state) do
@@ -266,7 +280,8 @@ defmodule Server.WebSocketConnection do
 
     case connect_gun(state.uri, state.opts) do
       {:ok, conn_pid} ->
-        {_monitor_ref, conn_manager} = ConnectionManager.add_monitor(state.conn_manager, conn_pid, :gun_connection)
+        {_monitor_ref, conn_manager} =
+          ConnectionManager.add_monitor(state.conn_manager, conn_pid, :gun_connection)
 
         state = %{state | conn_pid: conn_pid, conn_manager: conn_manager}
 
@@ -291,7 +306,13 @@ defmodule Server.WebSocketConnection do
     # Close connection
     conn_manager = ConnectionManager.close_connection(state.conn_manager, :websocket)
 
-    state = %{state | conn_pid: nil, stream_ref: nil, connection_state: :disconnected, conn_manager: conn_manager}
+    state = %{
+      state
+      | conn_pid: nil,
+        stream_ref: nil,
+        connection_state: :disconnected,
+        conn_manager: conn_manager
+    }
 
     notify_owner(state, {:websocket_disconnected, %{reason: reason}})
 
@@ -299,16 +320,8 @@ defmodule Server.WebSocketConnection do
   end
 
   defp do_send_data(%{conn_pid: conn_pid, stream_ref: stream_ref}, data) when is_binary(data) do
-    Logger.info("WebSocketConnection sending TEXT frame: #{data}",
-      data_length: String.length(data),
-      conn_pid: inspect(conn_pid),
-      stream_ref: inspect(stream_ref)
-    )
-
     # Explicitly send as text frame
-    result = :gun.ws_send(conn_pid, stream_ref, {:text, data})
-    Logger.info("Gun ws_send result: #{inspect(result)}")
-    result
+    :gun.ws_send(conn_pid, stream_ref, {:text, data})
   end
 
   defp do_send_data(%{conn_pid: conn_pid, stream_ref: stream_ref}, data) do

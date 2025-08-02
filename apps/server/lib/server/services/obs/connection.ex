@@ -161,13 +161,6 @@ defmodule Server.Services.OBS.Connection do
 
   @impl true
   def handle_info({WebSocketConnection, _pid, {:websocket_frame, {:text, frame}}}, state) do
-    # Log ALL incoming frames for debugging
-    Logger.info("OBS WebSocket frame received: #{String.slice(frame, 0, 500)}",
-      service: "obs",
-      session_id: state.session_id,
-      state: state.state
-    )
-
     case state.state do
       :connected ->
         # Expecting server Hello
@@ -191,12 +184,16 @@ defmodule Server.Services.OBS.Connection do
   end
 
   @impl true
-  def handle_info({WebSocketConnection, _pid, {:websocket_disconnected, %{reason: reason}}}, state) do
+  def handle_info(
+        {WebSocketConnection, _pid, {:websocket_disconnected, %{reason: reason}}},
+        state
+      ) do
     error_count = state.consecutive_errors + 1
 
     cond do
       error_count == @max_logged_errors ->
-        Logger.warning("WebSocket connection lost (suppressing further errors after #{@max_logged_errors} failures)",
+        Logger.warning(
+          "WebSocket connection lost (suppressing further errors after #{@max_logged_errors} failures)",
           reason: inspect(reason),
           service: "obs",
           session_id: state.session_id
@@ -232,7 +229,8 @@ defmodule Server.Services.OBS.Connection do
 
     cond do
       error_count == @max_logged_errors ->
-        Logger.error("WebSocket error (suppressing further errors after #{@max_logged_errors} failures)",
+        Logger.error(
+          "WebSocket error (suppressing further errors after #{@max_logged_errors} failures)",
           error: reason,
           service: "obs",
           session_id: state.session_id
@@ -395,24 +393,6 @@ defmodule Server.Services.OBS.Connection do
       pending_count: length(state.pending_messages)
     )
 
-    # TEST: Send a simple GetVersion request immediately
-    test_request =
-      Jason.encode!(%{
-        "op" => 6,
-        "d" => %{
-          "requestType" => "GetVersion",
-          "requestId" => "test-immediate",
-          "requestData" => %{}
-        }
-      })
-
-    Logger.info("TEST: Sending immediate GetVersion request after auth: #{test_request}",
-      service: "obs",
-      session_id: state.session_id
-    )
-
-    WebSocketConnection.send_data(state.ws_conn, test_request)
-
     # Broadcast connection established
     broadcast_event(state, :connection_established, %{
       session_id: state.session_id,
@@ -478,12 +458,6 @@ defmodule Server.Services.OBS.Connection do
     end
   end
 
-  defp generate_request_id do
-    # Generate a unique request ID
-    System.unique_integer([:positive])
-    |> Integer.to_string()
-  end
-
   defp queue_request(state, request) do
     %{state | pending_messages: state.pending_messages ++ [request]}
   end
@@ -491,21 +465,8 @@ defmodule Server.Services.OBS.Connection do
   defp process_pending_messages(state) do
     Enum.each(state.pending_messages, fn
       {:request, type, data, from} ->
-        # Process the queued request
-        case get_request_tracker(state.session_id) do
-          {:ok, tracker} ->
-            ws_state = WebSocketConnection.get_state(state.ws_conn)
-
-            if ws_state.connected do
-              result = GenServer.call(tracker, {:track_and_send, type, data, state.ws_conn})
-              GenServer.reply(from, result)
-            else
-              GenServer.reply(from, {:error, :not_connected})
-            end
-
-          {:error, reason} ->
-            GenServer.reply(from, {:error, reason})
-        end
+        # Process the queued request using the same mechanism as send_obs_request
+        send_obs_request(state, type, data, from)
     end)
 
     %{state | pending_messages: []}
@@ -517,7 +478,13 @@ defmodule Server.Services.OBS.Connection do
       Process.cancel_timer(state.auth_timer)
     end
 
-    %{state | state: :disconnected, auth_timer: nil, rpc_version: nil, authentication_required: false}
+    %{
+      state
+      | state: :disconnected,
+        auth_timer: nil,
+        rpc_version: nil,
+        authentication_required: false
+    }
   end
 
   defp broadcast_event(state, event_type, data) do

@@ -70,25 +70,14 @@ defmodule Server.Services.OBS.StatsCollector do
     # Request stats from OBS
     case get_connection(state.session_id) do
       {:ok, conn} ->
-        Logger.info("StatsCollector requesting GetVersion from OBS",
-          service: "obs",
-          session_id: state.session_id
-        )
-
         Task.start(fn ->
           # Try GetSceneList first - this is a basic OBS v5 request
           case Server.Services.OBS.Connection.send_request(conn, "GetSceneList", %{}) do
             {:ok, version_data} ->
-              Logger.info("StatsCollector received version response",
-                service: "obs",
-                session_id: state.session_id,
-                version_data: inspect(version_data)
-              )
-
               send(self(), {:version_received, version_data})
 
             {:error, reason} ->
-              Logger.error("Failed to get OBS version: #{inspect(reason)}",
+              Logger.error("Failed to get OBS stats: #{inspect(reason)}",
                 service: "obs",
                 session_id: state.session_id
               )

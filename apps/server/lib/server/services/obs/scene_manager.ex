@@ -148,7 +148,10 @@ defmodule Server.Services.OBS.SceneManager do
     {:noreply, state}
   end
 
-  def handle_info({:obs_event, %{eventType: "CurrentProgramSceneChanged", eventData: data}}, state) do
+  def handle_info(
+        {:obs_event, %{eventType: "CurrentProgramSceneChanged", eventData: data}},
+        state
+      ) do
     scene_name = data[:sceneName]
     state = %{state | current_scene: scene_name}
 
@@ -169,7 +172,10 @@ defmodule Server.Services.OBS.SceneManager do
     {:noreply, state}
   end
 
-  def handle_info({:obs_event, %{eventType: "CurrentPreviewSceneChanged", eventData: data}}, state) do
+  def handle_info(
+        {:obs_event, %{eventType: "CurrentPreviewSceneChanged", eventData: data}},
+        state
+      ) do
     scene_name = data[:sceneName]
     state = %{state | preview_scene: scene_name}
 
