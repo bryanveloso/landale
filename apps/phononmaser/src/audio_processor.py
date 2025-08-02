@@ -472,10 +472,7 @@ class AudioProcessor:
         for line in lines:
             if line.strip():
                 # Remove timestamp brackets if present
-                if line.startswith("[") and "] " in line:
-                    text = line.split("] ", 1)[1].strip()
-                else:
-                    text = line.strip()
+                text = line.split("] ", 1)[1].strip() if line.startswith("[") and "] " in line else line.strip()
 
                 # Filter out non-speech markers
                 if text and text not in ["[BLANK_AUDIO]", "Thank you."]:

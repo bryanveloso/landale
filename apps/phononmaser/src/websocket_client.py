@@ -1,6 +1,7 @@
 """WebSocket client for sending transcriptions to Phoenix server."""
 
 import asyncio
+import contextlib
 import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -193,10 +194,8 @@ class ServerWebSocketClient(BaseWebSocketClient):
         """Disconnect from Phoenix server."""
         if self._listen_task and not self._listen_task.done():
             self._listen_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._listen_task
-            except asyncio.CancelledError:
-                pass
 
         if self.ws:
             await self.ws.close()

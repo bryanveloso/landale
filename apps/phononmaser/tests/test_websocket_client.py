@@ -3,10 +3,9 @@
 import asyncio
 import json
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-import websockets
 from websockets.exceptions import ConnectionClosed
 
 from src.events import TranscriptionEvent
@@ -103,7 +102,7 @@ class TestServerWebSocketClient:
 
         connect_count = 0
 
-        async def mock_connect(*args, **kwargs):
+        async def mock_connect(*_args, **_kwargs):
             nonlocal connect_count
             connect_count += 1
 
@@ -195,7 +194,7 @@ class TestServerWebSocketClient:
 
         with patch("websockets.connect", return_value=mock_ws):
             # Should handle join error
-            result = await client.connect()
+            await client.connect()
 
             # Connection should fail due to channel join error
             assert client.state != "connected"
@@ -208,14 +207,14 @@ class TestServerWebSocketClient:
 
         connect_attempts = 0
 
-        async def failing_connect(*args, **kwargs):
+        async def failing_connect(*_args, **_kwargs):
             nonlocal connect_attempts
             connect_attempts += 1
             raise ConnectionClosed(None, None)
 
         with patch("websockets.connect", side_effect=failing_connect):
             # Should fail after threshold
-            with pytest.raises(Exception):
+            with pytest.raises(ConnectionClosed):
                 await client.connect()
 
             # Circuit should be open
@@ -223,7 +222,7 @@ class TestServerWebSocketClient:
 
             # Further attempts should fail fast
             initial_attempts = connect_attempts
-            with pytest.raises(Exception):
+            with pytest.raises(ConnectionClosed):
                 await client.connect()
 
             # Should not have made additional connection attempts
@@ -253,8 +252,8 @@ class TestServerWebSocketClient:
         assert ("connecting", "connected") in states
 
 
-@pytest.mark.parametrize("is_final,expected_event", [(True, "final_segment"), (False, "partial_segment")])
-async def test_transcription_event_types(client, is_final, expected_event):
+@pytest.mark.parametrize("is_final", [True, False])
+async def test_transcription_event_types(client, is_final):
     """Test different transcription event types."""
     mock_ws = AsyncMock()
     client.ws = mock_ws

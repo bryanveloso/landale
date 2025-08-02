@@ -1,10 +1,10 @@
 """Main entry point for the SEED intelligence service."""
 
 import asyncio
-import signal
 
 from dotenv import load_dotenv
 from shared import get_global_tracker
+from shared.supervisor import RestartStrategy, ServiceConfig, SupervisedService, run_with_supervisor
 
 from .config import get_config
 from .context_client import ContextClient
@@ -27,7 +27,7 @@ configure_json_logging(level=config.log_level, json_output=config.json_logs)
 logger = get_logger(__name__)
 
 
-class SeedService:
+class SeedService(SupervisedService):
     """Main SEED intelligence service that coordinates all components."""
 
     def __init__(self):
@@ -144,6 +144,50 @@ class SeedService:
 
         logger.info("SEED intelligence service stopped")
 
+    async def health_check(self) -> bool:
+        """Check if the SEED service is healthy."""
+        try:
+            # Check if service is running
+            if not self.running:
+                return False
+
+            # Check transcription client connection
+            if self.transcription_client and not await self.transcription_client.health_check():
+                logger.warning("Transcription client connection unhealthy")
+                return False
+
+            # Check server client connection (optional, non-critical)
+            if self.server_client:
+                server_healthy = await self.server_client.health_check()
+                if not server_healthy:
+                    logger.debug("Server client connection unhealthy (non-critical)")
+
+            # Check LMS client
+            if not self.lms_client:
+                return False
+
+            # Check correlator
+            if not self.correlator:
+                return False
+
+            # Check buffer health if available
+            if hasattr(self.correlator, "get_buffer_stats"):
+                try:
+                    stats = self.correlator.get_buffer_stats()
+                    # Check for buffer overflow or other issues
+                    for buffer_name, size in stats.get("buffer_sizes", {}).items():
+                        limit = stats.get("buffer_limits", {}).get(buffer_name, 1000)
+                        if size > limit * 0.9:  # 90% full
+                            logger.warning(f"Buffer {buffer_name} nearly full: {size}/{limit}")
+                except Exception as e:
+                    logger.debug(f"Could not check buffer stats: {e}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return False
+
     async def _handle_transcription(self, event: TranscriptionEvent):
         """Handle transcription events from Phoenix server."""
         logger.debug(
@@ -255,31 +299,26 @@ class SeedService:
 
 
 async def main():
-    """Main entry point."""
+    """Main entry point with supervisor pattern."""
+    logger.info("Starting SEED service with supervisor...")
+
+    # Create service instance
     service = SeedService()
 
-    # Handle shutdown signals
-    loop = asyncio.get_event_loop()
+    # Create service configuration with restart policy
+    config = ServiceConfig(
+        name="seed",
+        restart_strategy=RestartStrategy.ON_FAILURE,
+        max_restarts=5,
+        restart_window_seconds=300,  # 5 minutes
+        restart_delay_seconds=5.0,  # Longer delay for AI service
+        restart_delay_max=60.0,
+        health_check_interval=45.0,  # Less frequent for AI service
+        shutdown_timeout=30.0,  # More time for AI cleanup
+    )
 
-    def handle_shutdown():
-        logger.info("Received shutdown signal")
-        tracker = get_global_tracker()
-        tracker.create_task(service.stop(), name="seed_shutdown")
-
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, handle_shutdown)
-
-    try:
-        service._start_time = asyncio.get_event_loop().time()
-        await service.start()
-
-        # Keep running until stopped
-        while service.running:
-            await asyncio.sleep(1)
-
-    except Exception as e:
-        logger.error(f"Service error: {e}")
-        await service.stop()
+    # Run with supervisor
+    await run_with_supervisor([(service, config)])
 
 
 if __name__ == "__main__":

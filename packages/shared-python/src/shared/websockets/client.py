@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class ConnectionState(Enum):
     """WebSocket connection states."""
+
     DISCONNECTED = "disconnected"
     CONNECTING = "connecting"
     CONNECTED = "connected"
@@ -25,6 +26,7 @@ class ConnectionState(Enum):
 
 class ConnectionEvent:
     """Connection state change event."""
+
     def __init__(self, old_state: ConnectionState, new_state: ConnectionState, error: Exception | None = None):
         self.old_state = old_state
         self.new_state = new_state
@@ -236,7 +238,6 @@ class BaseWebSocketClient(ABC):
 
                     if await self._do_connect():
                         logger.info(f"Successfully connected to {self.url}")
-                        self._is_connected = True
                         self._reconnect_attempts = 0
                         self._reconnect_delay = self.reconnect_delay_base
                         self.successful_connects += 1
@@ -263,7 +264,6 @@ class BaseWebSocketClient(ABC):
                 if self._reconnect_attempts >= self.max_reconnect_attempts:
                     logger.error(f"Failed to connect after {self.max_reconnect_attempts} attempts. Giving up.")
                     self.failed_reconnects += 1
-                    self._is_connected = False
                     self._emit_connection_event(ConnectionState.FAILED)
                     return False
 
@@ -279,7 +279,7 @@ class BaseWebSocketClient(ABC):
         """Listen for messages with automatic reconnection on disconnect."""
         while self._should_reconnect:
             try:
-                if not self._is_connected:
+                if self._connection_state != ConnectionState.CONNECTED:
                     if not await self.connect():
                         # Max reconnection attempts reached or circuit breaker open
                         break
@@ -289,7 +289,6 @@ class BaseWebSocketClient(ABC):
 
             except websockets.exceptions.ConnectionClosed:
                 logger.info(f"Connection to {self.url} lost")
-                self._is_connected = False
                 self.total_reconnects += 1
 
                 # Stop heartbeat monitoring
@@ -310,7 +309,6 @@ class BaseWebSocketClient(ABC):
                 break
             except Exception as e:
                 logger.error(f"Unexpected error in listen loop: {e}")
-                self._is_connected = False
                 await self._stop_heartbeat()
                 self._emit_connection_event(ConnectionState.DISCONNECTED)
 
@@ -325,7 +323,6 @@ class BaseWebSocketClient(ABC):
         async with self._connection_lock:
             logger.info(f"Disconnecting from {self.url}")
             self._should_reconnect = False
-            self._is_connected = False
 
             # Stop heartbeat monitoring
             await self._stop_heartbeat()
@@ -352,10 +349,34 @@ class BaseWebSocketClient(ABC):
         task.add_done_callback(self._background_tasks.discard)
         return task
 
+    async def health_check(self) -> bool:
+        """Check if the WebSocket client is healthy."""
+        try:
+            # Check if connected
+            if self._connection_state != ConnectionState.CONNECTED:
+                return False
+
+            # Check circuit breaker status
+            if self._is_circuit_open():
+                return False
+
+            # Check if heartbeat is recent (within 2x heartbeat interval)
+            if self._last_heartbeat > 0:
+                time_since_heartbeat = time.time() - self._last_heartbeat
+                if time_since_heartbeat > (self.heartbeat_interval * 2):
+                    logger.debug(f"Heartbeat is stale: {time_since_heartbeat:.1f}s since last heartbeat")
+                    return False
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return False
+
     def get_status(self) -> dict:
         """Get connection status and metrics."""
         return {
-            "connected": self._is_connected,
+            "connected": self._connection_state == ConnectionState.CONNECTED,
             "connection_state": self._connection_state.value,
             "url": self.url,
             "reconnect_attempts": self._reconnect_attempts,

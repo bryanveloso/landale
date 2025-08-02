@@ -2,10 +2,9 @@
 
 import asyncio
 import os
-import signal
 
 from dotenv import load_dotenv
-from shared import get_global_tracker
+from shared.supervisor import RestartStrategy, ServiceConfig, SupervisedService, run_with_supervisor
 
 from .audio_processor import AudioProcessor
 from .health import create_health_app
@@ -21,8 +20,8 @@ configure_json_logging()
 logger = get_logger(__name__)
 
 
-class Phononmaser:
-    """Main phononmaser service."""
+class Phononmaser(SupervisedService):
+    """Main phononmaser service with supervisor support."""
 
     def __init__(self):
         # Configuration from environment variables
@@ -97,6 +96,31 @@ class Phononmaser:
 
         logger.info("Phononmaser stopped")
 
+    async def health_check(self) -> bool:
+        """Check if the phononmaser service is healthy."""
+        try:
+            # Check if components are running
+            if not self.running:
+                return False
+
+            # Check WebSocket server
+            if not self.websocket_server or not hasattr(self.websocket_server, "server"):
+                return False
+
+            # Check transcription client connection
+            if self.transcription_client:
+                is_connected = await self.transcription_client.health_check()
+                if not is_connected:
+                    logger.warning("Transcription client connection unhealthy")
+                    return False
+
+            # Check audio processor
+            return bool(self.audio_processor)
+
+        except Exception as e:
+            logger.error(f"Health check failed: {e}")
+            return False
+
     async def _handle_transcription(self, event):
         """Handle transcription events from audio processor."""
         logger.info(f"Transcription received: {event.text[:50] if event.text else 'empty'}...")
@@ -118,31 +142,26 @@ class Phononmaser:
 
 
 async def main():
-    """Main entry point."""
+    """Main entry point with supervisor pattern."""
+    logger.info("Starting Phononmaser with supervisor...")
+
+    # Create service instance
     service = Phononmaser()
 
-    # Handle shutdown signals
-    loop = asyncio.get_event_loop()
+    # Create service configuration with restart policy
+    config = ServiceConfig(
+        name="phononmaser",
+        restart_strategy=RestartStrategy.ON_FAILURE,
+        max_restarts=5,
+        restart_window_seconds=300,  # 5 minutes
+        restart_delay_seconds=2.0,
+        restart_delay_max=30.0,
+        health_check_interval=30.0,
+        shutdown_timeout=15.0,
+    )
 
-    def handle_shutdown():
-        logger.info("Received shutdown signal")
-        tracker = get_global_tracker()
-        tracker.create_task(service.stop(), name="phononmaser_shutdown")
-
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        loop.add_signal_handler(sig, handle_shutdown)
-
-    try:
-        await service.start()
-
-        # Keep running until stopped
-        while service.running:
-            await asyncio.sleep(1)
-
-    except Exception as e:
-        logger.error(f"Service error: {e}")
-        await service.stop()
-        raise
+    # Run with supervisor
+    await run_with_supervisor([(service, config)])
 
 
 if __name__ == "__main__":
