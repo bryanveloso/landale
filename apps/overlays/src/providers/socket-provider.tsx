@@ -54,10 +54,7 @@ export const SocketProvider: Component<SocketProviderProps> = (props) => {
   }).child({ module: 'socket-provider', correlationId })
 
   const getServerUrl = () => {
-    if (props.serverUrl) return props.serverUrl
-
-    // Auto-detect based on environment
-    return window.location.hostname === 'localhost' ? 'ws://localhost:7175/socket' : 'ws://zelan:7175/socket'
+    return 'ws://saya:7175/socket'
   }
 
   // Update health metrics periodically

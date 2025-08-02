@@ -10,11 +10,10 @@ import { useStreamCommands } from '@/hooks/use-stream-commands'
 import { useLayerState } from '@/hooks/use-layer-state'
 import type { TakeoverCommand } from '@/types/stream'
 import { Button } from './ui/button'
-import { createLogger } from '@landale/logger'
+import { createLogger } from '@landale/logger/browser'
 
 const logger = createLogger({
-  service: 'dashboard',
-  defaultMeta: { module: 'TakeoverPanel' }
+  service: 'dashboard'
 })
 
 export function TakeoverPanel() {

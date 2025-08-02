@@ -8,7 +8,7 @@
 import { createContext, useContext, createSignal, onCleanup, onMount } from 'solid-js'
 import type { Component, JSX } from 'solid-js'
 import { Channel } from 'phoenix'
-import { createLogger } from '@landale/logger'
+import { createLogger } from '@landale/logger/browser'
 import {
   Socket,
   ConnectionState as SocketConnectionState,
@@ -30,8 +30,7 @@ import type { PhoenixEvent } from '@landale/shared'
 import { validateServerStreamState, validateServerQueueState, validateTakeoverCommand } from '@/types/stream'
 
 const logger = createLogger({
-  service: 'dashboard',
-  defaultMeta: { module: 'StreamService' }
+  service: 'dashboard'
 })
 
 // Default states
@@ -141,13 +140,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   let reconnectTimer: number | null = null
 
   const getServerUrl = () => {
-    if (props.serverUrl) return props.serverUrl
-    // Use an environment variable for the production/non-localhost URL
-    if (import.meta.env.VITE_STREAM_SERVICE_URL) {
-      return import.meta.env.VITE_STREAM_SERVICE_URL
-    }
-    // Fallback for development or if env var is not set
-    return window.location.hostname === 'localhost' ? 'ws://localhost:7175/socket' : 'ws://zelan:7175/socket'
+    return 'ws://saya:7175/socket'
   }
 
   // Connection management

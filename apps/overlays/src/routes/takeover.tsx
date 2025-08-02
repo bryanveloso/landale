@@ -38,12 +38,7 @@ function TakeoverOverlay() {
 
   // Connect to WebSocket
   createEffect(() => {
-    // Use same server URL logic as StreamService
-    const getServerUrl = () => {
-      return window.location.hostname === 'localhost' ? 'ws://localhost:7175/socket' : 'ws://zelan:7175/socket'
-    }
-
-    const serverUrl = getServerUrl()
+    const serverUrl = 'ws://saya:7175/socket'
     logger.info('Initializing WebSocket connection', {
       metadata: { serverUrl }
     })

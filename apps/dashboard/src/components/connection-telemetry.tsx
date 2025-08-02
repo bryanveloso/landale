@@ -40,49 +40,21 @@ export function ConnectionTelemetry() {
 
   let healthCheckInterval: number | undefined
 
-  // Fetch detailed health status from server
-  const fetchHealthStatus = async () => {
-    try {
-      const response = await fetch('/api/health')
-      if (response.ok) {
-        const data = await response.json()
-        setSystemHealth(data)
-        setLastUpdate(Date.now())
+  // Initialize service health from connection state
+  const updateServiceHealth = () => {
+    const services: ServiceHealth[] = []
 
-        // Convert services to health array
-        const services: ServiceHealth[] = []
+    // WebSocket connection from our local state
+    services.push({
+      name: 'Phoenix WebSocket',
+      connected: connectionState().connected,
+      reconnectAttempts: connectionState().reconnectAttempts,
+      lastHeartbeat: connectionState().lastHeartbeat,
+      error: connectionState().error
+    })
 
-        // Map standard services
-        if (data.services?.obs) {
-          services.push({
-            name: 'OBS',
-            connected: data.services.obs.connected || false,
-            error: data.services.obs.error
-          })
-        }
-
-        if (data.services?.twitch) {
-          services.push({
-            name: 'Twitch',
-            connected: data.services.twitch.connected || false,
-            error: data.services.twitch.error
-          })
-        }
-
-        // WebSocket connection from our local state
-        services.push({
-          name: 'Phoenix WebSocket',
-          connected: connectionState().connected,
-          reconnectAttempts: connectionState().reconnectAttempts,
-          lastHeartbeat: connectionState().lastHeartbeat,
-          error: connectionState().error
-        })
-
-        setServiceHealth(services)
-      }
-    } catch (error) {
-      console.error('Failed to fetch health status:', error)
-    }
+    setServiceHealth(services)
+    setLastUpdate(Date.now())
   }
 
   // Subscribe to real-time health updates
@@ -126,13 +98,13 @@ export function ConnectionTelemetry() {
 
   onMount(() => {
     // Initial fetch
-    fetchHealthStatus()
+    updateServiceHealth()
 
     // Subscribe to real-time updates
     const channel = subscribeToHealthUpdates()
 
     // Poll health endpoint every 30 seconds
-    healthCheckInterval = window.setInterval(fetchHealthStatus, 30000)
+    healthCheckInterval = window.setInterval(updateServiceHealth, 30000)
 
     onCleanup(() => {
       if (healthCheckInterval) {

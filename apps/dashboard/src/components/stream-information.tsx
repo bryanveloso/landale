@@ -13,11 +13,10 @@ import { useLayerState } from '@/hooks/use-layer-state'
 import { Button } from './ui/button'
 import { StreamValidationRules, validateForm, sanitizeFormData } from '@/services/form-validation'
 import type { ValidationRule } from '@/services/form-validation'
-import { createLogger } from '@landale/logger'
+import { createLogger } from '@landale/logger/browser'
 
 const logger = createLogger({
-  service: 'dashboard',
-  defaultMeta: { module: 'StreamInformation' }
+  service: 'dashboard'
 })
 
 interface ChannelInfo {
