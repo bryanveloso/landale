@@ -6,13 +6,17 @@ from datetime import datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import pytest_asyncio
 from websockets.exceptions import ConnectionClosed
 
 from src.events import TranscriptionEvent
 from src.websocket_client import ServerWebSocketClient
 
+# Mark all tests in this module as async
+pytestmark = pytest.mark.asyncio
 
-@pytest.fixture
+
+@pytest_asyncio.fixture
 async def client():
     """Create a test WebSocket client."""
     client = ServerWebSocketClient(server_url="ws://test:7175/socket/websocket", stream_session_id="test_session")
