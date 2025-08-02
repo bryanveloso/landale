@@ -162,11 +162,10 @@ defmodule Server.Services.OBS.Connection do
   @impl true
   def handle_info({WebSocketConnection, _pid, {:websocket_frame, {:text, frame}}}, state) do
     # Log ALL incoming frames for debugging
-    Logger.info("OBS WebSocket frame received",
+    Logger.info("OBS WebSocket frame received: #{String.slice(frame, 0, 500)}",
       service: "obs",
       session_id: state.session_id,
-      state: state.state,
-      frame_preview: String.slice(frame, 0, 200)
+      state: state.state
     )
 
     case state.state do
@@ -389,6 +388,12 @@ defmodule Server.Services.OBS.Connection do
     end
 
     state = %{state | state: :ready, auth_timer: nil}
+
+    Logger.info("OBS connection ready, processing pending messages",
+      service: "obs",
+      session_id: state.session_id,
+      pending_count: length(state.pending_messages)
+    )
 
     # Broadcast connection established
     broadcast_event(state, :connection_established, %{
