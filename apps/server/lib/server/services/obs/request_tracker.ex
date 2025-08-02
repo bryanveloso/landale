@@ -48,11 +48,12 @@ defmodule Server.Services.OBS.RequestTracker do
     # Create request message
     request_msg = Protocol.encode_request(request_id, request_type, request_data)
 
-    Logger.debug("RequestTracker encoded message",
+    Logger.info("RequestTracker encoded message",
       service: "obs",
       session_id: state.session_id,
       request_id: request_id,
-      encoded_msg: request_msg
+      encoded_msg: request_msg,
+      message_length: String.length(request_msg)
     )
 
     # Send through WebSocketConnection

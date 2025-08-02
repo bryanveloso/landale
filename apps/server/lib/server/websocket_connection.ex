@@ -299,7 +299,14 @@ defmodule Server.WebSocketConnection do
   end
 
   defp do_send_data(%{conn_pid: conn_pid, stream_ref: stream_ref}, data) when is_binary(data) do
-    :gun.ws_send(conn_pid, stream_ref, {:text, data})
+    Logger.debug("WebSocketConnection sending data",
+      data_length: String.length(data),
+      data_preview: String.slice(data, 0, 100)
+    )
+
+    result = :gun.ws_send(conn_pid, stream_ref, {:text, data})
+    Logger.debug("Gun ws_send result", result: result)
+    result
   end
 
   defp do_send_data(%{conn_pid: conn_pid, stream_ref: stream_ref}, data) do

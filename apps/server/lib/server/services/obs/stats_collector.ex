@@ -70,13 +70,25 @@ defmodule Server.Services.OBS.StatsCollector do
     # Request stats from OBS
     case get_connection(state.session_id) do
       {:ok, conn} ->
+        Logger.info("StatsCollector requesting GetVersion from OBS",
+          service: "obs",
+          session_id: state.session_id
+        )
+
         Task.start(fn ->
-          case Server.Services.OBS.Connection.send_request(conn, "GetStats", %{}) do
-            {:ok, stats} ->
-              send(self(), {:stats_received, stats})
+          # Try GetVersion first to test basic connectivity
+          case Server.Services.OBS.Connection.send_request(conn, "GetVersion", %{}) do
+            {:ok, version_data} ->
+              Logger.info("StatsCollector received version response",
+                service: "obs",
+                session_id: state.session_id,
+                version_data: inspect(version_data)
+              )
+
+              send(self(), {:version_received, version_data})
 
             {:error, reason} ->
-              Logger.warning("Failed to get OBS stats: #{inspect(reason)}",
+              Logger.error("Failed to get OBS version: #{inspect(reason)}",
                 service: "obs",
                 session_id: state.session_id
               )
@@ -89,6 +101,36 @@ defmodule Server.Services.OBS.StatsCollector do
     end
 
     {:noreply, schedule_stats_poll(state)}
+  end
+
+  def handle_info({:version_received, version_data}, state) do
+    Logger.info("OBS version check successful, trying GetStats",
+      service: "obs",
+      session_id: state.session_id,
+      obs_version: version_data[:obsVersion]
+    )
+
+    # Now try the actual GetStats request
+    case get_connection(state.session_id) do
+      {:ok, conn} ->
+        Task.start(fn ->
+          case Server.Services.OBS.Connection.send_request(conn, "GetStats", %{}) do
+            {:ok, stats} ->
+              send(self(), {:stats_received, stats})
+
+            {:error, reason} ->
+              Logger.error("GetStats failed: #{inspect(reason)}",
+                service: "obs",
+                session_id: state.session_id
+              )
+          end
+        end)
+
+      {:error, _} ->
+        nil
+    end
+
+    {:noreply, state}
   end
 
   def handle_info({:stats_received, stats}, state) do
