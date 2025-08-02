@@ -420,7 +420,7 @@ defmodule Server.Services.OBS.Connection do
 
       {:ok, %{op: 7} = response} ->
         # Request response - forward to RequestTracker
-        Logger.info("Connection received OBS response",
+        Logger.debug("Connection received OBS response",
           service: "obs",
           session_id: state.session_id,
           request_id: response.d[:requestId],

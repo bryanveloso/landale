@@ -198,7 +198,7 @@ defmodule Server.Services.Twitch.EventSubManager do
       {:ok, response_body} ->
         case JSON.decode(response_body) do
           {:ok, %{"data" => [subscription]}} ->
-            Logger.info("Subscription created",
+            Logger.debug("Subscription created",
               event_type: event_type,
               subscription_id: subscription["id"],
               status: subscription["status"],
@@ -354,7 +354,15 @@ defmodule Server.Services.Twitch.EventSubManager do
   def create_default_subscriptions(state, opts \\ []) do
     if state.user_id do
       subscriptions_with_conditions = prepare_default_subscriptions(state.user_id)
-      process_subscription_list(state, subscriptions_with_conditions, opts)
+
+      # Batch process subscriptions and collect results
+      results = process_subscription_list_batch(state, subscriptions_with_conditions, opts)
+
+      # Log single summary
+      log_subscription_batch_summary(results)
+
+      # Return success/failed counts
+      {results.successful_count, results.failed_count}
     else
       Logger.error("Default subscriptions creation failed", error: "user_id not available")
       {0, 1}
@@ -369,39 +377,95 @@ defmodule Server.Services.Twitch.EventSubManager do
     end)
   end
 
-  # Processes the subscription list and creates subscriptions
-  defp process_subscription_list(state, subscriptions, opts) do
-    Enum.reduce(subscriptions, {0, 0}, fn subscription, acc ->
-      create_single_subscription(state, subscription, acc, opts)
+  # Processes the subscription list and collects detailed results for batched logging
+  defp process_subscription_list_batch(state, subscriptions, opts) do
+    initial_results = %{
+      successful: [],
+      failed: [],
+      skipped: [],
+      successful_count: 0,
+      failed_count: 0,
+      total_cost: 0
+    }
+
+    Enum.reduce(subscriptions, initial_results, fn subscription, acc ->
+      create_single_subscription_batch(state, subscription, acc, opts)
     end)
   end
 
-  # Creates a single subscription and handles the result
-  defp create_single_subscription(state, {event_type, condition, required_scopes, _sub_opts}, {success, failed}, opts) do
+  # Logs a single summary of all subscription creation results
+  defp log_subscription_batch_summary(results) do
+    total_attempted = results.successful_count + results.failed_count
+
+    Logger.info("EventSub subscription batch completed",
+      successful: results.successful_count,
+      failed: results.failed_count,
+      total_cost: results.total_cost,
+      total_attempted: total_attempted
+    )
+
+    # Log failures at debug level with details
+    if length(results.failed) > 0 do
+      Logger.debug("Failed subscriptions",
+        failed_events:
+          Enum.map(results.failed, fn {event, reason} ->
+            %{event: event, reason: reason}
+          end)
+      )
+    end
+
+    # Log skipped at debug level
+    if length(results.skipped) > 0 do
+      Logger.debug("Skipped subscriptions due to missing scopes",
+        skipped_events:
+          Enum.map(results.skipped, fn {event, scopes} ->
+            %{event: event, missing_scopes: scopes}
+          end)
+      )
+    end
+  end
+
+  # Creates a single subscription and collects detailed results for batched logging
+  defp create_single_subscription_batch(state, {event_type, condition, required_scopes, _sub_opts}, acc, opts) do
     if validate_scopes_for_subscription(state.scopes, required_scopes) do
       case create_subscription_with_retry(state, event_type, condition, opts) do
         {:ok, subscription} ->
-          log_successful_subscription(event_type, subscription)
-          {success + 1, failed}
+          # Don't log individual success, collect for batch
+          cost = subscription["cost"] || 1
+
+          %{
+            acc
+            | successful: [{event_type, subscription["id"]} | acc.successful],
+              successful_count: acc.successful_count + 1,
+              total_cost: acc.total_cost + cost
+          }
 
         {:error, reason} ->
-          log_failed_subscription(state, event_type, condition, reason)
-          {success, failed + 1}
+          # Don't log individual failure, collect for batch
+          # Special handling for critical events like chat
+          if event_type == "channel.chat.message" do
+            Logger.error("Chat subscription failed - critical feature",
+              event_type: event_type,
+              reason: inspect(reason)
+            )
+          end
+
+          %{acc | failed: [{event_type, inspect(reason)} | acc.failed], failed_count: acc.failed_count + 1}
       end
     else
+      # Collect skipped subscriptions
+      user_scope_list = MapSet.to_list(state.scopes || MapSet.new())
+      missing_scopes = required_scopes -- user_scope_list
+
       # Log missing chat scope as error since it's critical
       if event_type == "channel.chat.message" do
-        user_scope_list = MapSet.to_list(state.scopes || MapSet.new())
-        missing_scopes = required_scopes -- user_scope_list
-
         Logger.error("Chat subscription skipped - missing scopes",
           event_type: event_type,
           missing_scopes: missing_scopes
         )
       end
 
-      log_skipped_subscription(event_type, required_scopes, state.scopes)
-      {success, failed + 1}
+      %{acc | skipped: [{event_type, missing_scopes} | acc.skipped], failed_count: acc.failed_count + 1}
     end
   end
 
@@ -420,7 +484,7 @@ defmodule Server.Services.Twitch.EventSubManager do
     case create_subscription(state, event_type, condition, opts) do
       {:ok, subscription} ->
         if attempt > 0 do
-          Logger.info("Subscription created after retry",
+          Logger.debug("Subscription created after retry",
             event_type: event_type,
             attempt: attempt + 1,
             subscription_id: subscription["id"]
@@ -452,68 +516,6 @@ defmodule Server.Services.Twitch.EventSubManager do
   defp create_subscription_with_retry(_state, _event_type, _condition, _opts, attempt, max_retries)
        when attempt >= max_retries do
     {:error, :max_retries_exceeded}
-  end
-
-  # Logs successful subscription creation
-  defp log_successful_subscription(event_type, subscription) do
-    Logger.info("Default subscription created",
-      event_type: event_type,
-      subscription_id: subscription["id"],
-      status: subscription["status"],
-      cost: subscription["cost"] || 1
-    )
-  end
-
-  # Logs failed subscription creation with specific guidance
-  defp log_failed_subscription(state, event_type, condition, reason) do
-    Logger.warning("Default subscription creation failed",
-      error: reason,
-      event_type: event_type
-    )
-
-    log_subscription_failure_guidance(state, event_type, condition, reason)
-  end
-
-  # Provides specific guidance for known subscription failures
-  defp log_subscription_failure_guidance(state, "channel.follow", condition, reason) do
-    reason_str = inspect(reason)
-
-    cond do
-      String.contains?(reason_str, "Forbidden") ->
-        Logger.info("Channel follow subscription failed",
-          error: "Forbidden - broadcaster may need explicit moderator verification",
-          note: "This is common when using broadcaster token for moderator-required subscriptions"
-        )
-
-      String.contains?(reason_str, "unauthorized") ->
-        Logger.info("Channel follow subscription failed",
-          error: "Unauthorized - token may need additional verification",
-          scope_present: MapSet.member?(state.scopes || MapSet.new(), "moderator:read:followers")
-        )
-
-      true ->
-        Logger.info("Channel follow subscription failed",
-          error: reason,
-          condition: inspect(condition),
-          user_id: state.user_id
-        )
-    end
-  end
-
-  defp log_subscription_failure_guidance(_state, event_type, _condition, reason) do
-    Logger.debug("Subscription failed for #{event_type}", error: reason)
-  end
-
-  # Logs skipped subscription due to missing scopes
-  defp log_skipped_subscription(event_type, required_scopes, user_scopes) do
-    user_scope_list = MapSet.to_list(user_scopes || MapSet.new())
-    missing_scopes = required_scopes -- user_scope_list
-
-    Logger.info("Subscription creation skipped for #{event_type} - missing scopes: #{inspect(missing_scopes)}",
-      event_type: event_type,
-      missing_scopes: missing_scopes,
-      required_scopes: required_scopes
-    )
   end
 
   @doc """

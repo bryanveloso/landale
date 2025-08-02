@@ -3,8 +3,14 @@ import Config
 # Configure environment for runtime checks
 config :server, env: :prod
 
-# Production logging configuration  
+# Production logging configuration
 config :logger, level: :info
+
+# Compile out debug logs for production
+config :logger,
+  compile_time_purge_matching: [
+    [level_lower_than: :info]
+  ]
 
 # Use simple JSON formatting that's more reliable
 config :logger, :console,

@@ -31,7 +31,7 @@ defmodule Server.Services.OBS.ConnectionsSupervisor do
         {:ok, pid}
 
       {:error, {:already_started, pid}} ->
-        Logger.warning("OBS session already exists: #{session_id}",
+        Logger.debug("OBS session already exists: #{session_id}",
           service: "obs",
           session_id: session_id
         )

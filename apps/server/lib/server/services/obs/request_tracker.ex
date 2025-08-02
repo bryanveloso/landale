@@ -40,7 +40,7 @@ defmodule Server.Services.OBS.RequestTracker do
     # Generate request ID
     request_id = to_string(state.next_id)
 
-    Logger.info("RequestTracker sending request",
+    Logger.debug("RequestTracker sending request",
       service: "obs",
       session_id: state.session_id,
       request_type: request_type,
@@ -52,7 +52,7 @@ defmodule Server.Services.OBS.RequestTracker do
     request_msg = Protocol.encode_request(request_id, request_type, request_data)
 
     # Log the exact message being sent
-    Logger.info("RequestTracker sending to OBS: #{request_msg}",
+    Logger.debug("RequestTracker sending to OBS: #{request_msg}",
       service: "obs",
       session_id: state.session_id,
       request_id: request_id
@@ -98,7 +98,7 @@ defmodule Server.Services.OBS.RequestTracker do
   def handle_cast({:response_received, response_data}, state) do
     request_id = response_data[:requestId]
 
-    Logger.info("RequestTracker received response",
+    Logger.debug("RequestTracker received response",
       service: "obs",
       session_id: state.session_id,
       request_id: request_id,

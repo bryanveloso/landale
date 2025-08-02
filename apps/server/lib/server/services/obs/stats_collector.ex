@@ -93,7 +93,7 @@ defmodule Server.Services.OBS.StatsCollector do
   end
 
   def handle_info({:version_received, version_data}, state) do
-    Logger.info("OBS version check successful, trying GetStats",
+    Logger.debug("OBS version check successful, trying GetStats",
       service: "obs",
       session_id: state.session_id,
       obs_version: version_data[:obsVersion]

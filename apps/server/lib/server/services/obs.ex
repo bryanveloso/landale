@@ -47,6 +47,10 @@ defmodule Server.Services.OBS do
           {:ok, _} ->
             {:ok, supervisor}
 
+          {:error, {:already_started, _}} ->
+            # Session already exists, this is fine
+            {:ok, supervisor}
+
           {:error, reason} ->
             Logger.warning("Failed to start default OBS session: #{inspect(reason)}")
             # Still return ok, session can be started later
