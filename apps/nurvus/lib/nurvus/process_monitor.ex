@@ -192,32 +192,9 @@ defmodule Nurvus.ProcessMonitor do
     # Get process status first
     case Nurvus.ProcessManager.get_process_status(process_id) do
       {:ok, :running} ->
-        # Try to get detailed info from ProcessRunner
-        # This is a simplified version - in a full implementation,
-        # we'd get the actual ProcessRunner pid and call get_info/1
-
-        timestamp = DateTime.utc_now()
-
-        # For now, return mock metrics
-        # In a real implementation, we'd collect:
-        # - CPU usage
-        # - Memory usage (RSS, VSZ)
-        # - File descriptors
-        # - Network connections
-        # - Uptime
-
-        metrics = %{
-          timestamp: timestamp,
-          # Mock CPU usage 0-10%
-          cpu_percent: :rand.uniform() * 10,
-          # Mock memory 50-150MB
-          memory_mb: :rand.uniform(100) + 50,
-          # Mock uptime
-          uptime_seconds: :rand.uniform(3600),
-          file_descriptors: :rand.uniform(20),
-          status: :healthy
-        }
-
+        # For now, just return base metrics
+        # TODO: Add health check integration once ProcessManager exposes config
+        metrics = collect_base_metrics(process_id)
         {:ok, metrics}
 
       _ ->
@@ -297,5 +274,29 @@ defmodule Nurvus.ProcessMonitor do
     # Add new alerts to existing ones (keep last 50)
     all_alerts = alerts ++ existing_alerts
     Enum.take(all_alerts, 50)
+  end
+
+  defp collect_base_metrics(_process_id) do
+    timestamp = DateTime.utc_now()
+
+    # For now, return mock metrics
+    # In a real implementation, we'd collect:
+    # - CPU usage via platform-specific tools
+    # - Memory usage (RSS, VSZ)
+    # - File descriptors
+    # - Network connections
+    # - Uptime from process start time
+
+    %{
+      timestamp: timestamp,
+      # Mock CPU usage 0-10%
+      cpu_percent: :rand.uniform() * 10,
+      # Mock memory 50-150MB
+      memory_mb: :rand.uniform(100) + 50,
+      # Mock uptime
+      uptime_seconds: :rand.uniform(3600),
+      file_descriptors: :rand.uniform(20),
+      status: :healthy
+    }
   end
 end

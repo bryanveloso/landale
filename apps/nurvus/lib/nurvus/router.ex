@@ -24,14 +24,51 @@ defmodule Nurvus.Router do
 
   # Health check endpoint
   get "/health" do
+    # Get process statuses to determine health
+    {:ok, processes} = Nurvus.list_processes()
+
+    # Count statuses
+    running_count = Enum.count(processes, &(&1.status == :running))
+    total_count = length(processes)
+
+    # Get system status
+    {:ok, system_status} = Nurvus.system_status()
+
+    # Determine overall health
+    health_status =
+      cond do
+        # No processes configured is OK
+        total_count == 0 -> "healthy"
+        # All processes down
+        running_count == 0 -> "unhealthy"
+        # Some processes down
+        running_count < total_count -> "degraded"
+        # All processes running
+        true -> "healthy"
+      end
+
+    # Get uptime
+    start_time = Application.get_env(:nurvus, :start_time, System.system_time(:second))
+    uptime_seconds = System.system_time(:second) - start_time
+
     response = %{
-      status: "ok",
+      status: health_status,
       service: "nurvus",
+      timestamp: System.system_time(:second),
+      uptime_seconds: uptime_seconds,
       version: "0.1.0",
-      timestamp: DateTime.utc_now()
+      processes: %{
+        total: total_count,
+        running: running_count,
+        stopped: total_count - running_count
+      },
+      alerts: system_status.alerts
     }
 
-    send_json_response(conn, 200, response)
+    # Return appropriate status code
+    status_code = if health_status == "healthy", do: 200, else: 503
+
+    send_json_response(conn, status_code, response)
   end
 
   # System status endpoint

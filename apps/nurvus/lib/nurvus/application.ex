@@ -7,6 +7,9 @@ defmodule Nurvus.Application do
 
   @impl true
   def start(_type, _args) do
+    # Store start time for health checks
+    Application.put_env(:nurvus, :start_time, System.system_time(:second))
+
     children = [
       # Local process registry using standard Elixir Registry
       {Registry, [keys: :unique, name: Nurvus.ProcessRegistry]},

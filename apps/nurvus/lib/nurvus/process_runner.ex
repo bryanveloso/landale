@@ -83,6 +83,18 @@ defmodule Nurvus.ProcessRunner do
 
         new_state = %{state | port: port, os_pid: os_pid, start_time: DateTime.utc_now()}
 
+        # Check if health check is configured
+        case state.config[:health_check] do
+          %{"url" => _url} = health_config ->
+            # Schedule health check after process startup
+            startup_delay = Map.get(health_config, "startup_delay", 2000)
+            Process.send_after(self(), :check_startup_health, startup_delay)
+
+          _ ->
+            # No health check configured
+            :ok
+        end
+
         {:noreply, new_state}
 
       {:error, reason} ->
@@ -148,6 +160,34 @@ defmodule Nurvus.ProcessRunner do
   end
 
   @impl true
+  def handle_info(:check_startup_health, state) do
+    case state.config[:health_check] do
+      %{"url" => url} = health_config ->
+        max_retries = Map.get(health_config, "startup_retries", 10)
+        retry_interval = Map.get(health_config, "startup_interval", 2000)
+
+        Logger.info("Checking health for #{state.config.name} at #{url}")
+
+        # Spawn a task to check health without blocking the process
+        Task.start(fn ->
+          case Nurvus.HealthChecker.wait_for_healthy(url, max_retries, retry_interval) do
+            :ok ->
+              Logger.info("#{state.config.name} is healthy and ready")
+
+            {:error, :max_retries_exceeded} ->
+              Logger.error(
+                "#{state.config.name} failed health checks after #{max_retries} attempts"
+              )
+          end
+        end)
+
+      _ ->
+        :ok
+    end
+
+    {:noreply, state}
+  end
+
   def handle_info({port, {:data, data}}, %{port: port} = state) do
     output = format_process_output(data)
     log_process_output(output, state.config.name)
