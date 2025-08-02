@@ -390,7 +390,8 @@ defmodule Server.Services.Twitch.ApiClient do
     end
   end
 
-  defp send_http_request(method, path, params, %{access_token: access_token, client_id: client_id} = _token) do
+  defp send_http_request(method, path, params, %{access_token: access_token} = _token) do
+    client_id = Application.get_env(:server, :twitch_client_id)
     url = @api_base_url <> path
 
     headers = [
