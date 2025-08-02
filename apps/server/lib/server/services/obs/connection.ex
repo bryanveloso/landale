@@ -463,7 +463,8 @@ defmodule Server.Services.OBS.Connection do
     case get_request_tracker(state.session_id) do
       {:ok, tracker} ->
         # Delegate to RequestTracker for proper tracking
-        GenServer.call(tracker, {:send_request, request_type, request_data, from, state.ws_conn})
+        # Use cast to avoid blocking - RequestTracker will reply to the original caller
+        GenServer.cast(tracker, {:send_request, request_type, request_data, from, state.ws_conn})
         {:noreply, state}
 
       {:error, reason} ->

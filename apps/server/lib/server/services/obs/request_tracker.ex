@@ -33,9 +33,8 @@ defmodule Server.Services.OBS.RequestTracker do
   end
 
   @impl true
-  def handle_call(
+  def handle_cast(
         {:send_request, request_type, request_data, original_from, ws_conn},
-        from,
         state
       ) do
     # Generate request ID
@@ -66,8 +65,7 @@ defmodule Server.Services.OBS.RequestTracker do
         timer_ref = Process.send_after(self(), {:request_timeout, request_id}, @request_timeout)
 
         request_info = %{
-          from: from,
-          original_from: original_from,
+          from: original_from,
           type: request_type,
           data: request_data,
           timer: timer_ref,
@@ -80,7 +78,6 @@ defmodule Server.Services.OBS.RequestTracker do
             next_id: state.next_id + 1
         }
 
-        # Don't reply yet - will reply when response arrives
         {:noreply, state}
 
       {:error, reason} ->
@@ -91,7 +88,9 @@ defmodule Server.Services.OBS.RequestTracker do
           reason: reason
         )
 
-        {:reply, {:error, reason}, state}
+        # Reply to the original caller with the error
+        GenServer.reply(original_from, {:error, reason})
+        {:noreply, state}
     end
   end
 
