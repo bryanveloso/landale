@@ -161,6 +161,14 @@ defmodule Server.Services.OBS.Connection do
 
   @impl true
   def handle_info({WebSocketConnection, _pid, {:websocket_frame, {:text, frame}}}, state) do
+    # Log ALL incoming frames for debugging
+    Logger.info("OBS WebSocket frame received",
+      service: "obs",
+      session_id: state.session_id,
+      state: state.state,
+      frame_preview: String.slice(frame, 0, 200)
+    )
+
     case state.state do
       :connected ->
         # Expecting server Hello
