@@ -350,7 +350,7 @@ defmodule Server.Services.Twitch.ApiClient do
 
   defp make_api_request(state, method, path, params) do
     with :ok <- check_rate_limit(state),
-         {:ok, %{access_token: _, client_id: _} = token} <- Server.OAuthService.get_valid_token(:twitch),
+         {:ok, token} <- Server.OAuthService.get_valid_token(:twitch),
          {:ok, response} <- send_http_request(method, path, params, token) do
       # Update last API call time
       send(self(), {:update_last_api_call, DateTime.utc_now()})
