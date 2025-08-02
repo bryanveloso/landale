@@ -40,6 +40,11 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
       }
     })
 
+    // Clear references to prevent memory leaks
+    Object.keys(layerContexts).forEach((key) => {
+      layerContexts[key as LayerPriority] = null
+    })
+
     // Clean up main context
     ctx.revert()
   })
@@ -74,6 +79,8 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
 
   // Register a layer element for animation
   const registerLayer = (priority: LayerPriority, element: HTMLElement) => {
+    if (!element) return // Guard against null elements
+
     layerElements[priority] = element
 
     // Create per-layer context for animation management
@@ -100,6 +107,19 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
     }
   }
 
+  // Helper function to safely clean up and recreate a layer's animation context
+  const cleanupLayerContext = (priority: LayerPriority) => {
+    const layerCtx = layerContexts[priority]
+    if (layerCtx) {
+      layerCtx.revert()
+      // Immediately recreate the context to prevent null reference issues
+      const element = layerElements[priority]
+      if (element) {
+        layerContexts[priority] = gsap.context(() => {}, element)
+      }
+    }
+  }
+
   // Update layer state and trigger appropriate animation
   const updateLayerState = (priority: LayerPriority, newState: LayerState, content?: unknown) => {
     setLayerStates((prev) => ({
@@ -118,10 +138,7 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
     element.setAttribute('data-state', newState)
 
     // Kill any existing animations for this layer before starting new ones
-    const layerCtx = layerContexts[priority]
-    if (layerCtx) {
-      layerCtx.revert()
-    }
+    cleanupLayerContext(priority)
 
     switch (newState) {
       case 'entering':

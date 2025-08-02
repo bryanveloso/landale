@@ -43,6 +43,17 @@ const mockTimeline = {
   kill: () => mockTimeline
 }
 
+// Mock GSAP context for memory leak testing
+const mockContext = {
+  add: (fn: () => void) => {
+    // Execute the function to trigger animations
+    fn()
+  },
+  revert: () => {
+    // Mock revert behavior
+  }
+}
+
 // @ts-expect-error - Mock GSAP globally
 globalThis.gsap = {
   set: () => {},
@@ -54,6 +65,11 @@ globalThis.gsap = {
       setTimeout(config.onComplete, 0)
     }
     return mockTimeline
+  },
+  context: (fn?: () => void, element?: HTMLElement) => {
+    // Call the function if provided (for initialization)
+    if (fn) fn()
+    return mockContext
   },
   killTweensOf: () => {}
 }
