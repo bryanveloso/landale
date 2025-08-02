@@ -536,12 +536,7 @@ defmodule Server.Services.OBS.Connection do
   end
 
   defp get_request_tracker(session_id) do
-    # In test environment, we use a simpler approach
-    tracker_name = :"obs_request_tracker_#{session_id}"
-
-    case Process.whereis(tracker_name) do
-      nil -> {:error, :tracker_not_found}
-      pid -> {:ok, pid}
-    end
+    # Use the supervisor to get the request tracker process
+    Server.Services.OBS.Supervisor.get_process(session_id, :request_tracker)
   end
 end
