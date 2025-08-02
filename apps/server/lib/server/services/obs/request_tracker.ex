@@ -18,7 +18,7 @@ defmodule Server.Services.OBS.RequestTracker do
   defstruct [
     :session_id,
     requests: %{},
-    next_id: 1
+    next_id: 1000
   ]
 
   def start_link(opts) do
@@ -51,6 +51,13 @@ defmodule Server.Services.OBS.RequestTracker do
 
     # Create request message
     request_msg = Protocol.encode_request(request_id, request_type, request_data)
+
+    # Log the exact message being sent
+    Logger.info("RequestTracker sending to OBS: #{request_msg}",
+      service: "obs",
+      session_id: state.session_id,
+      request_id: request_id
+    )
 
     # Send through WebSocketConnection
     case WebSocketConnection.send_data(ws_conn, request_msg) do

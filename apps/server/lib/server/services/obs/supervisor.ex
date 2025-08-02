@@ -50,8 +50,9 @@ defmodule Server.Services.OBS.Supervisor do
       {Task.Supervisor, name: via_tuple(session_id, :task_supervisor)}
     ]
 
-    # one_for_all - if connection dies, restart everything
-    Supervisor.init(children, strategy: :one_for_all)
+    # rest_for_one - if connection dies, restart everything after it
+    # but if StatsCollector crashes, don't restart the core services
+    Supervisor.init(children, strategy: :rest_for_one)
   end
 
   @doc """
