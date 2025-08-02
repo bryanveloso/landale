@@ -161,12 +161,14 @@ defmodule Server.Services.OBS.Connection do
 
   @impl true
   def handle_info({WebSocketConnection, _pid, {:websocket_frame, {:text, frame}}}, state) do
-    # Log ALL frames to debug the issue
-    Logger.info("OBS frame received: #{frame}",
-      service: "obs",
-      session_id: state.session_id,
-      state: state.state
-    )
+    # Log OBS responses to debug
+    if String.contains?(frame, "\"op\":7") do
+      Logger.info("OBS response frame received",
+        service: "obs",
+        session_id: state.session_id,
+        frame: frame
+      )
+    end
 
     case state.state do
       :connected ->
@@ -423,6 +425,7 @@ defmodule Server.Services.OBS.Connection do
       {:ok, %{op: 5} = event} ->
         # Event from OBS - broadcast it
         broadcast_obs_event(state, event.d)
+        {:noreply, state}
 
       {:ok, %{op: 7} = response} ->
         # Request response - forward to RequestTracker
@@ -434,6 +437,7 @@ defmodule Server.Services.OBS.Connection do
         )
 
         forward_response(state, response.d)
+        {:noreply, state}
 
       {:ok, msg} ->
         Logger.debug("Received OBS message",
@@ -442,15 +446,17 @@ defmodule Server.Services.OBS.Connection do
           session_id: state.session_id
         )
 
+        {:noreply, state}
+
       {:error, reason} ->
         Logger.error("Failed to decode OBS message",
           reason: inspect(reason),
           service: "obs",
           session_id: state.session_id
         )
-    end
 
-    {:noreply, state}
+        {:noreply, state}
+    end
   end
 
   defp send_obs_request(state, request_type, request_data, from) do
