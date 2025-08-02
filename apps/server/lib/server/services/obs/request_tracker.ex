@@ -33,7 +33,7 @@ defmodule Server.Services.OBS.RequestTracker do
   end
 
   @impl true
-  def handle_call({:track_and_send, request_type, request_data, ws_conn}, from, state) do
+  def handle_call({:send_request, request_type, request_data, from, ws_conn}, _from, state) do
     # Generate request ID
     request_id = to_string(state.next_id)
 
