@@ -20,6 +20,8 @@ defmodule ServerWeb.TelemetryChannel do
 
   @impl true
   def join("dashboard:telemetry", _payload, socket) do
+    Logger.info("TelemetryChannel join called")
+
     socket =
       socket
       |> setup_correlation_id()
@@ -33,26 +35,17 @@ defmodule ServerWeb.TelemetryChannel do
       "telemetry:services"
     ])
 
-    # Send initial telemetry snapshot after a short delay
-    Process.send_after(self(), :send_initial_telemetry, 100)
+    # Emit telemetry for this channel join
+    emit_joined_telemetry("dashboard:telemetry", socket)
+
+    # Client will explicitly request telemetry via push("get_telemetry")
+    # No need for unreliable timer-based push
 
     {:ok, socket}
   end
 
-  @impl true
-  def handle_info(:send_initial_telemetry, socket) do
-    Logger.info("Sending initial telemetry snapshot")
-    # Gather current telemetry data
-    telemetry_data = gather_telemetry_snapshot()
-    Logger.info("Initial telemetry data keys: #{inspect(Map.keys(telemetry_data))}")
-
-    push(socket, "telemetry_snapshot", telemetry_data)
-
-    # Start periodic telemetry updates
-    schedule_telemetry_update()
-
-    {:noreply, socket}
-  end
+  # Removed unreliable timer-based initial snapshot
+  # Client explicitly requests data via push("get_telemetry")
 
   @impl true
   def handle_info(:periodic_telemetry_update, socket) do

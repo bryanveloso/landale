@@ -63,14 +63,14 @@ defmodule ServerWeb.WebSocketStatsTracker do
   end
 
   @impl true
-  def handle_info({:telemetry_event, [:landale, :websocket, :connected], measurements, metadata}, state) do
+  def handle_info({:telemetry_event, [:landale, :websocket, :connected], _measurements, metadata}, state) do
     Logger.info("Telemetry: Socket connected", socket_id: metadata[:socket_id])
 
     state = %{
       state
       | total_connections: state.total_connections + 1,
         total_connects: state.total_connects + 1,
-        connection_times: Map.put(state.connection_times, metadata[:socket_id], measurements[:system_time])
+        connection_times: Map.put(state.connection_times, metadata[:socket_id], System.system_time(:millisecond))
     }
 
     {:noreply, state}
@@ -202,7 +202,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
     if map_size(state.connection_times) == 0 do
       0
     else
-      current_time = System.monotonic_time(:millisecond)
+      current_time = System.system_time(:millisecond)
 
       durations =
         Enum.map(state.connection_times, fn {_socket_id, start_time} ->

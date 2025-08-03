@@ -128,7 +128,7 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
         <div
           class="fixed inset-0 z-40 bg-black/50 transition-opacity duration-300"
           classList={{
-            'opacity-0': !props.isOpen && isAnimating(),
+            'opacity-0': !props.isOpen,
             'opacity-100': props.isOpen
           }}
           onClick={handleOverlayClick}
