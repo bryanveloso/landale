@@ -297,4 +297,112 @@ defmodule Server.Services.Twitch.ConnectionManagerTest do
       assert Process.alive?(manager)
     end
   end
+
+  describe "session reconnect handling" do
+    setup do
+      # Use a non-reachable URL to prevent real connections
+      {:ok, manager} =
+        ConnectionManager.start_link(
+          url: "wss://test.invalid/ws",
+          owner: self(),
+          headers: @cloudfront_headers,
+          client_id: "test_client_id",
+          name: nil
+        )
+
+      {:ok, manager: manager}
+    end
+
+    test "handles session_reconnect message and reconnects to new URL", %{manager: manager} do
+      # Create a fake ws_conn process that simulates WebSocketConnection
+      test_pid = self()
+
+      ws_conn =
+        spawn(fn ->
+          # Simple GenServer mock that handles disconnect
+          Process.register(self(), :test_ws_conn)
+
+          loop = fn loop_fn ->
+            receive do
+              {:"$gen_call", from, :disconnect} ->
+                # Reply like a GenServer would
+                GenServer.reply(from, :ok)
+                # Send notification to test process that disconnect was called
+                send(test_pid, :ws_disconnected)
+                # Exit normally
+                :ok
+
+              _ ->
+                loop_fn.(loop_fn)
+            end
+          end
+
+          loop.(loop)
+        end)
+
+      # Update manager state to simulate connected state
+      :sys.replace_state(manager, fn state ->
+        %{state | ws_conn: ws_conn, session_id: "test-session-id", connection_state: :ready}
+      end)
+
+      # Simulate session_reconnect message from Twitch
+      reconnect_message = %{
+        "metadata" => %{
+          "message_id" => "test-msg-id",
+          "message_type" => "session_reconnect",
+          "message_timestamp" => "2025-08-03T12:00:00Z"
+        },
+        "payload" => %{
+          "session" => %{
+            "id" => "test-session-id",
+            "status" => "reconnecting",
+            "reconnect_url" => "wss://new-eventsub.wss.twitch.tv/ws?session=new"
+          }
+        }
+      }
+
+      # Send the session_reconnect frame
+      send(
+        manager,
+        {WebSocketConnection, ws_conn, {:websocket_frame, {:text, Jason.encode!(reconnect_message)}}}
+      )
+
+      # Should receive session_reconnect notification
+      assert_receive {:twitch_connection, {:session_reconnect, "wss://new-eventsub.wss.twitch.tv/ws?session=new"}}
+
+      # Should schedule reconnection (wait a bit for the Process.send_after)
+      Process.sleep(1100)
+
+      # Should have called disconnect on the WebSocket
+      assert_receive :ws_disconnected
+
+      # Should have notified about disconnection
+      assert_receive {:twitch_connection, {:connection_state_changed, :disconnected}}
+
+      # Should start connecting to new URL
+      assert_receive {:twitch_connection, {:connection_state_changed, :connecting}}
+
+      # Verify the URL was updated
+      state = ConnectionManager.get_state(manager)
+      assert state.uri == "wss://new-eventsub.wss.twitch.tv/ws?session=new"
+    end
+
+    test "handles reconnect_to_new_url message directly", %{manager: manager} do
+      # Update manager state to simulate connected state
+      :sys.replace_state(manager, fn state ->
+        %{state | session_id: "test-session-id", connection_state: :ready}
+      end)
+
+      # Send direct reconnect_to_new_url message
+      send(manager, {:reconnect_to_new_url, "wss://new-url.twitch.tv/ws"})
+
+      # Should disconnect and reconnect
+      assert_receive {:twitch_connection, {:connection_state_changed, :disconnected}}
+      assert_receive {:twitch_connection, {:connection_state_changed, :connecting}}
+
+      # Verify the URL was updated
+      state = ConnectionManager.get_state(manager)
+      assert state.uri == "wss://new-url.twitch.tv/ws"
+    end
+  end
 end

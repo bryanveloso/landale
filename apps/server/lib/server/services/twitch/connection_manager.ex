@@ -8,6 +8,7 @@ defmodule Server.Services.Twitch.ConnectionManager do
   - Message routing to the parent Twitch service
   - Automatic reconnection with exponential backoff
   - CloudFront 400 error retry with user-agent rotation
+  - Session reconnection to new URLs for load balancing
 
   ## Architecture
 
@@ -21,7 +22,8 @@ defmodule Server.Services.Twitch.ConnectionManager do
   2. Receive session_welcome message with session_id
   3. Parent service creates subscriptions using session_id
   4. Handle incoming events and notifications
-  5. Reconnect on session_keepalive timeout or connection loss
+  5. Handle session_reconnect messages and migrate to new URLs
+  6. Reconnect on session_keepalive timeout or connection loss
 
   ## CloudFront Compatibility
 
@@ -291,6 +293,27 @@ defmodule Server.Services.Twitch.ConnectionManager do
     {:noreply, state}
   end
 
+  # Handle reconnection to new URL
+  @impl true
+  def handle_info({:reconnect_to_new_url, new_url}, state) do
+    Logger.info("[#{state.correlation_id}] Reconnecting to new Twitch EventSub URL",
+      old_url: state.uri,
+      new_url: new_url,
+      session_id: state.session_id
+    )
+
+    # Disconnect current connection
+    state = do_disconnect(state)
+
+    # Update URL
+    state = %{state | uri: new_url}
+
+    # Connect to new URL
+    state = do_connect(state)
+
+    {:noreply, state}
+  end
+
   @impl true
   def handle_info(msg, state) do
     Logger.debug("[#{state.correlation_id}] Unhandled message",
@@ -432,7 +455,9 @@ defmodule Server.Services.Twitch.ConnectionManager do
     # Notify owner
     notify_owner(state, {:session_reconnect, reconnect_url})
 
-    # TODO: Implement reconnection to new URL
+    # Schedule reconnection to new URL
+    Process.send_after(self(), {:reconnect_to_new_url, reconnect_url}, 1000)
+
     state
   end
 
