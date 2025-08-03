@@ -1,8 +1,40 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Manager, WindowEvent,
+    Manager, WindowEvent, WebviewWindowBuilder, WebviewUrl,
 };
+
+#[tauri::command]
+async fn create_telemetry_window(app: tauri::AppHandle) -> Result<(), String> {
+    // Check if telemetry window already exists
+    if app.get_webview_window("telemetry").is_some() {
+        // If it exists, just focus it
+        if let Some(window) = app.get_webview_window("telemetry") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+        return Ok(());
+    }
+
+    // Create new telemetry window
+    let telemetry_window = WebviewWindowBuilder::new(
+        &app,
+        "telemetry",
+        WebviewUrl::App("#/telemetry".into())
+    )
+    .title("Landale Telemetry")
+    .inner_size(1200.0, 800.0)
+    .min_inner_size(800.0, 600.0)
+    .resizable(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    // Show and focus the new window
+    let _ = telemetry_window.show();
+    let _ = telemetry_window.set_focus();
+
+    Ok(())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -62,6 +94,7 @@ pub fn run() {
 
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![create_telemetry_window])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

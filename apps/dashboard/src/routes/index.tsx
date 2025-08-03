@@ -7,7 +7,6 @@ import { DebugDrawer } from '@/components/debug-drawer'
 import { StatusBar } from '@/components/status-bar'
 import { ConnectionMonitor } from '@/components/error-boundary'
 import { ActivityLogPanel } from '@/components/activity-log-panel'
-import { ConnectionTelemetry } from '@/components/connection-telemetry'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -25,7 +24,6 @@ function Index() {
           <StreamQueue />
           <ActivityLogPanel />
           <LayerStateMonitor />
-          <ConnectionTelemetry />
         </div>
 
         <StatusBar />

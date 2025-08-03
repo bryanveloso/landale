@@ -33,16 +33,18 @@ defmodule ServerWeb.TelemetryChannel do
       "telemetry:services"
     ])
 
-    # Send initial telemetry snapshot
-    send_after_join(socket, :send_initial_telemetry)
+    # Send initial telemetry snapshot after a short delay
+    Process.send_after(self(), :send_initial_telemetry, 100)
 
     {:ok, socket}
   end
 
   @impl true
   def handle_info(:send_initial_telemetry, socket) do
+    Logger.info("Sending initial telemetry snapshot")
     # Gather current telemetry data
     telemetry_data = gather_telemetry_snapshot()
+    Logger.info("Initial telemetry data keys: #{inspect(Map.keys(telemetry_data))}")
 
     push(socket, "telemetry_snapshot", telemetry_data)
 
@@ -119,7 +121,9 @@ defmodule ServerWeb.TelemetryChannel do
 
   @impl true
   def handle_in("get_telemetry", _params, socket) do
+    Logger.info("Received get_telemetry request")
     telemetry_data = gather_telemetry_snapshot()
+    Logger.info("Gathered telemetry data: #{inspect(Map.keys(telemetry_data))}")
     {:reply, {:ok, telemetry_data}, socket}
   end
 

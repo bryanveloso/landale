@@ -150,49 +150,43 @@ export function ConnectionTelemetry() {
   }
 
   return (
-    <div class="rounded-lg bg-gray-800 p-4">
-      <div class="mb-4 flex items-center justify-between">
-        <h3 class="text-lg font-semibold">Connection Telemetry</h3>
-        <button onClick={() => setIsExpanded(!isExpanded())} class="text-sm text-gray-400 hover:text-white">
-          {isExpanded() ? 'Show Less' : 'Show More'}
+    <div class="border-b border-gray-800 bg-gray-900">
+      <div class="flex items-center justify-between p-3">
+        <h3 class="text-xs font-medium text-gray-300">Connection Status</h3>
+        <button onClick={() => setIsExpanded(!isExpanded())} class="text-xs text-gray-500 hover:text-gray-300">
+          {isExpanded() ? '−' : '+'}
         </button>
       </div>
 
       {/* Summary View */}
-      <div class="mb-4 grid grid-cols-2 gap-4">
-        <div>
-          <span class="text-sm text-gray-400">System Status</span>
-          <div class="flex items-center gap-2">
-            <span class={systemHealth()?.status === 'healthy' ? 'text-green-500' : 'text-yellow-500'}>
-              {getHealthIcon(systemHealth()?.status)} {systemHealth()?.status || 'Unknown'}
-            </span>
-          </div>
+      <div class="px-3 pb-3 text-xs text-gray-500">
+        <div class="flex justify-between py-0.5">
+          <span>Status:</span>
+          <span class={systemHealth()?.status === 'healthy' ? 'text-green-500' : 'text-yellow-500'}>
+            {systemHealth()?.status || 'Unknown'}
+          </span>
         </div>
-
-        <div>
-          <span class="text-sm text-gray-400">Uptime</span>
-          <div>{systemHealth()?.system ? formatUptime(systemHealth()!.system.uptime) : 'N/A'}</div>
+        <div class="flex justify-between py-0.5">
+          <span>Uptime:</span>
+          <span>{systemHealth()?.system ? formatUptime(systemHealth()!.system.uptime) : 'N/A'}</span>
         </div>
       </div>
 
-      {/* Service Status Grid */}
-      <div class="space-y-2">
-        <h4 class="text-sm font-medium text-gray-400">Services</h4>
-        <div class="grid grid-cols-1 gap-2">
+      {/* Service Status */}
+      <div class="px-3 pb-3">
+        <div class="text-xs text-gray-500">
           <For each={serviceHealth()}>
             {(service) => (
-              <div class="flex items-center justify-between rounded bg-gray-700 p-2">
-                <div class="flex items-center gap-2">
+              <div class="flex items-center justify-between py-0.5">
+                <div class="flex items-center gap-1.5">
                   <span class={getStatusColor(service.connected)}>{service.connected ? '●' : '○'}</span>
-                  <span class="font-medium">{service.name}</span>
+                  <span>{service.name}</span>
                 </div>
-
                 <Show when={service.error}>
-                  <span class="text-xs text-red-400">{service.error}</span>
+                  <span class="text-red-500">{service.error}</span>
                 </Show>
-
                 <Show when={!service.error && service.connected && service.reconnectAttempts}>
-                  <span class="text-xs text-gray-400">Reconnects: {service.reconnectAttempts}</span>
+                  <span class="text-gray-600">R:{service.reconnectAttempts}</span>
                 </Show>
               </div>
             )}
@@ -200,58 +194,51 @@ export function ConnectionTelemetry() {
         </div>
       </div>
 
-      {/* Expanded Telemetry Details */}
+      {/* Expanded Details */}
       <Show when={isExpanded()}>
-        <div class="mt-4 border-t border-gray-700 pt-4">
-          <h4 class="mb-2 text-sm font-medium text-gray-400">Detailed Metrics</h4>
-
-          {/* WebSocket Metrics */}
-          <div class="space-y-2 text-sm">
-            <div class="grid grid-cols-2 gap-2">
-              <span class="text-gray-400">Connection State:</span>
+        <div class="border-t border-gray-800 px-3 pt-2 pb-3">
+          <div class="space-y-1 text-xs text-gray-600">
+            <div class="flex justify-between">
+              <span>Connection:</span>
               <span class={getStatusColor(connectionState().connected)}>
                 {connectionState().connected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
 
             <Show when={connectionState().reconnectAttempts > 0}>
-              <div class="grid grid-cols-2 gap-2">
-                <span class="text-gray-400">Reconnect Attempts:</span>
+              <div class="flex justify-between">
+                <span>Reconnects:</span>
                 <span>{connectionState().reconnectAttempts}</span>
               </div>
             </Show>
 
             <Show when={connectionState().lastHeartbeat}>
-              <div class="grid grid-cols-2 gap-2">
-                <span class="text-gray-400">Last Heartbeat:</span>
-                <span>{formatTimestamp(connectionState().lastHeartbeat)}</span>
+              <div class="flex justify-between">
+                <span>Last Heartbeat:</span>
+                <span class="font-mono">{formatTimestamp(connectionState().lastHeartbeat)}</span>
               </div>
             </Show>
 
             <Show when={connectionState().lastConnected}>
-              <div class="grid grid-cols-2 gap-2">
-                <span class="text-gray-400">Last Connected:</span>
-                <span>{formatTimestamp(connectionState().lastConnected)}</span>
+              <div class="flex justify-between">
+                <span>Connected:</span>
+                <span class="font-mono">{formatTimestamp(connectionState().lastConnected)}</span>
               </div>
             </Show>
 
-            {/* System Info */}
             <Show when={systemHealth()?.system}>
-              <div class="mt-2 border-t border-gray-700 pt-2">
-                <div class="grid grid-cols-2 gap-2">
-                  <span class="text-gray-400">Environment:</span>
+              <div class="mt-1 border-t border-gray-800 pt-1">
+                <div class="flex justify-between">
+                  <span>Environment:</span>
                   <span>{systemHealth()!.system!.environment}</span>
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                  <span class="text-gray-400">Version:</span>
+                <div class="flex justify-between">
+                  <span>Version:</span>
                   <span>{systemHealth()!.system!.version}</span>
                 </div>
               </div>
             </Show>
           </div>
-
-          {/* Last Update */}
-          <div class="mt-4 text-xs text-gray-500">Last updated: {formatTimestamp(lastUpdate())}</div>
         </div>
       </Show>
     </div>
