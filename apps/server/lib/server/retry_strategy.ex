@@ -147,32 +147,19 @@ defmodule Server.RetryStrategy do
   """
   @spec retry_with_circuit_breaker(atom(), retry_function(), retry_opts()) :: retry_result()
   def retry_with_circuit_breaker(service_name, fun, opts \\ []) do
-    case get_circuit_state(service_name) do
-      :closed ->
-        case retry(fun, opts) do
-          {:ok, result} ->
-            record_success(service_name)
-            {:ok, result}
+    # Use CircuitBreakerServer instead of ETS-based implementation
+    circuit_config = %{
+      failure_threshold: Keyword.get(opts, :circuit_failure_threshold, 5),
+      timeout_ms: Keyword.get(opts, :circuit_timeout_ms, 60_000),
+      reset_timeout_ms: Keyword.get(opts, :circuit_reset_timeout_ms, 30_000),
+      success_threshold: Keyword.get(opts, :circuit_success_threshold, 2)
+    }
 
-          {:error, _reason} = error ->
-            record_failure(service_name)
-            error
-        end
-
-      :open ->
-        {:error, :circuit_open}
-
-      :half_open ->
-        case retry(fun, Keyword.put(opts, :max_attempts, 1)) do
-          {:ok, result} ->
-            close_circuit(service_name)
-            {:ok, result}
-
-          {:error, reason} ->
-            open_circuit(service_name)
-            {:error, reason}
-        end
-    end
+    Server.CircuitBreakerServer.call(
+      service_name,
+      fn -> retry(fun, opts) end,
+      circuit_config
+    )
   end
 
   # Private functions
@@ -353,59 +340,6 @@ defmodule Server.RetryStrategy do
     :telemetry.execute(event, %{}, metadata)
   end
 
-  # Circuit breaker implementation (simple in-memory state)
-  # In production, this could be backed by Redis or ETS for persistence
-
-  defp get_circuit_state(service_name) do
-    case :ets.lookup(:circuit_breaker_state, service_name) do
-      [{^service_name, state, _timestamp}] -> state
-      [] -> :closed
-    end
-  end
-
-  defp record_success(service_name) do
-    ensure_circuit_table()
-    :ets.insert(:circuit_breaker_state, {service_name, :closed, System.system_time(:second)})
-  end
-
-  defp record_failure(service_name) do
-    ensure_circuit_table()
-
-    # Simple logic: open circuit after any failure, close after 60 seconds
-    current_time = System.system_time(:second)
-
-    case :ets.lookup(:circuit_breaker_state, service_name) do
-      [{^service_name, :open, timestamp}] when current_time - timestamp > 60 ->
-        :ets.insert(:circuit_breaker_state, {service_name, :half_open, current_time})
-
-      [{^service_name, :closed, _}] ->
-        :ets.insert(:circuit_breaker_state, {service_name, :open, current_time})
-
-      [] ->
-        :ets.insert(:circuit_breaker_state, {service_name, :open, current_time})
-
-      _ ->
-        :ok
-    end
-  end
-
-  defp open_circuit(service_name) do
-    ensure_circuit_table()
-    :ets.insert(:circuit_breaker_state, {service_name, :open, System.system_time(:second)})
-  end
-
-  defp close_circuit(service_name) do
-    ensure_circuit_table()
-    :ets.insert(:circuit_breaker_state, {service_name, :closed, System.system_time(:second)})
-  end
-
-  defp ensure_circuit_table do
-    case :ets.whereis(:circuit_breaker_state) do
-      :undefined ->
-        :ets.new(:circuit_breaker_state, [:set, :protected, :named_table])
-
-      _ ->
-        :ok
-    end
-  end
+  # Circuit breaker functionality has been moved to Server.CircuitBreakerServer
+  # for better state management and atomic operations
 end
