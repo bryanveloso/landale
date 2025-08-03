@@ -63,7 +63,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
   end
 
   @impl true
-  def handle_info({:telemetry_event, [:phoenix, :socket_connected], measurements, metadata}, state) do
+  def handle_info({:telemetry_event, [:landale, :websocket, :connected], measurements, metadata}, state) do
     Logger.debug("Socket connected", socket_id: metadata[:socket_id])
 
     state = %{
@@ -77,7 +77,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
   end
 
   @impl true
-  def handle_info({:telemetry_event, [:phoenix, :socket_disconnected], _measurements, metadata}, state) do
+  def handle_info({:telemetry_event, [:landale, :websocket, :disconnected], _measurements, metadata}, state) do
     Logger.debug("Socket disconnected", socket_id: metadata[:socket_id])
 
     state = %{
@@ -91,7 +91,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
   end
 
   @impl true
-  def handle_info({:telemetry_event, [:phoenix, :channel_joined], _measurements, metadata}, state) do
+  def handle_info({:telemetry_event, [:landale, :channel, :joined], _measurements, metadata}, state) do
     channel_type = extract_channel_type(metadata[:topic])
     Logger.debug("Channel joined", topic: metadata[:topic], channel_type: channel_type)
 
@@ -106,7 +106,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
   end
 
   @impl true
-  def handle_info({:telemetry_event, [:phoenix, :channel_left], _measurements, metadata}, state) do
+  def handle_info({:telemetry_event, [:landale, :channel, :left], _measurements, metadata}, state) do
     channel_type = extract_channel_type(metadata[:topic])
     Logger.debug("Channel left", topic: metadata[:topic], channel_type: channel_type)
 
@@ -140,10 +140,10 @@ defmodule ServerWeb.WebSocketStatsTracker do
 
   defp attach_telemetry_handlers do
     events = [
-      [:phoenix, :socket_connected],
-      [:phoenix, :socket_disconnected],
-      [:phoenix, :channel_joined],
-      [:phoenix, :channel_left]
+      [:landale, :websocket, :connected],
+      [:landale, :websocket, :disconnected],
+      [:landale, :channel, :joined],
+      [:landale, :channel, :left]
     ]
 
     :telemetry.attach_many(

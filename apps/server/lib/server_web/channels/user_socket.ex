@@ -36,7 +36,7 @@ defmodule ServerWeb.UserSocket do
 
     # Emit telemetry event for WebSocket connection
     :telemetry.execute(
-      [:phoenix, :socket_connected],
+      [:landale, :websocket, :connected],
       %{system_time: System.system_time()},
       %{socket_id: correlation_id}
     )

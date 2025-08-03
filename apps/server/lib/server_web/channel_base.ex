@@ -48,7 +48,7 @@ defmodule ServerWeb.ChannelBase do
       # Helper to emit telemetry after successful join
       def emit_joined_telemetry(topic, socket) do
         :telemetry.execute(
-          [:phoenix, :channel_joined],
+          [:landale, :channel, :joined],
           %{system_time: System.system_time()},
           %{
             topic: topic,
@@ -61,7 +61,7 @@ defmodule ServerWeb.ChannelBase do
       def emit_left_telemetry(socket) do
         if Map.has_key?(socket, :topic) do
           :telemetry.execute(
-            [:phoenix, :channel_left],
+            [:landale, :channel, :left],
             %{system_time: System.system_time()},
             %{
               topic: socket.topic,
