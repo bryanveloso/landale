@@ -95,6 +95,60 @@ defmodule Server.Services.OBS.RequestTracker do
   end
 
   @impl true
+  def handle_cast(
+        {:send_batch_request, requests, options, original_from, ws_conn},
+        state
+      ) do
+    # Generate batch request ID
+    batch_request_id = to_string(state.next_id)
+
+    Logger.debug("RequestTracker sending batch request",
+      service: "obs",
+      session_id: state.session_id,
+      batch_request_id: batch_request_id,
+      request_count: length(requests)
+    )
+
+    # Create batch request message
+    batch_msg = Protocol.encode_batch_request(batch_request_id, requests, options)
+
+    # Send through WebSocketConnection
+    case WebSocketConnection.send_data(ws_conn, batch_msg) do
+      :ok ->
+        # Track the batch request
+        timer_ref = Process.send_after(self(), {:request_timeout, batch_request_id}, @request_timeout)
+
+        request_info = %{
+          from: original_from,
+          type: :batch_request,
+          data: %{requests: requests, options: options},
+          timer: timer_ref,
+          sent_at: System.monotonic_time(:millisecond)
+        }
+
+        state = %{
+          state
+          | requests: Map.put(state.requests, batch_request_id, request_info),
+            next_id: state.next_id + 1
+        }
+
+        {:noreply, state}
+
+      {:error, reason} ->
+        Logger.error("RequestTracker failed to send batch to WebSocket",
+          service: "obs",
+          session_id: state.session_id,
+          batch_request_id: batch_request_id,
+          reason: reason
+        )
+
+        # Reply to the original caller with the error
+        GenServer.reply(original_from, {:error, reason})
+        {:noreply, state}
+    end
+  end
+
+  @impl true
   def handle_cast({:response_received, response_data}, state) do
     request_id = response_data[:requestId]
 
@@ -134,14 +188,8 @@ defmodule Server.Services.OBS.RequestTracker do
           latency_ms: latency
         )
 
-        # Reply to caller
-        result =
-          if response_data[:requestStatus][:result] do
-            {:ok, response_data[:responseData]}
-          else
-            {:error, response_data[:requestStatus]}
-          end
-
+        # Reply to caller based on request type
+        result = parse_response(request_info.type, response_data)
         GenServer.reply(request_info.from, result)
 
         # Remove from tracking
@@ -169,6 +217,36 @@ defmodule Server.Services.OBS.RequestTracker do
 
         state = %{state | requests: Map.delete(state.requests, request_id)}
         {:noreply, state}
+    end
+  end
+
+  # Private functions
+
+  defp parse_response(:batch_request, response_data) do
+    if response_data[:results] do
+      # Handle batch response - return list of results
+      results =
+        Enum.map(response_data[:results], fn result ->
+          parse_single_result(result)
+        end)
+
+      {:ok, results}
+    else
+      # Fallback for single response format
+      parse_single_result(response_data)
+    end
+  end
+
+  defp parse_response(_, response_data) do
+    # Regular request response
+    parse_single_result(response_data)
+  end
+
+  defp parse_single_result(result) do
+    if result[:requestStatus][:result] do
+      {:ok, result[:responseData]}
+    else
+      {:error, result[:requestStatus]}
     end
   end
 end

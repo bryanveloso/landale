@@ -60,6 +60,13 @@ defmodule Server.Services.OBS.Connection do
   end
 
   @doc """
+  Send a batch of requests to OBS. Will queue if not ready.
+  """
+  def send_batch_request(conn, requests, options \\ %{}) do
+    GenServer.call(conn, {:send_batch_request, requests, options})
+  end
+
+  @doc """
   Get current connection state.
   """
   def get_state(conn) do
@@ -102,6 +109,20 @@ defmodule Server.Services.OBS.Connection do
       _ ->
         # Queue the request
         state = queue_request(state, {:request, request_type, request_data, from})
+        {:noreply, state}
+    end
+  end
+
+  @impl true
+  def handle_call({:send_batch_request, requests, options}, from, state) do
+    case state.state do
+      :ready ->
+        # Forward to RequestTracker for tracking and sending
+        send_obs_batch_request(state, requests, options, from)
+
+      _ ->
+        # Queue the batch request
+        state = queue_request(state, {:batch_request, requests, options, from})
         {:noreply, state}
     end
   end
@@ -430,6 +451,17 @@ defmodule Server.Services.OBS.Connection do
         forward_response(state, response.d)
         {:noreply, state}
 
+      {:ok, %{op: 9} = batch_response} ->
+        # Batch request response - forward to RequestTracker
+        Logger.debug("Connection received OBS batch response",
+          service: "obs",
+          session_id: state.session_id,
+          request_id: batch_response.d[:requestId]
+        )
+
+        forward_response(state, batch_response.d)
+        {:noreply, state}
+
       {:ok, msg} ->
         Logger.debug("Received OBS message",
           message: inspect(msg),
@@ -463,6 +495,19 @@ defmodule Server.Services.OBS.Connection do
     end
   end
 
+  defp send_obs_batch_request(state, requests, options, from) do
+    case get_request_tracker(state.session_id) do
+      {:ok, tracker} ->
+        # Delegate to RequestTracker for proper tracking
+        # Use cast to avoid blocking - RequestTracker will reply to the original caller
+        GenServer.cast(tracker, {:send_batch_request, requests, options, from, state.ws_conn})
+        {:noreply, state}
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
+  end
+
   defp queue_request(state, request) do
     %{state | pending_messages: state.pending_messages ++ [request]}
   end
@@ -472,6 +517,10 @@ defmodule Server.Services.OBS.Connection do
       {:request, type, data, from} ->
         # Process the queued request using the same mechanism as send_obs_request
         send_obs_request(state, type, data, from)
+
+      {:batch_request, requests, options, from} ->
+        # Process the queued batch request
+        send_obs_batch_request(state, requests, options, from)
     end)
 
     %{state | pending_messages: []}

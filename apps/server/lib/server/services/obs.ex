@@ -221,9 +221,10 @@ defmodule Server.Services.OBS do
   end
 
   @impl true
-  def send_batch_request(_requests, _options \\ %{}) do
-    # TODO: Implement batch request handling
-    {:error, :not_implemented}
+  def send_batch_request(requests, options \\ %{}) do
+    with {:ok, conn} <- get_connection() do
+      Server.Services.OBS.Connection.send_batch_request(conn, requests, options)
+    end
   end
 
   @impl true
