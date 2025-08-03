@@ -180,7 +180,7 @@ defmodule Server.Services.Twitch.MessageRouter do
     end
   end
 
-  defp handle_revocation(message, _router_state) do
+  defp handle_revocation(message, router_state) do
     subscription = message["payload"]["subscription"]
 
     Logger.warning("Subscription revoked",
@@ -190,7 +190,15 @@ defmodule Server.Services.Twitch.MessageRouter do
       condition: subscription["condition"]
     )
 
-    # TODO: Notify SessionManager to remove subscription from tracking
+    # Notify SessionManager to remove subscription from tracking
+    if router_state.session_manager do
+      SessionManager.handle_subscription_revoked(
+        router_state.session_manager,
+        subscription["id"],
+        subscription
+      )
+    end
+
     :ok
   end
 

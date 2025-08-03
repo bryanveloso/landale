@@ -115,6 +115,13 @@ defmodule Server.Services.Twitch.SessionManager do
   end
 
   @doc """
+  Handles subscription revocation notification from Twitch.
+  """
+  def handle_subscription_revoked(manager \\ __MODULE__, subscription_id, subscription_data) do
+    GenServer.cast(manager, {:subscription_revoked, subscription_id, subscription_data})
+  end
+
+  @doc """
   Gets current session state.
   """
   def get_state(manager \\ __MODULE__) do
@@ -236,6 +243,23 @@ defmodule Server.Services.Twitch.SessionManager do
 
     # Notify owner
     notify_owner(state, :session_ended)
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({:subscription_revoked, subscription_id, subscription_data}, state) do
+    Logger.info("Subscription revoked notification received",
+      subscription_id: subscription_id,
+      subscription_type: subscription_data["type"],
+      status: subscription_data["status"]
+    )
+
+    # Remove from tracked subscriptions
+    state = %{state | subscriptions: Map.delete(state.subscriptions, subscription_id)}
+
+    # Notify owner about the revocation
+    notify_owner(state, {:subscription_revoked, subscription_id, subscription_data})
 
     {:noreply, state}
   end
