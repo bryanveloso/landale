@@ -149,7 +149,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
     case :telemetry.attach_many(
            "websocket-stats-tracker",
            events,
-           &handle_telemetry_event/4,
+           &__MODULE__.handle_telemetry_event/4,
            %{}
          ) do
       :ok ->
@@ -163,7 +163,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
         :telemetry.attach_many(
           "websocket-stats-tracker",
           events,
-          &handle_telemetry_event/4,
+          &__MODULE__.handle_telemetry_event/4,
           %{}
         )
 
@@ -173,7 +173,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
     end
   end
 
-  defp handle_telemetry_event(event, measurements, metadata, _config) do
+  def handle_telemetry_event(event, measurements, metadata, _config) do
     Logger.info("Telemetry handler called", event: event, metadata: metadata)
     # Forward telemetry events to our GenServer
     send(__MODULE__, {:telemetry_event, event, measurements, metadata})

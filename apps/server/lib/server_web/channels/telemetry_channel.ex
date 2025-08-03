@@ -26,6 +26,7 @@ defmodule ServerWeb.TelemetryChannel do
       socket
       |> setup_correlation_id()
       |> assign(:subscribed, true)
+      |> assign(:join_time, System.system_time(:second))
 
     # Subscribe to telemetry topics
     subscribe_to_topics([
@@ -114,9 +115,13 @@ defmodule ServerWeb.TelemetryChannel do
 
   @impl true
   def handle_in("get_telemetry", _params, socket) do
-    Logger.info("Received get_telemetry request")
+    Logger.info("Received get_telemetry request from dashboard")
     telemetry_data = gather_telemetry_snapshot()
-    Logger.info("Gathered telemetry data: #{inspect(Map.keys(telemetry_data))}")
+    Logger.info("Gathered telemetry data: #{inspect(telemetry_data)}")
+
+    # Also push the data immediately to ensure it's received
+    push(socket, "telemetry_update", telemetry_data)
+
     {:reply, {:ok, telemetry_data}, socket}
   end
 

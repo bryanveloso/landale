@@ -48,14 +48,11 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
         setPerformanceMetrics(data.performance)
       })
 
-      telemetryChannel.on('websocket_metrics', (data: any) => {
-        console.log('Received websocket_metrics:', data)
-        setWebsocketStats(data)
-      })
-
-      telemetryChannel.on('performance_metrics', (data: any) => {
-        console.log('Received performance_metrics:', data)
-        setPerformanceMetrics(data)
+      // Listen for telemetry updates from the server
+      telemetryChannel.on('telemetry_update', (data: any) => {
+        console.log('Received telemetry_update:', data)
+        if (data.websocket) setWebsocketStats(data.websocket)
+        if (data.performance) setPerformanceMetrics(data.performance)
       })
 
       telemetryChannel
