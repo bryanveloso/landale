@@ -58,6 +58,9 @@ defmodule ServerWeb.DashboardChannel do
     # Send initial state after join
     send_after_join(socket, :send_initial_state)
 
+    # Emit telemetry for channel join
+    emit_joined_telemetry("dashboard:#{room_id}", socket)
+
     {:ok, socket}
   end
 

@@ -41,6 +41,10 @@ defmodule ServerWeb.EventsChannel do
       end
 
     subscribe_to_topics(topics_to_subscribe)
+
+    # Emit telemetry for channel join
+    emit_joined_telemetry("events:#{topic}", socket)
+
     {:ok, socket}
   end
 

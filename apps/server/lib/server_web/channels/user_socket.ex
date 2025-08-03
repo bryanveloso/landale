@@ -34,6 +34,13 @@ defmodule ServerWeb.UserSocket do
     # Log the connection
     Logger.info("WebSocket connected", correlation_id: correlation_id)
 
+    # Emit telemetry event for WebSocket connection
+    :telemetry.execute(
+      [:phoenix, :socket_connected],
+      %{system_time: System.system_time()},
+      %{socket_id: correlation_id}
+    )
+
     {:ok, socket}
   end
 

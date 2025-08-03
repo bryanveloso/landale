@@ -12,7 +12,7 @@ defmodule ServerWeb.ChannelBase do
 
       defmodule ServerWeb.MyChannel do
         use ServerWeb.ChannelBase
-        
+
         @impl true
         def join(topic, payload, socket) do
           socket = setup_correlation_id(socket)
@@ -44,6 +44,40 @@ defmodule ServerWeb.ChannelBase do
       def push_error(socket, event, error_type, message) do
         ServerWeb.ChannelHelpers.push_error(socket, event, error_type, message, __MODULE__)
       end
+
+      # Helper to emit telemetry after successful join
+      def emit_joined_telemetry(topic, socket) do
+        :telemetry.execute(
+          [:phoenix, :channel_joined],
+          %{system_time: System.system_time()},
+          %{
+            topic: topic,
+            socket_id: Map.get(socket.assigns, :correlation_id, "unknown")
+          }
+        )
+      end
+
+      # Helper to emit telemetry on channel leave
+      def emit_left_telemetry(socket) do
+        if Map.has_key?(socket, :topic) do
+          :telemetry.execute(
+            [:phoenix, :channel_left],
+            %{system_time: System.system_time()},
+            %{
+              topic: socket.topic,
+              socket_id: Map.get(socket.assigns, :correlation_id, "unknown")
+            }
+          )
+        end
+      end
+
+      # Default terminate implementation that emits telemetry
+      def terminate(_reason, socket) do
+        emit_left_telemetry(socket)
+        :ok
+      end
+
+      defoverridable terminate: 2
     end
   end
 end
