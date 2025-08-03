@@ -8,8 +8,10 @@
 import { createSignal, Show, onMount, onCleanup, For, createEffect } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { invoke } from '@tauri-apps/api/core'
+import { Channel } from 'phoenix'
 import { ConnectionTelemetry } from './connection-telemetry'
 import { useStreamService } from '@/services/stream-service'
+import type { WebSocketStats, PerformanceMetrics, SystemInfo, TelemetryResponse } from '@/types/telemetry'
 
 interface TelemetryDrawerProps {
   isOpen: boolean
@@ -18,10 +20,11 @@ interface TelemetryDrawerProps {
 
 export function TelemetryDrawer(props: TelemetryDrawerProps) {
   const { getSocket } = useStreamService()
-  const [websocketStats, setWebsocketStats] = createSignal<any>(null)
-  const [performanceMetrics, setPerformanceMetrics] = createSignal<any>(null)
+  const [websocketStats, setWebsocketStats] = createSignal<WebSocketStats | null>(null)
+  const [performanceMetrics, setPerformanceMetrics] = createSignal<PerformanceMetrics | null>(null)
+  const [systemInfo, setSystemInfo] = createSignal<SystemInfo | null>(null)
 
-  let telemetryChannel: any
+  let telemetryChannel: Channel | null = null
 
   // Handle escape key to close
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -58,7 +61,8 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
       // If channel exists but isn't joined, try to rejoin
       if (telemetryChannel.state !== 'joined') {
         console.log('Channel exists but not joined, attempting to rejoin...')
-        telemetryChannel.rejoin()
+        telemetryChannel.leave()
+        telemetryChannel.join()
       }
       return
     }
@@ -73,10 +77,13 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
     console.log('Created telemetry channel:', telemetryChannel)
 
     // Listen for telemetry updates from the server (only one listener needed)
-    telemetryChannel.on('telemetry_update', (data: any) => {
-      console.log('Received telemetry_update:', data)
+    telemetryChannel.on('telemetry_update', (response: TelemetryResponse | any) => {
+      console.log('Received telemetry_update:', response)
+      // Handle ResponseBuilder wrapper if present
+      const data = response.data || response
       if (data.websocket) setWebsocketStats(data.websocket)
       if (data.performance) setPerformanceMetrics(data.performance)
+      if (data.system) setSystemInfo(data.system)
     })
 
     console.log('Attempting to join telemetry channel...')
@@ -86,10 +93,13 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
       console.log('Channel already joined, requesting telemetry data immediately')
       telemetryChannel
         .push('get_telemetry', {})
-        .receive('ok', (data: any) => {
-          console.log('Received telemetry data:', data)
+        .receive('ok', (response: any) => {
+          console.log('Received telemetry data:', response)
+          // Handle ResponseBuilder wrapper
+          const data = response.data || response
           if (data.websocket) setWebsocketStats(data.websocket)
           if (data.performance) setPerformanceMetrics(data.performance)
+          if (data.system) setSystemInfo(data.system)
         })
         .receive('error', (err: any) => console.error('Failed to get telemetry:', err))
         .receive('timeout', () => console.error('get_telemetry request timed out'))
@@ -101,15 +111,20 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
     joinPush.receive('ok', (resp: any) => {
       console.log('Successfully joined telemetry channel, response:', resp)
       // Request initial telemetry data immediately after join
-      telemetryChannel
-        .push('get_telemetry', {})
-        .receive('ok', (data: any) => {
-          console.log('Received telemetry data:', data)
-          if (data.websocket) setWebsocketStats(data.websocket)
-          if (data.performance) setPerformanceMetrics(data.performance)
-        })
-        .receive('error', (err: any) => console.error('Failed to get telemetry:', err))
-        .receive('timeout', () => console.error('get_telemetry request timed out'))
+      if (telemetryChannel) {
+        telemetryChannel
+          .push('get_telemetry', {})
+          .receive('ok', (response: any) => {
+            console.log('Received telemetry data:', response)
+            // Handle ResponseBuilder wrapper
+            const data = response.data || response
+            if (data.websocket) setWebsocketStats(data.websocket)
+            if (data.performance) setPerformanceMetrics(data.performance)
+            if (data.system) setSystemInfo(data.system)
+          })
+          .receive('error', (err: any) => console.error('Failed to get telemetry:', err))
+          .receive('timeout', () => console.error('get_telemetry request timed out'))
+      }
     })
 
     joinPush.receive('error', (resp: any) => console.error('Failed to join telemetry channel:', resp))
@@ -121,8 +136,10 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
         console.log('Fallback: Requesting telemetry data after delay')
         telemetryChannel
           .push('get_telemetry', {})
-          .receive('ok', (data: any) => {
-            console.log('Fallback: Received telemetry data:', data)
+          .receive('ok', (response: any) => {
+            console.log('Fallback: Received telemetry data:', response)
+            // Handle ResponseBuilder wrapper
+            const data = response.data || response
             if (data.websocket) setWebsocketStats(data.websocket)
             if (data.performance) setPerformanceMetrics(data.performance)
           })
@@ -228,7 +245,11 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
 
           {/* Content */}
           <div class="h-[calc(100%-40px)] overflow-y-auto bg-gray-950">
-            <ConnectionTelemetry />
+            <ConnectionTelemetry
+              websocketStats={websocketStats()}
+              performanceMetrics={performanceMetrics()}
+              systemInfo={systemInfo()}
+            />
 
             {/* Additional telemetry sections */}
             <div class="space-y-px">
@@ -250,7 +271,7 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
                     </div>
                     <Show when={websocketStats()?.channels_by_type}>
                       <div class="mt-1 border-t border-gray-800 pt-1">
-                        <For each={Object.entries(websocketStats().channels_by_type)}>
+                        <For each={Object.entries(websocketStats()?.channels_by_type || {})}>
                           {([type, count]) => (
                             <div class="flex justify-between py-0.5 pl-2">
                               <span>{type}:</span>
@@ -271,21 +292,21 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
                     <Show when={performanceMetrics()?.memory}>
                       <div class="flex justify-between py-0.5">
                         <span>Memory:</span>
-                        <span class="font-mono">{Math.round(performanceMetrics().memory.total_mb)} MB</span>
+                        <span class="font-mono">{Math.round(performanceMetrics()?.memory?.total_mb || 0)} MB</span>
                       </div>
                       <div class="flex justify-between py-0.5">
                         <span>Processes:</span>
-                        <span class="font-mono">{Math.round(performanceMetrics().memory.processes_mb)} MB</span>
+                        <span class="font-mono">{Math.round(performanceMetrics()?.memory?.processes_mb || 0)} MB</span>
                       </div>
                     </Show>
                     <Show when={performanceMetrics()?.cpu}>
                       <div class="flex justify-between py-0.5">
                         <span>Schedulers:</span>
-                        <span class="font-mono">{performanceMetrics().cpu.schedulers}</span>
+                        <span class="font-mono">{performanceMetrics()?.cpu?.schedulers || 0}</span>
                       </div>
                       <div class="flex justify-between py-0.5">
                         <span>Run Queue:</span>
-                        <span class="font-mono">{performanceMetrics().cpu.run_queue}</span>
+                        <span class="font-mono">{performanceMetrics()?.cpu?.run_queue || 0}</span>
                       </div>
                     </Show>
                   </Show>
@@ -298,19 +319,19 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
                   <div class="text-xs text-gray-500">
                     <div class="flex justify-between py-0.5">
                       <span>Connects:</span>
-                      <span class="font-mono">{websocketStats().totals.connects}</span>
+                      <span class="font-mono">{websocketStats()?.totals?.connects || 0}</span>
                     </div>
                     <div class="flex justify-between py-0.5">
                       <span>Disconnects:</span>
-                      <span class="font-mono">{websocketStats().totals.disconnects}</span>
+                      <span class="font-mono">{websocketStats()?.totals?.disconnects || 0}</span>
                     </div>
                     <div class="flex justify-between py-0.5">
                       <span>Channel Joins:</span>
-                      <span class="font-mono">{websocketStats().totals.joins}</span>
+                      <span class="font-mono">{websocketStats()?.totals?.joins || 0}</span>
                     </div>
                     <div class="flex justify-between py-0.5">
                       <span>Channel Leaves:</span>
-                      <span class="font-mono">{websocketStats().totals.leaves}</span>
+                      <span class="font-mono">{websocketStats()?.totals?.leaves || 0}</span>
                     </div>
                   </div>
                 </div>

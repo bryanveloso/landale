@@ -19,7 +19,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
             total_disconnects: 0,
             total_joins: 0,
             total_leaves: 0,
-            connection_times: %{},
+            # NOTE: connection_times removed until Phoenix.Tracker implemented (memory leak)
             start_time: nil
 
   def start_link(opts \\ []) do
@@ -50,7 +50,8 @@ defmodule ServerWeb.WebSocketStatsTracker do
       active_channels: state.active_channels,
       channels_by_type: state.channels_by_type,
       recent_disconnects: calculate_recent_disconnects(state),
-      average_connection_duration: calculate_avg_duration(state),
+      # NOTE: average_connection_duration disabled until Phoenix.Tracker implemented
+      average_connection_duration: 0,
       totals: %{
         connects: state.total_connects,
         disconnects: state.total_disconnects,
@@ -69,8 +70,8 @@ defmodule ServerWeb.WebSocketStatsTracker do
     state = %{
       state
       | total_connections: state.total_connections + 1,
-        total_connects: state.total_connects + 1,
-        connection_times: Map.put(state.connection_times, metadata[:socket_id], System.system_time(:millisecond))
+        total_connects: state.total_connects + 1
+        # NOTE: connection_times tracking disabled until Phoenix.Tracker implemented
     }
 
     {:noreply, state}
@@ -83,8 +84,8 @@ defmodule ServerWeb.WebSocketStatsTracker do
     state = %{
       state
       | total_connections: max(0, state.total_connections - 1),
-        total_disconnects: state.total_disconnects + 1,
-        connection_times: Map.delete(state.connection_times, metadata[:socket_id])
+        total_disconnects: state.total_disconnects + 1
+        # NOTE: connection_times cleanup disabled until Phoenix.Tracker implemented
     }
 
     {:noreply, state}
@@ -216,23 +217,24 @@ defmodule ServerWeb.WebSocketStatsTracker do
     state.total_disconnects
   end
 
-  defp calculate_avg_duration(state) do
-    # Calculate average connection duration from active connections
-    if map_size(state.connection_times) == 0 do
-      0
-    else
-      current_time = System.system_time(:millisecond)
-
-      durations =
-        Enum.map(state.connection_times, fn {_socket_id, start_time} ->
-          current_time - start_time
-        end)
-
-      if length(durations) > 0 do
-        Enum.sum(durations) / length(durations)
-      else
-        0
-      end
-    end
-  end
+  # NOTE: Disabled until Phoenix.Tracker is implemented for proper disconnect tracking
+  # defp calculate_avg_duration(state) do
+  #   # Calculate average connection duration from active connections
+  #   if map_size(state.connection_times) == 0 do
+  #     0
+  #   else
+  #     current_time = System.system_time(:millisecond)
+  #
+  #     durations =
+  #       Enum.map(state.connection_times, fn {_socket_id, start_time} ->
+  #         current_time - start_time
+  #       end)
+  #
+  #     if length(durations) > 0 do
+  #       Enum.sum(durations) / length(durations)
+  #     else
+  #       0
+  #     end
+  #   end
+  # end
 end

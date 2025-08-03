@@ -2,216 +2,222 @@
  * Telemetry Route
  *
  * Full telemetry dashboard view for the pop-out window.
- * This provides a more comprehensive view than the drawer.
+ * Uses the centralized telemetry service for real-time data.
  */
 
 import { createFileRoute } from '@tanstack/solid-router'
-import { ConnectionTelemetry } from '@/components/connection-telemetry'
-import { createSignal, onMount, onCleanup } from 'solid-js'
+import { Show, For, onMount, createEffect, onCleanup } from 'solid-js'
+import { TelemetryServiceProvider, useTelemetryService } from '@/services/telemetry-service'
 import { useStreamService } from '@/services/stream-service'
 
 export const Route = createFileRoute('/telemetry')({
-  component: TelemetryPage
+  component: () => (
+    <TelemetryServiceProvider>
+      <TelemetryPage />
+    </TelemetryServiceProvider>
+  )
 })
 
 function TelemetryPage() {
-  const { getSocket } = useStreamService()
-  const [websocketStats, setWebsocketStats] = createSignal<any>(null)
-  const [performanceMetrics, setPerformanceMetrics] = createSignal<any>(null)
+  const { websocketStats, performanceMetrics, systemInfo, requestRefresh } = useTelemetryService()
+  const { connectionState } = useStreamService()
 
-  let telemetryChannel: any
+  let intervalId: number
 
   onMount(() => {
-    const socket = getSocket()
-    if (!socket) return
+    requestRefresh()
 
-    // Subscribe to telemetry channel for detailed metrics
-    telemetryChannel = socket.channel('dashboard:telemetry')
-
-    telemetryChannel.on('telemetry_snapshot', (data: any) => {
-      setWebsocketStats(data.websocket)
-      setPerformanceMetrics(data.performance)
-    })
-
-    telemetryChannel.on('telemetry_update', (data: any) => {
-      setWebsocketStats(data.websocket)
-      setPerformanceMetrics(data.performance)
-    })
-
-    telemetryChannel.on('websocket_metrics', (data: any) => {
-      setWebsocketStats(data)
-    })
-
-    telemetryChannel.on('performance_metrics', (data: any) => {
-      setPerformanceMetrics(data)
-    })
-
-    telemetryChannel
-      .join()
-      .receive('ok', () => console.log('Joined telemetry channel'))
-      .receive('error', (resp: any) => console.error('Failed to join telemetry channel:', resp))
-
-    // Request initial telemetry data
-    telemetryChannel.push('get_telemetry', {})
+    // Refresh every 2 seconds
+    intervalId = setInterval(() => {
+      requestRefresh()
+    }, 2000)
   })
 
   onCleanup(() => {
-    if (telemetryChannel) {
-      telemetryChannel.leave()
-    }
+    if (intervalId) clearInterval(intervalId)
   })
 
+  const formatUptime = (seconds: number | undefined) => {
+    if (!seconds) return 'N/A'
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    return `${hours}h ${minutes}m`
+  }
+
   return (
-    <div class="min-h-screen bg-gray-900 text-white">
+    <div class="min-h-screen bg-black text-gray-100">
       {/* Header */}
-      <div class="sticky top-0 z-10 border-b border-gray-700 bg-gray-800/50 backdrop-blur-sm">
-        <div class="px-6 py-4">
-          <h1 class="text-2xl font-bold">Landale System Telemetry</h1>
-          <p class="mt-1 text-sm text-gray-400">Real-time monitoring and metrics</p>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div class="space-y-6 p-6">
-        {/* Connection Status */}
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div>
-            <h2 class="mb-4 text-lg font-semibold">Connection Status</h2>
-            <ConnectionTelemetry />
-          </div>
-
-          {/* WebSocket Statistics */}
-          <div class="rounded-lg bg-gray-800 p-6">
-            <h2 class="mb-4 text-lg font-semibold">WebSocket Statistics</h2>
-            {websocketStats() ? (
-              <div class="space-y-3 text-sm">
-                <div class="grid grid-cols-2 gap-2">
-                  <span class="text-gray-400">Total Connections:</span>
-                  <span class="font-mono">{websocketStats().total_connections || 0}</span>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                  <span class="text-gray-400">Active Channels:</span>
-                  <span class="font-mono">{websocketStats().active_channels || 0}</span>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                  <span class="text-gray-400">Recent Disconnects:</span>
-                  <span class="font-mono">{websocketStats().recent_disconnects || 0}</span>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                  <span class="text-gray-400">Avg Connection Duration:</span>
-                  <span class="font-mono">{Math.round(websocketStats().average_connection_duration || 0)}ms</span>
-                </div>
-
-                {/* Channel breakdown */}
-                {websocketStats().channels_by_type && (
-                  <div class="mt-4 border-t border-gray-700 pt-4">
-                    <h3 class="mb-2 text-sm font-medium">Active Channels by Type</h3>
-                    {Object.entries(websocketStats().channels_by_type).map(([type, count]) => (
-                      <div class="flex justify-between py-1">
-                        <span class="text-gray-400">{type}:</span>
-                        <span class="font-mono">{count as number}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p class="text-gray-500">Loading WebSocket statistics...</p>
-            )}
-          </div>
-        </div>
-
-        {/* Performance Metrics */}
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Memory Usage */}
-          <div class="rounded-lg bg-gray-800 p-6">
-            <h3 class="mb-4 text-lg font-semibold">Memory Usage</h3>
-            {performanceMetrics()?.memory ? (
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-400">Total:</span>
-                  <span class="font-mono">{Math.round(performanceMetrics().memory.total_mb)}MB</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">Processes:</span>
-                  <span class="font-mono">{Math.round(performanceMetrics().memory.processes_mb)}MB</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">Binary:</span>
-                  <span class="font-mono">{Math.round(performanceMetrics().memory.binary_mb)}MB</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">ETS:</span>
-                  <span class="font-mono">{Math.round(performanceMetrics().memory.ets_mb)}MB</span>
-                </div>
-              </div>
-            ) : (
-              <p class="text-sm text-gray-500">Loading memory metrics...</p>
-            )}
-          </div>
-
-          {/* CPU Metrics */}
-          <div class="rounded-lg bg-gray-800 p-6">
-            <h3 class="mb-4 text-lg font-semibold">CPU Usage</h3>
-            {performanceMetrics()?.cpu ? (
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-400">Schedulers:</span>
-                  <span class="font-mono">{performanceMetrics().cpu.schedulers}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-400">Run Queue:</span>
-                  <span class="font-mono">{performanceMetrics().cpu.run_queue}</span>
-                </div>
-              </div>
-            ) : (
-              <p class="text-sm text-gray-500">Loading CPU metrics...</p>
-            )}
-          </div>
-
-          {/* Message Queues */}
-          <div class="rounded-lg bg-gray-800 p-6">
-            <h3 class="mb-4 text-lg font-semibold">Message Queues</h3>
-            {performanceMetrics()?.message_queue ? (
-              <div class="space-y-2 text-sm">
-                {Object.entries(performanceMetrics().message_queue).map(([service, count]) => (
-                  <div class="flex justify-between">
-                    <span class="text-gray-400">{service}:</span>
-                    <span class="font-mono">{count as number}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p class="text-sm text-gray-500">Loading queue metrics...</p>
-            )}
-          </div>
-        </div>
-
-        {/* Telemetry Totals */}
-        {websocketStats()?.totals && (
-          <div class="rounded-lg bg-gray-800 p-6">
-            <h3 class="mb-4 text-lg font-semibold">Lifetime Totals</h3>
-            <div class="grid grid-cols-2 gap-4 text-sm lg:grid-cols-4">
-              <div>
-                <span class="block text-gray-400">Total Connects</span>
-                <span class="font-mono text-2xl">{websocketStats().totals.connects}</span>
-              </div>
-              <div>
-                <span class="block text-gray-400">Total Disconnects</span>
-                <span class="font-mono text-2xl">{websocketStats().totals.disconnects}</span>
-              </div>
-              <div>
-                <span class="block text-gray-400">Total Joins</span>
-                <span class="font-mono text-2xl">{websocketStats().totals.joins}</span>
-              </div>
-              <div>
-                <span class="block text-gray-400">Total Leaves</span>
-                <span class="font-mono text-2xl">{websocketStats().totals.leaves}</span>
-              </div>
+      <div class="border-b border-gray-800 bg-gray-950/50 backdrop-blur">
+        <div class="flex items-center justify-between px-6 py-3">
+          <div class="flex items-center gap-4">
+            <h1 class="text-lg font-medium">Telemetry</h1>
+            <div class="flex items-center gap-2 text-xs text-gray-500">
+              <span>Phoenix WebSocket</span>
+              <div
+                class={`h-1.5 w-1.5 rounded-full ${connectionState() === 'connected' ? 'bg-green-500' : 'bg-red-500'}`}
+              />
             </div>
           </div>
-        )}
+          <div class="text-xs text-gray-500">{new Date().toLocaleTimeString()}</div>
+        </div>
       </div>
+
+      {/* Stats Grid */}
+      <div class="grid grid-cols-4 gap-px bg-gray-800 p-px">
+        {/* System Status */}
+        <div class="bg-gray-950 p-4">
+          <div class="mb-2 text-xs font-medium text-gray-400">System</div>
+          <div class="space-y-2">
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Status</span>
+              <span
+                class={`text-sm font-medium ${systemInfo()?.status === 'running' ? 'text-green-400' : 'text-yellow-400'}`}>
+                {systemInfo()?.status || 'Unknown'}
+              </span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Uptime</span>
+              <span class="font-mono text-sm text-gray-300">{formatUptime(systemInfo()?.uptime)}</span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Version</span>
+              <span class="font-mono text-sm text-gray-300">{systemInfo()?.version || 'N/A'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* WebSocket Stats */}
+        <div class="bg-gray-950 p-4">
+          <div class="mb-2 text-xs font-medium text-gray-400">Connections</div>
+          <div class="space-y-2">
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Active</span>
+              <span class="text-2xl font-bold text-blue-400">{websocketStats()?.total_connections || 0}</span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Channels</span>
+              <span class="font-mono text-sm text-gray-300">{websocketStats()?.active_channels || 0}</span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Disconnects</span>
+              <span class="font-mono text-sm text-gray-300">{websocketStats()?.recent_disconnects || 0}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Memory Stats */}
+        <div class="bg-gray-950 p-4">
+          <div class="mb-2 text-xs font-medium text-gray-400">Memory</div>
+          <div class="space-y-2">
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Total</span>
+              <span class="text-2xl font-bold text-purple-400">
+                {Math.round(performanceMetrics()?.memory?.total_mb || 0)}
+                <span class="text-xs font-normal text-gray-500">MB</span>
+              </span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Processes</span>
+              <span class="font-mono text-sm text-gray-300">
+                {Math.round(performanceMetrics()?.memory?.processes_mb || 0)}MB
+              </span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Binary</span>
+              <span class="font-mono text-sm text-gray-300">
+                {Math.round(performanceMetrics()?.memory?.binary_mb || 0)}MB
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* CPU Stats */}
+        <div class="bg-gray-950 p-4">
+          <div class="mb-2 text-xs font-medium text-gray-400">Processing</div>
+          <div class="space-y-2">
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Schedulers</span>
+              <span class="text-2xl font-bold text-green-400">{performanceMetrics()?.cpu?.schedulers || 0}</span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Run Queue</span>
+              <span class="font-mono text-sm text-gray-300">{performanceMetrics()?.cpu?.run_queue || 0}</span>
+            </div>
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-gray-500">Avg Duration</span>
+              <span class="font-mono text-sm text-gray-300">
+                {Math.round(websocketStats()?.average_connection_duration || 0)}ms
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Detailed Sections */}
+      <div class="grid grid-cols-2 gap-px bg-gray-800 p-px">
+        {/* Channel Distribution */}
+        <div class="bg-gray-950 p-4">
+          <h3 class="mb-3 text-xs font-medium text-gray-400">Active Channels by Type</h3>
+          <Show
+            when={websocketStats()?.channels_by_type}
+            fallback={<div class="text-xs text-gray-600">No active channels</div>}>
+            <div class="space-y-1">
+              <For each={Object.entries(websocketStats()?.channels_by_type || {})}>
+                {([type, count]) => (
+                  <div class="flex items-center justify-between rounded bg-gray-900 px-3 py-2">
+                    <span class="text-xs text-gray-400">{type}</span>
+                    <span class="font-mono text-sm font-medium text-gray-200">{count as number}</span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
+        </div>
+
+        {/* Message Queues */}
+        <div class="bg-gray-950 p-4">
+          <h3 class="mb-3 text-xs font-medium text-gray-400">Message Queues</h3>
+          <Show
+            when={performanceMetrics()?.message_queue}
+            fallback={<div class="text-xs text-gray-600">No queue data</div>}>
+            <div class="space-y-1">
+              <For each={Object.entries(performanceMetrics()?.message_queue || {})}>
+                {([service, count]) => (
+                  <div class="flex items-center justify-between rounded bg-gray-900 px-3 py-2">
+                    <span class="text-xs text-gray-400">{service}</span>
+                    <span class="font-mono text-sm font-medium text-gray-200">{count as number}</span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
+        </div>
+      </div>
+
+      {/* Lifetime Totals */}
+      <Show when={websocketStats()?.totals}>
+        <div class="border-t border-gray-800 bg-gray-950/50 px-6 py-4">
+          <h3 class="mb-3 text-xs font-medium text-gray-400">Lifetime Totals</h3>
+          <div class="grid grid-cols-4 gap-4">
+            <div>
+              <div class="text-xs text-gray-500">Total Connects</div>
+              <div class="text-xl font-bold text-gray-200">{websocketStats()?.totals?.connects || 0}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">Total Disconnects</div>
+              <div class="text-xl font-bold text-gray-200">{websocketStats()?.totals?.disconnects || 0}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">Channel Joins</div>
+              <div class="text-xl font-bold text-gray-200">{websocketStats()?.totals?.joins || 0}</div>
+            </div>
+            <div>
+              <div class="text-xs text-gray-500">Channel Leaves</div>
+              <div class="text-xl font-bold text-gray-200">{websocketStats()?.totals?.leaves || 0}</div>
+            </div>
+          </div>
+        </div>
+      </Show>
     </div>
   )
 }

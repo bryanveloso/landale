@@ -120,9 +120,6 @@ defmodule ServerWeb.TelemetryChannel do
     telemetry_data = gather_telemetry_snapshot()
     Logger.info("Gathered telemetry data: #{inspect(telemetry_data)}")
 
-    # Also push the data immediately to ensure it's received
-    push(socket, "telemetry_update", telemetry_data)
-
     {:reply, ResponseBuilder.success(telemetry_data), socket}
   end
 
@@ -151,7 +148,8 @@ defmodule ServerWeb.TelemetryChannel do
       timestamp: System.system_time(:second),
       websocket: gather_websocket_metrics(),
       services: gather_service_metrics(),
-      performance: gather_performance_metrics()
+      performance: gather_performance_metrics(),
+      system: gather_system_metrics()
     }
   end
 
@@ -349,5 +347,38 @@ defmodule ServerWeb.TelemetryChannel do
   defp schedule_telemetry_update do
     # Send updates every 10 seconds
     Process.send_after(self(), :periodic_telemetry_update, 10_000)
+  end
+
+  defp gather_system_metrics do
+    # Get server uptime and system info
+    {uptime_microseconds, _} = :erlang.statistics(:wall_clock)
+    uptime_seconds = div(uptime_microseconds, 1_000_000)
+
+    %{
+      uptime: uptime_seconds,
+      version: Application.spec(:server, :vsn) |> to_string(),
+      environment: Application.get_env(:server, :environment, "production"),
+      status: determine_system_status()
+    }
+  end
+
+  defp determine_system_status do
+    # Simple health check based on process availability
+    critical_processes = [
+      ServerWeb.WebSocketStatsTracker,
+      Server.Services.OBS,
+      Server.Services.Twitch
+    ]
+
+    running_count =
+      Enum.count(critical_processes, fn module ->
+        Process.whereis(module) != nil
+      end)
+
+    case running_count do
+      n when n == length(critical_processes) -> "healthy"
+      n when n > 0 -> "degraded"
+      _ -> "unhealthy"
+    end
   end
 end

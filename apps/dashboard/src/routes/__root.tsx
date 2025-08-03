@@ -1,15 +1,25 @@
-import { createRootRoute, Outlet } from '@tanstack/solid-router'
+import { createRootRoute, Outlet, useLocation } from '@tanstack/solid-router'
 import { StreamServiceProvider } from '@/services/stream-service'
 import { TelemetryDrawer } from '@/components/telemetry-drawer'
 import { TelemetryProvider, useTelemetry } from '@/contexts/telemetry-context'
+import { Show } from 'solid-js'
 
 const RootLayout = () => {
   const telemetry = useTelemetry()
+  const location = useLocation()
+
+  // Only show drawer on main dashboard route
+  const isTelemetryPage = () => {
+    const path = location().pathname
+    return path === '/telemetry'
+  }
 
   return (
     <>
       <Outlet />
-      <TelemetryDrawer isOpen={telemetry.isOpen()} onClose={telemetry.close} />
+      <Show when={!isTelemetryPage()}>
+        <TelemetryDrawer isOpen={telemetry.isOpen()} onClose={telemetry.close} />
+      </Show>
     </>
   )
 }

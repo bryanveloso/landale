@@ -20,7 +20,7 @@ async fn create_telemetry_window(app: tauri::AppHandle) -> Result<(), String> {
     let telemetry_window = WebviewWindowBuilder::new(
         &app,
         "telemetry",
-        WebviewUrl::App("#/telemetry".into())
+        WebviewUrl::App("/telemetry".into())
     )
     .title("Landale Telemetry")
     .inner_size(1200.0, 800.0)
