@@ -49,6 +49,9 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
 
   let telemetryChannel: Channel | null = null
   let reconnectTimeout: number | null = null
+  let reconnectAttempts = 0
+  const maxReconnectDelay = 30000 // 30 seconds max
+  const baseReconnectDelay = 1000 // Start at 1 second
 
   const connectToTelemetry = () => {
     const socketWrapper = getSocket()
@@ -100,6 +103,7 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
     joinPush.receive('ok', (response: any) => {
       console.log('[TelemetryService] Successfully joined telemetry channel')
       setIsConnected(true)
+      reconnectAttempts = 0 // Reset on successful connection
 
       // Request initial data
       requestTelemetryData()
@@ -158,10 +162,19 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
       clearTimeout(reconnectTimeout)
     }
 
+    // Exponential backoff with jitter
+    reconnectAttempts++
+    const delay = Math.min(
+      baseReconnectDelay * Math.pow(2, reconnectAttempts - 1) + Math.random() * 1000,
+      maxReconnectDelay
+    )
+
+    console.log(`[TelemetryService] Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms`)
+
     reconnectTimeout = window.setTimeout(() => {
       console.log('[TelemetryService] Attempting reconnect...')
       connectToTelemetry()
-    }, 3000)
+    }, delay)
   }
 
   const requestRefresh = () => {

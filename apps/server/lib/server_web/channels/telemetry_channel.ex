@@ -21,8 +21,6 @@ defmodule ServerWeb.TelemetryChannel do
 
   @impl true
   def join("dashboard:telemetry", _payload, socket) do
-    Logger.info("TelemetryChannel join called")
-
     socket =
       socket
       |> setup_correlation_id()
@@ -116,9 +114,8 @@ defmodule ServerWeb.TelemetryChannel do
 
   @impl true
   def handle_in("get_telemetry", _params, socket) do
-    Logger.info("Received get_telemetry request from dashboard")
+    Logger.debug("Processing telemetry request")
     telemetry_data = gather_telemetry_snapshot()
-    Logger.info("Gathered telemetry data: #{inspect(telemetry_data)}")
 
     {:reply, ResponseBuilder.success(telemetry_data), socket}
   end

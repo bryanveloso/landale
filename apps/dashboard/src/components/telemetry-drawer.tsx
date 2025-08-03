@@ -5,26 +5,19 @@
  * Can be popped out to a separate window for detailed monitoring.
  */
 
-import { createSignal, Show, onMount, onCleanup, For, createEffect } from 'solid-js'
+import { Show, onMount, onCleanup, For, createEffect } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { invoke } from '@tauri-apps/api/core'
-import { Channel } from 'phoenix'
 import { ConnectionTelemetry } from './connection-telemetry'
-import { useStreamService } from '@/services/stream-service'
-import type { WebSocketStats, PerformanceMetrics, SystemInfo, TelemetryResponse } from '@/types/telemetry'
+import { TelemetryServiceProvider, useTelemetryService } from '@/services/telemetry-service'
 
 interface TelemetryDrawerProps {
   isOpen: boolean
   onClose: () => void
 }
 
-export function TelemetryDrawer(props: TelemetryDrawerProps) {
-  const { getSocket } = useStreamService()
-  const [websocketStats, setWebsocketStats] = createSignal<WebSocketStats | null>(null)
-  const [performanceMetrics, setPerformanceMetrics] = createSignal<PerformanceMetrics | null>(null)
-  const [systemInfo, setSystemInfo] = createSignal<SystemInfo | null>(null)
-
-  let telemetryChannel: Channel | null = null
+function TelemetryDrawerContent(props: TelemetryDrawerProps) {
+  const { websocketStats, performanceMetrics, systemInfo, requestRefresh } = useTelemetryService()
 
   // Handle escape key to close
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,135 +26,10 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
     }
   }
 
-  // Handle telemetry channel subscription based on drawer state
-  const subscribeTelemetry = () => {
-    const socketWrapper = getSocket()
-    if (!socketWrapper) {
-      console.error('No socket wrapper available')
-      return
-    }
-
-    console.log('Socket wrapper state:', socketWrapper.connectionState)
-    if (socketWrapper.connectionState !== 'connected') {
-      console.error('Socket is not connected, state:', socketWrapper.connectionState)
-      // Try to connect the socket if it's not connected
-      socketWrapper.connect()
-      console.log('Attempted to connect socket, new state:', socketWrapper.connectionState)
-    }
-
-    // Get the underlying Phoenix socket
-    const phoenixSocket = socketWrapper.getSocket()
-    if (!phoenixSocket) {
-      console.error('No Phoenix socket available')
-      return
-    }
-
-    if (telemetryChannel) {
-      console.log('Telemetry channel already exists, state:', telemetryChannel.state)
-      // If channel exists but isn't joined, try to rejoin
-      if (telemetryChannel.state !== 'joined') {
-        console.log('Channel exists but not joined, attempting to rejoin...')
-        telemetryChannel.leave()
-        telemetryChannel.join()
-      }
-      return
-    }
-
-    telemetryChannel = phoenixSocket.channel('dashboard:telemetry', {})
-
-    if (!telemetryChannel) {
-      console.error('Failed to create telemetry channel - socket.channel() returned null')
-      return
-    }
-
-    console.log('Created telemetry channel:', telemetryChannel)
-
-    // Listen for telemetry updates from the server (only one listener needed)
-    telemetryChannel.on('telemetry_update', (response: TelemetryResponse | any) => {
-      console.log('Received telemetry_update:', response)
-      // Handle ResponseBuilder wrapper if present
-      const data = response.data || response
-      if (data.websocket) setWebsocketStats(data.websocket)
-      if (data.performance) setPerformanceMetrics(data.performance)
-      if (data.system) setSystemInfo(data.system)
-    })
-
-    console.log('Attempting to join telemetry channel...')
-
-    // Check if channel is already joined (by another component)
-    if (telemetryChannel.state === 'joined') {
-      console.log('Channel already joined, requesting telemetry data immediately')
-      telemetryChannel
-        .push('get_telemetry', {})
-        .receive('ok', (response: any) => {
-          console.log('Received telemetry data:', response)
-          // Handle ResponseBuilder wrapper
-          const data = response.data || response
-          if (data.websocket) setWebsocketStats(data.websocket)
-          if (data.performance) setPerformanceMetrics(data.performance)
-          if (data.system) setSystemInfo(data.system)
-        })
-        .receive('error', (err: any) => console.error('Failed to get telemetry:', err))
-        .receive('timeout', () => console.error('get_telemetry request timed out'))
-      return
-    }
-
-    const joinPush = telemetryChannel.join()
-
-    joinPush.receive('ok', (resp: any) => {
-      console.log('Successfully joined telemetry channel, response:', resp)
-      // Request initial telemetry data immediately after join
-      if (telemetryChannel) {
-        telemetryChannel
-          .push('get_telemetry', {})
-          .receive('ok', (response: any) => {
-            console.log('Received telemetry data:', response)
-            // Handle ResponseBuilder wrapper
-            const data = response.data || response
-            if (data.websocket) setWebsocketStats(data.websocket)
-            if (data.performance) setPerformanceMetrics(data.performance)
-            if (data.system) setSystemInfo(data.system)
-          })
-          .receive('error', (err: any) => console.error('Failed to get telemetry:', err))
-          .receive('timeout', () => console.error('get_telemetry request timed out'))
-      }
-    })
-
-    joinPush.receive('error', (resp: any) => console.error('Failed to join telemetry channel:', resp))
-    joinPush.receive('timeout', () => console.error('Channel join timed out'))
-
-    // Try to push get_telemetry after a short delay as a fallback
-    setTimeout(() => {
-      if (telemetryChannel && telemetryChannel.state === 'joined') {
-        console.log('Fallback: Requesting telemetry data after delay')
-        telemetryChannel
-          .push('get_telemetry', {})
-          .receive('ok', (response: any) => {
-            console.log('Fallback: Received telemetry data:', response)
-            // Handle ResponseBuilder wrapper
-            const data = response.data || response
-            if (data.websocket) setWebsocketStats(data.websocket)
-            if (data.performance) setPerformanceMetrics(data.performance)
-          })
-          .receive('error', (err: any) => console.error('Fallback: Failed to get telemetry:', err))
-          .receive('timeout', () => console.error('Fallback: get_telemetry request timed out'))
-      }
-    }, 1000)
-  }
-
-  const unsubscribeTelemetry = () => {
-    if (telemetryChannel) {
-      telemetryChannel.leave()
-      telemetryChannel = null
-    }
-  }
-
-  // Subscribe when drawer opens
+  // Refresh telemetry when drawer opens
   createEffect(() => {
     if (props.isOpen) {
-      subscribeTelemetry()
-    } else {
-      unsubscribeTelemetry()
+      requestRefresh()
     }
   })
 
@@ -171,9 +39,6 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
 
   onCleanup(() => {
     document.removeEventListener('keydown', handleKeyDown)
-    if (telemetryChannel) {
-      telemetryChannel.leave()
-    }
   })
 
   const handlePopOut = async () => {
@@ -341,5 +206,13 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
         </div>
       </Show>
     </Portal>
+  )
+}
+
+export function TelemetryDrawer(props: TelemetryDrawerProps) {
+  return (
+    <TelemetryServiceProvider>
+      <TelemetryDrawerContent {...props} />
+    </TelemetryServiceProvider>
   )
 }

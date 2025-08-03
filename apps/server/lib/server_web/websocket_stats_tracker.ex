@@ -19,7 +19,8 @@ defmodule ServerWeb.WebSocketStatsTracker do
             total_disconnects: 0,
             total_joins: 0,
             total_leaves: 0,
-            # NOTE: connection_times removed until Phoenix.Tracker implemented (memory leak)
+            # List of recent connection durations for averaging
+            connection_durations: [],
             start_time: nil
 
   def start_link(opts \\ []) do
@@ -39,7 +40,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
       start_time: System.monotonic_time(:millisecond)
     }
 
-    Logger.info("WebSocket stats tracker started")
+    Logger.debug("WebSocket stats tracker started")
     {:ok, state}
   end
 
@@ -50,8 +51,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
       active_channels: state.active_channels,
       channels_by_type: state.channels_by_type,
       recent_disconnects: calculate_recent_disconnects(state),
-      # NOTE: average_connection_duration disabled until Phoenix.Tracker implemented
-      average_connection_duration: 0,
+      average_connection_duration: calculate_average_duration(state),
       totals: %{
         connects: state.total_connects,
         disconnects: state.total_disconnects,
@@ -65,13 +65,12 @@ defmodule ServerWeb.WebSocketStatsTracker do
 
   @impl true
   def handle_info({:telemetry_event, [:landale, :websocket, :connected], _measurements, metadata}, state) do
-    Logger.info("Telemetry: Socket connected", socket_id: metadata[:socket_id])
+    Logger.debug("Socket connected", socket_id: metadata[:socket_id])
 
     state = %{
       state
       | total_connections: state.total_connections + 1,
         total_connects: state.total_connects + 1
-        # NOTE: connection_times tracking disabled until Phoenix.Tracker implemented
     }
 
     {:noreply, state}
@@ -85,24 +84,34 @@ defmodule ServerWeb.WebSocketStatsTracker do
       state
       | total_connections: max(0, state.total_connections - 1),
         total_disconnects: state.total_disconnects + 1
-        # NOTE: connection_times cleanup disabled until Phoenix.Tracker implemented
     }
 
     {:noreply, state}
   end
 
   @impl true
-  def handle_info({:telemetry_event, [:phoenix, :socket, :disconnect], _measurements, metadata}, state) do
-    # Phoenix's built-in socket disconnect event
-    # NOTE: We can't properly map socket_pid to correlation_id without Phoenix.Tracker
-    # For now, just update counts but don't try to clean connection_times
-    Logger.debug("Phoenix socket disconnected", metadata: metadata)
+  def handle_info({:tracker_event, :connected, socket_id, _metadata}, state) do
+    Logger.debug("Tracker: Socket connected", socket_id: socket_id)
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:tracker_event, :disconnected, socket_id, metadata}, state) do
+    Logger.debug("Tracker: Socket disconnected",
+      socket_id: socket_id,
+      duration_ms: metadata[:duration_ms]
+    )
+
+    # Add duration to our list (keep last 100 for averaging)
+    durations =
+      [metadata[:duration_ms] | state.connection_durations]
+      |> Enum.take(100)
 
     state = %{
       state
-      | total_connections: max(0, state.total_connections - 1),
+      | connection_durations: durations,
+        total_connections: max(0, state.total_connections - 1),
         total_disconnects: state.total_disconnects + 1
-        # TODO: connection_times cleanup requires Phoenix.Tracker for PID-to-correlation_id mapping
     }
 
     {:noreply, state}
@@ -111,7 +120,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
   @impl true
   def handle_info({:telemetry_event, [:landale, :channel, :joined], _measurements, metadata}, state) do
     channel_type = extract_channel_type(metadata[:topic])
-    Logger.info("Telemetry: Channel joined", topic: metadata[:topic], channel_type: channel_type)
+    Logger.debug("Channel joined", topic: metadata[:topic], channel_type: channel_type)
 
     state = %{
       state
@@ -173,11 +182,11 @@ defmodule ServerWeb.WebSocketStatsTracker do
            %{}
          ) do
       :ok ->
-        Logger.info("Telemetry handlers attached successfully for events: #{inspect(events)}")
+        Logger.debug("Telemetry handlers attached for WebSocket stats tracking")
         :ok
 
       {:error, :already_exists} ->
-        Logger.warning("Telemetry handlers already attached, detaching and re-attaching")
+        Logger.debug("Telemetry handlers already attached, re-attaching")
         :telemetry.detach("websocket-stats-tracker")
 
         :telemetry.attach_many(
@@ -194,8 +203,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
   end
 
   def handle_telemetry_event(event, measurements, metadata, _config) do
-    Logger.info("Telemetry handler called", event: event, metadata: metadata)
-    # Forward telemetry events to our GenServer
+    # Forward telemetry events to our GenServer silently
     send(__MODULE__, {:telemetry_event, event, measurements, metadata})
   end
 
@@ -217,24 +225,16 @@ defmodule ServerWeb.WebSocketStatsTracker do
     state.total_disconnects
   end
 
-  # NOTE: Disabled until Phoenix.Tracker is implemented for proper disconnect tracking
-  # defp calculate_avg_duration(state) do
-  #   # Calculate average connection duration from active connections
-  #   if map_size(state.connection_times) == 0 do
-  #     0
-  #   else
-  #     current_time = System.system_time(:millisecond)
-  #
-  #     durations =
-  #       Enum.map(state.connection_times, fn {_socket_id, start_time} ->
-  #         current_time - start_time
-  #       end)
-  #
-  #     if length(durations) > 0 do
-  #       Enum.sum(durations) / length(durations)
-  #     else
-  #       0
-  #     end
-  #   end
-  # end
+  defp calculate_average_duration(state) do
+    case state.connection_durations do
+      [] ->
+        0
+
+      durations ->
+        # Calculate average of recent connection durations
+        sum = Enum.sum(durations)
+        count = length(durations)
+        round(sum / count)
+    end
+  end
 end

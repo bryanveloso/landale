@@ -34,6 +34,9 @@ defmodule ServerWeb.UserSocket do
     # Log the connection
     Logger.info("WebSocket connected", correlation_id: correlation_id)
 
+    # Track this socket with Phoenix.Tracker
+    ServerWeb.WebSocketTracker.track_socket(correlation_id, self())
+
     # Emit telemetry event for WebSocket connection
     :telemetry.execute(
       [:landale, :websocket, :connected],
