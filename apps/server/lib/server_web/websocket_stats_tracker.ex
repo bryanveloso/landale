@@ -64,7 +64,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
 
   @impl true
   def handle_info({:telemetry_event, [:landale, :websocket, :connected], measurements, metadata}, state) do
-    Logger.debug("Socket connected", socket_id: metadata[:socket_id])
+    Logger.info("Telemetry: Socket connected", socket_id: metadata[:socket_id])
 
     state = %{
       state
@@ -93,7 +93,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
   @impl true
   def handle_info({:telemetry_event, [:landale, :channel, :joined], _measurements, metadata}, state) do
     channel_type = extract_channel_type(metadata[:topic])
-    Logger.debug("Channel joined", topic: metadata[:topic], channel_type: channel_type)
+    Logger.info("Telemetry: Channel joined", topic: metadata[:topic], channel_type: channel_type)
 
     state = %{
       state
@@ -146,15 +146,35 @@ defmodule ServerWeb.WebSocketStatsTracker do
       [:landale, :channel, :left]
     ]
 
-    :telemetry.attach_many(
-      "websocket-stats-tracker",
-      events,
-      &handle_telemetry_event/4,
-      %{}
-    )
+    case :telemetry.attach_many(
+           "websocket-stats-tracker",
+           events,
+           &handle_telemetry_event/4,
+           %{}
+         ) do
+      :ok ->
+        Logger.info("Telemetry handlers attached successfully for events: #{inspect(events)}")
+        :ok
+
+      {:error, :already_exists} ->
+        Logger.warning("Telemetry handlers already attached, detaching and re-attaching")
+        :telemetry.detach("websocket-stats-tracker")
+
+        :telemetry.attach_many(
+          "websocket-stats-tracker",
+          events,
+          &handle_telemetry_event/4,
+          %{}
+        )
+
+      error ->
+        Logger.error("Failed to attach telemetry handlers: #{inspect(error)}")
+        error
+    end
   end
 
   defp handle_telemetry_event(event, measurements, metadata, _config) do
+    Logger.info("Telemetry handler called", event: event, metadata: metadata)
     # Forward telemetry events to our GenServer
     send(__MODULE__, {:telemetry_event, event, measurements, metadata})
   end
