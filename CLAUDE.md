@@ -110,6 +110,7 @@ self.event_queue = asyncio.Queue(maxsize=200)  # ~20 seconds buffer
 // State machine for overlay animations
 type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 // Priority levels: foreground > midground > background
+// GSAP contexts properly managed - no memory leaks
 ```
 
 ## Critical Rules
@@ -143,8 +144,9 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 
 - Correlation IDs track events across services
 - Phoenix PubSub for real-time broadcasting
-- Circuit breakers protect external API calls (needs GenServer refactor)
+- Circuit breakers protect external API calls (CircuitBreakerServer implemented)
 - Batch event publishing when possible
+- All Phoenix channels have catch-all handlers for safety
 
 ### Service Configuration
 
@@ -213,26 +215,25 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 
 **Remember**: Technical challenges are normal engineering work. Frame them as learning opportunities and process improvements, not crises.
 
-## Recent Improvements (2025-07-28)
+## Current State (2025-08-03)
 
-### WebSocket Migration Complete
+### Infrastructure Achievements
 
-- **Removed**: HTTP transport for transcription submission (90.7% latency improvement)
-- **Added**: Comprehensive telemetry for WebSocket submissions
-  - `Server.Telemetry.transcription_submitted/1` - Count submissions by source
-  - `Server.Telemetry.transcription_submission_latency/1` - Track submission latency
-  - `Server.Telemetry.transcription_submission_error/1` - Track errors by type
-  - `Server.Telemetry.transcription_text_length/1` - Monitor text lengths
-- **Metrics**: All WebSocket transcription flows now have full observability
+- **WebSocket Stats**: Real-time telemetry tracking via WebSocketStatsTracker
+- **Event Handler Safety**: All Phoenix channels have catch-all handlers
+- **Debug Interface**: Full `window.debug` implementation with query params
+- **Circuit Breakers**: Consolidated to CircuitBreakerServer pattern
+- **Batch Request Handling**: OBS operations optimized
+- **Test Infrastructure**: MockWebSocketConnection with exact protocol matching
+- **Concurrency Controls**: Task streams properly bounded
 
-### Configuration Centralization
+### What's Working Well
 
-- **Phononmaser**: Ports now configurable via environment variables
-  - `PHONONMASER_PORT` (default: 8889)
-  - `PHONONMASER_HEALTH_PORT` (default: 8890)
-- **Seed**: Full Pydantic configuration with environment variable support
-  - All settings exposed via `SEED_*` prefixed variables
-  - Nested configs use `__` delimiter (e.g., `SEED_LMS__API_URL`)
+- WebSocket resilience patterns prevent connection issues
+- Telemetry collection provides real-time insights
+- Debug interface enables rapid troubleshooting
+- Health check standards ensure service reliability
+- Pre-commit validation catches issues early
 
 ## Commands Reference
 
@@ -297,9 +298,10 @@ curl http://localhost:8890/health
 
 ## Known Limitations
 
-1. **Circuit Breaker**: Stateless implementation - GenServer refactor would improve fault tolerance
-2. **Animation Hook**: Complex implementation - GSAP master timeline could simplify
-3. **Documentation**: Guides in `docs/` may be outdated - `.claude/handoffs/implementation-roadmap.md` has latest patterns
+1. **Telemetry Dashboard**: Collection exists but lacks visualization
+2. **Documentation**: Some guides in `docs/` may be outdated
+3. **Test Patterns**: MockWebSocketConnection patterns work but aren't documented
+4. **Python Template**: Resilience patterns exist but no standardized template
 
 ## Architecture Assessment Summary
 
@@ -310,12 +312,12 @@ curl http://localhost:8890/health
 - **Clean Separation**: Clear service boundaries with defined responsibilities
 - **Developer Experience**: Comprehensive documentation, refactoring protocols, configuration management
 
-### Quick Wins
+### Next Priorities
 
-1. Add debug mode to overlays: `window.debug = { follow: (username) => ... }`
-2. Implement notification queue with audio feedback
-3. Create broadcast-only WebSocket endpoint for simple events
-4. Add GSAP master timeline for complex animations
+1. **Build Telemetry Dashboard**: Visualize the metrics already being collected
+2. **Document Test Patterns**: Capture MockWebSocketConnection implementation
+3. **Create Python Service Template**: Standardize resilience patterns
+4. **Update Documentation**: Remove outdated references, document what's real
 
 ## Development Workflow
 
@@ -431,12 +433,13 @@ landale/
 - **Security**: ETS tables use `:protected` access (never `:public`)
 - **Connection Resilience**: WebSocket clients implement exponential backoff and auto-reconnect
 
-### Architectural Limitations
+### Architectural Status
 
-1. **Circuit Breaker**: Stateless implementation - GenServer would provide better fault isolation
-2. **Documentation**: Some guides in `docs/` may not reflect current patterns
-3. **Animation System**: Complex hook implementation - could benefit from GSAP master timeline
-4. **Test Coverage**: Python services lack comprehensive test suites
+1. **Circuit Breaker**: Properly implemented as CircuitBreakerServer
+2. **Event Handlers**: All channels protected with catch-all handlers
+3. **Debug Interface**: Fully functional with `window.debug`
+4. **Concurrency**: Properly bounded with max_concurrency controls
+5. **Test Infrastructure**: MockWebSocketConnection enables proper testing
 
 ### Extension Points
 
