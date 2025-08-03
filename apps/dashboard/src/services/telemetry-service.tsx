@@ -13,6 +13,7 @@ import type {
   WebSocketStats,
   PerformanceMetrics,
   SystemInfo,
+  ServiceMetrics,
   TelemetryResponse,
   TelemetrySnapshot
 } from '@/types/telemetry'
@@ -21,6 +22,7 @@ interface TelemetryContextValue {
   websocketStats: () => WebSocketStats | null
   performanceMetrics: () => PerformanceMetrics | null
   systemInfo: () => SystemInfo | null
+  serviceMetrics: () => ServiceMetrics | null
   isConnected: () => boolean
   requestRefresh: () => void
 }
@@ -45,6 +47,7 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
   const [websocketStats, setWebsocketStats] = createSignal<WebSocketStats | null>(null)
   const [performanceMetrics, setPerformanceMetrics] = createSignal<PerformanceMetrics | null>(null)
   const [systemInfo, setSystemInfo] = createSignal<SystemInfo | null>(null)
+  const [serviceMetrics, setServiceMetrics] = createSignal<ServiceMetrics | null>(null)
   const [isConnected, setIsConnected] = createSignal(false)
 
   let telemetryChannel: Channel | null = null
@@ -135,6 +138,9 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
     if (data.system) {
       setSystemInfo(data.system)
     }
+    if (data.services) {
+      setServiceMetrics(data.services)
+    }
   }
 
   const requestTelemetryData = () => {
@@ -210,6 +216,7 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
     websocketStats,
     performanceMetrics,
     systemInfo,
+    serviceMetrics,
     isConnected,
     requestRefresh
   }

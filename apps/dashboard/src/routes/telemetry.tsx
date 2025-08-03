@@ -19,7 +19,7 @@ export const Route = createFileRoute('/telemetry')({
 })
 
 function TelemetryPage() {
-  const { websocketStats, performanceMetrics, systemInfo, requestRefresh } = useTelemetryService()
+  const { websocketStats, performanceMetrics, systemInfo, serviceMetrics, requestRefresh } = useTelemetryService()
   const { connectionState } = useStreamService()
 
   let intervalId: number
@@ -71,7 +71,13 @@ function TelemetryPage() {
             <div class="flex items-baseline justify-between">
               <span class="text-xs text-gray-500">Status</span>
               <span
-                class={`text-sm font-medium ${systemInfo()?.status === 'running' ? 'text-green-400' : 'text-yellow-400'}`}>
+                class={`text-sm font-medium ${
+                  systemInfo()?.status === 'healthy'
+                    ? 'text-green-400'
+                    : systemInfo()?.status === 'degraded'
+                      ? 'text-yellow-400'
+                      : 'text-red-400'
+                }`}>
                 {systemInfo()?.status || 'Unknown'}
               </span>
             </div>
@@ -193,6 +199,92 @@ function TelemetryPage() {
           </Show>
         </div>
       </div>
+
+      {/* Service Status */}
+      <Show when={serviceMetrics()}>
+        <div class="border-t border-gray-800 bg-gray-950/50 px-6 py-4">
+          <h3 class="mb-3 text-xs font-medium text-gray-400">Service Status</h3>
+          <div class="grid grid-cols-4 gap-4">
+            {/* Phononmaser */}
+            <div class="rounded bg-gray-900 p-3">
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-xs font-medium text-gray-400">Phononmaser</span>
+                <div
+                  class={`h-2 w-2 rounded-full ${
+                    serviceMetrics()?.phononmaser?.connected ? 'bg-green-500' : 'bg-red-500'
+                  }`}
+                />
+              </div>
+              <Show
+                when={serviceMetrics()?.phononmaser?.connected}
+                fallback={
+                  <div class="text-xs text-red-400">{serviceMetrics()?.phononmaser?.error || 'Disconnected'}</div>
+                }>
+                <div class="space-y-1">
+                  <div class="text-xs text-gray-500">
+                    Status: <span class="text-gray-300">{serviceMetrics()?.phononmaser?.status}</span>
+                  </div>
+                  <div class="text-xs text-gray-500">
+                    WS: <span class="text-gray-300">{serviceMetrics()?.phononmaser?.websocket_state}</span>
+                  </div>
+                </div>
+              </Show>
+            </div>
+
+            {/* Seed */}
+            <div class="rounded bg-gray-900 p-3">
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-xs font-medium text-gray-400">Seed</span>
+                <div
+                  class={`h-2 w-2 rounded-full ${serviceMetrics()?.seed?.connected ? 'bg-green-500' : 'bg-red-500'}`}
+                />
+              </div>
+              <Show
+                when={serviceMetrics()?.seed?.connected}
+                fallback={<div class="text-xs text-red-400">{serviceMetrics()?.seed?.error || 'Disconnected'}</div>}>
+                <div class="space-y-1">
+                  <div class="text-xs text-gray-500">
+                    Status: <span class="text-gray-300">{serviceMetrics()?.seed?.status}</span>
+                  </div>
+                  <div class="text-xs text-gray-500">
+                    WS: <span class="text-gray-300">{serviceMetrics()?.seed?.websocket_state}</span>
+                  </div>
+                </div>
+              </Show>
+            </div>
+
+            {/* OBS */}
+            <div class="rounded bg-gray-900 p-3">
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-xs font-medium text-gray-400">OBS</span>
+                <div
+                  class={`h-2 w-2 rounded-full ${serviceMetrics()?.obs?.connected ? 'bg-green-500' : 'bg-red-500'}`}
+                />
+              </div>
+              <Show
+                when={serviceMetrics()?.obs?.connected}
+                fallback={<div class="text-xs text-red-400">{serviceMetrics()?.obs?.error || 'Disconnected'}</div>}>
+                <div class="text-xs text-gray-300">Connected</div>
+              </Show>
+            </div>
+
+            {/* Twitch */}
+            <div class="rounded bg-gray-900 p-3">
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-xs font-medium text-gray-400">Twitch</span>
+                <div
+                  class={`h-2 w-2 rounded-full ${serviceMetrics()?.twitch?.connected ? 'bg-green-500' : 'bg-red-500'}`}
+                />
+              </div>
+              <Show
+                when={serviceMetrics()?.twitch?.connected}
+                fallback={<div class="text-xs text-red-400">{serviceMetrics()?.twitch?.error || 'Disconnected'}</div>}>
+                <div class="text-xs text-gray-300">Connected</div>
+              </Show>
+            </div>
+          </div>
+        </div>
+      </Show>
 
       {/* Lifetime Totals */}
       <Show when={websocketStats()?.totals}>

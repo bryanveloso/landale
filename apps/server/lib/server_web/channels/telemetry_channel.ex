@@ -360,22 +360,34 @@ defmodule ServerWeb.TelemetryChannel do
   end
 
   defp determine_system_status do
-    # Simple health check based on process availability
+    # Check both internal processes and external services
     critical_processes = [
-      ServerWeb.WebSocketStatsTracker,
-      Server.Services.OBS,
-      Server.Services.Twitch
+      ServerWeb.WebSocketStatsTracker
     ]
 
-    running_count =
+    # Check internal processes
+    process_count =
       Enum.count(critical_processes, fn module ->
         Process.whereis(module) != nil
       end)
 
-    case running_count do
-      n when n == length(critical_processes) -> "healthy"
-      n when n > 0 -> "degraded"
-      _ -> "unhealthy"
+    # Check external services (from gather_service_metrics results)
+    services = gather_service_metrics()
+
+    connected_services =
+      Enum.count([:phononmaser, :seed, :obs, :twitch], fn service ->
+        services[service][:connected] == true
+      end)
+
+    # 4 external services
+    total_critical = length(critical_processes) + 4
+    total_running = process_count + connected_services
+
+    cond do
+      total_running == total_critical -> "healthy"
+      # At least half working
+      total_running >= div(total_critical, 2) -> "degraded"
+      true -> "unhealthy"
     end
   end
 end
