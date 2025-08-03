@@ -32,18 +32,45 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
 
   // Handle telemetry channel subscription based on drawer state
   const subscribeTelemetry = () => {
-    const socket = getSocket()
-    if (!socket) {
+    const socketWrapper = getSocket()
+    if (!socketWrapper) {
+      console.error('No socket wrapper available')
+      return
+    }
+
+    console.log('Socket wrapper state:', socketWrapper.connectionState)
+    if (socketWrapper.connectionState !== 'connected') {
+      console.error('Socket is not connected, state:', socketWrapper.connectionState)
+      // Try to connect the socket if it's not connected
+      socketWrapper.connect()
+      console.log('Attempted to connect socket, new state:', socketWrapper.connectionState)
+    }
+
+    // Get the underlying Phoenix socket
+    const phoenixSocket = socketWrapper.getSocket()
+    if (!phoenixSocket) {
       console.error('No Phoenix socket available')
       return
     }
 
     if (telemetryChannel) {
-      console.log('Telemetry channel already exists, skipping subscription')
+      console.log('Telemetry channel already exists, state:', telemetryChannel.state)
+      // If channel exists but isn't joined, try to rejoin
+      if (telemetryChannel.state !== 'joined') {
+        console.log('Channel exists but not joined, attempting to rejoin...')
+        telemetryChannel.rejoin()
+      }
       return
     }
 
-    telemetryChannel = socket.channel('dashboard:telemetry')
+    telemetryChannel = phoenixSocket.channel('dashboard:telemetry', {})
+
+    if (!telemetryChannel) {
+      console.error('Failed to create telemetry channel - socket.channel() returned null')
+      return
+    }
+
+    console.log('Created telemetry channel:', telemetryChannel)
 
     // Listen for telemetry updates from the server (only one listener needed)
     telemetryChannel.on('telemetry_update', (data: any) => {
@@ -52,25 +79,57 @@ export function TelemetryDrawer(props: TelemetryDrawerProps) {
       if (data.performance) setPerformanceMetrics(data.performance)
     })
 
-    telemetryChannel
-      .join()
-      .receive('ok', () => {
-        console.log('Successfully joined telemetry channel, requesting data...')
-        // Request initial telemetry data
-        if (telemetryChannel) {
-          telemetryChannel
-            .push('get_telemetry', {})
-            .receive('ok', (data: any) => {
-              console.log('Received telemetry data:', data)
-              if (data.websocket) setWebsocketStats(data.websocket)
-              if (data.performance) setPerformanceMetrics(data.performance)
-            })
-            .receive('error', (err: any) => console.error('Failed to get telemetry:', err))
-            .receive('timeout', () => console.error('get_telemetry request timed out'))
-        }
-      })
-      .receive('error', (resp: any) => console.error('Failed to join telemetry channel:', resp))
-      .receive('timeout', () => console.error('Channel join timed out'))
+    console.log('Attempting to join telemetry channel...')
+
+    // Check if channel is already joined (by another component)
+    if (telemetryChannel.state === 'joined') {
+      console.log('Channel already joined, requesting telemetry data immediately')
+      telemetryChannel
+        .push('get_telemetry', {})
+        .receive('ok', (data: any) => {
+          console.log('Received telemetry data:', data)
+          if (data.websocket) setWebsocketStats(data.websocket)
+          if (data.performance) setPerformanceMetrics(data.performance)
+        })
+        .receive('error', (err: any) => console.error('Failed to get telemetry:', err))
+        .receive('timeout', () => console.error('get_telemetry request timed out'))
+      return
+    }
+
+    const joinPush = telemetryChannel.join()
+
+    joinPush.receive('ok', (resp: any) => {
+      console.log('Successfully joined telemetry channel, response:', resp)
+      // Request initial telemetry data immediately after join
+      telemetryChannel
+        .push('get_telemetry', {})
+        .receive('ok', (data: any) => {
+          console.log('Received telemetry data:', data)
+          if (data.websocket) setWebsocketStats(data.websocket)
+          if (data.performance) setPerformanceMetrics(data.performance)
+        })
+        .receive('error', (err: any) => console.error('Failed to get telemetry:', err))
+        .receive('timeout', () => console.error('get_telemetry request timed out'))
+    })
+
+    joinPush.receive('error', (resp: any) => console.error('Failed to join telemetry channel:', resp))
+    joinPush.receive('timeout', () => console.error('Channel join timed out'))
+
+    // Try to push get_telemetry after a short delay as a fallback
+    setTimeout(() => {
+      if (telemetryChannel && telemetryChannel.state === 'joined') {
+        console.log('Fallback: Requesting telemetry data after delay')
+        telemetryChannel
+          .push('get_telemetry', {})
+          .receive('ok', (data: any) => {
+            console.log('Fallback: Received telemetry data:', data)
+            if (data.websocket) setWebsocketStats(data.websocket)
+            if (data.performance) setPerformanceMetrics(data.performance)
+          })
+          .receive('error', (err: any) => console.error('Fallback: Failed to get telemetry:', err))
+          .receive('timeout', () => console.error('Fallback: get_telemetry request timed out'))
+      }
+    }, 1000)
   }
 
   const unsubscribeTelemetry = () => {

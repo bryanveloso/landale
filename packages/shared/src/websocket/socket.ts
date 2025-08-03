@@ -55,7 +55,7 @@ export class Socket {
   private options: Required<SocketOptions>
 
   // State management
-  private connectionState = ConnectionState.DISCONNECTED
+  private _connectionState = ConnectionState.DISCONNECTED
   private reconnectAttempts = 0
   private shouldReconnect = true
   private connectionCallbacks: Array<(event: ConnectionEvent) => void> = []
@@ -97,15 +97,15 @@ export class Socket {
 
   // Connection state management
   private emitConnectionEvent(newState: ConnectionState, error?: Error) {
-    if (newState !== this.connectionState) {
+    if (newState !== this._connectionState) {
       const event: ConnectionEvent = {
-        oldState: this.connectionState,
+        oldState: this._connectionState,
         newState,
         error: error ?? undefined,
         timestamp: Date.now()
       }
 
-      this.connectionState = newState
+      this._connectionState = newState
 
       this.connectionCallbacks.forEach((callback) => {
         try {
@@ -172,7 +172,7 @@ export class Socket {
     this.stopHeartbeat()
 
     this.heartbeatTimer = setInterval(() => {
-      if (this.connectionState === ConnectionState.CONNECTED && this.socket) {
+      if (this._connectionState === ConnectionState.CONNECTED && this.socket) {
         // Phoenix already handles heartbeats, but we monitor them
         const timeSinceLastHeartbeat = Date.now() - this.lastHeartbeat
 
@@ -201,7 +201,7 @@ export class Socket {
 
   // Connection management
   async connect(): Promise<void> {
-    if (this.isConnecting || this.connectionState === ConnectionState.CONNECTED) {
+    if (this.isConnecting || this._connectionState === ConnectionState.CONNECTED) {
       return
     }
 
@@ -245,7 +245,7 @@ export class Socket {
         this.options.logger('info', 'Socket closed')
         this.stopHeartbeat()
 
-        if (this.connectionState !== ConnectionState.DISCONNECTED) {
+        if (this._connectionState !== ConnectionState.DISCONNECTED) {
           this.emitConnectionEvent(ConnectionState.DISCONNECTED)
 
           if (this.shouldReconnect && this.reconnectAttempts < this.options.maxReconnectAttempts) {
@@ -316,7 +316,7 @@ export class Socket {
   // Health metrics
   getHealthMetrics(): HealthMetrics {
     return {
-      connectionState: this.connectionState,
+      connectionState: this._connectionState,
       reconnectAttempts: this.reconnectAttempts,
       totalReconnects: this.metrics.totalReconnects,
       failedReconnects: this.metrics.failedReconnects,
@@ -341,6 +341,11 @@ export class Socket {
   }
 
   isConnected(): boolean {
-    return this.connectionState === ConnectionState.CONNECTED && this.socket?.isConnected() === true
+    return this._connectionState === ConnectionState.CONNECTED && this.socket?.isConnected() === true
+  }
+
+  // Getter for connection state
+  get connectionState(): ConnectionState {
+    return this._connectionState
   }
 }

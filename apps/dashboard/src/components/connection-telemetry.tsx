@@ -59,41 +59,7 @@ export function ConnectionTelemetry() {
 
   // Subscribe to real-time health updates
   const subscribeToHealthUpdates = () => {
-    const socket = getSocket()
-    if (!socket) return
-
-    const channel = socket.channel('dashboard:telemetry')
-
-    channel.on('health_update', (data: any) => {
-      if (data.services) {
-        // Update service health from real-time events
-        const services = serviceHealth()
-
-        // Update or add service metrics
-        Object.entries(data.services).forEach(([serviceName, metrics]: [string, any]) => {
-          const existing = services.find((s) => s.name.toLowerCase() === serviceName.toLowerCase())
-          if (existing) {
-            Object.assign(existing, metrics)
-          } else {
-            services.push({
-              name: serviceName,
-              connected: metrics.connected || false,
-              ...metrics
-            })
-          }
-        })
-
-        setServiceHealth([...services])
-        setLastUpdate(Date.now())
-      }
-    })
-
-    channel
-      .join()
-      .receive('ok', () => console.log('Joined telemetry channel'))
-      .receive('error', (resp) => console.error('Failed to join telemetry channel:', resp))
-
-    return channel
+    return null
   }
 
   onMount(() => {

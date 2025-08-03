@@ -17,6 +17,7 @@ defmodule ServerWeb.TelemetryChannel do
   """
 
   use ServerWeb.ChannelBase
+  alias ServerWeb.ResponseBuilder
 
   @impl true
   def join("dashboard:telemetry", _payload, socket) do
@@ -122,13 +123,13 @@ defmodule ServerWeb.TelemetryChannel do
     # Also push the data immediately to ensure it's received
     push(socket, "telemetry_update", telemetry_data)
 
-    {:reply, {:ok, telemetry_data}, socket}
+    {:reply, ResponseBuilder.success(telemetry_data), socket}
   end
 
   @impl true
   def handle_in("get_service_health", %{"service" => service_name}, socket) do
     health_data = get_service_health(service_name)
-    {:reply, {:ok, health_data}, socket}
+    {:reply, ResponseBuilder.success(health_data), socket}
   end
 
   @impl true
@@ -140,7 +141,7 @@ defmodule ServerWeb.TelemetryChannel do
   @impl true
   def handle_in(event, payload, socket) do
     log_unhandled_message(event, payload, socket)
-    {:reply, {:error, %{message: "Unknown command: #{event}"}}, socket}
+    {:reply, ResponseBuilder.error("unknown_command", "Unknown command: #{event}"), socket}
   end
 
   # Private functions
@@ -181,7 +182,7 @@ defmodule ServerWeb.TelemetryChannel do
 
       pid ->
         try do
-          stats = GenServer.call(pid, :get_stats)
+          stats = GenServer.call(pid, :get_stats, 5000)
           {:ok, Map.put(stats, :status, "Active telemetry tracking")}
         rescue
           _ -> {:error, :call_failed}

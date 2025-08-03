@@ -91,6 +91,23 @@ defmodule ServerWeb.WebSocketStatsTracker do
   end
 
   @impl true
+  def handle_info({:telemetry_event, [:phoenix, :socket, :disconnect], _measurements, metadata}, state) do
+    # Phoenix's built-in socket disconnect event
+    # NOTE: We can't properly map socket_pid to correlation_id without Phoenix.Tracker
+    # For now, just update counts but don't try to clean connection_times
+    Logger.debug("Phoenix socket disconnected", metadata: metadata)
+
+    state = %{
+      state
+      | total_connections: max(0, state.total_connections - 1),
+        total_disconnects: state.total_disconnects + 1
+        # TODO: connection_times cleanup requires Phoenix.Tracker for PID-to-correlation_id mapping
+    }
+
+    {:noreply, state}
+  end
+
+  @impl true
   def handle_info({:telemetry_event, [:landale, :channel, :joined], _measurements, metadata}, state) do
     channel_type = extract_channel_type(metadata[:topic])
     Logger.info("Telemetry: Channel joined", topic: metadata[:topic], channel_type: channel_type)
@@ -143,7 +160,9 @@ defmodule ServerWeb.WebSocketStatsTracker do
       [:landale, :websocket, :connected],
       [:landale, :websocket, :disconnected],
       [:landale, :channel, :joined],
-      [:landale, :channel, :left]
+      [:landale, :channel, :left],
+      # Also listen for Phoenix's built-in socket disconnect event
+      [:phoenix, :socket, :disconnect]
     ]
 
     case :telemetry.attach_many(

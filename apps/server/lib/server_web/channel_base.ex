@@ -49,7 +49,7 @@ defmodule ServerWeb.ChannelBase do
       def emit_joined_telemetry(topic, socket) do
         :telemetry.execute(
           [:landale, :channel, :joined],
-          %{system_time: System.system_time()},
+          %{system_time: System.system_time(:millisecond)},
           %{
             topic: topic,
             socket_id: Map.get(socket.assigns, :correlation_id, "unknown")
@@ -62,7 +62,7 @@ defmodule ServerWeb.ChannelBase do
         if Map.has_key?(socket, :topic) do
           :telemetry.execute(
             [:landale, :channel, :left],
-            %{system_time: System.system_time()},
+            %{system_time: System.system_time(:millisecond)},
             %{
               topic: socket.topic,
               socket_id: Map.get(socket.assigns, :correlation_id, "unknown")

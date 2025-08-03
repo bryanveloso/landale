@@ -6,12 +6,12 @@ defmodule ServerWeb.UserSocket do
   alias Server.CorrelationId
 
   # Channels
+  channel "dashboard:telemetry", ServerWeb.TelemetryChannel
   channel "dashboard:*", ServerWeb.DashboardChannel
   channel "events:*", ServerWeb.EventsChannel
   channel "overlay:*", ServerWeb.OverlayChannel
   channel "stream:*", ServerWeb.StreamChannel
   channel "transcription:*", ServerWeb.TranscriptionChannel
-  channel "dashboard:telemetry", ServerWeb.TelemetryChannel
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After
@@ -37,7 +37,7 @@ defmodule ServerWeb.UserSocket do
     # Emit telemetry event for WebSocket connection
     :telemetry.execute(
       [:landale, :websocket, :connected],
-      %{system_time: System.system_time()},
+      %{system_time: System.system_time(:millisecond)},
       %{socket_id: correlation_id}
     )
 
