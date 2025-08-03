@@ -110,6 +110,7 @@ defmodule Server.Services.Twitch.ConnectionManager do
     # Accept optional parameters for testing
     uri = Keyword.get(opts, :url, @eventsub_uri)
     client_id = Keyword.get(opts, :client_id)
+    websocket_module = Keyword.get(opts, :websocket_module, Server.WebSocketConnection)
 
     state = %{
       uri: uri,
@@ -120,7 +121,8 @@ defmodule Server.Services.Twitch.ConnectionManager do
       owner_ref: Process.monitor(owner),
       keepalive_timer: nil,
       correlation_id: correlation_id,
-      client_id: client_id
+      client_id: client_id,
+      websocket_module: websocket_module
     }
 
     Logger.info("[#{correlation_id}] Twitch ConnectionManager initialized",
@@ -348,7 +350,7 @@ defmodule Server.Services.Twitch.ConnectionManager do
     ]
 
     {:ok, ws_conn} =
-      WebSocketConnection.start_link(
+      state.websocket_module.start_link(
         uri: state.uri,
         owner: self(),
         auto_connect: true,

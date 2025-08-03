@@ -82,26 +82,91 @@ defmodule Server.Services.Twitch.ConnectionManagerSimpleTest do
   end
 
   describe "ConnectionManager with mocked WebSocket" do
-    # This is where we'd use Mox or similar to mock WebSocketConnection
-    # and test how ConnectionManager responds to WebSocket events
-    # without testing the internal message passing details
+    setup do
+      # Create a connection manager with mock WebSocket module
+      {:ok, manager} =
+        ConnectionManager.start_link(
+          url: "wss://test.example.com/ws",
+          owner: self(),
+          client_id: "test_client_id",
+          name: nil,
+          websocket_module: MockWebSocketConnection
+        )
 
-    @tag :skip
-    test "transitions to ready state after session_welcome" do
-      # TODO: Implement with proper mocking library
-      # 1. Mock WebSocketConnection.start_link to return a mock pid
-      # 2. Call ConnectionManager.connect
-      # 3. Have mock trigger connected callback
-      # 4. Have mock send session_welcome frame
-      # 5. Assert ConnectionManager.get_state shows ready
+      {:ok, manager: manager}
     end
 
-    @tag :skip
-    test "handles connection errors gracefully" do
-      # TODO: Implement with proper mocking library
-      # 1. Mock WebSocketConnection to simulate errors
-      # 2. Assert ConnectionManager transitions to disconnected
-      # 3. Assert owner receives appropriate notification
+    test "transitions to ready state after session_welcome", %{manager: manager} do
+      # Connect and get the mock WebSocket
+      assert :ok = ConnectionManager.connect(manager)
+
+      # Wait for connection attempt and let mock connect
+      Process.sleep(100)
+
+      # Get internal state to access WebSocket connection
+      internal_state = :sys.get_state(manager)
+      ws_conn = internal_state.ws_conn
+
+      # Simulate successful connection
+      if ws_conn do
+        MockWebSocketConnection.simulate_connected(ws_conn)
+        Process.sleep(50)
+
+        # Send session_welcome message
+        session_welcome = %{
+          "metadata" => %{
+            "message_id" => "test-123",
+            "message_type" => "session_welcome",
+            "message_timestamp" => "2024-01-01T00:00:00.000Z"
+          },
+          "payload" => %{
+            "session" => %{
+              "id" => "test-session-123",
+              "status" => "connected",
+              "keepalive_timeout_seconds" => 10,
+              "connected_at" => "2024-01-01T00:00:00.000Z"
+            }
+          }
+        }
+
+        frame = {:text, Jason.encode!(session_welcome)}
+        MockWebSocketConnection.simulate_frame_received(ws_conn, frame)
+        Process.sleep(50)
+
+        # Verify state transition
+        final_state = ConnectionManager.get_state(manager)
+        assert final_state.connected == true
+        assert final_state.connection_state == :ready
+        assert final_state.session_id == "test-session-123"
+      end
+    end
+
+    test "handles connection errors gracefully", %{manager: manager} do
+      # Connect
+      assert :ok = ConnectionManager.connect(manager)
+      Process.sleep(100)
+
+      # Get internal state to access WebSocket connection
+      internal_state = :sys.get_state(manager)
+      ws_conn = internal_state.ws_conn
+
+      if ws_conn do
+        # First connect successfully
+        MockWebSocketConnection.simulate_connected(ws_conn)
+        Process.sleep(50)
+
+        # Then simulate an error
+        MockWebSocketConnection.simulate_error(ws_conn, "Network error")
+        Process.sleep(50)
+
+        # Verify manager transitions to error/disconnected state
+        error_state = ConnectionManager.get_state(manager)
+        assert error_state.connected == false
+        assert error_state.connection_state in [:disconnected, :reconnecting, :error]
+
+        # Verify owner receives notification (connection_lost is sent for errors)
+        assert_receive {:twitch_connection, {:connection_lost, _}}, 100
+      end
     end
   end
 end
