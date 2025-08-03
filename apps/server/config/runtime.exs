@@ -55,6 +55,12 @@ config :server,
   twitch_client_secret: System.get_env("TWITCH_CLIENT_SECRET"),
   twitch_user_id: System.get_env("TWITCH_USER_ID")
 
+# Also configure under nested :twitch key for services that expect it
+config :server, :twitch,
+  client_id: System.get_env("TWITCH_CLIENT_ID"),
+  client_secret: System.get_env("TWITCH_CLIENT_SECRET"),
+  user_id: System.get_env("TWITCH_USER_ID")
+
 # OBS WebSocket configuration for all environments
 config :server, :obs_websocket_url, System.get_env("OBS_WEBSOCKET_URL", "ws://100.106.173.14:4455")
 

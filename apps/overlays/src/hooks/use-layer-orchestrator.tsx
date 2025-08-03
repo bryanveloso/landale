@@ -330,7 +330,13 @@ export function useLayerOrchestrator(config: Partial<AnimationConfig> = {}) {
     const layerCtx = layerContexts[priority]
     if (layerCtx) {
       layerCtx.revert()
-      layerContexts[priority] = null
+      // Recreate the context to prevent memory leaks
+      const element = layerElements[priority]
+      if (element) {
+        layerContexts[priority] = gsap.context(() => {}, element)
+      } else {
+        layerContexts[priority] = null
+      }
     }
 
     layerElements[priority] = null

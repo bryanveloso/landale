@@ -174,52 +174,37 @@ defmodule ServerWeb.TelemetryChannel do
     }
   end
 
-  defp get_python_service_metrics(service_name) do
-    # Fetch metrics from Python service health endpoints
-    health_url =
-      case service_name do
-        "phononmaser" -> "http://localhost:8890/health"
-        "seed" -> "http://localhost:8891/health"
-        _ -> nil
-      end
-
-    if health_url do
-      case HTTPoison.get(health_url, [], timeout: 2000, recv_timeout: 2000) do
-        {:ok, %{status_code: 200, body: body}} ->
-          case Jason.decode(body) do
-            {:ok, data} ->
-              %{
-                connected: true,
-                status: data["status"],
-                uptime: data["uptime"],
-                websocket_state: data["websocket"]["state"],
-                reconnect_attempts: data["websocket"]["reconnect_attempts"],
-                circuit_breaker_trips: data["websocket"]["circuit_breaker_trips"]
-              }
-
-            _ ->
-              %{connected: false, error: "Invalid response"}
-          end
-
-        _ ->
-          %{connected: false, error: "Service unreachable"}
-      end
-    else
-      %{connected: false, error: "Unknown service"}
-    end
+  defp get_python_service_metrics(_service_name) do
+    # For now, return basic metrics without HTTP calls
+    # The telemetry data should come from the services broadcasting their status
+    %{
+      connected: false,
+      status: "pending",
+      note: "Direct HTTP metrics collection disabled - use telemetry events"
+    }
   end
 
   defp get_obs_metrics do
-    case Server.Services.OBS.get_status() do
-      {:ok, status} -> Map.merge(%{connected: true}, status)
-      {:error, _} -> %{connected: false}
+    try do
+      case Server.Services.OBS.get_status() do
+        {:ok, status} -> Map.merge(%{connected: true}, status)
+        {:error, _} -> %{connected: false}
+      end
+    rescue
+      _ ->
+        %{connected: false, error: "Service unavailable"}
     end
   end
 
   defp get_twitch_metrics do
-    case Server.Services.Twitch.get_status() do
-      {:ok, status} -> Map.merge(%{connected: true}, status)
-      {:error, _} -> %{connected: false}
+    try do
+      case Server.Services.Twitch.get_status() do
+        {:ok, status} -> Map.merge(%{connected: true}, status)
+        {:error, _} -> %{connected: false}
+      end
+    rescue
+      _ ->
+        %{connected: false, error: "Service unavailable"}
     end
   end
 
