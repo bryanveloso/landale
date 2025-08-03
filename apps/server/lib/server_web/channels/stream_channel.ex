@@ -357,6 +357,17 @@ defmodule ServerWeb.StreamChannel do
     {:noreply, socket}
   end
 
+  # Catch-all handler to prevent crashes from unexpected messages
+  @impl true
+  def handle_info(unhandled_msg, socket) do
+    Logger.warning("Unhandled message in #{__MODULE__}",
+      message: inspect(unhandled_msg),
+      topic: socket.topic
+    )
+
+    {:noreply, socket}
+  end
+
   # Private helper functions
 
   defp format_state_for_client(state) do

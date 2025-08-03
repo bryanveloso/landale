@@ -221,4 +221,15 @@ defmodule ServerWeb.EventsChannel do
 
     {:noreply, socket}
   end
+
+  # Catch-all handler to prevent crashes from unexpected messages
+  @impl true
+  def handle_info(unhandled_msg, socket) do
+    Logger.warning("Unhandled message in #{__MODULE__}",
+      message: inspect(unhandled_msg),
+      event_topic: socket.assigns[:event_topic]
+    )
+
+    {:noreply, socket}
+  end
 end

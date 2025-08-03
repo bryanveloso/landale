@@ -497,6 +497,17 @@ defmodule ServerWeb.OverlayChannel do
     {:noreply, socket}
   end
 
+  # Catch-all handler to prevent crashes from unexpected messages
+  @impl true
+  def handle_info(unhandled_msg, socket) do
+    Logger.warning("Unhandled message in #{__MODULE__}",
+      message: inspect(unhandled_msg),
+      overlay_type: socket.assigns[:overlay_type]
+    )
+
+    {:noreply, socket}
+  end
+
   # Private helper functions
 
   # Parameter validation

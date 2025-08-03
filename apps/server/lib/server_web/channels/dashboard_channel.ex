@@ -7,6 +7,7 @@ defmodule ServerWeb.DashboardChannel do
   performance metrics.
 
   ## Events Subscribed To
+  - `dashboard` - Twitch connection and event updates
   - `obs:events` - OBS WebSocket state changes and events
   - `rainwave:events` - Rainwave music service updates
   - `system:health` - System health status updates
@@ -18,6 +19,10 @@ defmodule ServerWeb.DashboardChannel do
   - `rainwave_event` - Rainwave music updates (song changes, station changes)
   - `health_update` - System health status changes
   - `performance_update` - Performance metrics updates
+  - `twitch_connected` - Twitch EventSub connection established
+  - `twitch_disconnected` - Twitch EventSub connection lost
+  - `twitch_connection_changed` - Twitch connection state changes
+  - `twitch_event` - General Twitch events (follows, subs, etc.)
 
   ## Incoming Commands
   - `obs:get_status` - Request current OBS status
@@ -42,6 +47,8 @@ defmodule ServerWeb.DashboardChannel do
 
     # Subscribe to relevant PubSub topics for real-time updates
     subscribe_to_topics([
+      # For Twitch connection events
+      "dashboard",
       "obs:events",
       "rainwave:events",
       "system:health",
@@ -93,6 +100,41 @@ defmodule ServerWeb.DashboardChannel do
   def handle_info({:event_batch, batch}, socket) do
     # Handle batched events efficiently
     push(socket, "event_batch", batch)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:twitch_connected, event}, socket) do
+    push(socket, "twitch_connected", event)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:twitch_disconnected, event}, socket) do
+    push(socket, "twitch_disconnected", event)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:twitch_connection_changed, event}, socket) do
+    push(socket, "twitch_connection_changed", event)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:twitch_event, event}, socket) do
+    push(socket, "twitch_event", event)
+    {:noreply, socket}
+  end
+
+  # Catch-all handler to prevent crashes from unexpected messages
+  @impl true
+  def handle_info(unhandled_msg, socket) do
+    Logger.warning("Unhandled message in #{__MODULE__}",
+      message: inspect(unhandled_msg),
+      room_id: socket.assigns[:room_id]
+    )
+
     {:noreply, socket}
   end
 

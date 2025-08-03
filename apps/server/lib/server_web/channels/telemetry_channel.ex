@@ -87,6 +87,34 @@ defmodule ServerWeb.TelemetryChannel do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_info({:telemetry_health_event, event}, socket) do
+    push(socket, "health_update", event)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:telemetry_websocket_event, event}, socket) do
+    push(socket, "websocket_metrics", event)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:telemetry_metrics_event, event}, socket) do
+    push(socket, "performance_metrics", event)
+    {:noreply, socket}
+  end
+
+  # Catch-all handler to prevent crashes from unexpected messages
+  @impl true
+  def handle_info(unhandled_msg, socket) do
+    Logger.warning("Unhandled message in #{__MODULE__}",
+      message: inspect(unhandled_msg)
+    )
+
+    {:noreply, socket}
+  end
+
   # Client commands
 
   @impl true
@@ -99,6 +127,18 @@ defmodule ServerWeb.TelemetryChannel do
   def handle_in("get_service_health", %{"service" => service_name}, socket) do
     health_data = get_service_health(service_name)
     {:reply, {:ok, health_data}, socket}
+  end
+
+  @impl true
+  def handle_in("ping", payload, socket) do
+    handle_ping(payload, socket)
+  end
+
+  # Catch-all for unhandled client messages
+  @impl true
+  def handle_in(event, payload, socket) do
+    log_unhandled_message(event, payload, socket)
+    {:reply, {:error, %{message: "Unknown command: #{event}"}}, socket}
   end
 
   # Private functions
