@@ -93,7 +93,7 @@ defmodule Server.Services.Twitch do
       :twitch_service,
       :connection_status,
       fn ->
-        GenServer.call(__MODULE__, :get_status)
+        GenServer.call(__MODULE__, :get_service_status)
       end,
       ttl_seconds: 10
     )
@@ -424,10 +424,13 @@ defmodule Server.Services.Twitch do
   def handle_call(:get_service_status, _from, state) do
     status = %{
       connected: state.connected,
-      connection_state: state.connection_state,
-      session_id: state.session_id,
-      subscription_count: map_size(state.subscriptions),
-      subscription_cost: state.subscription_total_cost
+      status: determine_service_status(state),
+      metadata: %{
+        connection_state: state.connection_state,
+        session_id: state.session_id,
+        subscription_count: map_size(state.subscriptions),
+        subscription_cost: state.subscription_total_cost
+      }
     }
 
     {:reply, {:ok, status}, state}
@@ -1674,5 +1677,15 @@ defmodule Server.Services.Twitch do
     )
 
     send(self(), :connect)
+  end
+
+  # Helper to determine standardized service status
+  defp determine_service_status(state) do
+    cond do
+      state.connected && state.session_id -> "healthy"
+      # Connected but no session
+      state.connected -> "degraded"
+      true -> "unhealthy"
+    end
   end
 end

@@ -264,7 +264,9 @@ function TelemetryPage() {
               <Show
                 when={serviceMetrics()?.obs?.connected}
                 fallback={<div class="text-xs text-red-400">{serviceMetrics()?.obs?.error || 'Disconnected'}</div>}>
-                <div class="text-xs text-gray-300">Connected</div>
+                <div class="text-xs text-gray-500">
+                  Status: <span class="text-gray-300">{serviceMetrics()?.obs?.status || 'healthy'}</span>
+                </div>
               </Show>
             </div>
 
@@ -279,7 +281,9 @@ function TelemetryPage() {
               <Show
                 when={serviceMetrics()?.twitch?.connected}
                 fallback={<div class="text-xs text-red-400">{serviceMetrics()?.twitch?.error || 'Disconnected'}</div>}>
-                <div class="text-xs text-gray-300">Connected</div>
+                <div class="text-xs text-gray-500">
+                  Status: <span class="text-gray-300">{serviceMetrics()?.twitch?.status || 'healthy'}</span>
+                </div>
               </Show>
             </div>
           </div>

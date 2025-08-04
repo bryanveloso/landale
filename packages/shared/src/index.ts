@@ -11,6 +11,7 @@ export * from './types/music'
 export * from './types/apple-music'
 export * from './types/phoenix'
 export type * from './hooks/use-display'
+export { logger } from './logger'
 
 // Common utility types
 export type DeepPartial<T> = T extends object

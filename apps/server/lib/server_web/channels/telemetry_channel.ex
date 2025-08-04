@@ -48,22 +48,6 @@ defmodule ServerWeb.TelemetryChannel do
   # Client explicitly requests data via push("get_telemetry")
 
   @impl true
-  def handle_info(:periodic_telemetry_update, socket) do
-    # Only send updates if there are significant changes
-    telemetry_data = gather_telemetry_snapshot()
-
-    # Compare with last sent data (could store in socket assigns)
-    if telemetry_changed?(socket, telemetry_data) do
-      push(socket, "telemetry_update", telemetry_data)
-    end
-
-    # Schedule next update
-    schedule_telemetry_update()
-
-    {:noreply, assign(socket, :last_telemetry, telemetry_data)}
-  end
-
-  @impl true
   def handle_info({:telemetry_event, event_type, data}, socket) do
     # Forward telemetry events to client
     push(socket, event_type, data)
@@ -186,75 +170,35 @@ defmodule ServerWeb.TelemetryChannel do
   end
 
   defp gather_service_metrics do
-    %{
-      phononmaser: get_python_service_metrics("phononmaser"),
-      seed: get_python_service_metrics("seed"),
-      obs: get_obs_metrics(),
-      twitch: get_twitch_metrics()
-    }
-  end
+    services = [
+      {:obs, Server.Services.OBS},
+      {:twitch, Server.Services.Twitch},
+      {:phononmaser, {Server.HTTPServiceAdapter, get_service_health_url(:phononmaser)}},
+      {:seed, {Server.HTTPServiceAdapter, get_service_health_url(:seed)}}
+    ]
 
-  defp get_python_service_metrics(service_name) do
-    # Fetch metrics from Python service health endpoints
-    health_url =
-      case service_name do
-        "phononmaser" -> "http://localhost:8890/health"
-        "seed" -> "http://localhost:8891/health"
-        _ -> nil
-      end
+    Map.new(services, fn {name, service_spec} ->
+      status =
+        case service_spec do
+          {_adapter_module, nil} ->
+            # Handle missing configuration
+            {:error, "Service URL not configured"}
 
-    if health_url do
-      case HTTPoison.get(health_url, [], timeout: 2000, recv_timeout: 2000) do
-        {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-          case Jason.decode(body) do
-            {:ok, data} ->
-              %{
-                connected: true,
-                status: data["status"],
-                uptime: data["uptime"],
-                websocket_state: data["websocket"]["state"],
-                reconnect_attempts: data["websocket"]["reconnect_attempts"],
-                circuit_breaker_trips: data["websocket"]["circuit_breaker_trips"]
-              }
+          {adapter_module, url} ->
+            adapter_module.get_status(url)
 
-            _ ->
-              %{connected: false, error: "Invalid response"}
-          end
+          service_module ->
+            service_module.get_status()
+        end
 
-        _ ->
-          %{connected: false, error: "Service unreachable"}
-      end
-    else
-      %{connected: false, error: "Unknown service"}
-    end
-  rescue
-    error ->
-      Logger.debug("Failed to fetch metrics for #{service_name}", error: inspect(error))
-      %{connected: false, error: "Service check failed"}
-  end
+      formatted_status =
+        case status do
+          {:ok, data} -> Map.merge(%{connected: true}, data)
+          {:error, reason} -> %{connected: false, error: sanitize_error(reason)}
+        end
 
-  defp get_obs_metrics do
-    try do
-      case Server.Services.OBS.get_status() do
-        {:ok, status} -> Map.merge(%{connected: true}, status)
-        {:error, _} -> %{connected: false}
-      end
-    rescue
-      _ ->
-        %{connected: false, error: "Service unavailable"}
-    end
-  end
-
-  defp get_twitch_metrics do
-    try do
-      case Server.Services.Twitch.get_status() do
-        {:ok, status} -> Map.merge(%{connected: true}, status)
-        {:error, _} -> %{connected: false}
-      end
-    rescue
-      _ ->
-        %{connected: false, error: "Service unavailable"}
-    end
+      {name, formatted_status}
+    end)
   end
 
   defp gather_performance_metrics do
@@ -307,43 +251,15 @@ defmodule ServerWeb.TelemetryChannel do
   end
 
   defp get_service_health(service_name) do
+    services = gather_service_metrics()
+
     case service_name do
-      "phononmaser" -> get_python_service_metrics("phononmaser")
-      "seed" -> get_python_service_metrics("seed")
-      "obs" -> get_obs_metrics()
-      "twitch" -> get_twitch_metrics()
+      "phononmaser" -> Map.get(services, :phononmaser, %{error: "Service not found"})
+      "seed" -> Map.get(services, :seed, %{error: "Service not found"})
+      "obs" -> Map.get(services, :obs, %{error: "Service not found"})
+      "twitch" -> Map.get(services, :twitch, %{error: "Service not found"})
       _ -> %{error: "Unknown service"}
     end
-  end
-
-  defp telemetry_changed?(socket, new_data) do
-    # Simple change detection - could be more sophisticated
-    case socket.assigns[:last_telemetry] do
-      nil ->
-        true
-
-      last_data ->
-        # Check if any metrics have significantly changed
-        websocket_changed?(last_data.websocket, new_data.websocket) ||
-          services_changed?(last_data.services, new_data.services)
-    end
-  end
-
-  defp websocket_changed?(old, new) do
-    old[:total_connections] != new[:total_connections] ||
-      old[:active_channels] != new[:active_channels]
-  end
-
-  defp services_changed?(old, new) do
-    # Check if any service connection status changed
-    Enum.any?([:phononmaser, :seed, :obs, :twitch], fn service ->
-      old[service][:connected] != new[service][:connected]
-    end)
-  end
-
-  defp schedule_telemetry_update do
-    # Send updates every 10 seconds
-    Process.send_after(self(), :periodic_telemetry_update, 10_000)
   end
 
   defp gather_system_metrics do
@@ -390,4 +306,27 @@ defmodule ServerWeb.TelemetryChannel do
       true -> "unhealthy"
     end
   end
+
+  # Helper to get service health URL from configuration
+  defp get_service_health_url(service_name) do
+    Application.get_env(:server, :services)
+    |> get_in([service_name, :health_url])
+    |> case do
+      nil ->
+        Logger.warning("No health URL configured for service #{service_name}")
+        nil
+
+      url ->
+        url
+    end
+  end
+
+  # Helper to sanitize error messages before sending to client
+  defp sanitize_error(:timeout), do: "Connection timed out"
+  defp sanitize_error(:econnrefused), do: "Service unreachable"
+  defp sanitize_error("Invalid JSON response"), do: "Invalid response from service"
+  defp sanitize_error("Service unreachable"), do: "Service unreachable"
+  defp sanitize_error("Service URL not configured"), do: "Service not configured"
+  defp sanitize_error(reason) when is_binary(reason), do: reason
+  defp sanitize_error(_), do: "An unknown error occurred"
 end

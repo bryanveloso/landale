@@ -8,6 +8,7 @@
 import { createContext, useContext, createSignal, onMount, onCleanup, createEffect } from 'solid-js'
 import type { JSX } from 'solid-js'
 import { Channel } from 'phoenix'
+import { logger } from '@landale/shared/logger'
 import { useStreamService } from './stream-service'
 import type {
   WebSocketStats,
@@ -59,21 +60,21 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
   const connectToTelemetry = () => {
     const socketWrapper = getSocket()
     if (!socketWrapper) {
-      console.error('[TelemetryService] No socket wrapper available')
+      logger.error('[TelemetryService] No socket wrapper available')
       scheduleReconnect()
       return
     }
 
     // Check socket state
     if (socketWrapper.connectionState !== 'connected') {
-      console.log('[TelemetryService] Socket not connected, waiting...')
+      logger.debug('[TelemetryService] Socket not connected, waiting...')
       scheduleReconnect()
       return
     }
 
     const phoenixSocket = socketWrapper.getSocket()
     if (!phoenixSocket) {
-      console.error('[TelemetryService] No Phoenix socket available')
+      logger.error('[TelemetryService] No Phoenix socket available')
       scheduleReconnect()
       return
     }
@@ -84,27 +85,27 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
       telemetryChannel = null
     }
 
-    console.log('[TelemetryService] Creating telemetry channel...')
+    logger.debug('[TelemetryService] Creating telemetry channel...')
     telemetryChannel = phoenixSocket.channel('dashboard:telemetry', {})
 
     if (!telemetryChannel) {
-      console.error('[TelemetryService] Failed to create channel')
+      logger.error('[TelemetryService] Failed to create channel')
       scheduleReconnect()
       return
     }
 
     // Set up event listeners
     telemetryChannel.on('telemetry_update', (response: TelemetryResponse | TelemetrySnapshot) => {
-      console.log('[TelemetryService] Received telemetry update')
+      logger.debug('[TelemetryService] Received telemetry update')
       handleTelemetryData(response)
     })
 
     // Join the channel
-    console.log('[TelemetryService] Joining telemetry channel...')
+    logger.debug('[TelemetryService] Joining telemetry channel...')
     const joinPush = telemetryChannel.join()
 
     joinPush.receive('ok', (response: any) => {
-      console.log('[TelemetryService] Successfully joined telemetry channel')
+      logger.info('[TelemetryService] Successfully joined telemetry channel')
       setIsConnected(true)
       reconnectAttempts = 0 // Reset on successful connection
 
@@ -113,13 +114,13 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
     })
 
     joinPush.receive('error', (resp: any) => {
-      console.error('[TelemetryService] Failed to join channel:', resp)
+      logger.error('[TelemetryService] Failed to join channel:', resp)
       setIsConnected(false)
       scheduleReconnect()
     })
 
     joinPush.receive('timeout', () => {
-      console.error('[TelemetryService] Channel join timeout')
+      logger.error('[TelemetryService] Channel join timeout')
       setIsConnected(false)
       scheduleReconnect()
     })
@@ -145,21 +146,21 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
 
   const requestTelemetryData = () => {
     if (!telemetryChannel || telemetryChannel.state !== 'joined') {
-      console.warn('[TelemetryService] Cannot request data - channel not joined')
+      logger.warn('[TelemetryService] Cannot request data - channel not joined')
       return
     }
 
     telemetryChannel
       .push('get_telemetry', {})
       .receive('ok', (response: TelemetryResponse | any) => {
-        console.log('[TelemetryService] Received telemetry data')
+        logger.debug('[TelemetryService] Received telemetry data')
         handleTelemetryData(response)
       })
       .receive('error', (err: any) => {
-        console.error('[TelemetryService] Failed to get telemetry:', err)
+        logger.error('[TelemetryService] Failed to get telemetry:', err)
       })
       .receive('timeout', () => {
-        console.error('[TelemetryService] get_telemetry timeout')
+        logger.error('[TelemetryService] get_telemetry timeout')
       })
   }
 
@@ -175,10 +176,10 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
       maxReconnectDelay
     )
 
-    console.log(`[TelemetryService] Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms`)
+    logger.debug(`[TelemetryService] Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms`)
 
     reconnectTimeout = window.setTimeout(() => {
-      console.log('[TelemetryService] Attempting reconnect...')
+      logger.debug('[TelemetryService] Attempting reconnect...')
       connectToTelemetry()
     }, delay)
   }

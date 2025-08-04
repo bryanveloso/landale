@@ -97,12 +97,16 @@ defmodule Server.Services.OBS do
   def get_status do
     case get_connection() do
       {:ok, conn} ->
-        state = Server.Services.OBS.Connection.get_state(conn)
+        connection_state = Server.Services.OBS.Connection.get_state(conn)
+        connected = connection_state in [:ready, :authenticating]
 
         {:ok,
          %{
-           connected: state in [:ready, :authenticating],
-           connection_state: state
+           connected: connected,
+           status: determine_service_status(connection_state),
+           metadata: %{
+             connection_state: connection_state
+           }
          }}
 
       {:error, reason} ->
@@ -411,5 +415,16 @@ defmodule Server.Services.OBS do
 
   defp get_stream_manager do
     Server.Services.OBS.Supervisor.get_process(@default_session, :stream_manager)
+  end
+
+  # Helper to determine standardized service status
+  defp determine_service_status(connection_state) do
+    case connection_state do
+      :ready -> "healthy"
+      :authenticating -> "degraded"
+      :connecting -> "degraded"
+      :reconnecting -> "degraded"
+      _ -> "unhealthy"
+    end
   end
 end

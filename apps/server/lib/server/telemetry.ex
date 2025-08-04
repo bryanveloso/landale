@@ -20,7 +20,7 @@ defmodule Server.Telemetry do
           connection_value = if status.connected, do: 1, else: 0
 
           :telemetry.execute([:server, :obs, :connection, :status], %{value: connection_value}, %{
-            state: status.connection_state
+            state: status.metadata.connection_state
           })
 
           # Get detailed state for additional metrics
@@ -55,12 +55,21 @@ defmodule Server.Telemetry do
           connection_value = if status.connected, do: 1, else: 0
 
           :telemetry.execute([:server, :twitch, :connection, :status], %{value: connection_value}, %{
-            state: status.connection_state
+            state: status.metadata.connection_state
           })
 
           # Emit subscription metrics
-          :telemetry.execute([:server, :twitch, :subscriptions, :active], %{value: status.subscription_count}, %{})
-          :telemetry.execute([:server, :twitch, :subscriptions, :cost], %{value: status.subscription_cost}, %{})
+          :telemetry.execute(
+            [:server, :twitch, :subscriptions, :active],
+            %{value: status.metadata.subscription_count},
+            %{}
+          )
+
+          :telemetry.execute(
+            [:server, :twitch, :subscriptions, :cost],
+            %{value: status.metadata.subscription_cost},
+            %{}
+          )
 
         {:error, _reason} ->
           :telemetry.execute([:server, :twitch, :connection, :status], %{value: 0}, %{state: "error"})

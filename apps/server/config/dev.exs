@@ -78,3 +78,25 @@ config :phoenix, :plug_init_mode, :runtime
 
 # IronMON TCP server port
 config :server, :ironmon_tcp_port, String.to_integer(System.get_env("IRONMON_TCP_PORT") || "8080")
+
+# Service discovery configuration
+# Using Tailscale hostnames/IPs for proper service location
+config :server, :services,
+  phononmaser: [
+    # Phononmaser runs on the same machine as Phoenix
+    health_url: "http://zelan:8890/health",
+    host: "zelan",
+    port: 8890
+  ],
+  seed: [
+    # Seed also runs on the same machine as Phoenix
+    health_url: "http://zelan:8891/health",
+    host: "zelan",
+    port: 8891
+  ],
+  obs: [
+    # OBS runs on Demi (streaming machine)
+    host: "demi",
+    ip: "100.106.173.14",
+    port: 4455
+  ]
