@@ -19,7 +19,22 @@ defmodule ServerWeb.Endpoint do
 
   # WebSocket endpoint for dashboard and event clients
   socket "/socket", ServerWeb.UserSocket,
-    websocket: true,
+    websocket: [
+      check_origin: [
+        "http://localhost:*",
+        "http://127.0.0.1:*",
+        "http://saya:*",
+        "http://zelan:*",
+        "http://demi:*",
+        "http://alys:*",
+        "//localhost:*",
+        "//127.0.0.1:*",
+        "//saya:*",
+        "//zelan:*",
+        "//demi:*",
+        "//alys:*"
+      ]
+    ],
     longpoll: false
 
   # Serve at "/" the static files from "priv/static" directory.
