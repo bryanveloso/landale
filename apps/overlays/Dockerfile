@@ -6,9 +6,10 @@ WORKDIR /app
 COPY package.json bun.lock turbo.json ./
 
 # Create directory structure
-RUN mkdir -p packages/logger packages/shared apps/overlays
+RUN mkdir -p packages/logger packages/shared packages/config-typescript apps/overlays
 
 # Copy all package.json files to maintain workspace integrity
+COPY packages/config-typescript/package.json ./packages/config-typescript/
 COPY packages/logger/package.json ./packages/logger/
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/overlays/package.json ./apps/overlays/
@@ -17,6 +18,7 @@ COPY apps/overlays/package.json ./apps/overlays/
 RUN bun install
 
 # Now copy all source files
+COPY packages/config-typescript ./packages/config-typescript
 COPY packages/logger ./packages/logger
 COPY packages/shared ./packages/shared
 COPY apps/overlays ./apps/overlays
