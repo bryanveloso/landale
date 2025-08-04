@@ -66,22 +66,23 @@ services:
       retries: 3
       start_period: 40s
 
-  # overlays:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #     target: ${DOCKER_TARGET:-development}
-  #   restart: unless-stopped
-  #   working_dir: /app/apps/overlays
-  #   volumes:
-  #     - emotes_cache:/app/apps/overlays/public/emotes
-  #   environment:
-  #     NODE_ENV: ${NODE_ENV:-development}
-  #   ports:
-  #     - '8008:8008'
-  #   depends_on:
-  #     - server
-  #   command: ['bunx', '--bun', 'vite']
+  overlays:
+    build:
+      context: .
+      dockerfile: apps/overlays/Dockerfile
+      args:
+        VITE_WEBSOCKET_URL: ws://saya:7175
+    restart: unless-stopped
+    volumes:
+      - emotes_cache:/workspace/apps/overlays/public/emotes
+    environment:
+      VITE_WEBSOCKET_URL: ws://saya:7175
+    ports:
+      - '8008:8008'
+    depends_on:
+      server:
+        condition: service_healthy
+    network_mode: service:tailscale-server
 
 volumes:
   postgres_data:
