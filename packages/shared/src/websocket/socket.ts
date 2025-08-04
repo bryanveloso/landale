@@ -7,9 +7,11 @@
  * - Connection state management
  * - Health monitoring
  * - Graceful degradation
+ * - Message inspection for debugging
  */
 
 import { Socket as PhoenixSocket, Channel } from 'phoenix'
+import { MessageInspector } from './message-inspector'
 
 export enum ConnectionState {
   DISCONNECTED = 'disconnected',
@@ -81,6 +83,9 @@ export class Socket {
   // Connection lock to prevent concurrent attempts
   private isConnecting = false
 
+  // Message inspector for debugging
+  private messageInspector: MessageInspector
+
   constructor(options: SocketOptions) {
     this.options = {
       url: options.url,
@@ -93,6 +98,9 @@ export class Socket {
       logger: options.logger ?? ((kind, msg, data) => console.log(`[Phoenix ${kind}] ${msg}`, data)),
       params: options.params ?? {}
     }
+
+    // Initialize message inspector
+    this.messageInspector = new MessageInspector(100)
   }
 
   // Connection state management
@@ -224,6 +232,22 @@ export class Socket {
         heartbeatIntervalMs: this.options.heartbeatInterval
       })
 
+      // Hook into Phoenix socket messages for inspection
+      const originalOnMessage = this.socket.onMessage.bind(this.socket)
+      this.socket.onMessage = (msg: any) => {
+        // Record incoming message
+        this.messageInspector.recordIncoming(msg)
+        return originalOnMessage(msg)
+      }
+
+      // Hook into push for outgoing messages
+      const originalPush = this.socket.push.bind(this.socket)
+      this.socket.push = (data: any) => {
+        // Record outgoing message
+        this.messageInspector.recordOutgoing(data)
+        return originalPush(data)
+      }
+
       // Set up event handlers
       this.socket.onOpen(() => {
         this.options.logger('info', 'Socket connected')
@@ -347,5 +371,19 @@ export class Socket {
   // Getter for connection state
   get connectionState(): ConnectionState {
     return this._connectionState
+  }
+
+  // Message Inspector API
+  getMessageInspector(): MessageInspector {
+    return this.messageInspector
+  }
+
+  enableMessageInspection(enabled = true) {
+    this.messageInspector.setEnabled(enabled)
+    this.options.logger('info', `Message inspection ${enabled ? 'enabled' : 'disabled'}`)
+  }
+
+  isMessageInspectionEnabled(): boolean {
+    return this.messageInspector.isEnabled()
   }
 }

@@ -3,7 +3,6 @@ import { StreamQueue } from '@/components/stream-queue'
 import { LayerStateMonitor } from '@/components/layer-state-monitor'
 import { TakeoverPanel } from '@/components/takeover-panel'
 import { StreamInformation } from '@/components/stream-information'
-import { DebugDrawer } from '@/components/debug-drawer'
 import { StatusBar } from '@/components/status-bar'
 import { ConnectionMonitor } from '@/components/error-boundary'
 import { ActivityLogPanel } from '@/components/activity-log-panel'
@@ -27,7 +26,6 @@ function Index() {
         </div>
 
         <StatusBar />
-        <DebugDrawer />
       </div>
     </ConnectionMonitor>
   )

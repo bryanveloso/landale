@@ -193,8 +193,18 @@ defmodule ServerWeb.TelemetryChannel do
 
       formatted_status =
         case status do
-          {:ok, data} -> Map.merge(%{connected: true}, data)
-          {:error, reason} -> %{connected: false, error: sanitize_error(reason)}
+          {:ok, data} ->
+            Map.merge(%{connected: true, phoenix_reachable: true}, data)
+
+          {:error, reason} ->
+            # Determine if this is a Phoenix connectivity issue
+            phoenix_issue = reason in [:econnrefused, :timeout, "Connection timed out", "Service unreachable"]
+
+            %{
+              connected: false,
+              error: sanitize_error(reason),
+              phoenix_reachable: not phoenix_issue
+            }
         end
 
       {name, formatted_status}
@@ -276,7 +286,11 @@ defmodule ServerWeb.TelemetryChannel do
   end
 
   defp determine_system_status do
-    # Check both internal processes and external services
+    # SERVICE HEALTH CASCADE: Phoenix is the central hub
+    # If Phoenix is down, ALL services should be marked as degraded
+    # because they can't communicate even if individually healthy
+
+    # Check critical internal processes
     critical_processes = [
       ServerWeb.WebSocketStatsTracker
     ]
@@ -290,6 +304,20 @@ defmodule ServerWeb.TelemetryChannel do
     # Check external services (from gather_service_metrics results)
     services = gather_service_metrics()
 
+    # If any service can't reach Phoenix, that's a connectivity issue
+    # Check if services are reporting connection errors
+    services_with_errors =
+      Enum.count([:phononmaser, :seed, :obs, :twitch], fn service ->
+        case services[service] do
+          %{connected: false, error: "Service unreachable"} -> true
+          %{connected: false, error: "Connection timed out"} -> true
+          _ -> false
+        end
+      end)
+
+    # If multiple services can't connect, Phoenix might appear up but be unreachable
+    phoenix_unreachable = services_with_errors >= 3
+
     connected_services =
       Enum.count([:phononmaser, :seed, :obs, :twitch], fn service ->
         services[service][:connected] == true
@@ -300,9 +328,13 @@ defmodule ServerWeb.TelemetryChannel do
     total_running = process_count + connected_services
 
     cond do
+      # If Phoenix appears unreachable to services, system is degraded
+      phoenix_unreachable -> "degraded"
+      # All services running
       total_running == total_critical -> "healthy"
       # At least half working
       total_running >= div(total_critical, 2) -> "degraded"
+      # Less than half working
       true -> "unhealthy"
     end
   end
