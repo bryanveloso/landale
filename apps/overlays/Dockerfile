@@ -17,12 +17,15 @@ RUN bun install --frozen-lockfile
 # Now copy the overlays app source
 COPY apps/overlays ./apps/overlays
 
-# Build the SolidJS application for production
-# VITE_WEBSOCKET_URL will be injected at build time
+# Set working directory for the app
 WORKDIR /workspace/apps/overlays
+
+# Set WebSocket URL environment variable
 ARG VITE_WEBSOCKET_URL=ws://saya:7175
 ENV VITE_WEBSOCKET_URL=${VITE_WEBSOCKET_URL}
-RUN bun run build
+
+# Skip build step since overlays are inherently unfinished and we're using dev server
+# The dev server will compile on-the-fly
 
 # Expose port for dev server
 EXPOSE 8008
