@@ -1,31 +1,32 @@
 FROM oven/bun:1.1.18-alpine
 
-# Set working directory
-WORKDIR /workspace
+WORKDIR /app
 
-# Copy workspace root files first for workspace dependencies
-COPY package.json bun.lock ./
-COPY packages/logger ./packages/logger
-COPY packages/shared ./packages/shared
+# Copy root package files first for workspace setup
+COPY package.json bun.lock turbo.json ./
 
-# Copy overlays package files
+# Create directory structure
+RUN mkdir -p packages/logger packages/shared apps/overlays
+
+# Copy all package.json files to maintain workspace integrity
+COPY packages/logger/package.json ./packages/logger/
+COPY packages/shared/package.json ./packages/shared/
 COPY apps/overlays/package.json ./apps/overlays/
 
-# Install dependencies from workspace root
+# Install all dependencies (respects workspace)
 RUN bun install --frozen-lockfile
 
-# Now copy the overlays app source
+# Now copy all source files
+COPY packages/logger ./packages/logger
+COPY packages/shared ./packages/shared
 COPY apps/overlays ./apps/overlays
 
-# Set working directory for the app
-WORKDIR /workspace/apps/overlays
+# Set working directory to the overlays app
+WORKDIR /app/apps/overlays
 
 # Set WebSocket URL environment variable
 ARG VITE_WEBSOCKET_URL=ws://saya:7175
 ENV VITE_WEBSOCKET_URL=${VITE_WEBSOCKET_URL}
-
-# Skip build step since overlays are inherently unfinished and we're using dev server
-# The dev server will compile on-the-fly
 
 # Expose port for dev server
 EXPOSE 8008
