@@ -14,7 +14,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY apps/overlays/package.json ./apps/overlays/
 
 # Install all dependencies (respects workspace)
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Now copy all source files
 COPY packages/logger ./packages/logger
