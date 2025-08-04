@@ -3,9 +3,12 @@
   "identifier": "default",
   "description": "enables the default permissions",
   "windows": [
-    "main"
+    "main",
+    "telemetry"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "window-state:allow-restore-state",
+    "window-state:allow-save-window-state"
   ]
 }
