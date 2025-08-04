@@ -4,7 +4,7 @@
  * Visual interface for debugging WebSocket communication with Phoenix channels.
  */
 
-import { createSignal, createEffect, For, Show, onMount, onCleanup } from 'solid-js'
+import { createSignal, For, Show, onMount, onCleanup } from 'solid-js'
 import { useStreamService } from '@/services/stream-service'
 import type { WebSocketMessage, MessageFilter } from '@landale/shared/websocket'
 

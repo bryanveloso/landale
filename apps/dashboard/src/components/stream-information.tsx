@@ -109,7 +109,7 @@ export function StreamInformation() {
           if (isChannelInfo(response.data)) {
             return response.data
           } else {
-            logger.warn('Invalid channel info format received', { data: response.data })
+            logger.warn('Invalid channel info format received', { metadata: { response: response.data } })
             setLastAction('Received invalid channel information format')
             return null
           }
@@ -185,7 +185,7 @@ export function StreamInformation() {
         if (isGameCategoryArray(response.data)) {
           setSearchResults(response.data)
         } else {
-          logger.warn('Invalid game categories format received', { data: response.data })
+          logger.warn('Invalid game categories format received', { metadata: { response: response.data } })
           setSearchResults([])
         }
       } else {

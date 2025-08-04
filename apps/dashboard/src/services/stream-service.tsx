@@ -158,7 +158,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       circuitBreakerThreshold: 5,
       circuitBreakerTimeout: 300000,
       logger: (kind: string, msg: string, data?: unknown) => {
-        logger.debug(`Phoenix ${kind}: ${msg}`, data)
+        logger.debug(`Phoenix ${kind}: ${msg}`, { metadata: { data } })
       }
     })
 
@@ -489,7 +489,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   const requestState = () => {
     if (overlayChannel) {
       overlayChannel.push('request_state', {})
-    } else if (socket && socket.connectionState() === 'open') {
+    } else if (socket && socket.connectionState === SocketConnectionState.CONNECTED) {
       // Try to rejoin channels if socket is open but channel is missing
       joinOverlayChannel()
     }
@@ -504,7 +504,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   const requestQueueState = () => {
     if (queueChannel) {
       queueChannel.push('request_queue_state', {})
-    } else if (socket && socket.connectionState() === 'open') {
+    } else if (socket && socket.connectionState === SocketConnectionState.CONNECTED) {
       // Try to rejoin channels if socket is open but channel is missing
       joinQueueChannel()
     }

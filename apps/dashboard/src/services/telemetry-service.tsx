@@ -104,7 +104,7 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
     logger.debug('[TelemetryService] Joining telemetry channel...')
     const joinPush = telemetryChannel.join()
 
-    joinPush.receive('ok', (response: any) => {
+    joinPush.receive('ok', (_response: any) => {
       logger.info('[TelemetryService] Successfully joined telemetry channel')
       setIsConnected(true)
       reconnectAttempts = 0 // Reset on successful connection

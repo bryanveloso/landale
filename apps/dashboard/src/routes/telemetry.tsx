@@ -6,7 +6,7 @@
  */
 
 import { createFileRoute } from '@tanstack/solid-router'
-import { Show, For, onMount, createEffect, onCleanup } from 'solid-js'
+import { Show, For, onMount, onCleanup } from 'solid-js'
 import { TelemetryServiceProvider, useTelemetryService } from '@/services/telemetry-service'
 import { useStreamService } from '@/services/stream-service'
 
@@ -22,13 +22,13 @@ function TelemetryPage() {
   const { websocketStats, performanceMetrics, systemInfo, serviceMetrics, requestRefresh } = useTelemetryService()
   const { connectionState } = useStreamService()
 
-  let intervalId: number
+  let intervalId: number | undefined
 
   onMount(() => {
     requestRefresh()
 
     // Refresh every 2 seconds
-    intervalId = setInterval(() => {
+    intervalId = window.setInterval(() => {
       requestRefresh()
     }, 2000)
   })
@@ -53,9 +53,7 @@ function TelemetryPage() {
             <h1 class="text-lg font-medium">Telemetry</h1>
             <div class="flex items-center gap-2 text-xs text-gray-500">
               <span>Phoenix WebSocket</span>
-              <div
-                class={`h-1.5 w-1.5 rounded-full ${connectionState() === 'connected' ? 'bg-green-500' : 'bg-red-500'}`}
-              />
+              <div class={`h-1.5 w-1.5 rounded-full ${connectionState().connected ? 'bg-green-500' : 'bg-red-500'}`} />
             </div>
           </div>
           <div class="text-xs text-gray-500">{new Date().toLocaleTimeString()}</div>

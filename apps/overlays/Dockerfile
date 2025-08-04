@@ -4,7 +4,7 @@ FROM oven/bun:1.1.18-alpine
 WORKDIR /workspace
 
 # Copy workspace root files first for workspace dependencies
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 COPY packages/logger ./packages/logger
 COPY packages/shared ./packages/shared
 
