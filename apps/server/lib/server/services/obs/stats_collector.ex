@@ -67,26 +67,49 @@ defmodule Server.Services.OBS.StatsCollector do
 
   @impl true
   def handle_info(:poll_stats, state) do
-    # Request stats from OBS
-    case get_connection(state.session_id) do
-      {:ok, conn} ->
-        Task.start(fn ->
-          # Try GetSceneList first - this is a basic OBS v5 request
-          case Server.Services.OBS.Connection.send_request(conn, "GetSceneList", %{}) do
-            {:ok, version_data} ->
-              send(self(), {:version_received, version_data})
+    # Check if OBS is connected before requesting stats
+    case Server.Services.OBS.get_status() do
+      {:ok, %{connected: true}} ->
+        # OBS is connected, try to get stats
+        case get_connection(state.session_id) do
+          {:ok, conn} ->
+            Task.start(fn ->
+              # Try GetSceneList first - this is a basic OBS v5 request
+              # Use a shorter timeout to avoid long waits when OBS is disconnecting
+              try do
+                case GenServer.call(conn, {:send_request, "GetSceneList", %{}}, 2000) do
+                  {:ok, version_data} ->
+                    send(self(), {:version_received, version_data})
 
-            {:error, reason} ->
-              Logger.error("Failed to get OBS stats: #{inspect(reason)}",
-                service: "obs",
-                session_id: state.session_id
-              )
-          end
-        end)
+                  {:error, reason} ->
+                    Logger.debug("Failed to get OBS stats: #{inspect(reason)}",
+                      service: "obs",
+                      session_id: state.session_id
+                    )
+                end
+              catch
+                :exit, {:timeout, _} ->
+                  Logger.debug("OBS stats request timed out - OBS may be disconnecting",
+                    service: "obs",
+                    session_id: state.session_id
+                  )
+              end
+            end)
 
-      {:error, _} ->
-        # Connection not available
-        nil
+          {:error, _} ->
+            # Connection not available
+            Logger.debug("OBS connection not available for stats",
+              service: "obs",
+              session_id: state.session_id
+            )
+        end
+
+      _ ->
+        # OBS is not connected, skip stats polling
+        Logger.debug("Skipping OBS stats poll - not connected",
+          service: "obs",
+          session_id: state.session_id
+        )
     end
 
     {:noreply, schedule_stats_poll(state)}
@@ -103,12 +126,20 @@ defmodule Server.Services.OBS.StatsCollector do
     case get_connection(state.session_id) do
       {:ok, conn} ->
         Task.start(fn ->
-          case Server.Services.OBS.Connection.send_request(conn, "GetStats", %{}) do
-            {:ok, stats} ->
-              send(self(), {:stats_received, stats})
+          try do
+            case GenServer.call(conn, {:send_request, "GetStats", %{}}, 2000) do
+              {:ok, stats} ->
+                send(self(), {:stats_received, stats})
 
-            {:error, reason} ->
-              Logger.error("GetStats failed: #{inspect(reason)}",
+              {:error, reason} ->
+                Logger.debug("GetStats failed: #{inspect(reason)}",
+                  service: "obs",
+                  session_id: state.session_id
+                )
+            end
+          catch
+            :exit, {:timeout, _} ->
+              Logger.debug("GetStats request timed out",
                 service: "obs",
                 session_id: state.session_id
               )
@@ -116,7 +147,10 @@ defmodule Server.Services.OBS.StatsCollector do
         end)
 
       {:error, _} ->
-        nil
+        Logger.debug("OBS connection not available for GetStats",
+          service: "obs",
+          session_id: state.session_id
+        )
     end
 
     {:noreply, state}
