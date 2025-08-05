@@ -25,14 +25,17 @@ export function TakeoverPanel() {
   const [takeoverType, setTakeoverType] = createSignal<TakeoverCommand['type']>('technical-difficulties')
 
   const sendTakeover = async () => {
-    if (takeoverType() !== 'screen-cover' && !takeoverText().trim()) {
-      logger.error('No message provided for non-screen-cover takeover', {})
+    const message = takeoverText().trim()
+
+    // Only custom type requires a message
+    if (takeoverType() === 'custom' && !message) {
+      logger.error('No message provided for custom takeover', {})
       return
     }
 
     const takeoverData: TakeoverCommand = {
       type: takeoverType(),
-      message: takeoverText().trim(),
+      message: message,
       duration: duration() * 1000
     }
 
@@ -127,7 +130,7 @@ export function TakeoverPanel() {
           <Button
             onClick={sendTakeover}
             disabled={
-              (takeoverType() !== 'screen-cover' && !takeoverText().trim()) ||
+              (takeoverType() === 'custom' && !takeoverText().trim()) ||
               commands.takeoverState().loading ||
               !isConnected()
             }>

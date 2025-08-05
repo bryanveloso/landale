@@ -249,13 +249,6 @@ function TakeoverContent(props: TakeoverContentProps) {
       <Show when={props.state.type === 'custom'}>
         <CustomMessage message={props.state.message} />
       </Show>
-
-      {/* Takeover close button (development only) */}
-      {import.meta.env.DEV && (
-        <button class="takeover-close" onClick={props.onHide}>
-          Close Takeover
-        </button>
-      )}
     </div>
   )
 }
