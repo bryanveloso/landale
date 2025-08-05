@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/solid-router'
 import { createSignal, createEffect, onCleanup, Show } from 'solid-js'
-import { Socket, Channel } from 'phoenix'
+import { Channel } from 'phoenix'
+import { Socket, ConnectionState, type ConnectionEvent } from '@landale/shared/websocket'
 import { createLogger } from '@landale/logger/browser'
 
 export const Route = createFileRoute('/takeover')({
@@ -28,6 +29,7 @@ function TakeoverOverlay() {
 
   let channel: Channel | null = null
   let hideTimer: ReturnType<typeof setTimeout> | null = null
+  let channelJoinTimer: number | null = null
 
   // Initialize logger with correlation ID
   const correlationId = `overlay-takeover-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
@@ -43,42 +45,65 @@ function TakeoverOverlay() {
       metadata: { serverUrl }
     })
 
-    const phoenixSocket = new Socket(serverUrl, {
-      logger: (kind: string, msg: string, data: unknown) => {
-        logger.debug('Phoenix WebSocket event', {
-          metadata: { kind, message: msg, data }
-        })
+    const resilientSocket = new Socket({
+      url: serverUrl,
+      logger: (kind: string, msg: string, data?: unknown) => {
+        if (msg?.includes('heartbeat')) {
+          logger.debug(`Phoenix ${kind}: ${msg}`, { metadata: { data } })
+        } else {
+          logger.debug(`Phoenix ${kind}: ${msg}`, data ? { metadata: { data } } : {})
+        }
       }
     })
 
-    phoenixSocket.onOpen(() => {
-      logger.info('WebSocket connection established')
-      setIsConnected(true)
-      joinChannel()
-    })
-
-    phoenixSocket.onError((error: unknown) => {
-      logger.error('WebSocket connection error', {
-        error: { message: error?.message || 'Unknown socket error', type: 'WebSocketError' },
-        metadata: { serverUrl }
+    // Subscribe to connection state changes
+    resilientSocket.onConnectionChange((event: ConnectionEvent) => {
+      logger.info('Connection state changed', {
+        metadata: {
+          oldState: event.oldState,
+          newState: event.newState,
+          error: event.error?.message
+        }
       })
-      setIsConnected(false)
+
+      const connected = event.newState === ConnectionState.CONNECTED
+      setIsConnected(connected)
+
+      if (connected) {
+        // Add small delay before joining channel to ensure stability
+        channelJoinTimer = setTimeout(() => {
+          joinChannel()
+        }, 100) as unknown as number
+      } else if (event.newState === ConnectionState.DISCONNECTED || event.newState === ConnectionState.FAILED) {
+        // Clean up channel on disconnection
+        if (channel) {
+          channel.leave()
+          channel = null
+        }
+      }
     })
 
-    phoenixSocket.onClose(() => {
-      logger.warn('WebSocket connection closed')
-      setIsConnected(false)
-    })
-
-    phoenixSocket.connect()
-    setSocket(phoenixSocket)
+    resilientSocket.connect()
+    setSocket(resilientSocket)
   })
 
   const joinChannel = () => {
     const currentSocket = socket()
-    if (!currentSocket) return
+    if (!currentSocket || !currentSocket.isConnected()) {
+      logger.debug('Skipping channel join - socket not ready', {
+        metadata: {
+          hasSocket: !!currentSocket,
+          socketConnected: currentSocket?.isConnected()
+        }
+      })
+      return
+    }
 
     channel = currentSocket.channel('stream:overlays', {})
+    if (!channel) {
+      logger.error('Failed to create channel')
+      return
+    }
 
     // Handle takeover events
     channel.on('takeover', (payload: unknown) => {
@@ -141,12 +166,19 @@ function TakeoverOverlay() {
   onCleanup(() => {
     if (channel) {
       channel.leave()
+      channel = null
     }
     if (socket()) {
-      socket()?.disconnect()
+      socket()?.shutdown()
+      setSocket(null)
     }
     if (hideTimer) {
       clearTimeout(hideTimer)
+      hideTimer = null
+    }
+    if (channelJoinTimer) {
+      clearTimeout(channelJoinTimer)
+      channelJoinTimer = null
     }
   })
 

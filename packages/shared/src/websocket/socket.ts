@@ -12,6 +12,7 @@
 
 import { Socket as PhoenixSocket, Channel } from 'phoenix'
 import { MessageInspector } from './message-inspector'
+import { WEBSOCKET_DEFAULTS } from './constants'
 
 export const ConnectionState = {
   DISCONNECTED: 'disconnected',
@@ -88,18 +89,18 @@ export class Socket {
   constructor(options: SocketOptions) {
     this.options = {
       url: options.url,
-      maxReconnectAttempts: options.maxReconnectAttempts ?? 10,
-      reconnectDelayBase: options.reconnectDelayBase ?? 1000,
-      reconnectDelayCap: options.reconnectDelayCap ?? 60000,
-      heartbeatInterval: options.heartbeatInterval ?? 30000,
-      circuitBreakerThreshold: options.circuitBreakerThreshold ?? 5,
-      circuitBreakerTimeout: options.circuitBreakerTimeout ?? 300000,
+      maxReconnectAttempts: options.maxReconnectAttempts ?? WEBSOCKET_DEFAULTS.MAX_RECONNECT_ATTEMPTS,
+      reconnectDelayBase: options.reconnectDelayBase ?? WEBSOCKET_DEFAULTS.RECONNECT_DELAY_BASE,
+      reconnectDelayCap: options.reconnectDelayCap ?? WEBSOCKET_DEFAULTS.RECONNECT_DELAY_CAP,
+      heartbeatInterval: options.heartbeatInterval ?? WEBSOCKET_DEFAULTS.HEARTBEAT_INTERVAL,
+      circuitBreakerThreshold: options.circuitBreakerThreshold ?? WEBSOCKET_DEFAULTS.CIRCUIT_BREAKER_THRESHOLD,
+      circuitBreakerTimeout: options.circuitBreakerTimeout ?? WEBSOCKET_DEFAULTS.CIRCUIT_BREAKER_TIMEOUT,
       logger: options.logger ?? ((kind, msg, data) => console.log(`[Phoenix ${kind}] ${msg}`, data)),
       params: options.params ?? {}
     }
 
     // Initialize message inspector
-    this.messageInspector = new MessageInspector(100)
+    this.messageInspector = new MessageInspector(WEBSOCKET_DEFAULTS.MESSAGE_INSPECTOR_BUFFER_SIZE)
   }
 
   // Connection state management

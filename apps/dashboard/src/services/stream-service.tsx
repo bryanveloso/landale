@@ -192,7 +192,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       maxReconnectAttempts: 10,
       reconnectDelayBase: 1000,
       reconnectDelayCap: 30000,
-      heartbeatInterval: 30000,
+      heartbeatInterval: 15000, // 15s heartbeat for 6x safety factor with 90s server timeout
       circuitBreakerThreshold: 5,
       circuitBreakerTimeout: 300000,
       logger: (kind: string, msg: any, data?: any) => {
