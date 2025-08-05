@@ -15,6 +15,8 @@ defmodule ServerWeb.ServicesChannel do
   alias ServerWeb.ResponseBuilder
 
   @nurvus_port 4001
+  # zelan's IP
+  @nurvus_host "100.112.39.113"
   @http_timeout 5_000
   @allowed_services ["phononmaser", "seed"]
 
@@ -113,7 +115,7 @@ defmodule ServerWeb.ServicesChannel do
   # Private functions
 
   defp call_nurvus(service_name, action) do
-    url = "http://localhost:#{@nurvus_port}/api/processes/#{service_name}/#{action}"
+    url = "http://#{@nurvus_host}:#{@nurvus_port}/api/processes/#{service_name}/#{action}"
 
     Logger.info("Calling Nurvus: #{action} #{service_name}")
 
@@ -145,7 +147,7 @@ defmodule ServerWeb.ServicesChannel do
   end
 
   defp get_nurvus_status(service_name) do
-    url = "http://localhost:#{@nurvus_port}/api/processes/#{service_name}"
+    url = "http://#{@nurvus_host}:#{@nurvus_port}/api/processes/#{service_name}"
 
     case HTTPoison.get(url, [], timeout: @http_timeout, recv_timeout: @http_timeout) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
