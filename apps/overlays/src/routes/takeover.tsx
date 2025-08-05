@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createEffect, onCleanup, Show } from 'solid-js'
+import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
 import type { Channel } from 'phoenix'
 import { SocketProvider, useSocket } from '@/providers/socket-provider'
 import { createLogger } from '@landale/logger/browser'
