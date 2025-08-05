@@ -367,7 +367,7 @@ defmodule ServerWeb.TelemetryChannel do
   defp sanitize_error(reason) when is_binary(reason), do: reason
   defp sanitize_error(_), do: "An unknown error occurred"
 
-  defp gather_overlay_health(environment_filter \\ nil) do
+  defp gather_overlay_health(environment_filter) do
     # Use ETS to track overlay channel joins
     # Create table if it doesn't exist
     table_name = :overlay_channel_tracker
