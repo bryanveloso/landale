@@ -64,7 +64,10 @@ defmodule ServerWeb.WebSocketStatsTracker do
   end
 
   @impl true
-  def handle_info({:telemetry_event, [:landale, :websocket, :connected], _measurements, metadata}, state) do
+  def handle_info(
+        {:telemetry_event, [:landale, :websocket, :connected], _measurements, metadata},
+        state
+      ) do
     Logger.debug("Socket connected", socket_id: metadata[:socket_id])
 
     state = %{
@@ -76,18 +79,19 @@ defmodule ServerWeb.WebSocketStatsTracker do
     {:noreply, state}
   end
 
-  @impl true
-  def handle_info({:telemetry_event, [:landale, :websocket, :disconnected], _measurements, metadata}, state) do
-    Logger.debug("Socket disconnected", socket_id: metadata[:socket_id])
+  # Removed to avoid double counting - handled by tracker event instead
+  # @impl true
+  # def handle_info({:telemetry_event, [:landale, :websocket, :disconnected], _measurements, metadata}, state) do
+  #   Logger.debug("Socket disconnected", socket_id: metadata[:socket_id])
 
-    state = %{
-      state
-      | total_connections: max(0, state.total_connections - 1),
-        total_disconnects: state.total_disconnects + 1
-    }
+  #   state = %{
+  #     state
+  #     | total_connections: max(0, state.total_connections - 1),
+  #       total_disconnects: state.total_disconnects + 1
+  #   }
 
-    {:noreply, state}
-  end
+  #   {:noreply, state}
+  # end
 
   @impl true
   def handle_info({:tracker_event, :connected, socket_id, _metadata}, state) do
@@ -118,7 +122,10 @@ defmodule ServerWeb.WebSocketStatsTracker do
   end
 
   @impl true
-  def handle_info({:telemetry_event, [:landale, :channel, :joined], _measurements, metadata}, state) do
+  def handle_info(
+        {:telemetry_event, [:landale, :channel, :joined], _measurements, metadata},
+        state
+      ) do
     channel_type = extract_channel_type(metadata[:topic])
     Logger.debug("Channel joined", topic: metadata[:topic], channel_type: channel_type)
 
@@ -168,7 +175,7 @@ defmodule ServerWeb.WebSocketStatsTracker do
   defp attach_telemetry_handlers do
     events = [
       [:landale, :websocket, :connected],
-      [:landale, :websocket, :disconnected],
+      # [:landale, :websocket, :disconnected], # Removed - handled by tracker event
       [:landale, :channel, :joined],
       [:landale, :channel, :left],
       # Also listen for Phoenix's built-in socket disconnect event

@@ -33,6 +33,21 @@ const logger = createLogger({
   service: 'dashboard'
 })
 
+// Channel retry configuration
+const CHANNEL_RETRY_CONFIG = {
+  initialDelayMs: 1000, // 1 second initial delay
+  maxDelayMs: 30000, // 30 seconds max delay
+  maxRetries: 5, // Max 5 retry attempts
+  multiplier: 2, // Double the delay each time
+  jitterFactor: 0.1 // +/- 10% random jitter
+}
+
+// Connection timing constants
+const CHANNEL_JOIN_DELAY_MS = 100 // Delay before starting channel joins
+const CHANNEL_JOIN_SPACING_MS = 100 // Delay between channel joins
+const CHANNEL_JOIN_SEQUENCE_TIMEOUT_MS = 1000 // Time to complete join sequence
+const FORCE_RECONNECT_CLEANUP_DELAY_MS = 1500 // Delay before reconnecting
+
 // Default states
 const DEFAULT_LAYER_STATE: OverlayLayerState = {
   current_show: 'variety',
@@ -141,8 +156,29 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   let isJoiningChannels = false
   let connectionCleanupInProgress = false
 
+  // Channel retry tracking
+  let overlayChannelRetries = 0
+  let overlayChannelRetryTimer: number | null = null
+  let queueChannelRetries = 0
+  let queueChannelRetryTimer: number | null = null
+
+  // Other timers
+  let channelJoinDelayTimer: number | null = null
+  let channelJoinSpacingTimer: number | null = null
+  let channelJoinSequenceTimer: number | null = null
+  let forceReconnectTimer: number | null = null
+
   const getServerUrl = () => {
     return 'ws://saya:7175/socket'
+  }
+
+  // Calculate retry delay with exponential backoff and jitter
+  const calculateRetryDelay = (attempt: number): number => {
+    const { initialDelayMs, maxDelayMs, multiplier, jitterFactor } = CHANNEL_RETRY_CONFIG
+    let delay = initialDelayMs * Math.pow(multiplier, attempt - 1)
+    delay = Math.min(delay, maxDelayMs)
+    const jitter = delay * jitterFactor * (Math.random() * 2 - 1)
+    return Math.max(0, delay + jitter)
   }
 
   // Connection management
@@ -205,11 +241,11 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
 
       if (isConnected) {
         // Add small delay to ensure connection is stable before joining channels
-        setTimeout(() => {
+        channelJoinDelayTimer = setTimeout(() => {
           if (!connectionCleanupInProgress && !isJoiningChannels) {
             joinChannels()
           }
-        }, 100)
+        }, CHANNEL_JOIN_DELAY_MS)
       } else if (
         event.newState === SocketConnectionState.DISCONNECTED ||
         event.newState === SocketConnectionState.FAILED
@@ -240,15 +276,15 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     // Join channels sequentially to avoid race conditions
     joinOverlayChannel()
     // Small delay between channel joins
-    setTimeout(() => {
+    channelJoinSpacingTimer = setTimeout(() => {
       joinQueueChannel()
-    }, 100)
+    }, CHANNEL_JOIN_SPACING_MS)
 
     // Reset flag after both channels have time to join
-    setTimeout(() => {
+    channelJoinSequenceTimer = setTimeout(() => {
       isJoiningChannels = false
       logger.debug('Channel join sequence complete')
-    }, 1000)
+    }, CHANNEL_JOIN_SEQUENCE_TIMEOUT_MS)
   }
 
   const joinOverlayChannel = () => {
@@ -306,28 +342,69 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       // Overlay components will handle this directly
     })
 
-    // Join with error handling
+    // Join with error handling and retry logic
     overlayChannel
       ?.join()
       .receive('ok', () => {
         logger.info('Successfully joined overlay channel')
+        overlayChannelRetries = 0 // Reset retry count on success
         requestState()
       })
       .receive('error', (resp: Record<string, unknown>) => {
         logger.error('Failed to join overlay channel', { metadata: { error: resp } })
         overlayChannel = null // Clean up on failure
-        setConnectionState((prev) => ({
-          ...prev,
-          error: `Failed to join overlay channel: ${(resp as Record<string, unknown>)?.message || 'unknown'}`
-        }))
+
+        // Retry logic
+        overlayChannelRetries++
+        if (overlayChannelRetries <= CHANNEL_RETRY_CONFIG.maxRetries) {
+          const delay = calculateRetryDelay(overlayChannelRetries)
+          logger.info(
+            `Retrying overlay channel join in ${Math.round(delay)}ms (attempt ${overlayChannelRetries}/${CHANNEL_RETRY_CONFIG.maxRetries})`
+          )
+
+          setConnectionState((prev) => ({
+            ...prev,
+            error: `Failed to join overlay channel, retrying... (${overlayChannelRetries}/${CHANNEL_RETRY_CONFIG.maxRetries})`
+          }))
+
+          overlayChannelRetryTimer = setTimeout(() => {
+            joinOverlayChannel()
+          }, delay)
+        } else {
+          logger.error(`Failed to join overlay channel after ${CHANNEL_RETRY_CONFIG.maxRetries} attempts`)
+          setConnectionState((prev) => ({
+            ...prev,
+            error: `Failed to join overlay channel after ${CHANNEL_RETRY_CONFIG.maxRetries} attempts`
+          }))
+        }
       })
       .receive('timeout', () => {
         logger.error('Overlay channel join timeout')
         overlayChannel = null // Clean up on timeout
-        setConnectionState((prev) => ({
-          ...prev,
-          error: 'Overlay channel join timeout'
-        }))
+
+        // Retry logic
+        overlayChannelRetries++
+        if (overlayChannelRetries <= CHANNEL_RETRY_CONFIG.maxRetries) {
+          const delay = calculateRetryDelay(overlayChannelRetries)
+          logger.info(
+            `Retrying overlay channel join after timeout in ${Math.round(delay)}ms (attempt ${overlayChannelRetries}/${CHANNEL_RETRY_CONFIG.maxRetries})`
+          )
+
+          setConnectionState((prev) => ({
+            ...prev,
+            error: `Overlay channel join timeout, retrying... (${overlayChannelRetries}/${CHANNEL_RETRY_CONFIG.maxRetries})`
+          }))
+
+          overlayChannelRetryTimer = setTimeout(() => {
+            joinOverlayChannel()
+          }, delay)
+        } else {
+          logger.error(`Overlay channel join timed out after ${CHANNEL_RETRY_CONFIG.maxRetries} attempts`)
+          setConnectionState((prev) => ({
+            ...prev,
+            error: `Overlay channel join timed out after ${CHANNEL_RETRY_CONFIG.maxRetries} attempts`
+          }))
+        }
       })
   }
 
@@ -394,28 +471,69 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       }
     })
 
-    // Join with error handling
+    // Join with error handling and retry logic
     queueChannel
       ?.join()
       .receive('ok', () => {
         logger.info('Successfully joined queue channel')
+        queueChannelRetries = 0 // Reset retry count on success
         requestQueueState()
       })
       .receive('error', (resp: Record<string, unknown>) => {
         logger.error('Failed to join queue channel', { metadata: { error: resp } })
         queueChannel = null // Clean up on failure
-        setConnectionState((prev) => ({
-          ...prev,
-          error: `Failed to join queue channel: ${(resp as Record<string, unknown>)?.message || 'unknown'}`
-        }))
+
+        // Retry logic
+        queueChannelRetries++
+        if (queueChannelRetries <= CHANNEL_RETRY_CONFIG.maxRetries) {
+          const delay = calculateRetryDelay(queueChannelRetries)
+          logger.info(
+            `Retrying queue channel join in ${Math.round(delay)}ms (attempt ${queueChannelRetries}/${CHANNEL_RETRY_CONFIG.maxRetries})`
+          )
+
+          setConnectionState((prev) => ({
+            ...prev,
+            error: `Failed to join queue channel, retrying... (${queueChannelRetries}/${CHANNEL_RETRY_CONFIG.maxRetries})`
+          }))
+
+          queueChannelRetryTimer = setTimeout(() => {
+            joinQueueChannel()
+          }, delay)
+        } else {
+          logger.error(`Failed to join queue channel after ${CHANNEL_RETRY_CONFIG.maxRetries} attempts`)
+          setConnectionState((prev) => ({
+            ...prev,
+            error: `Failed to join queue channel after ${CHANNEL_RETRY_CONFIG.maxRetries} attempts`
+          }))
+        }
       })
       .receive('timeout', () => {
         logger.error('Queue channel join timeout')
         queueChannel = null // Clean up on timeout
-        setConnectionState((prev) => ({
-          ...prev,
-          error: 'Queue channel join timeout'
-        }))
+
+        // Retry logic
+        queueChannelRetries++
+        if (queueChannelRetries <= CHANNEL_RETRY_CONFIG.maxRetries) {
+          const delay = calculateRetryDelay(queueChannelRetries)
+          logger.info(
+            `Retrying queue channel join after timeout in ${Math.round(delay)}ms (attempt ${queueChannelRetries}/${CHANNEL_RETRY_CONFIG.maxRetries})`
+          )
+
+          setConnectionState((prev) => ({
+            ...prev,
+            error: `Queue channel join timeout, retrying... (${queueChannelRetries}/${CHANNEL_RETRY_CONFIG.maxRetries})`
+          }))
+
+          queueChannelRetryTimer = setTimeout(() => {
+            joinQueueChannel()
+          }, delay)
+        } else {
+          logger.error(`Queue channel join timed out after ${CHANNEL_RETRY_CONFIG.maxRetries} attempts`)
+          setConnectionState((prev) => ({
+            ...prev,
+            error: `Queue channel join timed out after ${CHANNEL_RETRY_CONFIG.maxRetries} attempts`
+          }))
+        }
       })
   }
 
@@ -436,10 +554,36 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       clearTimeout(reconnectTimer)
       reconnectTimer = null
     }
+    if (overlayChannelRetryTimer) {
+      clearTimeout(overlayChannelRetryTimer)
+      overlayChannelRetryTimer = null
+    }
+    if (queueChannelRetryTimer) {
+      clearTimeout(queueChannelRetryTimer)
+      queueChannelRetryTimer = null
+    }
+    if (channelJoinDelayTimer) {
+      clearTimeout(channelJoinDelayTimer)
+      channelJoinDelayTimer = null
+    }
+    if (channelJoinSpacingTimer) {
+      clearTimeout(channelJoinSpacingTimer)
+      channelJoinSpacingTimer = null
+    }
+    if (channelJoinSequenceTimer) {
+      clearTimeout(channelJoinSequenceTimer)
+      channelJoinSequenceTimer = null
+    }
+    if (forceReconnectTimer) {
+      clearTimeout(forceReconnectTimer)
+      forceReconnectTimer = null
+    }
 
-    // Reset flags
+    // Reset flags and retry counts
     isJoiningChannels = false
     connectionCleanupInProgress = false
+    overlayChannelRetries = 0
+    queueChannelRetries = 0
   }
 
   const disconnect = () => {
@@ -565,12 +709,12 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     disconnect()
 
     // Give cleanup time to complete
-    setTimeout(() => {
+    forceReconnectTimer = setTimeout(() => {
       // Reset flags before reconnecting
       isJoiningChannels = false
       connectionCleanupInProgress = false
       connect()
-    }, 1500)
+    }, FORCE_RECONNECT_CLEANUP_DELAY_MS)
   }
 
   const requestQueueState = () => {
