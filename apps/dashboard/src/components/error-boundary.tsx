@@ -7,7 +7,7 @@
 
 import { createSignal, createEffect } from 'solid-js'
 import type { Component, JSX } from 'solid-js'
-import { useStreamService } from '@/services/stream-service'
+import { usePhoenixService } from '@/services/phoenix-service'
 
 interface ConnectionMonitorProps {
   children: JSX.Element
@@ -21,31 +21,35 @@ interface ErrorState {
 }
 
 export const ConnectionMonitor: Component<ConnectionMonitorProps> = (props) => {
-  const streamService = useStreamService()
+  const { isConnected, reconnect } = usePhoenixService()
   const [errorState, setErrorState] = createSignal<ErrorState>({
     hasError: false,
     error: null,
     retryCount: 0
   })
+  const [reconnectAttempts, setReconnectAttempts] = createSignal(0)
 
   // Monitor connection state for critical errors
   createEffect(() => {
-    const connection = streamService.connectionState()
+    const connected = isConnected()
 
     // Show error state after multiple failed reconnection attempts
-    if (connection.error && connection.reconnectAttempts >= 3) {
+    if (!connected && reconnectAttempts() >= 3) {
       setErrorState((prev) => ({
         hasError: true,
-        error: new Error(connection.error || 'WebSocket connection failed'),
+        error: new Error('WebSocket connection failed'),
         retryCount: prev.retryCount
       }))
-    } else if (connection.connected && errorState().hasError) {
+    } else if (connected && errorState().hasError) {
       // Reset error state on successful connection
       setErrorState({
         hasError: false,
         error: null,
         retryCount: 0
       })
+      setReconnectAttempts(0)
+    } else if (!connected) {
+      setReconnectAttempts((prev) => prev + 1)
     }
   })
 
@@ -55,9 +59,10 @@ export const ConnectionMonitor: Component<ConnectionMonitorProps> = (props) => {
       error: null,
       retryCount: prev.retryCount + 1
     }))
+    setReconnectAttempts(0)
 
     // Force reconnection attempt
-    streamService.forceReconnect()
+    reconnect()
   }
 
   const FallbackComponent = props.fallback || DefaultErrorFallback

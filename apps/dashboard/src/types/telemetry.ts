@@ -47,6 +47,14 @@ export interface ServiceMetrics {
   twitch: ServiceStatus
 }
 
+export interface OverlayHealth {
+  name: string
+  connected: boolean
+  lastSeen?: string
+  channelState?: string
+  error?: string
+}
+
 export interface ServiceStatus {
   connected: boolean
   status?: string
@@ -59,10 +67,9 @@ export interface ServiceStatus {
 
 export interface TelemetrySnapshot {
   timestamp: number
-  websocket: WebSocketStats
   services: ServiceMetrics
-  performance: PerformanceMetrics
   system: SystemInfo
+  overlays?: OverlayHealth[]
 }
 
 export interface TelemetryResponse {
@@ -73,3 +80,6 @@ export interface TelemetryResponse {
     server_version: string
   }
 }
+
+// These interfaces are kept for backwards compatibility but are not used
+// WebSocketStats and PerformanceMetrics have been removed in favor of direct Phoenix connections

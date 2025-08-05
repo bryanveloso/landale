@@ -155,7 +155,9 @@ export function WebSocketInspector() {
           <select
             class="rounded bg-gray-800 px-2 py-1 text-xs"
             value={filter().direction || 'both'}
-            onChange={(e) => setFilter((prev) => ({ ...prev, direction: e.target.value as any }))}>
+            onChange={(e) =>
+              setFilter((prev) => ({ ...prev, direction: e.target.value as 'both' | 'incoming' | 'outgoing' }))
+            }>
             <option value="both">All</option>
             <option value="incoming">Incoming</option>
             <option value="outgoing">Outgoing</option>

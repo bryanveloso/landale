@@ -13,12 +13,15 @@ defmodule ServerWeb.StreamChannel do
   alias Server.StreamProducer
 
   @impl true
-  def join("stream:overlays", _payload, socket) do
+  def join("stream:overlays", payload, socket) do
     socket = setup_correlation_id(socket)
 
     Logger.info("Stream overlays channel joined",
       correlation_id: socket.assigns.correlation_id
     )
+
+    # Track this overlay connection
+    track_overlay_connection(socket, payload)
 
     # Subscribe to stream events
     Phoenix.PubSub.subscribe(Server.PubSub, "stream:updates")
@@ -537,4 +540,35 @@ defmodule ServerWeb.StreamChannel do
   end
 
   defp validate_channel_info_update(_), do: {:error, "Payload must be a map"}
+
+  # Overlay tracking functions
+  defp track_overlay_connection(socket, payload) do
+    table_name = :overlay_channel_tracker
+
+    # Ensure table exists
+    if :ets.whereis(table_name) == :undefined do
+      :ets.new(table_name, [:set, :public, :named_table])
+    end
+
+    # Store overlay info
+    overlay_info = %{
+      name: Map.get(payload, "overlay_type", "Takeover"),
+      joined_at: DateTime.utc_now(),
+      socket_id: socket.assigns.correlation_id
+    }
+
+    :ets.insert(table_name, {socket.assigns.correlation_id, overlay_info})
+  end
+
+  @impl true
+  def terminate(_reason, socket) do
+    # Remove from tracking when channel terminates
+    table_name = :overlay_channel_tracker
+
+    if :ets.whereis(table_name) != :undefined do
+      :ets.delete(table_name, socket.assigns.correlation_id)
+    end
+
+    :ok
+  end
 end

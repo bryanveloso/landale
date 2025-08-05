@@ -1,4 +1,4 @@
-import type { Socket } from '@landale/shared/websocket'
+import type { Socket } from 'phoenix'
 import type { LayerPriority } from '../hooks/use-layer-orchestrator'
 
 export interface DebugInterface {
@@ -36,18 +36,28 @@ export interface DebugInterface {
 
 export class DebugManager {
   private socket: Socket | null = null
-  private orchestratorRef: WeakRef<any> | null = null
-  private streamChannelRef: WeakRef<any> | null = null
+  private orchestratorRef: WeakRef<{
+    showLayer: (priority: LayerPriority, content: unknown) => void
+    hideLayer: (priority: LayerPriority) => void
+    clearAllLayers: () => void
+    getLayerStates: () => Record<LayerPriority, string>
+  }> | null = null
+  private streamChannelRef: WeakRef<{ push: (event: string, payload: unknown) => void }> | null = null
 
   setSocket(socket: Socket) {
     this.socket = socket
   }
 
-  setOrchestrator(orchestrator: any) {
+  setOrchestrator(orchestrator: {
+    showLayer: (priority: LayerPriority, content: unknown) => void
+    hideLayer: (priority: LayerPriority) => void
+    clearAllLayers: () => void
+    getLayerStates: () => Record<LayerPriority, string>
+  }) {
     this.orchestratorRef = new WeakRef(orchestrator)
   }
 
-  setStreamChannel(channel: any) {
+  setStreamChannel(channel: { push: (event: string, payload: unknown) => void }) {
     this.streamChannelRef = new WeakRef(channel)
   }
 
@@ -62,8 +72,17 @@ export class DebugManager {
   createInterface(): DebugInterface {
     return {
       socket: {
-        getMetrics: () => this.socket?.getHealthMetrics() || null,
-        getState: () => this.socket?.getHealthMetrics()?.connectionState || 'unknown',
+        getMetrics: () => {
+          if (!this.socket) return null
+          // Phoenix doesn't have built-in metrics, so we'll return basic info
+          return {
+            isConnected: this.socket.isConnected(),
+            connectionState: this.socket.connectionState(),
+            transport: this.socket.protocol(),
+            reconnectTimer: (this.socket as Socket & { reconnectTimer?: unknown }).reconnectTimer
+          }
+        },
+        getState: () => this.socket?.connectionState() || 'unknown',
         reconnect: () => {
           if (this.socket) {
             this.socket.disconnect()
@@ -169,8 +188,9 @@ export class DebugManager {
         console.group('🔍 Landale Debug State')
 
         console.group('Socket')
-        console.log('State:', this.socket?.getHealthMetrics()?.connectionState)
-        console.log('Metrics:', this.socket?.getHealthMetrics())
+        console.log('State:', this.socket?.connectionState())
+        console.log('Connected:', this.socket?.isConnected())
+        console.log('Transport:', this.socket?.protocol())
         console.groupEnd()
 
         console.group('Layers')

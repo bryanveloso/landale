@@ -1,6 +1,6 @@
-import { createSignal, createEffect, onCleanup } from 'solid-js'
-import { Channel } from 'phoenix'
-import { useSocket } from '../providers/socket-provider'
+import { createSignal, createEffect, onCleanup, onMount } from 'solid-js'
+import { Channel, Socket } from 'phoenix'
+import { createPhoenixSocket, isSocketConnected } from '@landale/shared/phoenix-connection'
 import { createLogger } from '@landale/logger/browser'
 
 // Phoenix types for better TypeScript support
@@ -66,10 +66,10 @@ const DEFAULT_STATE: StreamState = {
 }
 
 export function useStreamChannel() {
-  const { socket, isConnected } = useSocket()
+  const [socket, setSocket] = createSignal<Socket | null>(null)
+  const [isConnected, setIsConnected] = createSignal(false)
   const [streamState, setStreamState] = createSignal<StreamState>(DEFAULT_STATE)
-
-  let channel: Channel | null = null
+  const [channel, setChannel] = createSignal<Channel | null>(null)
 
   // Initialize logger
   const correlationId = `overlay-stream-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
@@ -83,10 +83,11 @@ export function useStreamChannel() {
     if (!currentSocket) return
 
     // Join the stream channel
-    channel = currentSocket.channel('stream:overlays', {})
+    const newChannel = currentSocket.channel('stream:overlays', {})
+    setChannel(newChannel)
 
     // Handle channel events
-    channel.on('stream_state', (payload: StreamState) => {
+    newChannel.on('stream_state', (payload: StreamState) => {
       logger.info('Stream state received', {
         metadata: {
           currentShow: payload.current_show,
@@ -98,7 +99,7 @@ export function useStreamChannel() {
       setStreamState(payload)
     })
 
-    channel.on('show_changed', (payload: ShowChange) => {
+    newChannel.on('show_changed', (payload: ShowChange) => {
       logger.info('Show changed', {
         metadata: {
           newShow: payload.show,
@@ -108,7 +109,7 @@ export function useStreamChannel() {
       // Handle show changes for theme switching
     })
 
-    channel.on('interrupt', (payload: unknown) => {
+    newChannel.on('interrupt', (payload: unknown) => {
       logger.info('Priority interrupt received', {
         metadata: {
           type: payload.type,
@@ -119,7 +120,7 @@ export function useStreamChannel() {
       // Handle priority interrupts
     })
 
-    channel.on('content_update', (payload: ContentUpdate) => {
+    newChannel.on('content_update', (payload: ContentUpdate) => {
       logger.debug('Content update received', {
         metadata: {
           type: payload.type,
@@ -140,7 +141,7 @@ export function useStreamChannel() {
     })
 
     // Join channel with error handling
-    channel
+    newChannel
       .join()
       .receive('ok', (resp: PhoenixResponse) => {
         logger.info('Channel joined successfully', {
@@ -148,7 +149,7 @@ export function useStreamChannel() {
           metadata: { channel: 'stream:overlays', response: resp }
         })
         // Request initial state
-        channel?.push('request_state', {})
+        newChannel?.push('request_state', {})
       })
       .receive('error', (resp: PhoenixResponse) => {
         logger.error('Channel join failed', {
@@ -167,16 +168,17 @@ export function useStreamChannel() {
   }
 
   const leaveChannel = () => {
-    if (channel) {
-      channel.leave()
-      channel = null
+    const ch = channel()
+    if (ch) {
+      ch.leave()
+      setChannel(null)
     }
   }
 
   const sendMessage = (event: string, payload: unknown = {}) => {
-    if (channel && isConnected()) {
-      channel
-        .push(event, payload)
+    const ch = channel()
+    if (ch && isConnected()) {
+      ch.push(event, payload)
         .receive('ok', (resp: PhoenixResponse) => {
           logger.debug('Message sent successfully', {
             operation: event,
@@ -198,12 +200,28 @@ export function useStreamChannel() {
     }
   }
 
+  // Initialize Phoenix socket on mount
+  onMount(() => {
+    const phoenixSocket = createPhoenixSocket()
+    setSocket(phoenixSocket)
+
+    // Check connection status periodically
+    const checkInterval = setInterval(() => {
+      setIsConnected(isSocketConnected(phoenixSocket))
+    }, 1000)
+
+    onCleanup(() => {
+      clearInterval(checkInterval)
+      phoenixSocket.disconnect()
+    })
+  })
+
   // Watch for socket connection changes and auto-join channel
   createEffect(() => {
     const connected = isConnected()
-    if (connected && !channel) {
+    if (connected && !channel()) {
       joinChannel()
-    } else if (!connected && channel) {
+    } else if (!connected && channel()) {
       leaveChannel()
     }
   })

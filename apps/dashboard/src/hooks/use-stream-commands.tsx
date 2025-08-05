@@ -6,7 +6,7 @@
  */
 
 import { createSignal } from 'solid-js'
-import { useStreamService } from '@/services/stream-service'
+import { useOverlayChannel, useQueueChannel } from './use-phoenix-channel'
 import type { TakeoverCommand } from '@/types/stream'
 
 interface CommandState {
@@ -16,7 +16,8 @@ interface CommandState {
 }
 
 export function useStreamCommands() {
-  const streamService = useStreamService()
+  const overlayChannel = useOverlayChannel()
+  const queueChannel = useQueueChannel()
 
   // Command state tracking
   const [takeoverState, setTakeoverState] = createSignal<CommandState>({
@@ -40,7 +41,7 @@ export function useStreamCommands() {
     })
 
     try {
-      const response = await streamService.sendTakeover(command)
+      const response = await overlayChannel.sendTakeover(command)
       setTakeoverState({
         loading: false,
         error: null,
@@ -66,7 +67,7 @@ export function useStreamCommands() {
     })
 
     try {
-      const response = await streamService.clearTakeover()
+      const response = await overlayChannel.clearTakeover()
       setTakeoverState({
         loading: false,
         error: null,
@@ -93,7 +94,7 @@ export function useStreamCommands() {
     })
 
     try {
-      const response = await streamService.removeQueueItem(id)
+      const response = await queueChannel.removeQueueItem(id)
       setQueueCommandState({
         loading: false,
         error: null,
@@ -111,27 +112,32 @@ export function useStreamCommands() {
     }
   }
 
-  // Utility functions
+  // Utility commands
   const requestState = () => {
-    streamService.requestState()
+    // State is automatically requested by channels
   }
 
   const requestQueueState = () => {
-    streamService.requestQueueState()
+    // Queue state is automatically requested by channels
+  }
+
+  const forceReconnect = () => {
+    // This would be implemented at the Phoenix service level
   }
 
   return {
-    // Takeover commands
+    // Commands
     sendTakeover,
     clearTakeover,
-    takeoverState,
-
-    // Queue commands
     removeQueueItem,
+
+    // Command states
+    takeoverState,
     queueCommandState,
 
-    // Utility
+    // Utilities
     requestState,
-    requestQueueState
+    requestQueueState,
+    forceReconnect
   }
 }

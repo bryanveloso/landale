@@ -17,7 +17,7 @@ interface TelemetryDrawerProps {
 }
 
 function TelemetryDrawerContent(props: TelemetryDrawerProps) {
-  const { websocketStats, performanceMetrics, systemInfo, requestRefresh } = useTelemetryService()
+  const { systemInfo, serviceMetrics, overlayHealth, requestRefresh } = useTelemetryService()
 
   // Handle escape key to close
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -110,94 +110,140 @@ function TelemetryDrawerContent(props: TelemetryDrawerProps) {
 
           {/* Content */}
           <div class="h-[calc(100%-40px)] overflow-y-auto bg-gray-950">
-            <ConnectionTelemetry
-              websocketStats={websocketStats()}
-              performanceMetrics={performanceMetrics()}
-              systemInfo={systemInfo()}
-            />
+            <ConnectionTelemetry />
 
-            {/* Additional telemetry sections */}
+            {/* System Information */}
             <div class="space-y-px">
               <div class="border-b border-gray-800 bg-gray-900 p-3">
-                <h3 class="mb-2 text-xs font-medium text-gray-300">WebSocket Metrics</h3>
+                <h3 class="mb-2 text-xs font-medium text-gray-300">System Information</h3>
                 <div class="text-xs text-gray-500">
-                  <Show when={websocketStats()} fallback={<span class="text-gray-600">Loading...</span>}>
+                  <Show when={systemInfo()} fallback={<span class="text-gray-600">Loading...</span>}>
                     <div class="flex justify-between py-0.5">
-                      <span>Connections:</span>
-                      <span class="font-mono">{websocketStats()?.total_connections || 0}</span>
+                      <span>Status:</span>
+                      <span
+                        class={`font-medium ${
+                          systemInfo()?.status === 'healthy'
+                            ? 'text-green-400'
+                            : systemInfo()?.status === 'degraded'
+                              ? 'text-yellow-400'
+                              : 'text-red-400'
+                        }`}>
+                        {systemInfo()?.status || 'Unknown'}
+                      </span>
                     </div>
                     <div class="flex justify-between py-0.5">
-                      <span>Active Channels:</span>
-                      <span class="font-mono">{websocketStats()?.active_channels || 0}</span>
+                      <span>Version:</span>
+                      <span class="font-mono">{systemInfo()?.version || 'N/A'}</span>
                     </div>
                     <div class="flex justify-between py-0.5">
-                      <span>Recent Disconnects:</span>
-                      <span class="font-mono">{websocketStats()?.recent_disconnects || 0}</span>
+                      <span>Uptime:</span>
+                      <span class="font-mono">
+                        {(() => {
+                          const seconds = systemInfo()?.uptime || 0
+                          const hours = Math.floor(seconds / 3600)
+                          const minutes = Math.floor((seconds % 3600) / 60)
+                          return `${hours}h ${minutes}m`
+                        })()}
+                      </span>
                     </div>
-                    <Show when={websocketStats()?.channels_by_type}>
-                      <div class="mt-1 border-t border-gray-800 pt-1">
-                        <For each={Object.entries(websocketStats()?.channels_by_type || {})}>
-                          {([type, count]) => (
-                            <div class="flex justify-between py-0.5 pl-2">
-                              <span>{type}:</span>
-                              <span class="font-mono">{count as number}</span>
-                            </div>
-                          )}
-                        </For>
-                      </div>
-                    </Show>
                   </Show>
                 </div>
               </div>
 
-              <div class="border-b border-gray-800 bg-gray-900 p-3">
-                <h3 class="mb-2 text-xs font-medium text-gray-300">Performance</h3>
-                <div class="text-xs text-gray-500">
-                  <Show when={performanceMetrics()} fallback={<span class="text-gray-600">Loading...</span>}>
-                    <Show when={performanceMetrics()?.memory}>
-                      <div class="flex justify-between py-0.5">
-                        <span>Memory:</span>
-                        <span class="font-mono">{Math.round(performanceMetrics()?.memory?.total_mb || 0)} MB</span>
-                      </div>
-                      <div class="flex justify-between py-0.5">
-                        <span>Processes:</span>
-                        <span class="font-mono">{Math.round(performanceMetrics()?.memory?.processes_mb || 0)} MB</span>
-                      </div>
-                    </Show>
-                    <Show when={performanceMetrics()?.cpu}>
-                      <div class="flex justify-between py-0.5">
-                        <span>Schedulers:</span>
-                        <span class="font-mono">{performanceMetrics()?.cpu?.schedulers || 0}</span>
-                      </div>
-                      <div class="flex justify-between py-0.5">
-                        <span>Run Queue:</span>
-                        <span class="font-mono">{performanceMetrics()?.cpu?.run_queue || 0}</span>
-                      </div>
-                    </Show>
-                  </Show>
-                </div>
-              </div>
-
-              <Show when={websocketStats()?.totals}>
+              {/* Service Status */}
+              <Show when={serviceMetrics()}>
                 <div class="border-b border-gray-800 bg-gray-900 p-3">
-                  <h3 class="mb-2 text-xs font-medium text-gray-300">Lifetime Totals</h3>
-                  <div class="text-xs text-gray-500">
-                    <div class="flex justify-between py-0.5">
-                      <span>Connects:</span>
-                      <span class="font-mono">{websocketStats()?.totals?.connects || 0}</span>
+                  <h3 class="mb-2 text-xs font-medium text-gray-300">Service Status</h3>
+                  <div class="space-y-2 text-xs">
+                    {/* Phononmaser */}
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <div
+                          class={`h-2 w-2 rounded-full ${serviceMetrics()?.phononmaser?.connected ? 'bg-green-500' : 'bg-red-500'}`}
+                        />
+                        <span class="text-gray-400">Phononmaser</span>
+                      </div>
+                      <Show
+                        when={serviceMetrics()?.phononmaser?.connected}
+                        fallback={
+                          <span class="text-red-400">{serviceMetrics()?.phononmaser?.error || 'Disconnected'}</span>
+                        }>
+                        <span class="text-green-400">Connected</span>
+                      </Show>
                     </div>
-                    <div class="flex justify-between py-0.5">
-                      <span>Disconnects:</span>
-                      <span class="font-mono">{websocketStats()?.totals?.disconnects || 0}</span>
+
+                    {/* Seed */}
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <div
+                          class={`h-2 w-2 rounded-full ${serviceMetrics()?.seed?.connected ? 'bg-green-500' : 'bg-red-500'}`}
+                        />
+                        <span class="text-gray-400">Seed</span>
+                      </div>
+                      <Show
+                        when={serviceMetrics()?.seed?.connected}
+                        fallback={<span class="text-red-400">{serviceMetrics()?.seed?.error || 'Disconnected'}</span>}>
+                        <span class="text-green-400">Connected</span>
+                      </Show>
                     </div>
-                    <div class="flex justify-between py-0.5">
-                      <span>Channel Joins:</span>
-                      <span class="font-mono">{websocketStats()?.totals?.joins || 0}</span>
+
+                    {/* OBS */}
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <div
+                          class={`h-2 w-2 rounded-full ${serviceMetrics()?.obs?.connected ? 'bg-green-500' : 'bg-red-500'}`}
+                        />
+                        <span class="text-gray-400">OBS</span>
+                      </div>
+                      <Show
+                        when={serviceMetrics()?.obs?.connected}
+                        fallback={<span class="text-red-400">{serviceMetrics()?.obs?.error || 'Disconnected'}</span>}>
+                        <span class="text-green-400">Connected</span>
+                      </Show>
                     </div>
-                    <div class="flex justify-between py-0.5">
-                      <span>Channel Leaves:</span>
-                      <span class="font-mono">{websocketStats()?.totals?.leaves || 0}</span>
+
+                    {/* Twitch */}
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <div
+                          class={`h-2 w-2 rounded-full ${serviceMetrics()?.twitch?.connected ? 'bg-green-500' : 'bg-red-500'}`}
+                        />
+                        <span class="text-gray-400">Twitch</span>
+                      </div>
+                      <Show
+                        when={serviceMetrics()?.twitch?.connected}
+                        fallback={
+                          <span class="text-red-400">{serviceMetrics()?.twitch?.error || 'Disconnected'}</span>
+                        }>
+                        <span class="text-green-400">Connected</span>
+                      </Show>
                     </div>
+                  </div>
+                </div>
+              </Show>
+
+              {/* Overlay Health */}
+              <Show when={overlayHealth() && overlayHealth()!.length > 0}>
+                <div class="border-b border-gray-800 bg-gray-900 p-3">
+                  <h3 class="mb-2 text-xs font-medium text-gray-300">Overlay Health</h3>
+                  <div class="space-y-2 text-xs">
+                    <For each={overlayHealth()}>
+                      {(overlay) => (
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center gap-2">
+                            <div class={`h-2 w-2 rounded-full ${overlay.connected ? 'bg-green-500' : 'bg-red-500'}`} />
+                            <span class="text-gray-400">{overlay.name}</span>
+                          </div>
+                          <Show
+                            when={overlay.connected}
+                            fallback={<span class="text-red-400">{overlay.error || 'Disconnected'}</span>}>
+                            <span class="text-green-400">
+                              {overlay.channelState === 'joined' ? 'Connected' : overlay.channelState}
+                            </span>
+                          </Show>
+                        </div>
+                      )}
+                    </For>
                   </div>
                 </div>
               </Show>

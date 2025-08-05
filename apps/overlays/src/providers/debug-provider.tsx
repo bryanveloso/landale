@@ -1,26 +1,35 @@
-import { createEffect, onMount, type Component, type JSX } from 'solid-js'
-import { useSocket } from './socket-provider'
+import { createEffect, onMount, createSignal, type Component, type JSX } from 'solid-js'
+import { Socket } from 'phoenix'
+import { createPhoenixSocket } from '@landale/shared/phoenix-connection'
 import { debugManager } from '../debug/debug-interface'
 import { createLogger } from '@landale/logger/browser'
 
 interface DebugProviderProps {
   children: JSX.Element
-  orchestrator?: any
-  streamChannel?: any
+  orchestrator?: {
+    showLayer: (priority: string, content: unknown) => void
+    hideLayer: (priority: string) => void
+    clearAllLayers: () => void
+    getLayerStates: () => Record<string, string>
+  }
+  streamChannel?: { push: (event: string, payload: unknown) => void }
 }
 
 export const DebugProvider: Component<DebugProviderProps> = (props) => {
-  const { socket } = useSocket()
+  const [, setSocket] = createSignal<Socket | null>(null)
   const logger = createLogger({
     service: 'landale-overlays',
     level: 'debug'
   }).child({ module: 'debug-provider' })
 
-  // Set up debug manager references
-  createEffect(() => {
-    const currentSocket = socket()
-    if (currentSocket) {
-      debugManager.setSocket(currentSocket)
+  onMount(() => {
+    // Create Phoenix socket for debug
+    const phoenixSocket = createPhoenixSocket()
+    setSocket(phoenixSocket)
+
+    // Set up debug manager references
+    if (phoenixSocket) {
+      debugManager.setSocket(phoenixSocket)
     }
   })
 
@@ -45,55 +54,26 @@ export const DebugProvider: Component<DebugProviderProps> = (props) => {
     if (isDev || debugParam) {
       // Create debug interface
       const debug = debugManager.createInterface()
-      ;(window as any).debug = debug
+      ;(window as Window & { debug?: typeof debug }).debug = debug
 
       logger.info('Debug interface enabled', {
-        metadata: { isDev, debugParam }
-      })
-
-      // Show help on first load
-      if (!sessionStorage.getItem('landale-debug-shown')) {
-        console.log('🎮 Landale Debug Interface enabled! Type `debug.help()` for commands.')
-        sessionStorage.setItem('landale-debug-shown', 'true')
-      }
-
-      // Handle auto-simulation based on query param
-      if (debugParam && debugParam !== 'true') {
-        setTimeout(() => {
-          switch (debugParam) {
-            case 'follow':
-              debug.layers.simulateFollow('debuguser')
-              break
-            case 'sub':
-              debug.layers.simulateSub('debuguser', 3)
-              break
-            case 'raid':
-              debug.layers.simulateRaid('debugraider', 100)
-              break
-            case 'bits':
-              debug.layers.simulateBits('debugbits', 500)
-              break
-            case 'inspect':
-              debug.inspect()
-              break
-          }
-        }, 2000) // Wait for everything to initialize
-      }
-
-      // Listen for keyboard shortcuts in debug mode
-      window.addEventListener('keydown', (e) => {
-        // Ctrl/Cmd + Shift + D to toggle debug panel
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
-          e.preventDefault()
-          debug.inspect()
-        }
-
-        // Ctrl/Cmd + Shift + C to clear all layers
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'C') {
-          e.preventDefault()
-          debug.layers.clear()
+        metadata: {
+          development: isDev,
+          debugParam: !!debugParam
         }
       })
+
+      // Log initial state
+      logger.debug('Debug provider mounted', {
+        metadata: {
+          hasOrchestrator: !!props.orchestrator,
+          hasStreamChannel: !!props.streamChannel
+        }
+      })
+
+      // Add help text
+      console.log('%c🛠️ Debug Interface Ready', 'font-size: 14px; font-weight: bold; color: #4ade80;')
+      console.log('Type `debug.help()` to see available commands')
     }
   })
 

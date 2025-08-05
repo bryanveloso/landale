@@ -7,8 +7,7 @@
  */
 
 import { createSignal, createResource, For, Show, onMount, createEffect, onCleanup, untrack } from 'solid-js'
-import { useStreamService } from '@/services/stream-service'
-import type { ChannelInfoUpdate } from '@/services/stream-service'
+import { useOverlayChannel } from '@/hooks/use-phoenix-channel'
 import { useLayerState } from '@/hooks/use-layer-state'
 import { Button } from './ui/button'
 import { StreamValidationRules, validateForm, sanitizeFormData } from '@/services/form-validation'
@@ -74,8 +73,14 @@ function isGameCategoryArray(data: unknown): data is GameCategory[] {
   return Array.isArray(data) && data.every(isGameCategory)
 }
 
+export interface ChannelInfoUpdate {
+  title?: string
+  game_id?: string
+  broadcaster_language?: string
+}
+
 export function StreamInformation() {
-  const { connectionState, getChannelInfo, searchCategories, updateChannelInfo } = useStreamService()
+  const { isConnected, getChannelInfo, searchCategories, updateChannelInfo } = useOverlayChannel()
   const { layerState } = useLayerState()
 
   const [isExpanded, setIsExpanded] = createSignal(false)
@@ -93,7 +98,6 @@ export function StreamInformation() {
   const [showSearch, setShowSearch] = createSignal(false)
   const [searchTimeout, setSearchTimeout] = createSignal<ReturnType<typeof setTimeout> | null>(null)
 
-  const isConnected = () => connectionState().connected
   const currentShow = () => layerState().current_show
 
   // Load current channel information

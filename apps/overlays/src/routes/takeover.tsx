@@ -1,15 +1,11 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
-import type { Channel } from 'phoenix'
-import { SocketProvider, useSocket } from '@/providers/socket-provider'
+import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
+import type { Socket, Channel } from 'phoenix'
+import { createPhoenixSocket, isSocketConnected } from '@landale/shared/phoenix-connection'
 import { createLogger } from '@landale/logger/browser'
 
 export const Route = createFileRoute('/takeover')({
-  component: () => (
-    <SocketProvider>
-      <TakeoverOverlay />
-    </SocketProvider>
-  )
+  component: TakeoverOverlay
 })
 
 interface TakeoverState {
@@ -34,12 +30,15 @@ const DEFAULT_TAKEOVER_STATE: TakeoverState = {
 }
 
 function TakeoverOverlay() {
-  const { socket, isConnected } = useSocket()
+  const [socket, setSocket] = createSignal<Socket | null>(null)
+  const [isConnected, setIsConnected] = createSignal(false)
   const [takeoverState, setTakeoverState] = createSignal<TakeoverState>(DEFAULT_TAKEOVER_STATE)
   const [channel, setChannel] = createSignal<Channel | null>(null)
+  const [, setChannelState] = createSignal<string>('closed')
 
   let hideTimer: ReturnType<typeof setTimeout> | null = null
-  let channelJoinTimer: number | null = null
+  let connectionCheckInterval: ReturnType<typeof setInterval> | null = null
+  let channelStateInterval: ReturnType<typeof setInterval> | null = null
 
   // Initialize logger with correlation ID
   const correlationId = `overlay-takeover-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
@@ -48,41 +47,58 @@ function TakeoverOverlay() {
     level: 'debug'
   }).child({ module: 'takeover', correlationId })
 
-  // Join channel when connected
+  // Track channel state changes
   createEffect(() => {
-    const phoenixSocket = socket()
-    const connected = isConnected()
+    const ch = channel()
+    if (ch) {
+      // Update channel state immediately
+      setChannelState(ch.state)
 
-    if (connected && phoenixSocket && !channel()) {
-      logger.info('Socket connected, joining channel')
-      // Add small delay before joining channel to ensure stability
-      channelJoinTimer = window.setTimeout(() => {
-        joinChannel()
+      // Poll for state changes
+      if (channelStateInterval) clearInterval(channelStateInterval)
+      channelStateInterval = setInterval(() => {
+        setChannelState(ch.state)
       }, 100)
-    } else if (!connected && channel()) {
-      // Clean up channel on disconnection
-      logger.info('Socket disconnected, leaving channel')
-      const ch = channel()
-      if (ch) {
-        ch.leave()
-        setChannel(null)
+    } else {
+      setChannelState('closed')
+      if (channelStateInterval) {
+        clearInterval(channelStateInterval)
+        channelStateInterval = null
       }
     }
   })
 
-  const joinChannel = () => {
-    const phoenixSocket = socket()
+  // Create Phoenix socket on mount
+  onMount(() => {
+    logger.info('Initializing Phoenix socket')
+    const phoenixSocket = createPhoenixSocket()
+    setSocket(phoenixSocket)
+
+    // Check connection status periodically
+    connectionCheckInterval = setInterval(() => {
+      const connected = isSocketConnected(phoenixSocket)
+      setIsConnected(connected)
+    }, 1000)
+
+    // Join channel after socket is ready
+    setTimeout(() => {
+      setupChannel(phoenixSocket)
+    }, 100)
+  })
+
+  const setupChannel = (phoenixSocket: Socket) => {
     if (!phoenixSocket) {
-      logger.debug('Skipping channel join - no socket')
+      logger.debug('Skipping channel setup - no socket')
       return
     }
+
+    logger.debug('Creating channel', {
+      metadata: {
+        socketConnected: isSocketConnected(phoenixSocket)
+      }
+    })
 
     const newChannel = phoenixSocket.channel('stream:overlays', {})
-    if (!newChannel) {
-      logger.error('Failed to create channel')
-      return
-    }
-
     setChannel(newChannel)
 
     // Handle takeover events
@@ -120,17 +136,40 @@ function TakeoverOverlay() {
       hideTakeover()
     })
 
+    logger.debug('Attempting to join channel', {
+      metadata: {
+        channelState: newChannel.state
+      }
+    })
+
     newChannel
       .join()
-      .receive('ok', () => {
+      .receive('ok', (resp) => {
         logger.info('Channel joined successfully', {
-          metadata: { channel: 'stream:overlays' }
+          metadata: {
+            channel: 'stream:overlays',
+            channelState: newChannel.state,
+            response: resp
+          }
         })
       })
       .receive('error', (resp: { reason?: string }) => {
         logger.error('Channel join failed', {
           error: { message: resp?.reason || 'Unknown join error', type: 'ChannelJoinError' },
-          metadata: { channel: 'stream:overlays', response: resp }
+          metadata: {
+            channel: 'stream:overlays',
+            channelState: newChannel.state,
+            response: resp
+          }
+        })
+      })
+      .receive('timeout', () => {
+        logger.error('Channel join timeout', {
+          error: { message: 'Join timeout', type: 'ChannelJoinTimeout' },
+          metadata: {
+            channel: 'stream:overlays',
+            channelState: newChannel.state
+          }
         })
       })
   }
@@ -144,18 +183,33 @@ function TakeoverOverlay() {
   }
 
   onCleanup(() => {
+    logger.info('Cleaning up takeover overlay')
+
     const ch = channel()
     if (ch) {
       ch.leave()
       setChannel(null)
     }
+
+    const s = socket()
+    if (s) {
+      s.disconnect()
+      setSocket(null)
+    }
+
     if (hideTimer) {
       clearTimeout(hideTimer)
       hideTimer = null
     }
-    if (channelJoinTimer) {
-      clearTimeout(channelJoinTimer)
-      channelJoinTimer = null
+
+    if (connectionCheckInterval) {
+      clearInterval(connectionCheckInterval)
+      connectionCheckInterval = null
+    }
+
+    if (channelStateInterval) {
+      clearInterval(channelStateInterval)
+      channelStateInterval = null
     }
   })
 
@@ -168,17 +222,6 @@ function TakeoverOverlay() {
       <Show when={takeoverState().active}>
         <TakeoverContent state={takeoverState()} onHide={hideTakeover} />
       </Show>
-
-      {/* Debug info in development */}
-      {import.meta.env.DEV && (
-        <div class="debug-takeover">
-          <div>Socket Connected: {isConnected() ? '✓' : '✗'}</div>
-          <div>Channel Joined: {channel() ? '✓' : '✗'}</div>
-          <div>Channel State: {channel()?.state || 'no channel'}</div>
-          <div>Active: {takeoverState().active ? 'Yes' : 'No'}</div>
-          <div>Type: {takeoverState().type || 'none'}</div>
-        </div>
-      )}
     </div>
   )
 }

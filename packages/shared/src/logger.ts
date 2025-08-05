@@ -13,7 +13,7 @@ export const logger = {
    * Debug level - development only
    * Use for detailed debugging information
    */
-  debug: (...args: any[]) => {
+  debug: (...args: unknown[]) => {
     if (isDev) {
       console.log('[DEBUG]', ...args)
     }
@@ -23,7 +23,7 @@ export const logger = {
    * Info level - important state changes
    * Use for service starts, connections established, etc.
    */
-  info: (...args: any[]) => {
+  info: (...args: unknown[]) => {
     console.info('[INFO]', ...args)
   },
 
@@ -31,7 +31,7 @@ export const logger = {
    * Warning level - recoverable errors
    * Use for retries, fallbacks, degraded functionality
    */
-  warn: (...args: any[]) => {
+  warn: (...args: unknown[]) => {
     console.warn('[WARN]', ...args)
   },
 
@@ -39,7 +39,7 @@ export const logger = {
    * Error level - unrecoverable errors
    * Use for failures that require user intervention
    */
-  error: (...args: any[]) => {
+  error: (...args: unknown[]) => {
     console.error('[ERROR]', ...args)
   }
 }

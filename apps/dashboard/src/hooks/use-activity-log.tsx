@@ -1,6 +1,6 @@
 import { createSignal, createEffect, onCleanup } from 'solid-js'
 import { Channel } from 'phoenix'
-import { useStreamService } from '@/services/stream-service'
+import { usePhoenixService } from '@/services/phoenix-service'
 import type { ActivityEvent, ActivityLogFilters } from '@/types/activity-log'
 import { EVENT_TYPES } from '@/types/activity-log'
 
@@ -19,7 +19,7 @@ interface EventPayload {
 }
 
 export function useActivityLog() {
-  const streamService = useStreamService()
+  const { socket, isConnected } = usePhoenixService()
   const [events, setEvents] = createSignal<ActivityEvent[]>([])
   const [loading] = createSignal(false)
   const [error] = createSignal(null)
@@ -68,36 +68,35 @@ export function useActivityLog() {
   }
 
   createEffect(() => {
-    const connectionState = streamService.connectionState()
-    if (connectionState.connected && !eventsChannel()) {
-      const socket = streamService.getSocket()
-      if (socket) {
-        const channel = socket.channel('events:all', {})
+    const connected = isConnected()
+    const phoenixSocket = socket()
 
-        channel?.on('chat_message', (payload: EventPayload) => {
-          const event = transformEvent('chat_message', payload)
-          if (event) addEvent(event)
-        })
+    if (connected && phoenixSocket && !eventsChannel()) {
+      const channel = phoenixSocket.channel('events:all', {})
 
-        channel?.on('follower', (payload: EventPayload) => {
-          const event = transformEvent('follower', payload)
-          if (event) addEvent(event)
-        })
+      channel.on('chat_message', (payload: EventPayload) => {
+        const event = transformEvent('chat_message', payload)
+        if (event) addEvent(event)
+      })
 
-        channel?.on('subscription', (payload: EventPayload) => {
-          const event = transformEvent('subscription', payload)
-          if (event) addEvent(event)
-        })
+      channel.on('follower', (payload: EventPayload) => {
+        const event = transformEvent('follower', payload)
+        if (event) addEvent(event)
+      })
 
-        channel?.on('cheer', (payload: EventPayload) => {
-          const event = transformEvent('cheer', payload)
-          if (event) addEvent(event)
-        })
+      channel.on('subscription', (payload: EventPayload) => {
+        const event = transformEvent('subscription', payload)
+        if (event) addEvent(event)
+      })
 
-        channel?.join()
-        setEventsChannel(channel)
-      }
-    } else if (!connectionState.connected && eventsChannel()) {
+      channel.on('cheer', (payload: EventPayload) => {
+        const event = transformEvent('cheer', payload)
+        if (event) addEvent(event)
+      })
+
+      channel.join()
+      setEventsChannel(channel)
+    } else if (!connected && eventsChannel()) {
       eventsChannel()?.leave()
       setEventsChannel(null)
     }

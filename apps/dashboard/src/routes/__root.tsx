@@ -1,5 +1,5 @@
 import { createRootRoute, Outlet, useLocation } from '@tanstack/solid-router'
-import { StreamServiceProvider } from '@/services/stream-service'
+import { PhoenixServiceProvider } from '@/services/phoenix-service'
 import { TelemetryDrawer } from '@/components/telemetry-drawer'
 import { TelemetryProvider, useTelemetry } from '@/contexts/telemetry-context'
 import { Show } from 'solid-js'
@@ -27,11 +27,11 @@ const RootLayout = () => {
 export const Route = createRootRoute({
   component: () => {
     return (
-      <StreamServiceProvider>
+      <PhoenixServiceProvider>
         <TelemetryProvider>
           <RootLayout />
         </TelemetryProvider>
-      </StreamServiceProvider>
+      </PhoenixServiceProvider>
     )
   },
   errorComponent: ({ error }) => (

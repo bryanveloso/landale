@@ -3,15 +3,6 @@ defmodule ServerWeb.TelemetryChannelTest do
   alias ServerWeb.TelemetryChannel
 
   setup do
-    # Ensure WebSocketStatsTracker is running
-    case Process.whereis(ServerWeb.WebSocketStatsTracker) do
-      nil ->
-        {:ok, _pid} = ServerWeb.WebSocketStatsTracker.start_link([])
-
-      _ ->
-        :ok
-    end
-
     # Ensure OBS Registry is started
     unless Process.whereis(Server.Services.OBS.SessionRegistry) do
       Registry.start_link(keys: :unique, name: Server.Services.OBS.SessionRegistry)

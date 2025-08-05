@@ -2,10 +2,10 @@
  * Connection Status Component for Status Bar
  */
 
-import { useStreamService } from '@/services/stream-service'
+import { usePhoenixService } from '@/services/phoenix-service'
 
 export function ConnectionStatus() {
-  const { connectionState } = useStreamService()
+  const { isConnected } = usePhoenixService()
 
-  return <div>{connectionState().connected ? 'WebSocket: Connected' : 'WebSocket: Disconnected'}</div>
+  return <div>{isConnected() ? 'WebSocket: Connected' : 'WebSocket: Disconnected'}</div>
 }

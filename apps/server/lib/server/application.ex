@@ -26,8 +26,6 @@ defmodule Server.Application do
       {Phoenix.PubSub, name: Server.PubSub},
       # Phoenix.Tracker for WebSocket lifecycle tracking
       {ServerWeb.WebSocketTracker, [pubsub_server: Server.PubSub]},
-      # WebSocket statistics tracking
-      ServerWeb.WebSocketStatsTracker,
       # Start to serve requests, typically the last entry
       ServerWeb.Endpoint
     ]

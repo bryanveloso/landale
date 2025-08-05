@@ -3,15 +3,6 @@ defmodule ServerWeb.TelemetryChannelSimpleTest do
   alias ServerWeb.TelemetryChannel
 
   setup do
-    # Ensure WebSocketStatsTracker is running
-    case Process.whereis(ServerWeb.WebSocketStatsTracker) do
-      nil ->
-        {:ok, _pid} = ServerWeb.WebSocketStatsTracker.start_link([])
-
-      _ ->
-        :ok
-    end
-
     {:ok, _, socket} =
       ServerWeb.UserSocket
       |> socket("user_id", %{some: :assign})

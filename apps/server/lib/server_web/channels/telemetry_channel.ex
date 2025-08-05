@@ -142,43 +142,26 @@ defmodule ServerWeb.TelemetryChannel do
       websocket: gather_websocket_metrics(),
       services: gather_service_metrics(),
       performance: gather_performance_metrics(),
-      system: gather_system_metrics()
+      system: gather_system_metrics(),
+      overlays: gather_overlay_health()
     }
   end
 
   defp gather_websocket_metrics do
-    # Get real WebSocket connection statistics from our telemetry tracker
-    case get_websocket_stats() do
-      {:ok, stats} ->
-        stats
-
-      {:error, _} ->
-        %{
-          total_connections: 0,
-          active_channels: 0,
-          channels_by_type: %{},
-          recent_disconnects: 0,
-          average_connection_duration: 0,
-          status: "WebSocket stats tracker unavailable"
-        }
-    end
+    # WebSocket stats tracking has been removed in favor of direct Phoenix connections
+    # Always return basic info since get_websocket_stats/0 always returns {:ok, _}
+    {:ok, stats} = get_websocket_stats()
+    stats
   end
 
   defp get_websocket_stats do
-    # Try to get stats from our WebSocket stats tracker
-    # This will be implemented as a GenServer that listens to Phoenix telemetry
-    case Process.whereis(ServerWeb.WebSocketStatsTracker) do
-      nil ->
-        {:error, :not_running}
-
-      pid ->
-        try do
-          stats = GenServer.call(pid, :get_stats, 5000)
-          {:ok, Map.put(stats, :status, "Active telemetry tracking")}
-        rescue
-          _ -> {:error, :call_failed}
-        end
-    end
+    # WebSocket stats tracking has been removed in favor of direct Phoenix connections
+    # Return basic connection info instead
+    {:ok,
+     %{
+       status: "Direct Phoenix connections",
+       message: "Using direct Phoenix sockets without telemetry wrapper"
+     }}
   end
 
   defp gather_service_metrics do
@@ -310,9 +293,7 @@ defmodule ServerWeb.TelemetryChannel do
     # because they can't communicate even if individually healthy
 
     # Check critical internal processes
-    critical_processes = [
-      ServerWeb.WebSocketStatsTracker
-    ]
+    critical_processes = []
 
     # Check internal processes
     process_count =
@@ -380,4 +361,31 @@ defmodule ServerWeb.TelemetryChannel do
   defp sanitize_error("Service URL not configured"), do: "Service not configured"
   defp sanitize_error(reason) when is_binary(reason), do: reason
   defp sanitize_error(_), do: "An unknown error occurred"
+
+  defp gather_overlay_health do
+    # Use ETS to track overlay channel joins
+    # Create table if it doesn't exist
+    table_name = :overlay_channel_tracker
+
+    if :ets.whereis(table_name) == :undefined do
+      :ets.new(table_name, [:set, :public, :named_table])
+    end
+
+    # Get all entries from the tracking table
+    overlays =
+      :ets.tab2list(table_name)
+      |> Enum.map(fn {_socket_id, info} ->
+        %{
+          name: Map.get(info, :name, "Takeover"),
+          connected: true,
+          lastSeen: Map.get(info, :joined_at, DateTime.utc_now()) |> format_datetime(),
+          channelState: "joined"
+        }
+      end)
+
+    overlays
+  end
+
+  defp format_datetime(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
+  defp format_datetime(_), do: DateTime.utc_now() |> DateTime.to_iso8601()
 end

@@ -66,7 +66,7 @@ globalThis.gsap = {
     }
     return mockTimeline
   },
-  context: (fn?: () => void, element?: HTMLElement) => {
+  context: (fn?: () => void, _element?: HTMLElement) => {
     // Call the function if provided (for initialization)
     if (fn) fn()
     return mockContext
