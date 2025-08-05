@@ -6,6 +6,7 @@ defmodule ServerWeb.UserSocket do
   alias Server.CorrelationId
 
   # Channels
+  channel "dashboard:services", ServerWeb.ServicesChannel
   channel "dashboard:telemetry", ServerWeb.TelemetryChannel
   channel "dashboard:*", ServerWeb.DashboardChannel
   channel "events:*", ServerWeb.EventsChannel

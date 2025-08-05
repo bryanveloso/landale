@@ -9,6 +9,7 @@ import { Show, onMount, onCleanup, For, createEffect } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { invoke } from '@tauri-apps/api/core'
 import { ConnectionTelemetry } from './connection-telemetry'
+import { ServiceControls } from './service-controls'
 import { TelemetryServiceProvider, useTelemetryService } from '@/services/telemetry-service'
 
 interface TelemetryDrawerProps {
@@ -172,76 +173,9 @@ function TelemetryDrawerContent(props: TelemetryDrawerProps) {
                 </div>
               </div>
 
-              {/* Service Status */}
+              {/* Service Status with Controls */}
               <Show when={serviceMetrics()}>
-                <div class="border-b border-gray-800 bg-gray-900 p-3">
-                  <h3 class="mb-2 text-xs font-medium text-gray-300">Service Status</h3>
-                  <div class="space-y-2 text-xs">
-                    {/* Phononmaser */}
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-2">
-                        <div
-                          class={`h-2 w-2 rounded-full ${serviceMetrics()?.phononmaser?.connected ? 'bg-green-500' : 'bg-red-500'}`}
-                        />
-                        <span class="text-gray-400">Phononmaser</span>
-                      </div>
-                      <Show
-                        when={serviceMetrics()?.phononmaser?.connected}
-                        fallback={
-                          <span class="text-red-400">{serviceMetrics()?.phononmaser?.error || 'Disconnected'}</span>
-                        }>
-                        <span class="text-green-400">Connected</span>
-                      </Show>
-                    </div>
-
-                    {/* Seed */}
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-2">
-                        <div
-                          class={`h-2 w-2 rounded-full ${serviceMetrics()?.seed?.connected ? 'bg-green-500' : 'bg-red-500'}`}
-                        />
-                        <span class="text-gray-400">Seed</span>
-                      </div>
-                      <Show
-                        when={serviceMetrics()?.seed?.connected}
-                        fallback={<span class="text-red-400">{serviceMetrics()?.seed?.error || 'Disconnected'}</span>}>
-                        <span class="text-green-400">Connected</span>
-                      </Show>
-                    </div>
-
-                    {/* OBS */}
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-2">
-                        <div
-                          class={`h-2 w-2 rounded-full ${serviceMetrics()?.obs?.connected ? 'bg-green-500' : 'bg-red-500'}`}
-                        />
-                        <span class="text-gray-400">OBS</span>
-                      </div>
-                      <Show
-                        when={serviceMetrics()?.obs?.connected}
-                        fallback={<span class="text-red-400">{serviceMetrics()?.obs?.error || 'Disconnected'}</span>}>
-                        <span class="text-green-400">Connected</span>
-                      </Show>
-                    </div>
-
-                    {/* Twitch */}
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-2">
-                        <div
-                          class={`h-2 w-2 rounded-full ${serviceMetrics()?.twitch?.connected ? 'bg-green-500' : 'bg-red-500'}`}
-                        />
-                        <span class="text-gray-400">Twitch</span>
-                      </div>
-                      <Show
-                        when={serviceMetrics()?.twitch?.connected}
-                        fallback={
-                          <span class="text-red-400">{serviceMetrics()?.twitch?.error || 'Disconnected'}</span>
-                        }>
-                        <span class="text-green-400">Connected</span>
-                      </Show>
-                    </div>
-                  </div>
-                </div>
+                <ServiceControls serviceMetrics={serviceMetrics} requestRefresh={requestRefresh} />
               </Show>
 
               {/* Overlay Health */}
