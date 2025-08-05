@@ -60,98 +60,170 @@ function TelemetryPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div class="grid grid-cols-4 gap-px bg-gray-800 p-px">
-        {/* System Status */}
-        <div class="bg-gray-950 p-4">
-          <div class="mb-2 text-xs font-medium text-gray-400">System</div>
-          <div class="space-y-2">
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Status</span>
-              <span
-                class={`text-sm font-medium ${
-                  systemInfo()?.status === 'healthy'
-                    ? 'text-green-400'
-                    : systemInfo()?.status === 'degraded'
-                      ? 'text-yellow-400'
-                      : 'text-red-400'
-                }`}>
-                {systemInfo()?.status || 'Unknown'}
-              </span>
+      {/* Connection Health Grid */}
+      <div class="bg-gray-950 p-4">
+        <h2 class="mb-4 text-sm font-medium text-gray-400">Connection Health</h2>
+        <div class="grid grid-cols-2 gap-4">
+          {/* WebSocket Connections */}
+          <div class="space-y-3">
+            <h3 class="text-xs font-medium tracking-wider text-gray-500 uppercase">WebSocket Status</h3>
+            <Show
+              when={websocketStats()?.channels_by_type}
+              fallback={<div class="text-sm text-gray-600">No connection data</div>}>
+              <For each={Object.entries(websocketStats()?.channels_by_type || {})}>
+                {([type, count]) => {
+                  const isHealthy = (count as number) > 0
+                  const hasDisconnects = type === 'overlay' && (websocketStats()?.recent_disconnects || 0) > 0
+
+                  return (
+                    <div class="flex items-center justify-between rounded-lg bg-gray-900 px-3 py-2">
+                      <div class="flex items-center gap-2">
+                        <div
+                          class={`h-2 w-2 rounded-full ${
+                            hasDisconnects ? 'animate-pulse bg-yellow-500' : isHealthy ? 'bg-green-500' : 'bg-gray-600'
+                          }`}
+                        />
+                        <span class="text-sm text-gray-300 capitalize">{type}</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <Show when={hasDisconnects}>
+                          <span class="text-xs text-yellow-400">{websocketStats()?.recent_disconnects} failures</span>
+                        </Show>
+                        <span class="font-mono text-sm font-medium text-gray-400">{count as number}</span>
+                      </div>
+                    </div>
+                  )
+                }}
+              </For>
+            </Show>
+
+            {/* Overall health indicator */}
+            <div class="mt-2 rounded-lg bg-gray-900 p-3">
+              <div class="flex items-center justify-between">
+                <span
+                  class="text-xs text-gray-500"
+                  title="Ratio of successful connections to total connection attempts. Low values in development are normal due to hot-reload.">
+                  Connection Stability
+                </span>
+                <Show when={websocketStats()?.totals} fallback={<span class="text-sm text-gray-600">No data</span>}>
+                  {() => {
+                    const total = websocketStats()?.totals?.connects || 0
+                    const disconnects = websocketStats()?.totals?.disconnects || 0
+                    const rate = total > 0 ? ((total - disconnects) / total) * 100 : 100
+
+                    return (
+                      <div class="flex items-center gap-2">
+                        <span
+                          class={`text-sm font-medium ${
+                            rate >= 99 ? 'text-green-400' : rate >= 95 ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                          {rate.toFixed(1)}%
+                        </span>
+                        <Show when={rate < 50}>
+                          <span class="text-xs text-gray-500">(Dev environment)</span>
+                        </Show>
+                      </div>
+                    )
+                  }}
+                </Show>
+              </div>
             </div>
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Uptime</span>
-              <span class="font-mono text-sm text-gray-300">{formatUptime(systemInfo()?.uptime)}</span>
+          </div>
+
+          {/* System Stats */}
+          <div class="space-y-3">
+            <h3 class="text-xs font-medium tracking-wider text-gray-500 uppercase">System Health</h3>
+
+            <div class="rounded-lg bg-gray-900 p-3">
+              <div class="mb-2 flex items-center justify-between">
+                <span class="text-sm text-gray-300">Phoenix Server</span>
+                <span
+                  class={`text-sm font-medium ${
+                    systemInfo()?.status === 'healthy'
+                      ? 'text-green-400'
+                      : systemInfo()?.status === 'degraded'
+                        ? 'text-yellow-400'
+                        : 'text-red-400'
+                  }`}>
+                  {systemInfo()?.status || 'Unknown'}
+                </span>
+              </div>
+              <div class="text-xs text-gray-500">Uptime: {formatUptime(systemInfo()?.uptime)}</div>
             </div>
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Version</span>
-              <span class="font-mono text-sm text-gray-300">{systemInfo()?.version || 'N/A'}</span>
+
+            <div class="rounded-lg bg-gray-900 p-3">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-300">Active Connections</span>
+                <span class="text-xl font-bold text-blue-400">{websocketStats()?.total_connections || 0}</span>
+              </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* WebSocket Stats */}
-        <div class="bg-gray-950 p-4">
-          <div class="mb-2 text-xs font-medium text-gray-400">Connections</div>
-          <div class="space-y-2">
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Active</span>
-              <span class="text-2xl font-bold text-blue-400">{websocketStats()?.total_connections || 0}</span>
+      {/* Performance & Resource Status */}
+      <div class="mt-px bg-gray-950 p-4">
+        <h2 class="mb-4 text-sm font-medium text-gray-400">System Resources</h2>
+        <div class="grid grid-cols-3 gap-4">
+          {/* Memory Status */}
+          <div class="rounded-lg bg-gray-900 p-3">
+            <div class="mb-2 flex items-center justify-between">
+              <span class="text-xs text-gray-500">Memory Usage</span>
+              <Show when={performanceMetrics()?.memory}>
+                {() => {
+                  const total = performanceMetrics()?.memory?.total_mb || 0
+                  const percent = total > 1000 ? (total / 4096) * 100 : (total / 1024) * 100
+                  return (
+                    <span
+                      class={`text-xs font-medium ${
+                        percent > 80 ? 'text-red-400' : percent > 60 ? 'text-yellow-400' : 'text-green-400'
+                      }`}>
+                      {percent.toFixed(0)}%
+                    </span>
+                  )
+                }}
+              </Show>
             </div>
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Channels</span>
-              <span class="font-mono text-sm text-gray-300">{websocketStats()?.active_channels || 0}</span>
-            </div>
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Disconnects</span>
-              <span class="font-mono text-sm text-gray-300">{websocketStats()?.recent_disconnects || 0}</span>
+            <div class="text-xl font-bold text-purple-400">
+              {Math.round(performanceMetrics()?.memory?.total_mb || 0)}
+              <span class="text-xs font-normal text-gray-500"> MB</span>
             </div>
           </div>
-        </div>
 
-        {/* Memory Stats */}
-        <div class="bg-gray-950 p-4">
-          <div class="mb-2 text-xs font-medium text-gray-400">Memory</div>
-          <div class="space-y-2">
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Total</span>
-              <span class="text-2xl font-bold text-purple-400">
-                {Math.round(performanceMetrics()?.memory?.total_mb || 0)}
-                <span class="text-xs font-normal text-gray-500">MB</span>
-              </span>
-            </div>
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Processes</span>
-              <span class="font-mono text-sm text-gray-300">
-                {Math.round(performanceMetrics()?.memory?.processes_mb || 0)}MB
-              </span>
-            </div>
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Binary</span>
-              <span class="font-mono text-sm text-gray-300">
-                {Math.round(performanceMetrics()?.memory?.binary_mb || 0)}MB
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* CPU Stats */}
-        <div class="bg-gray-950 p-4">
-          <div class="mb-2 text-xs font-medium text-gray-400">Processing</div>
-          <div class="space-y-2">
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Schedulers</span>
-              <span class="text-2xl font-bold text-green-400">{performanceMetrics()?.cpu?.schedulers || 0}</span>
-            </div>
-            <div class="flex items-baseline justify-between">
+          {/* CPU Status */}
+          <div class="rounded-lg bg-gray-900 p-3">
+            <div class="mb-2 flex items-center justify-between">
               <span class="text-xs text-gray-500">Run Queue</span>
-              <span class="font-mono text-sm text-gray-300">{performanceMetrics()?.cpu?.run_queue || 0}</span>
+              <Show when={performanceMetrics()?.cpu}>
+                {() => {
+                  const queue = performanceMetrics()?.cpu?.run_queue || 0
+                  return (
+                    <span
+                      class={`text-xs font-medium ${
+                        queue > 10 ? 'text-red-400' : queue > 5 ? 'text-yellow-400' : 'text-green-400'
+                      }`}>
+                      {queue === 0 ? 'Idle' : 'Active'}
+                    </span>
+                  )
+                }}
+              </Show>
             </div>
-            <div class="flex items-baseline justify-between">
-              <span class="text-xs text-gray-500">Avg Duration</span>
-              <span class="font-mono text-sm text-gray-300">
-                {Math.round(websocketStats()?.average_connection_duration || 0)}ms
-              </span>
+            <div class="text-xl font-bold text-green-400">
+              {performanceMetrics()?.cpu?.run_queue || 0}
+              <span class="text-xs font-normal text-gray-500"> tasks</span>
+            </div>
+          </div>
+
+          {/* Connection Duration */}
+          <div class="rounded-lg bg-gray-900 p-3">
+            <div class="mb-2 text-xs text-gray-500">Avg Connection</div>
+            <div class="text-xl font-bold text-blue-400">
+              {(() => {
+                const ms = websocketStats()?.average_connection_duration || 0
+                if (ms < 1000) return `${Math.round(ms)} ms`
+                if (ms < 60000) return `${(ms / 1000).toFixed(1)} s`
+                return `${(ms / 60000).toFixed(1)} m`
+              })()}
             </div>
           </div>
         </div>

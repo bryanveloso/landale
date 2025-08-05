@@ -1,11 +1,15 @@
 import { createFileRoute } from '@tanstack/solid-router'
-import { createSignal, createEffect, onCleanup, Show } from 'solid-js'
-import { Channel } from 'phoenix'
-import { Socket, ConnectionState, type ConnectionEvent } from '@landale/shared/websocket'
+import { createEffect, onCleanup, Show } from 'solid-js'
+import type { Channel } from 'phoenix'
+import { SocketProvider, useSocket } from '@/providers/socket-provider'
 import { createLogger } from '@landale/logger/browser'
 
 export const Route = createFileRoute('/takeover')({
-  component: TakeoverOverlay
+  component: () => (
+    <SocketProvider>
+      <TakeoverOverlay />
+    </SocketProvider>
+  )
 })
 
 interface TakeoverState {
@@ -23,9 +27,8 @@ const DEFAULT_TAKEOVER_STATE: TakeoverState = {
 }
 
 function TakeoverOverlay() {
+  const { socket, isConnected } = useSocket()
   const [takeoverState, setTakeoverState] = createSignal<TakeoverState>(DEFAULT_TAKEOVER_STATE)
-  const [socket, setSocket] = createSignal<Socket | null>(null)
-  const [isConnected, setIsConnected] = createSignal(false)
 
   let channel: Channel | null = null
   let hideTimer: ReturnType<typeof setTimeout> | null = null
@@ -38,68 +41,33 @@ function TakeoverOverlay() {
     level: 'debug'
   }).child({ module: 'takeover', correlationId })
 
-  // Connect to WebSocket
+  // Join channel when connected
   createEffect(() => {
-    const serverUrl = 'ws://saya:7175/socket'
-    logger.info('Initializing WebSocket connection', {
-      metadata: { serverUrl }
-    })
+    const phoenixSocket = socket()
+    const connected = isConnected()
 
-    const resilientSocket = new Socket({
-      url: serverUrl,
-      logger: (kind: string, msg: string, data?: unknown) => {
-        if (msg?.includes('heartbeat')) {
-          logger.debug(`Phoenix ${kind}: ${msg}`, { metadata: { data } })
-        } else {
-          logger.debug(`Phoenix ${kind}: ${msg}`, data ? { metadata: { data } } : {})
-        }
-      }
-    })
-
-    // Subscribe to connection state changes
-    resilientSocket.onConnectionChange((event: ConnectionEvent) => {
-      logger.info('Connection state changed', {
-        metadata: {
-          oldState: event.oldState,
-          newState: event.newState,
-          error: event.error?.message
-        }
-      })
-
-      const connected = event.newState === ConnectionState.CONNECTED
-      setIsConnected(connected)
-
-      if (connected) {
-        // Add small delay before joining channel to ensure stability
-        channelJoinTimer = setTimeout(() => {
-          joinChannel()
-        }, 100) as unknown as number
-      } else if (event.newState === ConnectionState.DISCONNECTED || event.newState === ConnectionState.FAILED) {
-        // Clean up channel on disconnection
-        if (channel) {
-          channel.leave()
-          channel = null
-        }
-      }
-    })
-
-    resilientSocket.connect()
-    setSocket(resilientSocket)
+    if (connected && phoenixSocket && !channel) {
+      logger.info('Socket connected, joining channel')
+      // Add small delay before joining channel to ensure stability
+      channelJoinTimer = window.setTimeout(() => {
+        joinChannel()
+      }, 100)
+    } else if (!connected && channel) {
+      // Clean up channel on disconnection
+      logger.info('Socket disconnected, leaving channel')
+      channel.leave()
+      channel = null
+    }
   })
 
   const joinChannel = () => {
-    const currentSocket = socket()
-    if (!currentSocket || !currentSocket.isConnected()) {
-      logger.debug('Skipping channel join - socket not ready', {
-        metadata: {
-          hasSocket: !!currentSocket,
-          socketConnected: currentSocket?.isConnected()
-        }
-      })
+    const phoenixSocket = socket()
+    if (!phoenixSocket) {
+      logger.debug('Skipping channel join - no socket')
       return
     }
 
-    channel = currentSocket.channel('stream:overlays', {})
+    channel = phoenixSocket.channel('stream:overlays', {})
     if (!channel) {
       logger.error('Failed to create channel')
       return
@@ -167,10 +135,6 @@ function TakeoverOverlay() {
     if (channel) {
       channel.leave()
       channel = null
-    }
-    if (socket()) {
-      socket()?.shutdown()
-      setSocket(null)
     }
     if (hideTimer) {
       clearTimeout(hideTimer)

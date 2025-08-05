@@ -38,8 +38,8 @@ defmodule ServerWeb.TelemetryChannel do
     # Emit telemetry for this channel join
     emit_joined_telemetry("dashboard:telemetry", socket)
 
-    # Client will explicitly request telemetry via push("get_telemetry")
-    # No need for unreliable timer-based push
+    # Start periodic telemetry updates (every 2 seconds)
+    Process.send_after(self(), :broadcast_telemetry, 2_000)
 
     {:ok, socket}
   end
@@ -81,6 +81,18 @@ defmodule ServerWeb.TelemetryChannel do
   @impl true
   def handle_info({:telemetry_metrics_event, event}, socket) do
     push(socket, "performance_metrics", event)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(:broadcast_telemetry, socket) do
+    # Push current telemetry snapshot
+    telemetry_data = gather_telemetry_snapshot()
+    push(socket, "telemetry_update", telemetry_data)
+
+    # Schedule next broadcast
+    Process.send_after(self(), :broadcast_telemetry, 2_000)
+
     {:noreply, socket}
   end
 
@@ -188,7 +200,14 @@ defmodule ServerWeb.TelemetryChannel do
             adapter_module.get_status(url)
 
           service_module ->
-            service_module.get_status()
+            # Add timeout protection for service calls
+            try do
+              service_module.get_status()
+            catch
+              :exit, {:timeout, _} ->
+                Logger.warning("Service status timeout", service: name)
+                {:error, "Service status timeout"}
+            end
         end
 
       formatted_status =
