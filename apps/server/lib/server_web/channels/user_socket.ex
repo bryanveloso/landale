@@ -25,14 +25,23 @@ defmodule ServerWeb.UserSocket do
   # See `Phoenix.Token` documentation for examples in
   # performing token verification on connect.
   @impl true
-  def connect(_params, socket, _connect_info) do
+  def connect(params, socket, _connect_info) do
     # Generate a correlation ID for this connection
     correlation_id = CorrelationId.generate()
 
-    socket = assign(socket, :correlation_id, correlation_id)
+    # Extract environment from params (defaults to "production" if not provided)
+    environment = Map.get(params, "environment", "production")
 
-    # Log the connection
-    Logger.info("WebSocket connected", correlation_id: correlation_id)
+    socket =
+      socket
+      |> assign(:correlation_id, correlation_id)
+      |> assign(:environment, environment)
+
+    # Log the connection with environment
+    Logger.info("WebSocket connected",
+      correlation_id: correlation_id,
+      environment: environment
+    )
 
     # Track this socket with Phoenix.Tracker
     ServerWeb.WebSocketTracker.track_socket(correlation_id, self())
@@ -41,7 +50,10 @@ defmodule ServerWeb.UserSocket do
     :telemetry.execute(
       [:landale, :websocket, :connected],
       %{system_time: System.system_time(:millisecond)},
-      %{socket_id: correlation_id}
+      %{
+        socket_id: correlation_id,
+        environment: environment
+      }
     )
 
     {:ok, socket}

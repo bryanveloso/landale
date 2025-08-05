@@ -17,7 +17,8 @@ interface TelemetryDrawerProps {
 }
 
 function TelemetryDrawerContent(props: TelemetryDrawerProps) {
-  const { systemInfo, serviceMetrics, overlayHealth, requestRefresh } = useTelemetryService()
+  const { systemInfo, serviceMetrics, overlayHealth, requestRefresh, environmentFilter, setEnvironmentFilter } =
+    useTelemetryService()
 
   // Handle escape key to close
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -111,6 +112,27 @@ function TelemetryDrawerContent(props: TelemetryDrawerProps) {
           {/* Content */}
           <div class="h-[calc(100%-40px)] overflow-y-auto bg-gray-950">
             <ConnectionTelemetry />
+
+            {/* Environment Filter */}
+            <div class="border-b border-gray-800 bg-gray-900 p-3">
+              <div class="flex items-center justify-between">
+                <h3 class="text-xs font-medium text-gray-300">Environment Filter</h3>
+                <select
+                  class="rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-300 focus:border-blue-500 focus:outline-none"
+                  value={environmentFilter() || 'all'}
+                  onChange={(e) => {
+                    const value = e.target.value === 'all' ? null : e.target.value
+                    setEnvironmentFilter(value)
+                    requestRefresh()
+                  }}>
+                  <option value="all">All Environments</option>
+                  <option value="production">Production</option>
+                  <option value="development">Development</option>
+                  <option value="obs">OBS</option>
+                  <option value="tauri">Tauri</option>
+                </select>
+              </div>
+            </div>
 
             {/* System Information */}
             <div class="space-y-px">
@@ -232,7 +254,12 @@ function TelemetryDrawerContent(props: TelemetryDrawerProps) {
                         <div class="flex items-center justify-between">
                           <div class="flex items-center gap-2">
                             <div class={`h-2 w-2 rounded-full ${overlay.connected ? 'bg-green-500' : 'bg-red-500'}`} />
-                            <span class="text-gray-400">{overlay.name}</span>
+                            <span class="text-gray-400">
+                              {overlay.name}
+                              <Show when={overlay.environment && overlay.environment !== 'production'}>
+                                <span class="ml-1 text-xs text-gray-500">({overlay.environment})</span>
+                              </Show>
+                            </span>
                           </div>
                           <Show
                             when={overlay.connected}

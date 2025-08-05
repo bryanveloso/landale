@@ -109,9 +109,13 @@ defmodule ServerWeb.TelemetryChannel do
   # Client commands
 
   @impl true
-  def handle_in("get_telemetry", _params, socket) do
+  def handle_in("get_telemetry", params, socket) do
     Logger.debug("Processing telemetry request")
-    telemetry_data = gather_telemetry_snapshot()
+
+    # Extract environment filter if provided
+    environment_filter = Map.get(params, "environment", nil)
+
+    telemetry_data = gather_telemetry_snapshot(environment_filter)
 
     {:reply, ResponseBuilder.success(telemetry_data), socket}
   end
@@ -136,14 +140,15 @@ defmodule ServerWeb.TelemetryChannel do
 
   # Private functions
 
-  defp gather_telemetry_snapshot do
+  defp gather_telemetry_snapshot(environment_filter \\ nil) do
     %{
       timestamp: System.system_time(:second),
       websocket: gather_websocket_metrics(),
       services: gather_service_metrics(),
       performance: gather_performance_metrics(),
       system: gather_system_metrics(),
-      overlays: gather_overlay_health()
+      overlays: gather_overlay_health(environment_filter),
+      environment_filter: environment_filter
     }
   end
 
@@ -362,7 +367,7 @@ defmodule ServerWeb.TelemetryChannel do
   defp sanitize_error(reason) when is_binary(reason), do: reason
   defp sanitize_error(_), do: "An unknown error occurred"
 
-  defp gather_overlay_health do
+  defp gather_overlay_health(environment_filter \\ nil) do
     # Use ETS to track overlay channel joins
     # Create table if it doesn't exist
     table_name = :overlay_channel_tracker
@@ -379,11 +384,21 @@ defmodule ServerWeb.TelemetryChannel do
           name: Map.get(info, :name, "Takeover"),
           connected: true,
           lastSeen: Map.get(info, :joined_at, DateTime.utc_now()) |> format_datetime(),
-          channelState: "joined"
+          channelState: "joined",
+          environment: Map.get(info, :environment, "unknown")
         }
       end)
+      |> filter_by_environment(environment_filter)
 
     overlays
+  end
+
+  defp filter_by_environment(items, nil), do: items
+
+  defp filter_by_environment(items, environment) do
+    Enum.filter(items, fn item ->
+      Map.get(item, :environment) == environment
+    end)
   end
 
   defp format_datetime(%DateTime{} = dt), do: DateTime.to_iso8601(dt)

@@ -17,6 +17,8 @@ interface TelemetryContextValue {
   overlayHealth: () => OverlayHealth[] | null
   isConnected: () => boolean
   requestRefresh: () => void
+  environmentFilter: () => string | null
+  setEnvironmentFilter: (env: string | null) => void
 }
 
 const TelemetryContext = createContext<TelemetryContextValue>()
@@ -39,6 +41,7 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
   const [systemInfo, setSystemInfo] = createSignal<SystemInfo | null>(null)
   const [serviceMetrics, setServiceMetrics] = createSignal<ServiceMetrics | null>(null)
   const [overlayHealth, setOverlayHealth] = createSignal<OverlayHealth[] | null>(null)
+  const [environmentFilter, setEnvironmentFilter] = createSignal<string | null>(null)
 
   const handleTelemetryData = (response: TelemetryResponse | TelemetrySnapshot) => {
     // Handle ResponseBuilder wrapper or direct data
@@ -58,8 +61,10 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
   const requestRefresh = () => {
     const channel = telemetryChannel()
     if (channel && channel.state === 'joined') {
-      logger.debug('[TelemetryService] Requesting telemetry refresh')
-      channel.push('request_telemetry', {})
+      const filter = environmentFilter()
+      const params = filter ? { environment: filter } : {}
+      logger.debug('[TelemetryService] Requesting telemetry refresh', params)
+      channel.push('get_telemetry', params)
     }
   }
 
@@ -85,7 +90,9 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
     serviceMetrics,
     overlayHealth,
     isConnected,
-    requestRefresh
+    requestRefresh,
+    environmentFilter,
+    setEnvironmentFilter
   }
 
   return <TelemetryContext.Provider value={contextValue}>{props.children}</TelemetryContext.Provider>

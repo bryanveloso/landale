@@ -550,11 +550,12 @@ defmodule ServerWeb.StreamChannel do
       :ets.new(table_name, [:set, :public, :named_table])
     end
 
-    # Store overlay info
+    # Store overlay info with environment
     overlay_info = %{
       name: Map.get(payload, "overlay_type", "Takeover"),
       joined_at: DateTime.utc_now(),
-      socket_id: socket.assigns.correlation_id
+      socket_id: socket.assigns.correlation_id,
+      environment: Map.get(socket.assigns, :environment, "unknown")
     }
 
     :ets.insert(table_name, {socket.assigns.correlation_id, overlay_info})
