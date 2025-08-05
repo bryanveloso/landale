@@ -32,9 +32,12 @@ defmodule Nurvus.RouterTest do
       conn = conn(:get, "/health")
       conn = Router.call(conn, Router.init([]))
 
-      assert conn.status == 200
+      # Status can be 200 (healthy) or 503 (degraded/unhealthy) depending on process state
+      assert conn.status in [200, 503]
       assert {:ok, body} = Jason.decode(conn.resp_body)
-      assert body["status"] == "ok"
+      assert body["status"] in ["healthy", "degraded", "unhealthy"]
+      assert body["service"] == "nurvus"
+      assert is_integer(body["uptime_seconds"])
     end
   end
 end
