@@ -11,7 +11,7 @@
       "HEALTH_PORT": "8890",
       "SERVER_WS_URL": "ws://saya:7175/socket/websocket",
       "NURVUS_MANAGED": "true",
-      "LOG_DIR": "/var/log/landale/phononmaser"
+      "LOG_DIR": "/Users/Avalonstar/Library/Logs/landale/phononmaser"
     },
     "auto_restart": true,
     "max_restarts": 3,
@@ -35,7 +35,7 @@
       "LMS_API_URL": "http://zelan:1234/v1",
       "LMS_MODEL": "meta/llama-3.3-70b",
       "NURVUS_MANAGED": "true",
-      "LOG_DIR": "/var/log/landale/seed"
+      "LOG_DIR": "/Users/Avalonstar/Library/Logs/landale/seed"
     },
     "auto_restart": true,
     "max_restarts": 3,
