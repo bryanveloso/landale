@@ -172,14 +172,6 @@ export function TakeoverPanel() {
           </div>
         )}
       </div>
-
-      {/* Debug info in development */}
-      {import.meta.env.DEV && (
-        <div>
-          <div>Takeover Loading: {commands.takeoverState().loading ? 'Yes' : 'No'}</div>
-          <div>Takeover Error: {commands.takeoverState().error || 'None'}</div>
-        </div>
-      )}
     </div>
   )
 }
