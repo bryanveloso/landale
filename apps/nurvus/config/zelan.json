@@ -2,13 +2,16 @@
   {
     "id": "phononmaser",
     "name": "Phononmaser Audio Processing Service",
-    "command": "/Users/Avalonstar/Code/bryanveloso/landale/apps/phononmaser/.venv/bin/python",
-    "args": ["-m", "src.main"],
+    "command": "uv",
+    "args": ["run", "python", "-m", "src.main"],
     "cwd": "/Users/Avalonstar/Code/bryanveloso/landale/apps/phononmaser",
     "env": {
       "PYTHONPATH": "/Users/Avalonstar/Code/bryanveloso/landale/apps/phononmaser",
       "PORT": "8889",
-      "HEALTH_PORT": "8890"
+      "HEALTH_PORT": "8890",
+      "SERVER_WS_URL": "ws://saya:7175/socket/websocket",
+      "NURVUS_MANAGED": "true",
+      "LOG_DIR": "/var/log/landale/phononmaser"
     },
     "auto_restart": true,
     "max_restarts": 3,
@@ -24,13 +27,15 @@
     "id": "seed",
     "name": "SEED Intelligence Service",
     "command": "uv",
-    "args": ["run", "python", "start.py"],
+    "args": ["run", "python", "-m", "src.main"],
     "cwd": "/Users/Avalonstar/Code/bryanveloso/landale/apps/seed",
     "env": {
       "SERVER_URL": "http://saya:7175",
-      "SERVER_WS_URL": "ws://saya:7175",
+      "SERVER_WS_URL": "ws://saya:7175/socket/websocket",
       "LMS_API_URL": "http://zelan:1234/v1",
-      "LMS_MODEL": "meta/llama-3.3-70b"
+      "LMS_MODEL": "meta/llama-3.3-70b",
+      "NURVUS_MANAGED": "true",
+      "LOG_DIR": "/var/log/landale/seed"
     },
     "auto_restart": true,
     "max_restarts": 3,

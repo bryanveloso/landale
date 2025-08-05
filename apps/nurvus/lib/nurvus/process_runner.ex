@@ -292,6 +292,9 @@ defmodule Nurvus.ProcessRunner do
     # Check for resource conflicts before starting
     case check_resource_availability(config) do
       :ok ->
+        # Create LOG_DIR if specified in environment
+        ensure_log_directory(config)
+
         # Build command options
         opts = build_port_options(config)
 
@@ -449,6 +452,24 @@ defmodule Nurvus.ProcessRunner do
           Logger.debug("Process #{os_pid} terminated gracefully")
           :ok
       end
+    end
+  end
+
+  defp ensure_log_directory(config) do
+    case Map.get(config.env, "LOG_DIR") do
+      nil ->
+        :ok
+
+      log_dir ->
+        case File.mkdir_p(log_dir) do
+          :ok ->
+            Logger.debug("Ensured log directory exists: #{log_dir}")
+            :ok
+
+          {:error, reason} ->
+            Logger.warning("Failed to create log directory #{log_dir}: #{inspect(reason)}")
+            :ok
+        end
     end
   end
 end

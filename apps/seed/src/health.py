@@ -162,7 +162,8 @@ async def create_health_app(port: int = 8891, service=None, correlator: "StreamC
     app.router.add_get("/health", health_check)
     app.router.add_get("/status", detailed_status)
 
-    runner = web.AppRunner(app)
+    # Disable access logging to prevent broken pipe errors when managed by Nurvus
+    runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     host = os.getenv("SEED_HOST", "0.0.0.0")
     site = web.TCPSite(runner, host, port)

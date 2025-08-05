@@ -48,7 +48,8 @@ async def create_health_app(port: int = 8890, websocket_client=None):
     app["websocket_client"] = websocket_client
     app.router.add_get("/health", health_check)
 
-    runner = web.AppRunner(app)
+    # Disable access logging to prevent broken pipe errors when managed by Nurvus
+    runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     host = os.getenv("PHONONMASER_HOST", "0.0.0.0")
     site = web.TCPSite(runner, host, port)

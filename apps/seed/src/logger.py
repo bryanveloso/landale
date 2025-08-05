@@ -1,7 +1,10 @@
 """Structured JSON logging configuration for SEED intelligence service."""
 
 import logging
+import os
 import sys
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any
 
 import structlog
@@ -17,10 +20,36 @@ def configure_json_logging(level: str = "INFO", json_output: bool = True) -> Non
     # Convert string level to logging constant
     log_level = getattr(logging, level.upper(), logging.INFO)
 
-    # Configure standard library logging to output to stdout
+    # Determine if we're running under Nurvus based on environment
+    is_managed = os.getenv("NURVUS_MANAGED", "false").lower() == "true"
+    log_to_file = is_managed or os.getenv("LOG_TO_FILE", "false").lower() == "true"
+
+    # Configure handler based on environment
+    if log_to_file:
+        # Get log directory from environment (must be set by Nurvus)
+        log_dir = os.getenv("LOG_DIR")
+        if not log_dir:
+            raise ValueError("LOG_DIR environment variable must be set when running under Nurvus")
+
+        log_dir = Path(log_dir).resolve()
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "seed.log"
+
+        # Use rotating file handler to manage log size
+        handler = RotatingFileHandler(
+            log_file,
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=5,
+            encoding="utf-8",
+        )
+    else:
+        # Use standard stream handler for development
+        handler = logging.StreamHandler(sys.stdout)
+
+    handler.setFormatter(logging.Formatter("%(message)s"))
+
     logging.basicConfig(
-        format="%(message)s",  # structlog will handle formatting
-        stream=sys.stdout,
+        handlers=[handler],
         level=log_level,
     )
 
