@@ -13,13 +13,15 @@
 import { Socket as PhoenixSocket, Channel } from 'phoenix'
 import { MessageInspector } from './message-inspector'
 
-export enum ConnectionState {
-  DISCONNECTED = 'disconnected',
-  CONNECTING = 'connecting',
-  CONNECTED = 'connected',
-  RECONNECTING = 'reconnecting',
-  FAILED = 'failed'
-}
+export const ConnectionState = {
+  DISCONNECTED: 'disconnected',
+  CONNECTING: 'connecting',
+  CONNECTED: 'connected',
+  RECONNECTING: 'reconnecting',
+  FAILED: 'failed'
+} as const
+
+export type ConnectionState = (typeof ConnectionState)[keyof typeof ConnectionState]
 
 export interface ConnectionEvent {
   oldState: ConnectionState
@@ -57,15 +59,13 @@ export class Socket {
   private options: Required<SocketOptions>
 
   // State management
-  private _connectionState = ConnectionState.DISCONNECTED
+  private _connectionState: ConnectionState = ConnectionState.DISCONNECTED
   private reconnectAttempts = 0
   private shouldReconnect = true
   private connectionCallbacks: Array<(event: ConnectionEvent) => void> = []
 
   // Health monitoring
   private lastHeartbeat = 0
-  private heartbeatTimer: NodeJS.Timeout | null = null
-  private heartbeatFailures = 0
 
   // Circuit breaker
   private consecutiveFailures = 0
@@ -76,7 +76,6 @@ export class Socket {
     totalReconnects: 0,
     failedReconnects: 0,
     successfulConnects: 0,
-    heartbeatFailures: 0,
     circuitBreakerTrips: 0
   }
 
@@ -175,38 +174,6 @@ export class Socket {
     return Math.max(0, baseDelay + jitter)
   }
 
-  // Health monitoring
-  private startHeartbeat() {
-    this.stopHeartbeat()
-
-    this.heartbeatTimer = setInterval(() => {
-      if (this._connectionState === ConnectionState.CONNECTED && this.socket) {
-        // Phoenix already handles heartbeats, but we monitor them
-        const timeSinceLastHeartbeat = Date.now() - this.lastHeartbeat
-
-        if (timeSinceLastHeartbeat > this.options.heartbeatInterval * 2) {
-          this.heartbeatFailures++
-          this.metrics.heartbeatFailures++
-          this.options.logger('warn', `Heartbeat stale (${this.heartbeatFailures} failures)`)
-
-          // Force reconnection after multiple heartbeat failures
-          if (this.heartbeatFailures >= 3) {
-            this.options.logger('error', 'Multiple heartbeat failures, forcing reconnection')
-            this.disconnect()
-            this.connect()
-          }
-        }
-      }
-    }, this.options.heartbeatInterval)
-  }
-
-  private stopHeartbeat() {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer)
-      this.heartbeatTimer = null
-    }
-  }
-
   // Connection management
   async connect(): Promise<void> {
     if (this.isConnecting || this._connectionState === ConnectionState.CONNECTED) {
@@ -256,8 +223,6 @@ export class Socket {
         this.metrics.successfulConnects++
         this.reconnectAttempts = 0
         this.lastHeartbeat = Date.now()
-        this.heartbeatFailures = 0
-        this.startHeartbeat()
       })
 
       this.socket.onError((error) => {
@@ -267,7 +232,6 @@ export class Socket {
 
       this.socket.onClose(() => {
         this.options.logger('info', 'Socket closed')
-        this.stopHeartbeat()
 
         if (this._connectionState !== ConnectionState.DISCONNECTED) {
           this.emitConnectionEvent(ConnectionState.DISCONNECTED)
@@ -281,8 +245,6 @@ export class Socket {
         }
       })
 
-      // Track successful connections for heartbeat monitoring
-      // Phoenix handles heartbeats internally, we just track the timing
       this.lastHeartbeat = Date.now()
 
       this.socket.connect()
@@ -317,7 +279,6 @@ export class Socket {
 
   disconnect() {
     this.shouldReconnect = false
-    this.stopHeartbeat()
 
     if (this.socket) {
       this.socket.disconnect()
@@ -345,7 +306,7 @@ export class Socket {
       totalReconnects: this.metrics.totalReconnects,
       failedReconnects: this.metrics.failedReconnects,
       successfulConnects: this.metrics.successfulConnects,
-      heartbeatFailures: this.metrics.heartbeatFailures,
+      heartbeatFailures: 0,
       circuitBreakerTrips: this.metrics.circuitBreakerTrips,
       lastHeartbeat: this.lastHeartbeat,
       isCircuitOpen: this.isCircuitOpen()

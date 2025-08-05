@@ -74,27 +74,27 @@ export function useActivityLog() {
       if (socket) {
         const channel = socket.channel('events:all', {})
 
-        channel.on('chat_message', (payload: EventPayload) => {
+        channel?.on('chat_message', (payload: EventPayload) => {
           const event = transformEvent('chat_message', payload)
           if (event) addEvent(event)
         })
 
-        channel.on('follower', (payload: EventPayload) => {
+        channel?.on('follower', (payload: EventPayload) => {
           const event = transformEvent('follower', payload)
           if (event) addEvent(event)
         })
 
-        channel.on('subscription', (payload: EventPayload) => {
+        channel?.on('subscription', (payload: EventPayload) => {
           const event = transformEvent('subscription', payload)
           if (event) addEvent(event)
         })
 
-        channel.on('cheer', (payload: EventPayload) => {
+        channel?.on('cheer', (payload: EventPayload) => {
           const event = transformEvent('cheer', payload)
           if (event) addEvent(event)
         })
 
-        channel.join()
+        channel?.join()
         setEventsChannel(channel)
       }
     } else if (!connectionState.connected && eventsChannel()) {

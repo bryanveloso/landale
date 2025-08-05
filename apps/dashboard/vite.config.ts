@@ -7,13 +7,7 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 const host = process.env.TAURI_DEV_HOST || 'localhost'
 
 export default defineConfig({
-  plugins: [
-    tsconfigPaths(),
-    tanstackRouter({ target: 'solid', autoCodeSplitting: true }),
-    //@ts-expect-error vite-plugin-solid is fragile
-    solid(),
-    tailwindcss()
-  ],
+  plugins: [tsconfigPaths(), tanstackRouter({ target: 'solid', autoCodeSplitting: true }), solid(), tailwindcss()],
   clearScreen: false,
   server: {
     host: host || false,

@@ -138,6 +138,8 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   let overlayChannel: Channel | null = null
   let queueChannel: Channel | null = null
   let reconnectTimer: number | null = null
+  let isJoiningChannels = false
+  let connectionCleanupInProgress = false
 
   const getServerUrl = () => {
     return 'ws://saya:7175/socket'
@@ -157,8 +159,27 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       heartbeatInterval: 30000,
       circuitBreakerThreshold: 5,
       circuitBreakerTimeout: 300000,
-      logger: (kind: string, msg: string, data?: unknown) => {
-        logger.debug(`Phoenix ${kind}: ${msg}`, { metadata: { data } })
+      logger: (kind: string, msg: any, data?: any) => {
+        // Phoenix sometimes passes objects or undefined as msg
+        if (typeof msg === 'object' && msg !== null) {
+          // Handle object messages (e.g., from onConnError)
+          logger.debug(`Phoenix ${kind}`, { metadata: msg })
+          return
+        }
+
+        const message = msg ? String(msg) : ''
+
+        // For heartbeats, extract the reference number if present
+        if (message.includes('heartbeat')) {
+          const parts = message.split(' ')
+          const heartbeatMsg = parts.slice(0, 2).join(' ') // "phoenix heartbeat"
+          const ref = data || parts[2] // reference number
+          logger.info(`${heartbeatMsg} (${ref})`)
+        } else if (kind === 'transport') {
+          logger.info(`Phoenix ${kind}: ${message}`)
+        } else {
+          logger.debug(`Phoenix ${kind}: ${message}`, data !== undefined ? { metadata: { data } } : {})
+        }
       }
     })
 
@@ -173,18 +194,27 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       })
 
       const isConnected = event.newState === SocketConnectionState.CONNECTED
-      const metrics = socket.getHealthMetrics()
+      const metrics = socket?.getHealthMetrics()
 
       setConnectionState({
         connected: isConnected,
-        reconnectAttempts: metrics.reconnectAttempts,
+        reconnectAttempts: metrics?.reconnectAttempts ?? 0,
         lastConnected: isConnected ? new Date().toISOString() : connectionState().lastConnected,
         error: event.error?.message ?? null
       })
 
       if (isConnected) {
-        joinChannels()
-      } else if (event.newState === SocketConnectionState.DISCONNECTED) {
+        // Add small delay to ensure connection is stable before joining channels
+        setTimeout(() => {
+          if (!connectionCleanupInProgress && !isJoiningChannels) {
+            joinChannels()
+          }
+        }, 100)
+      } else if (
+        event.newState === SocketConnectionState.DISCONNECTED ||
+        event.newState === SocketConnectionState.FAILED
+      ) {
+        // Clean up channels on any disconnection
         cleanup()
       }
     })
@@ -193,10 +223,32 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   }
 
   const joinChannels = () => {
-    if (!socket) return
+    if (!socket || isJoiningChannels || !socket.isConnected()) {
+      logger.debug('Skipping channel join', {
+        metadata: {
+          hasSocket: !!socket,
+          isJoiningChannels,
+          socketConnected: socket?.isConnected()
+        }
+      })
+      return
+    }
 
+    isJoiningChannels = true
+    logger.info('Starting channel join sequence')
+
+    // Join channels sequentially to avoid race conditions
     joinOverlayChannel()
-    joinQueueChannel()
+    // Small delay between channel joins
+    setTimeout(() => {
+      joinQueueChannel()
+    }, 100)
+
+    // Reset flag after both channels have time to join
+    setTimeout(() => {
+      isJoiningChannels = false
+      logger.debug('Channel join sequence complete')
+    }, 1000)
   }
 
   const joinOverlayChannel = () => {
@@ -206,7 +258,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     overlayChannel = socket.channel('stream:overlays', {})
 
     // Handle overlay events
-    overlayChannel.on('stream_state', (payload: unknown) => {
+    overlayChannel?.on('stream_state', (payload: unknown) => {
       logger.debug('Received stream state', { metadata: { payload } })
 
       if (validateServerStreamState(payload)) {
@@ -223,7 +275,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       }
     })
 
-    overlayChannel.on('show_changed', (payload: unknown) => {
+    overlayChannel?.on('show_changed', (payload: unknown) => {
       logger.info('Show changed', { metadata: { payload } })
       const data = payload as { show: string; changed_at: string }
       setLayerState((prev) => ({
@@ -233,36 +285,37 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       }))
     })
 
-    overlayChannel.on('interrupt', (payload: unknown) => {
+    overlayChannel?.on('interrupt', (payload: unknown) => {
       logger.debug('Priority interrupt', { metadata: { payload } })
       // Stream state update will handle the actual changes
     })
 
-    overlayChannel.on('content_update', (payload: unknown) => {
+    overlayChannel?.on('content_update', (payload: unknown) => {
       logger.debug('Content update', { metadata: { payload } })
       // Handle real-time content updates
       setLayerState((prev) => updateLayerContent(prev, payload as PhoenixEvent))
     })
 
-    overlayChannel.on('takeover', (payload: unknown) => {
+    overlayChannel?.on('takeover', (payload: unknown) => {
       logger.info('Takeover broadcast', { metadata: { payload } })
       // Overlay components will handle this directly
     })
 
-    overlayChannel.on('takeover_clear', (payload: unknown) => {
+    overlayChannel?.on('takeover_clear', (payload: unknown) => {
       logger.info('Takeover clear broadcast', { metadata: { payload } })
       // Overlay components will handle this directly
     })
 
     // Join with error handling
     overlayChannel
-      .join()
+      ?.join()
       .receive('ok', () => {
         logger.info('Successfully joined overlay channel')
         requestState()
       })
       .receive('error', (resp: Record<string, unknown>) => {
         logger.error('Failed to join overlay channel', { metadata: { error: resp } })
+        overlayChannel = null // Clean up on failure
         setConnectionState((prev) => ({
           ...prev,
           error: `Failed to join overlay channel: ${(resp as Record<string, unknown>)?.message || 'unknown'}`
@@ -270,6 +323,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       })
       .receive('timeout', () => {
         logger.error('Overlay channel join timeout')
+        overlayChannel = null // Clean up on timeout
         setConnectionState((prev) => ({
           ...prev,
           error: 'Overlay channel join timeout'
@@ -284,7 +338,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
     queueChannel = socket.channel('stream:queue', {})
 
     // Handle queue events
-    queueChannel.on('queue_state', (payload: unknown) => {
+    queueChannel?.on('queue_state', (payload: unknown) => {
       logger.debug('Received queue state', { metadata: { payload } })
 
       if (validateServerQueueState(payload)) {
@@ -294,7 +348,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       }
     })
 
-    queueChannel.on('queue_item_added', (payload: unknown) => {
+    queueChannel?.on('queue_item_added', (payload: unknown) => {
       logger.debug('Queue item added', { metadata: { payload } })
       const data = payload as { queue?: QueueItem[] }
       if (data.queue) {
@@ -310,7 +364,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       }
     })
 
-    queueChannel.on('queue_item_processed', (payload: unknown) => {
+    queueChannel?.on('queue_item_processed', (payload: unknown) => {
       logger.debug('Queue item processed', { metadata: { payload } })
       const data = payload as { queue?: QueueItem[]; item?: QueueItem }
       if (data.queue) {
@@ -328,7 +382,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       }
     })
 
-    queueChannel.on('queue_item_expired', (payload: unknown) => {
+    queueChannel?.on('queue_item_expired', (payload: unknown) => {
       logger.debug('Queue item expired', { metadata: { payload } })
       const data = payload as { queue?: QueueItem[]; item?: QueueItem }
       if (data.queue) {
@@ -342,13 +396,14 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
 
     // Join with error handling
     queueChannel
-      .join()
+      ?.join()
       .receive('ok', () => {
         logger.info('Successfully joined queue channel')
         requestQueueState()
       })
       .receive('error', (resp: Record<string, unknown>) => {
         logger.error('Failed to join queue channel', { metadata: { error: resp } })
+        queueChannel = null // Clean up on failure
         setConnectionState((prev) => ({
           ...prev,
           error: `Failed to join queue channel: ${(resp as Record<string, unknown>)?.message || 'unknown'}`
@@ -356,6 +411,7 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       })
       .receive('timeout', () => {
         logger.error('Queue channel join timeout')
+        queueChannel = null // Clean up on timeout
         setConnectionState((prev) => ({
           ...prev,
           error: 'Queue channel join timeout'
@@ -364,6 +420,10 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
   }
 
   const cleanup = () => {
+    if (connectionCleanupInProgress) return
+
+    connectionCleanupInProgress = true
+
     if (overlayChannel) {
       overlayChannel.leave()
       overlayChannel = null
@@ -376,6 +436,10 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
       clearTimeout(reconnectTimer)
       reconnectTimer = null
     }
+
+    // Reset flags
+    isJoiningChannels = false
+    connectionCleanupInProgress = false
   }
 
   const disconnect = () => {
@@ -497,8 +561,16 @@ export const StreamServiceProvider: Component<StreamServiceProviderProps> = (pro
 
   const forceReconnect = () => {
     logger.info('Force reconnecting...')
+
     disconnect()
-    setTimeout(() => connect(), 1000)
+
+    // Give cleanup time to complete
+    setTimeout(() => {
+      // Reset flags before reconnecting
+      isJoiningChannels = false
+      connectionCleanupInProgress = false
+      connect()
+    }, 1500)
   }
 
   const requestQueueState = () => {

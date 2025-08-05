@@ -20,6 +20,11 @@ defmodule ServerWeb.Endpoint do
   # WebSocket endpoint for dashboard and event clients
   socket "/socket", ServerWeb.UserSocket,
     websocket: [
+      # 90 seconds (3x client heartbeat of 30s)
+      timeout: 90_000,
+      # Enable transport debugging to see heartbeats
+      transport_log: :debug,
+      compress: true,
       check_origin: [
         "http://localhost:*",
         "http://127.0.0.1:*",
