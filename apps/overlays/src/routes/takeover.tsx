@@ -159,9 +159,11 @@ function TakeoverOverlay() {
       {/* Debug info in development */}
       {import.meta.env.DEV && (
         <div class="debug-takeover">
-          <div>Connected: {isConnected() ? '✓' : '✗'}</div>
+          <div>Socket Connected: {isConnected() ? '✓' : '✗'}</div>
+          <div>Channel Joined: {channel ? '✓' : '✗'}</div>
+          <div>Channel State: {channel?.state || 'no channel'}</div>
           <div>Active: {takeoverState().active ? 'Yes' : 'No'}</div>
-          <div>Type: {takeoverState().type}</div>
+          <div>Type: {takeoverState().type || 'none'}</div>
         </div>
       )}
     </div>
