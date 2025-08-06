@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Service Identity -->
+    <key>Label</key>
+    <string>com.bryanveloso.nurvus</string>
+
+    <!-- Program Configuration -->
+    <key>Program</key>
+    <string>__HOME__/.local/bin/nurvus</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__HOME__/.local/bin/nurvus</string>
+        <string>start</string>
+    </array>
+
+    <!-- Working Directory -->
+    <key>WorkingDirectory</key>
+    <string>__HOME__/.local/bin</string>
+
+    <!-- Environment Variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>MIX_ENV</key>
+        <string>prod</string>
+        <key>NURVUS_PORT</key>
+        <string>4001</string>
+        <key>NURVUS_LOG_LEVEL</key>
+        <string>info</string>
+        <key>HOME</key>
+        <string>__HOME__</string>
+        <key>PATH</key>
+        <string>__HOME__/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Execution Settings -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Restart Policy -->
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+
+    <!-- Logging -->
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/nurvus/stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/nurvus/stderr.log</string>
+
+    <!-- Process Management -->
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <!-- Network Dependency -->
+    <key>LaunchOnlyOnce</key>
+    <false/>
+
+    <!-- Security -->
+    <key>InitGroups</key>
+    <true/>
+
+    <!-- Resource Limits -->
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>65536</integer>
+        <key>NumberOfProcesses</key>
+        <integer>4096</integer>
+    </dict>
+</dict>
+</plist>

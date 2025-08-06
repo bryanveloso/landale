@@ -109,8 +109,8 @@ class SeedService(SupervisedService):
         # Start listening tasks
         tracker = get_global_tracker()
         self.tasks = [
-            tracker.create_task(self.transcription_client.listen(), name="seed_transcription_listener"),
-            tracker.create_task(self.server_client.listen(), name="seed_server_listener"),
+            tracker.create_task(self.transcription_client.listen_with_reconnect(), name="seed_transcription_listener"),
+            tracker.create_task(self.server_client.listen_with_reconnect(), name="seed_server_listener"),
             tracker.create_task(self.correlator.periodic_analysis_loop(), name="seed_correlator_loop"),
             tracker.create_task(self._health_check_loop(), name="seed_health_check_loop"),
         ]

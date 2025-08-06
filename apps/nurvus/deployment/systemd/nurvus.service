@@ -8,9 +8,9 @@ Wants=network-online.target
 Type=exec
 User=bryan
 Group=bryan
-WorkingDirectory=/opt/nurvus
-ExecStart=/opt/nurvus/bin/nurvus start
-ExecStop=/opt/nurvus/bin/nurvus stop
+WorkingDirectory=%h/.local/bin
+ExecStart=%h/.local/bin/nurvus start
+ExecStop=%h/.local/bin/nurvus stop
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=mixed
 KillSignal=SIGTERM
@@ -28,8 +28,8 @@ Environment=NURVUS_LOG_LEVEL=info
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/opt/nurvus /var/log/nurvus
+ProtectHome=false
+ReadWritePaths=%h/.local/bin %h/.config/nurvus %h/Library/Logs
 
 # Resource limits
 LimitNOFILE=65536
