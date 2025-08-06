@@ -47,6 +47,8 @@ defmodule Server.Application do
             Server.CorrelationIdPool,
             Server.Events.BatchPublisher,
             Server.Cache,
+            # Health monitoring for system status
+            Server.Health.HealthMonitorServer,
             # Circuit breakers for external service resilience
             Server.CircuitBreakerServer,
             # Service registry for unified service discovery

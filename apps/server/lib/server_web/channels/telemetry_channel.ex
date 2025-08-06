@@ -32,11 +32,24 @@ defmodule ServerWeb.TelemetryChannel do
       "telemetry:health",
       "telemetry:websocket",
       "telemetry:performance",
-      "telemetry:services"
+      "telemetry:services",
+      "system:health"
     ])
 
     # Emit telemetry for this channel join
     emit_joined_telemetry("dashboard:telemetry", socket)
+
+    # Send current health status immediately if available
+    # Handle test environment where HealthMonitorServer may not be started
+    try do
+      case Server.Health.HealthMonitorServer.get_current_status() do
+        nil -> :ok
+        status -> push(socket, "health_update", %{status: status, timestamp: System.system_time(:second)})
+      end
+    catch
+      # HealthMonitorServer not started (test environment)
+      :exit, {:noproc, _} -> :ok
+    end
 
     # Start periodic telemetry updates (every 2 seconds)
     Process.send_after(self(), :broadcast_telemetry, 2_000)
@@ -288,59 +301,17 @@ defmodule ServerWeb.TelemetryChannel do
       uptime: uptime_seconds,
       version: Application.spec(:server, :vsn) |> to_string(),
       environment: Application.get_env(:server, :environment, "production"),
-      status: determine_system_status()
+      status: get_health_status()
     }
   end
 
-  defp determine_system_status do
-    # SERVICE HEALTH CASCADE: Phoenix is the central hub
-    # If Phoenix is down, ALL services should be marked as degraded
-    # because they can't communicate even if individually healthy
-
-    # Check critical internal processes
-    critical_processes = []
-
-    # Check internal processes
-    process_count =
-      Enum.count(critical_processes, fn module ->
-        Process.whereis(module) != nil
-      end)
-
-    # Check external services (from gather_service_metrics results)
-    services = gather_service_metrics()
-
-    # If any service can't reach Phoenix, that's a connectivity issue
-    # Check if services are reporting connection errors
-    services_with_errors =
-      Enum.count([:phononmaser, :seed, :obs, :twitch], fn service ->
-        case services[service] do
-          %{connected: false, error: "Service unreachable"} -> true
-          %{connected: false, error: "Connection timed out"} -> true
-          _ -> false
-        end
-      end)
-
-    # If multiple services can't connect, Phoenix might appear up but be unreachable
-    phoenix_unreachable = services_with_errors >= 3
-
-    connected_services =
-      Enum.count([:phononmaser, :seed, :obs, :twitch], fn service ->
-        services[service][:connected] == true
-      end)
-
-    # 4 external services
-    total_critical = length(critical_processes) + 4
-    total_running = process_count + connected_services
-
-    cond do
-      # If Phoenix appears unreachable to services, system is degraded
-      phoenix_unreachable -> "degraded"
-      # All services running
-      total_running == total_critical -> "healthy"
-      # At least half working
-      total_running >= div(total_critical, 2) -> "degraded"
-      # Less than half working
-      true -> "unhealthy"
+  # Helper to safely get health status (handles test environment)
+  defp get_health_status do
+    try do
+      Server.Health.HealthMonitorServer.get_current_status() || "unknown"
+    catch
+      # HealthMonitorServer not started (test environment)
+      :exit, {:noproc, _} -> "unknown"
     end
   end
 
