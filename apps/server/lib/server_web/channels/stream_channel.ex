@@ -547,7 +547,8 @@ defmodule ServerWeb.StreamChannel do
 
     # Ensure table exists
     if :ets.whereis(table_name) == :undefined do
-      :ets.new(table_name, [:set, :public, :named_table])
+      # Using :protected - shared tracking table with telemetry_channel
+      :ets.new(table_name, [:set, :protected, :named_table])
     end
 
     # Store overlay info with environment

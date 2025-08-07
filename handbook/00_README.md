@@ -1,6 +1,8 @@
 # Landale Developer Handbook
 
 > Personal knowledge base for future you - not tutorials, just memory augmentation
+>
+> **Note**: Some sections from July 2025 may not reflect August 2025 improvements. See CLAUDE.md for latest patterns.
 
 ## What This Is
 

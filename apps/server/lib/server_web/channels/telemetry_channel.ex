@@ -344,7 +344,8 @@ defmodule ServerWeb.TelemetryChannel do
     table_name = :overlay_channel_tracker
 
     if :ets.whereis(table_name) == :undefined do
-      :ets.new(table_name, [:set, :public, :named_table])
+      # Using :protected - only telemetry channel needs access to this tracking data
+      :ets.new(table_name, [:set, :protected, :named_table])
     end
 
     # Get all entries from the tracking table

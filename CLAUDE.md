@@ -6,7 +6,7 @@
 **Purpose**: Create sophisticated, animated streaming overlays that respond to audio, chat, and viewer interactions in real-time
 **Architecture**: Event-driven monorepo with real-time WebSocket communication
 **Network**: Runs on Tailscale VPN (not public internet) - brilliant security simplification
-**Scale**: Personal project - avoid enterprise over-engineering
+**Scale**: Personal project - avoid enterprise over-engineering while maintaining video production-grade patterns
 **Stability**: Production-ready with resilient patterns for memory management, state handling, and security
 
 ### Key Features
@@ -44,7 +44,7 @@
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   Overlays  │────▶│ Phoenix      │────▶│ PostgreSQL  │
+│ Overlays.   │────▶│ Phoenix      │────▶│ PostgreSQL  │
 │ (SolidJS)   │     │ Server       │     │ TimescaleDB │
 └─────────────┘     └──────────────┘     └─────────────┘
                            │
@@ -68,8 +68,8 @@
 
 - WebSocket Server: 7175
 - TCP Server: 8080
-- Phononmaser: 8889
-- Health Checks: 8890
+- Phononmaser: 8889 (WebSocket), 8890 (Health Check)
+- Seed: 8891 (Health Check)
 - PostgreSQL: 5433 (custom port)
 
 ## Established Patterns (CRITICAL)
@@ -77,9 +77,9 @@
 ### 1. WebSocket Resilience
 
 ```python
-# All Python services use shared ResilientWebSocketClient
-from shared.websockets import ResilientWebSocketClient
-# Features: exponential backoff, health checks, auto-reconnect
+# All Python services use shared BaseWebSocketClient
+from shared.websockets import BaseWebSocketClient
+# Features: connection state management, event handling, reconnection support
 ```
 
 ### 2. Memory Safety
@@ -102,6 +102,7 @@ self.event_queue = asyncio.Queue(maxsize=200)  # ~20 seconds buffer
 ```elixir
 # GenServer state > ETS tables (prevents race conditions)
 # Use :protected access when ETS is necessary
+# EXCEPTION: correlation_id_pool uses :public for atomic operations (documented)
 ```
 
 ### 5. Layer Orchestration
@@ -158,17 +159,16 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 
 **Before ANY refactoring that renames, moves, or removes code:**
 
-1. **Create refactor.md** in project root (gitignored)
-2. **Document intent**: "Renaming `old_thing` to `new_thing` because..."
-3. **Search and document ALL references**:
+1. **Document intent**: "Renaming `old_thing` to `new_thing` because..."
+2. **Search and document ALL references**:
    ```bash
    rg 'old_function_name' --type elixir
    rg 'old_config_key' --type elixir
    rg ':old_field' --type elixir
    ```
-4. **Paste full results** (files + line numbers) into refactor.md
-5. **Check off each reference** as you update it
-6. **Only commit when refactor.md is empty**
+3. **Paste full results** (files + line numbers) into refactor.md
+4. **Check off each reference** as you update it
+5. **Only commit when refactor.md is empty**
 
 **Why this matters**: During recent OAuth refactoring, we encountered runtime errors because some references were updated while others weren't. This protocol ensures systematic reference handling.
 
@@ -215,7 +215,7 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 
 **Remember**: Technical challenges are normal engineering work. Frame them as learning opportunities and process improvements, not crises.
 
-## Current State (2025-08-03)
+## Current State (2025-08-07)
 
 ### Infrastructure Achievements
 
@@ -226,6 +226,8 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 - **Batch Request Handling**: OBS operations optimized
 - **Test Infrastructure**: MockWebSocketConnection with exact protocol matching
 - **Concurrency Controls**: Task streams properly bounded
+- **ETS Security**: Fixed :public tables to :protected (except correlation_id_pool)
+- **Python WebSocket**: BaseWebSocketClient provides connection resilience
 
 ### What's Working Well
 
@@ -295,13 +297,20 @@ curl http://localhost:8890/health
 - **Editable Installs**: Changes to `packages/shared-python` reflect immediately
 - Use `uv` for ALL Python commands (not pip/poetry)
 - Services read config from environment variables
+- **WebSocket Pattern**: Services extend `BaseWebSocketClient` from `shared.websockets`
+  - Provides connection state management and event handling
+  - Implement `on_connected()`, `on_disconnected()`, `on_message()` handlers
+  - Automatic reconnection built into base class
 
 ## Known Limitations
 
-1. **Telemetry Dashboard**: Collection exists but lacks visualization
-2. **Documentation**: Some guides in `docs/` may be outdated
-3. **Test Patterns**: MockWebSocketConnection patterns work but aren't documented
-4. **Python Template**: Resilience patterns exist but no standardized template
+1. **Telemetry Dashboard**: Basic implementation exists but could be enhanced
+   - Metrics are collected in `apps/server/lib/server_web/channels/telemetry_channel.ex`
+   - Data is broadcast via `dashboard:telemetry` Phoenix channel every 2 seconds
+   - Basic dashboard available at `/telemetry` route in dashboard app (shows service status)
+   - Could be enhanced with more detailed metrics visualization
+2. **Documentation**: Some guides in `handbook/` may be outdated (mostly July 2025) - see handbook/00_README.md note
+3. **Python Template**: Resilience patterns exist but no standardized template
 
 ## Architecture Assessment Summary
 
@@ -341,9 +350,7 @@ curl http://localhost:8890/health
 - Use `node`, `ts-node`, `npm`, `yarn`, or `pnpm` commands (use `bun` instead)
 - Import Node.js-specific packages when Bun equivalents exist
 - Create enterprise patterns (service contracts, connection pooling)
-- Use `:public` ETS tables (security risk)
 - Forget to increment Nurvus version before builds
-- Trust outdated documentation in `docs/` directory
 - Over-engineer for scale - this is a personal project
 
 ## Nurvus Version Management (CRITICAL)
@@ -527,31 +534,6 @@ Choose models based on task requirements:
 - Get perspectives from different models
 - Cross-validate security findings
 - Comprehensive vulnerability assessment
-
-### Enhanced Handoff System
-
-Zen-enhanced analysis results are stored in `.claude/handoffs/`:
-
-```
-.claude/handoffs/
-├── landale-analysis-summary.md      # Architecture analysis
-├── zen-development-plan.md          # Structured roadmap
-├── debug-analysis.md                # Runtime issues found
-├── refactor-roadmap.md              # Refactoring opportunities
-├── landale-development-constitution.md
-├── code-reality-documentation-templates.md
-├── integration-playbook.md
-├── quality-gates.md
-├── documentation-modernization-plan.md
-└── technical-debt-management-strategy.md
-```
-
-Reference these in development:
-
-- Check analysis before major changes
-- Follow development plan priorities
-- Use templates for consistency
-- Apply quality gates in reviews
 
 ### Development Workflow with Zen
 

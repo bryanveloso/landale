@@ -4,7 +4,21 @@ This is the **Landale Overlay System**, the continuing culmination of my efforts
 
 ## Features
 
-TBD.
+- Real-time WebSocket-based event distribution across multiple services
+- Multi-layered animation system with priority-based interruption handling
+- Live audio transcription and processing
+- AI-powered stream context analysis and correlation
+- Distributed multi-machine architecture (Zelan, Demi, Saya, Alys)
+- Comprehensive health monitoring and resilience patterns
+
+## Architecture
+
+- **Core Hub**: Elixir Phoenix WebSocket server (port 7175)
+- **Overlays**: SolidJS with GSAP animations
+- **Audio Service**: Phononmaser for transcription (port 8889)
+- **AI Service**: Seed for context analysis (health port 8891)
+- **Process Manager**: Nurvus for service orchestration
+- **Database**: PostgreSQL with TimescaleDB (port 5433)
 
 ## Design Philosophy
 
