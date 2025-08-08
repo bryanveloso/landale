@@ -219,14 +219,14 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 
 ### Infrastructure Achievements
 
-- **WebSocket Stats**: Real-time telemetry tracking via WebSocketStatsTracker
+- **WebSocket Tracking**: Connection lifecycle managed via Phoenix.Tracker (WebSocketTracker)
 - **Event Handler Safety**: All Phoenix channels have catch-all handlers
 - **Debug Interface**: Full `window.debug` implementation with query params
 - **Circuit Breakers**: Consolidated to CircuitBreakerServer pattern
 - **Batch Request Handling**: OBS operations optimized
-- **Test Infrastructure**: MockWebSocketConnection with exact protocol matching
+- **Test Infrastructure**: Strong Elixir (92 files) and TypeScript (142 files) coverage
 - **Concurrency Controls**: Task streams properly bounded
-- **ETS Security**: Fixed :public tables to :protected (except correlation_id_pool)
+- **ETS Security**: Using :protected tables (except correlation_id_pool which uses :public for atomic operations)
 - **Python WebSocket**: BaseWebSocketClient provides connection resilience
 
 ### What's Working Well
@@ -236,6 +236,7 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 - Debug interface enables rapid troubleshooting
 - Health check standards ensure service reliability
 - Pre-commit validation catches issues early
+- Test infrastructure solid for Elixir (92 test files) and TypeScript (142 test files)
 
 ## Commands Reference
 
@@ -304,13 +305,17 @@ curl http://localhost:8890/health
 
 ## Known Limitations
 
-1. **Telemetry Dashboard**: Basic implementation exists but could be enhanced
+1. **Python Test Coverage**: Only 6 test files exist (needs expansion to meet 50-65% target)
+   - phononmaser has 4 test files
+   - seed has 2 test files
+   - Need comprehensive test suite for WebSocket resilience patterns
+2. **Telemetry Dashboard**: Basic implementation exists but could be enhanced
    - Metrics are collected in `apps/server/lib/server_web/channels/telemetry_channel.ex`
    - Data is broadcast via `dashboard:telemetry` Phoenix channel every 2 seconds
    - Basic dashboard available at `/telemetry` route in dashboard app (shows service status)
    - Could be enhanced with more detailed metrics visualization
-2. **Documentation**: Some guides in `handbook/` may be outdated (mostly July 2025) - see handbook/00_README.md note
-3. **Python Template**: Resilience patterns exist but no standardized template
+3. **Documentation**: Some guides in `handbook/` are from July 2025 and may not reflect August improvements
+4. **Python Template**: Resilience patterns exist but no standardized template
 
 ## Architecture Assessment Summary
 
