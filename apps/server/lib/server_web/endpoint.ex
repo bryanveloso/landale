@@ -64,9 +64,10 @@ defmodule ServerWeb.Endpoint do
 
   # CORS support for OpenAPI/Swagger and dashboard
   plug Corsica,
-    origins: "*",
-    allow_headers: :all,
-    allow_methods: :all
+    origins: String.split(System.get_env("PHOENIX_CORS_ORIGIN", "http://localhost:5173,http://localhost:5174"), ","),
+    allow_headers: ["content-type", "authorization"],
+    allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    max_age: 86_400
 
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],

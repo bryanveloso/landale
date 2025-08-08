@@ -2,7 +2,14 @@
 
 > Personal knowledge base for future you - not tutorials, just memory augmentation
 >
-> **Note**: Most sections are from July 2025. For the latest patterns and current state, see CLAUDE.md and STANDARDS.md (August 2025).
+> **⚠️ DEPRECATION NOTICE**: This handbook is from July 2025 and contains outdated information.
+> For current patterns and accurate project state, refer to:
+>
+> - **CLAUDE.md** - Current development patterns and instructions
+> - **PROJECT-CONTEXT.md** - Accurate project status and test coverage
+> - **STANDARDS.md** - Current coding standards
+>
+> This handbook remains for historical reference only.
 
 ## What This Is
 

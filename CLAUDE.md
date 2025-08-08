@@ -305,17 +305,21 @@ curl http://localhost:8890/health
 
 ## Known Limitations
 
-1. **Python Test Coverage**: Only 6 test files exist (needs expansion to meet 50-65% target)
-   - phononmaser has 4 test files
-   - seed has 2 test files
+1. **TypeScript Test Coverage**: Only 2 test files exist (~1% coverage) - Critical gap
+   - Only 1 real test (layer orchestrator) and 1 placeholder
+   - Frontend essentially untested despite 143 test files claimed in old docs
+2. **Python Test Coverage**: 10 test files exist (~15% coverage, needs 50-65% target)
+   - phononmaser has 6 test files
+   - seed has 3 test files
+   - shared-python has 1 test file
    - Need comprehensive test suite for WebSocket resilience patterns
-2. **Telemetry Dashboard**: Basic implementation exists but could be enhanced
+3. **Telemetry Dashboard**: Basic implementation exists but could be enhanced
    - Metrics are collected in `apps/server/lib/server_web/channels/telemetry_channel.ex`
    - Data is broadcast via `dashboard:telemetry` Phoenix channel every 2 seconds
    - Basic dashboard available at `/telemetry` route in dashboard app (shows service status)
    - Could be enhanced with more detailed metrics visualization
-3. **Documentation**: Some guides in `handbook/` are from July 2025 and may not reflect August improvements
-4. **Python Template**: Resilience patterns exist but no standardized template
+4. **Documentation**: Some guides in `handbook/` are from July 2025 and may not reflect August improvements
+5. **Python Template**: Resilience patterns exist but no standardized template
 
 ## Architecture Assessment Summary
 
