@@ -26,18 +26,21 @@ defmodule ServerWeb.Endpoint do
       transport_log: :debug,
       compress: true,
       check_origin: [
-        "http://localhost:*",
-        "http://127.0.0.1:*",
-        "http://saya:*",
-        "http://zelan:*",
-        "http://demi:*",
-        "http://alys:*",
-        "//localhost:*",
-        "//127.0.0.1:*",
-        "//saya:*",
-        "//zelan:*",
-        "//demi:*",
-        "//alys:*"
+        # Local development
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        # Tailscale network machines (HTTPS required in production)
+        "https://saya.tailscale.net",
+        "https://zelan.tailscale.net",
+        "https://demi.tailscale.net",
+        "https://alys.tailscale.net",
+        # Local machine names for development
+        "http://saya.local:5173",
+        "http://zelan.local:5173",
+        "http://demi.local:5173",
+        "http://alys.local:5173"
       ]
     ],
     longpoll: false
@@ -64,9 +67,17 @@ defmodule ServerWeb.Endpoint do
 
   # CORS support for OpenAPI/Swagger and dashboard
   plug Corsica,
-    origins: String.split(System.get_env("PHOENIX_CORS_ORIGIN", "http://localhost:5173,http://localhost:5174"), ","),
-    allow_headers: ["content-type", "authorization"],
+    origins: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://saya.tailscale.net",
+      "https://zelan.tailscale.net",
+      "https://demi.tailscale.net",
+      "https://alys.tailscale.net"
+    ],
+    allow_headers: ["content-type", "authorization", "x-correlation-id"],
     allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_credentials: true,
     max_age: 86_400
 
   plug Plug.Parsers,

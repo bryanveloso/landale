@@ -8,6 +8,13 @@ defmodule ServerWeb.Router do
     plug OpenApiSpex.Plug.PutApiSpec, module: ServerWeb.ApiSpec
   end
 
+  # Rate limiting only - authentication handled by Tailscale network
+  pipeline :protected_api do
+    plug :accepts, ["json"]
+    plug OpenApiSpex.Plug.PutApiSpec, module: ServerWeb.ApiSpec
+    plug ServerWeb.Plugs.RateLimiter, max_requests: 100, interval_seconds: 60
+  end
+
   pipeline :browser do
     plug :accepts, ["html"]
   end
@@ -27,14 +34,20 @@ defmodule ServerWeb.Router do
     get "/openapi", OpenApiSpex.Plug.RenderSpec, []
   end
 
+  # Public API endpoints (health checks only)
   scope "/api", ServerWeb do
     pipe_through :api
 
-    # Health and system status
+    # Health and system status (public for monitoring)
     get "/health", HealthController, :detailed
     get "/health/subscriptions", HealthController, :subscriptions
+  end
 
-    # OBS controls
+  # Protected API endpoints (Tailscale network provides security)
+  scope "/api", ServerWeb do
+    pipe_through :protected_api
+
+    # OBS controls (require authentication)
     get "/obs/status", OBSController, :status
     post "/obs/streaming/start", OBSController, :start_streaming
     post "/obs/streaming/stop", OBSController, :stop_streaming

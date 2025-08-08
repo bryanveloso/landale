@@ -27,6 +27,7 @@ defmodule ServerWeb.UserSocket do
   # performing token verification on connect.
   @impl true
   def connect(params, socket, _connect_info) do
+    # No authentication needed - Tailscale provides network security
     # Generate a correlation ID for this connection
     correlation_id = CorrelationId.generate()
 
@@ -38,8 +39,8 @@ defmodule ServerWeb.UserSocket do
       |> assign(:correlation_id, correlation_id)
       |> assign(:environment, environment)
 
-    # Log the connection with environment
-    Logger.info("WebSocket connected",
+    # Log the connection
+    Logger.info("WebSocket connection established",
       correlation_id: correlation_id,
       environment: environment
     )

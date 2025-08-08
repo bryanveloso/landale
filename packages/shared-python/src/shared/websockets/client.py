@@ -298,6 +298,10 @@ class BaseWebSocketClient(ABC):
                 if self._should_reconnect:
                     logger.info("Attempting to reconnect...")
                     self._emit_connection_event(ConnectionState.RECONNECTING)
+                    # Add exponential backoff delay before reconnecting to prevent connection storms
+                    delay = min(self._reconnect_delay, self.reconnect_delay_cap)
+                    await asyncio.sleep(delay)
+                    self._reconnect_delay = min(self._reconnect_delay * 2, self.reconnect_delay_cap)
                     continue
                 else:
                     break
