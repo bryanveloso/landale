@@ -361,6 +361,36 @@ curl http://localhost:8890/health
 - Create enterprise patterns (service contracts, connection pooling)
 - Forget to increment Nurvus version before builds
 - Over-engineer for scale - this is a personal project
+- **Add authentication to services running on Tailscale** - the network IS the security
+
+## Authentication Strategy (CRITICAL)
+
+### Core Principle: Tailscale Provides Security
+
+For services running exclusively within our private Tailscale network, the network itself is the security boundary. Adding application-level authentication is overengineering.
+
+**What NOT to implement:**
+
+- Bearer token authentication for internal APIs
+- JWT validation middleware
+- WebSocket token verification
+- Custom session management
+- OAuth flows for internal services
+
+**What TO implement:**
+
+- Rate limiting (100 req/min) for DoS protection
+- Input validation to prevent injection attacks
+- CORS configuration for browser security
+- Tailscale ACLs for network access control
+
+**Exceptions (when auth IS needed):**
+
+- Services exposed to public internet
+- Multi-user features with different access levels
+- Compliance/auditing requiring user-level tracking
+
+**Remember:** This is a personal project on a private network. Keep it simple.
 
 ## Nurvus Version Management (CRITICAL)
 
@@ -446,7 +476,7 @@ landale/
 
 - **Memory Protection**: Bounded queues (200 item limit) prevent exhaustion
 - **State Management**: GenServer state preferred over ETS tables to prevent race conditions
-- **Security**: ETS tables use `:protected` access (never `:public`)
+- **Security**: Tailscale network provides authentication; app focuses on rate limiting & validation
 - **Connection Resilience**: WebSocket clients implement exponential backoff and auto-reconnect
 
 ### Architectural Status
