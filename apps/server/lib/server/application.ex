@@ -24,6 +24,8 @@ defmodule Server.Application do
       Server.Repo,
       {DNSCluster, query: Application.get_env(:server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Server.PubSub},
+      # Token encryption vault - must start before services that use tokens
+      Server.TokenVault,
       # Phoenix.Tracker for WebSocket lifecycle tracking
       {ServerWeb.WebSocketTracker, [pubsub_server: Server.PubSub]},
       # Start to serve requests, typically the last entry

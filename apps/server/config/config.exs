@@ -30,6 +30,15 @@ config :logger, :console,
 # Use native JSON module for JSON parsing in Phoenix (Elixir 1.18+)
 config :phoenix, :json_library, JSON
 
+# Configure Cloak vault for token encryption
+config :server, Server.TokenVault,
+  ciphers: [
+    default: {
+      Cloak.Ciphers.AES.GCM,
+      tag: "AES.GCM.V1", key: Base.decode64!("0000000000000000000000000000000000000000000="), iv_length: 12
+    }
+  ]
+
 # Game ID to show mapping configuration (migrated from root config)
 config :server, :game_show_mapping, %{
   # Pokemon FireRed/LeafGreen for IronMON

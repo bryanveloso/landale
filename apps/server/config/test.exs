@@ -49,3 +49,12 @@ config :server, :twitch,
   client_id: "test_client_id",
   client_secret: "test_client_secret",
   client_impl: Server.Services.TwitchClientMock
+
+# Configure test encryption key for token vault
+config :server, Server.TokenVault,
+  ciphers: [
+    default: {
+      Cloak.Ciphers.AES.GCM,
+      tag: "AES.GCM.V1", key: Base.decode64!("test1234567890abcdef1234567890abcdef1234567="), iv_length: 12
+    }
+  ]

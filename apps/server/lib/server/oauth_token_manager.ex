@@ -50,6 +50,7 @@ defmodule Server.OAuthTokenManager do
   require Logger
 
   alias Server.Logging
+  alias Server.TokenVault
 
   @behaviour Server.OAuthTokenManagerBehaviour
 
@@ -463,22 +464,49 @@ defmodule Server.OAuthTokenManager do
   end
 
   defp serialize_token(token_info) do
-    %{
+    base_map = %{
       access_token: token_info.access_token,
       refresh_token: token_info.refresh_token,
       expires_at: token_info.expires_at && DateTime.to_iso8601(token_info.expires_at),
       scopes: token_info.scopes && MapSet.to_list(token_info.scopes),
       user_id: token_info.user_id
     }
+
+    # Encrypt sensitive fields
+    case TokenVault.encrypt_token_map(base_map) do
+      {:ok, encrypted_map} ->
+        encrypted_map
+
+      {:error, reason} ->
+        Logger.error("Token encryption failed, storing in plaintext (SECURITY RISK)",
+          error: inspect(reason)
+        )
+
+        base_map
+    end
   end
 
   defp deserialize_token(token_data) do
+    # Decrypt sensitive fields first
+    decrypted_data =
+      case TokenVault.decrypt_token_map(token_data) do
+        {:ok, decrypted} ->
+          decrypted
+
+        {:error, reason} ->
+          Logger.warning("Token decryption failed, attempting plaintext read",
+            error: inspect(reason)
+          )
+
+          token_data
+      end
+
     %{
-      access_token: token_data.access_token,
-      refresh_token: token_data.refresh_token,
-      expires_at: token_data.expires_at && parse_stored_datetime(token_data.expires_at),
-      scopes: token_data.scopes && MapSet.new(token_data.scopes),
-      user_id: token_data.user_id
+      access_token: decrypted_data.access_token,
+      refresh_token: decrypted_data.refresh_token,
+      expires_at: decrypted_data.expires_at && parse_stored_datetime(decrypted_data.expires_at),
+      scopes: decrypted_data.scopes && MapSet.new(decrypted_data.scopes),
+      user_id: decrypted_data.user_id
     }
   end
 
@@ -619,13 +647,19 @@ defmodule Server.OAuthTokenManager do
         json_data = File.read!(backup_file)
         backup_data = JSON.decode!(json_data)
 
-        # Convert backup data to token_info
+        # Decrypt and convert backup data to token_info
+        decrypted_data =
+          case TokenVault.decrypt_token_map(backup_data) do
+            {:ok, decrypted} -> decrypted
+            {:error, _} -> backup_data
+          end
+
         token_info = %{
-          access_token: backup_data["access_token"],
-          refresh_token: backup_data["refresh_token"],
-          expires_at: backup_data["expires_at"] && parse_stored_datetime(backup_data["expires_at"]),
-          scopes: backup_data["scopes"] && MapSet.new(backup_data["scopes"]),
-          user_id: backup_data["user_id"]
+          access_token: decrypted_data["access_token"],
+          refresh_token: decrypted_data["refresh_token"],
+          expires_at: decrypted_data["expires_at"] && parse_stored_datetime(decrypted_data["expires_at"]),
+          scopes: decrypted_data["scopes"] && MapSet.new(decrypted_data["scopes"]),
+          user_id: decrypted_data["user_id"]
         }
 
         # Create new DETS file
@@ -709,7 +743,7 @@ defmodule Server.OAuthTokenManager do
   # Creates an automatic JSON backup to prevent DETS corruption data loss
   defp create_json_backup(manager) do
     try do
-      backup_data = %{
+      base_data = %{
         access_token: manager.token_info.access_token,
         refresh_token: manager.token_info.refresh_token,
         expires_at: manager.token_info.expires_at && DateTime.to_iso8601(manager.token_info.expires_at),
@@ -717,6 +751,20 @@ defmodule Server.OAuthTokenManager do
         user_id: manager.token_info.user_id,
         backup_timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
       }
+
+      # Encrypt sensitive fields in backup
+      backup_data =
+        case TokenVault.encrypt_token_map(base_data) do
+          {:ok, encrypted} ->
+            encrypted
+
+          {:error, reason} ->
+            Logger.error("Backup encryption failed, storing in plaintext (SECURITY RISK)",
+              error: inspect(reason)
+            )
+
+            base_data
+        end
 
       # Create backup file path
       storage_dir = Path.dirname(manager.storage_path)
