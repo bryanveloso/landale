@@ -36,6 +36,9 @@ jobs:
           SECRET_KEY_BASE=${{ secrets.SECRET_KEY_BASE }}
           PHX_HOST=${{ vars.PHX_HOST }}
           PORT=${{ vars.PORT }}
+
+          # Cloak Encryption Key
+          CLOAK_SECRET_KEY=${{ secrets.CLOAK_SECRET_KEY }}
           EOF
 
       - name: Deploy with OrbStack
