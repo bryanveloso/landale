@@ -203,11 +203,21 @@ defmodule ServerWeb.TelemetryChannel do
           service_module ->
             # Add timeout protection for service calls
             try do
-              service_module.get_status()
+              GenServer.call(service_module, :get_service_status, 5000)
+            rescue
+              _ ->
+                {:error, "Service unavailable"}
             catch
+              :exit, {:noproc, _} ->
+                Logger.debug("Service not started", service: name)
+                {:error, "Service not started"}
+
               :exit, {:timeout, _} ->
                 Logger.warning("Service status timeout", service: name)
                 {:error, "Service status timeout"}
+
+              :exit, _ ->
+                {:error, "Service error"}
             end
         end
 

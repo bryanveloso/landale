@@ -601,45 +601,6 @@ defmodule ServerWeb.OverlayChannel do
   defp format_error(reason) when is_binary(reason), do: reason
   defp format_error(reason), do: inspect(reason)
 
-  # Service status helpers (copied from ControlController)
-
-  defp get_service_status(:obs) do
-    case obs_service().get_status() do
-      {:ok, status} -> %{connected: true, status: status}
-      {:error, reason} -> %{connected: false, error: format_error(reason)}
-    end
-  rescue
-    e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
-    e -> %{connected: false, error: "Service call failed: #{inspect(e)}"}
-  end
-
-  defp get_service_status(:twitch) do
-    case twitch_service().get_status() do
-      {:ok, status} -> %{connected: true, status: status}
-      {:error, reason} -> %{connected: false, error: format_error(reason)}
-    end
-  rescue
-    e in ArgumentError -> %{connected: false, error: "Invalid service configuration: #{e.message}"}
-    e -> %{connected: false, error: "Service call failed: #{inspect(e)}"}
-  end
-
-  defp get_service_status(:ironmon_tcp) do
-    case GenServer.whereis(Server.Services.IronmonTCP) do
-      pid when is_pid(pid) ->
-        %{connected: true, pid: inspect(pid)}
-
-      nil ->
-        %{connected: false, error: "Service not running"}
-    end
-  end
-
-  defp get_service_status(:database) do
-    case safe_database_query("SELECT 1", []) do
-      {:ok, _} -> %{connected: true, status: "healthy"}
-      {:error, reason} -> %{connected: false, error: reason}
-    end
-  end
-
   defp get_detailed_service_info(:obs) do
     base_status = get_service_status(:obs)
 
