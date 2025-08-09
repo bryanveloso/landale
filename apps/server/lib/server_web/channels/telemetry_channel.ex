@@ -130,13 +130,15 @@ defmodule ServerWeb.TelemetryChannel do
 
     telemetry_data = gather_telemetry_snapshot(environment_filter)
 
-    {:reply, ResponseBuilder.success(telemetry_data), socket}
+    {:ok, response} = ResponseBuilder.success(telemetry_data)
+    {:reply, {:ok, response}, socket}
   end
 
   @impl true
   def handle_in("get_service_health", %{"service" => service_name}, socket) do
     health_data = get_service_health(service_name)
-    {:reply, ResponseBuilder.success(health_data), socket}
+    {:ok, response} = ResponseBuilder.success(health_data)
+    {:reply, {:ok, response}, socket}
   end
 
   @impl true
@@ -148,7 +150,8 @@ defmodule ServerWeb.TelemetryChannel do
   @impl true
   def handle_in(event, payload, socket) do
     log_unhandled_message(event, payload, socket)
-    {:reply, ResponseBuilder.error("unknown_command", "Unknown command: #{event}"), socket}
+    {:error, response} = ResponseBuilder.error("unknown_command", "Unknown command: #{event}")
+    {:reply, {:error, response}, socket}
   end
 
   # Private functions

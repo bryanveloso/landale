@@ -111,7 +111,8 @@ defmodule ServerWeb.StreamChannel do
           correlation_id: socket.assigns.correlation_id
         )
 
-        {:reply, ResponseBuilder.error("validation_failed", reason), socket}
+        {:error, response} = ResponseBuilder.error("validation_failed", reason)
+        {:reply, {:error, response}, socket}
     end
   end
 
@@ -159,7 +160,8 @@ defmodule ServerWeb.StreamChannel do
            }}
         )
 
-        {:reply, ResponseBuilder.success(%{operation: "takeover_sent", type: takeover_type}), socket}
+        {:ok, response} = ResponseBuilder.success(%{operation: "takeover_sent", type: takeover_type})
+        {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
         Logger.warning("Invalid takeover payload",
@@ -168,7 +170,8 @@ defmodule ServerWeb.StreamChannel do
           correlation_id: socket.assigns.correlation_id
         )
 
-        {:reply, ResponseBuilder.error("validation_failed", reason), socket}
+        {:error, response} = ResponseBuilder.error("validation_failed", reason)
+        {:reply, {:error, response}, socket}
     end
   end
 
@@ -186,7 +189,8 @@ defmodule ServerWeb.StreamChannel do
       {:takeover_clear, %{timestamp: DateTime.utc_now()}}
     )
 
-    {:reply, ResponseBuilder.success(%{operation: "takeover_cleared"}), socket}
+    {:ok, response} = ResponseBuilder.success(%{operation: "takeover_cleared"})
+    {:reply, {:ok, response}, socket}
   end
 
   @impl true
@@ -201,7 +205,8 @@ defmodule ServerWeb.StreamChannel do
         # Call Twitch API to update channel information
         case Server.Services.Twitch.ApiClient.modify_channel_information(channel_data) do
           :ok ->
-            {:reply, ResponseBuilder.success(%{operation: "channel_info_updated"}), socket}
+            {:ok, response} = ResponseBuilder.success(%{operation: "channel_info_updated"})
+            {:reply, {:ok, response}, socket}
 
           {:error, reason} ->
             Logger.warning("Failed to update channel information",
@@ -209,7 +214,8 @@ defmodule ServerWeb.StreamChannel do
               correlation_id: socket.assigns.correlation_id
             )
 
-            {:reply, ResponseBuilder.error("api_error", reason), socket}
+            {:error, response} = ResponseBuilder.error("api_error", reason)
+            {:reply, {:error, response}, socket}
         end
 
       {:error, reason} ->
@@ -219,7 +225,8 @@ defmodule ServerWeb.StreamChannel do
           correlation_id: socket.assigns.correlation_id
         )
 
-        {:reply, ResponseBuilder.error("validation_failed", reason), socket}
+        {:error, response} = ResponseBuilder.error("validation_failed", reason)
+        {:reply, {:error, response}, socket}
     end
   end
 
@@ -231,7 +238,8 @@ defmodule ServerWeb.StreamChannel do
 
     case Server.Services.Twitch.ApiClient.get_channel_information() do
       {:ok, channel_info} ->
-        {:reply, ResponseBuilder.success(channel_info), socket}
+        {:ok, response} = ResponseBuilder.success(channel_info)
+        {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
         Logger.warning("Failed to get channel information",
@@ -239,7 +247,8 @@ defmodule ServerWeb.StreamChannel do
           correlation_id: socket.assigns.correlation_id
         )
 
-        {:reply, ResponseBuilder.error("api_error", reason), socket}
+        {:error, response} = ResponseBuilder.error("api_error", reason)
+        {:reply, {:error, response}, socket}
     end
   end
 
@@ -252,7 +261,8 @@ defmodule ServerWeb.StreamChannel do
 
     case Server.Services.Twitch.ApiClient.search_categories(query) do
       {:ok, categories} ->
-        {:reply, ResponseBuilder.success(categories), socket}
+        {:ok, response} = ResponseBuilder.success(categories)
+        {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
         Logger.warning("Failed to search categories",
@@ -261,7 +271,8 @@ defmodule ServerWeb.StreamChannel do
           correlation_id: socket.assigns.correlation_id
         )
 
-        {:reply, ResponseBuilder.error("api_error", reason), socket}
+        {:error, response} = ResponseBuilder.error("api_error", reason)
+        {:reply, {:error, response}, socket}
     end
   end
 

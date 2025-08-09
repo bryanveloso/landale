@@ -47,7 +47,8 @@ defmodule ServerWeb.ChannelHelpers do
   Include in your handle_in/3 clauses.
   """
   def handle_ping(_payload, socket) do
-    {:reply, ResponseBuilder.success(%{pong: true, timestamp: System.system_time(:second)}), socket}
+    {:ok, response} = ResponseBuilder.success(%{pong: true, timestamp: System.system_time(:second)})
+    {:reply, {:ok, response}, socket}
   end
 
   @doc """
@@ -75,7 +76,8 @@ defmodule ServerWeb.ChannelHelpers do
       correlation_id: Map.get(socket.assigns, :correlation_id, "unknown")
     )
 
-    Phoenix.Channel.push(socket, event, ResponseBuilder.error(error_type, message))
+    {:error, response} = ResponseBuilder.error(error_type, message)
+    Phoenix.Channel.push(socket, event, response)
     socket
   end
 
