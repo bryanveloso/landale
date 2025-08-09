@@ -10,8 +10,6 @@ defmodule ServerWeb.Plugs.RateLimiter do
   require Logger
 
   @default_limit 100
-  # 1 minute in milliseconds
-  @default_window 60_000
   @table_name :rate_limiter_buckets
 
   def init(opts) do

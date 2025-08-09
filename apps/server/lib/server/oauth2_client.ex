@@ -19,7 +19,7 @@ defmodule Server.OAuth2Client do
 
       # Exchange authorization code for tokens
       case OAuth2Client.exchange_code(client, code, redirect_uri) do
-        {:ok, tokens} -> 
+        {:ok, tokens} ->
           # tokens contains access_token, refresh_token, expires_in, scope
         {:error, reason} ->
           # Handle error
@@ -30,7 +30,7 @@ defmodule Server.OAuth2Client do
         {:ok, new_tokens} ->
           # Use new tokens
         {:error, reason} ->
-          # Handle refresh failure  
+          # Handle refresh failure
       end
 
       # Validate token
@@ -46,7 +46,7 @@ defmodule Server.OAuth2Client do
   The client requires these configuration parameters:
 
   - `:auth_url` - OAuth2 authorization endpoint URL
-  - `:token_url` - OAuth2 token endpoint URL  
+  - `:token_url` - OAuth2 token endpoint URL
   - `:validate_url` - Token validation endpoint URL (optional)
   - `:client_id` - OAuth2 client ID
   - `:client_secret` - OAuth2 client secret
@@ -391,8 +391,10 @@ defmodule Server.OAuth2Client do
 
   defp parse_token_response({status, _headers, body}) when status >= 400 do
     case JSON.decode(body) do
-      {:ok, %{"error" => error}} ->
-        {:error, String.to_atom(error)}
+      {:ok, %{"error" => error}} when is_binary(error) ->
+        # Use safe atom conversion to prevent atom table exhaustion attacks
+        safe_error = parse_oauth_error(error)
+        {:error, safe_error}
 
       {:ok, data} ->
         {:error, {:http_error, status, data}}
@@ -421,8 +423,10 @@ defmodule Server.OAuth2Client do
 
   defp parse_validation_response({status, _headers, body}) when status >= 400 do
     case JSON.decode(body) do
-      {:ok, %{"error" => error}} ->
-        {:error, String.to_atom(error)}
+      {:ok, %{"error" => error}} when is_binary(error) ->
+        # Use safe atom conversion to prevent atom table exhaustion attacks
+        safe_error = parse_oauth_error(error)
+        {:error, safe_error}
 
       {:ok, data} ->
         {:error, {:http_error, status, data}}
@@ -440,4 +444,24 @@ defmodule Server.OAuth2Client do
     event = client.telemetry_prefix ++ event_suffix
     :telemetry.execute(event, %{}, metadata)
   end
+
+  # Safe OAuth error conversion - only allows known error types to prevent atom table exhaustion
+  defp parse_oauth_error(error_string) when is_binary(error_string) do
+    case error_string do
+      "access_denied" -> :access_denied
+      "invalid_client" -> :invalid_client
+      "invalid_grant" -> :invalid_grant
+      "invalid_request" -> :invalid_request
+      "invalid_scope" -> :invalid_scope
+      "server_error" -> :server_error
+      "temporarily_unavailable" -> :temporarily_unavailable
+      "unauthorized_client" -> :unauthorized_client
+      "unsupported_grant_type" -> :unsupported_grant_type
+      "unsupported_response_type" -> :unsupported_response_type
+      # Return the string as-is for unknown errors to prevent atom creation
+      _ -> {:unknown_oauth_error, error_string}
+    end
+  end
+
+  defp parse_oauth_error(error), do: {:invalid_oauth_error, error}
 end

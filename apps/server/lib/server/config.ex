@@ -15,12 +15,12 @@ defmodule Server.Config do
     Application.fetch_env!(:server, :twitch_client_id)
   rescue
     _e in ArgumentError ->
-      reraise ArgumentError.exception("""
+      reraise """
               Missing required environment variable: TWITCH_CLIENT_ID
 
               This is required for Twitch EventSub subscriptions to work.
               Set it in your environment or config files.
-              """),
+              """,
               __STACKTRACE__
   end
 
@@ -31,12 +31,12 @@ defmodule Server.Config do
     Application.fetch_env!(:server, :twitch_client_secret)
   rescue
     _e in ArgumentError ->
-      reraise ArgumentError.exception("""
+      reraise """
               Missing required environment variable: TWITCH_CLIENT_SECRET
 
               This is required for OAuth token refresh to work.
               Set it in your environment or config files.
-              """),
+              """,
               __STACKTRACE__
   end
 
@@ -54,12 +54,12 @@ defmodule Server.Config do
     Application.fetch_env!(:server, :database_url)
   rescue
     _e in ArgumentError ->
-      reraise ArgumentError.exception("""
+      reraise """
               Missing required environment variable: DATABASE_URL
 
               This is required for PostgreSQL database connection.
               Example: postgres://user:password@localhost:5432/database
-              """),
+              """,
               __STACKTRACE__
   end
 
@@ -100,13 +100,67 @@ defmodule Server.Config do
     Application.fetch_env!(:server, ServerWeb.Endpoint)[:secret_key_base]
   rescue
     _e in ArgumentError ->
-      reraise ArgumentError.exception("""
+      reraise """
               Missing required configuration: secret_key_base
 
               This is required for Phoenix session security.
               Generate one with: mix phx.gen.secret
-              """),
+              """,
               __STACKTRACE__
+  end
+
+  @doc """
+  Validates database connectivity on startup.
+
+  Tests the database connection and verifies TimescaleDB extension is available.
+  """
+  def validate_database! do
+    require Logger
+
+    try do
+      # Test basic connectivity
+      case Ecto.Adapters.SQL.query(Server.Repo, "SELECT 1", []) do
+        {:ok, _result} ->
+          Logger.info("Database connectivity validated")
+
+          # Check for TimescaleDB extension (non-critical)
+          case Ecto.Adapters.SQL.query(Server.Repo, "SELECT * FROM pg_extension WHERE extname = 'timescaledb'", []) do
+            {:ok, %{rows: []}} ->
+              Logger.warning("TimescaleDB extension not found - time-series features may not work")
+
+            {:ok, _result} ->
+              Logger.info("TimescaleDB extension available")
+
+            {:error, reason} ->
+              Logger.warning("Could not check TimescaleDB extension: #{inspect(reason)}")
+          end
+
+          :ok
+
+        {:error, reason} ->
+          raise RuntimeError, """
+          Database connectivity check failed: #{inspect(reason)}
+
+          Ensure PostgreSQL is running and accessible at the configured DATABASE_URL.
+          Check your connection settings and database server status.
+          """
+      end
+    rescue
+      error ->
+        reraise RuntimeError,
+                """
+                Database validation failed: #{inspect(error)}
+
+                This could indicate:
+                1. PostgreSQL server is not running
+                2. Database credentials are incorrect
+                3. Database does not exist
+                4. Network connectivity issues
+
+                Check your DATABASE_URL configuration and database server status.
+                """,
+                __STACKTRACE__
+    end
   end
 
   @doc """
@@ -119,6 +173,11 @@ defmodule Server.Config do
     twitch_client_id()
     twitch_client_secret()
     secret_key_base()
+
+    # Validate database connectivity (only after repo is started)
+    if Process.whereis(Server.Repo) do
+      validate_database!()
+    end
 
     :ok
   end

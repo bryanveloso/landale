@@ -80,11 +80,18 @@ defmodule Server.Application do
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: Server.Supervisor]
+    # Use :one_for_all for personal-scale reliability - if any critical service crashes,
+    # restart all services to ensure consistent state (prevents half-alive scenarios)
+    opts = [strategy: :one_for_all, name: Server.Supervisor]
 
     case Supervisor.start_link(children, opts) do
       {:ok, _pid} = result ->
         Logger.info("Server application started successfully")
+
+        # Validate database connectivity after repo is started (non-test environments)
+        if Application.get_env(:server, :env) != :test do
+          Server.Config.validate_database!()
+        end
 
         # Register services with the registry in non-test environments
         if Application.get_env(:server, :env) != :test do

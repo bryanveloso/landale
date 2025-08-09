@@ -31,11 +31,11 @@ defmodule ServerWeb.Endpoint do
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
-        # Tailscale network machines (HTTPS required in production)
-        "https://saya.tailscale.net",
-        "https://zelan.tailscale.net",
-        "https://demi.tailscale.net",
-        "https://alys.tailscale.net",
+        # Tailscale network machines (correct domain format)
+        "https://saya.tailnet-dffc.ts.net:5173",
+        "https://zelan.tailnet-dffc.ts.net:5173",
+        "https://demi.tailnet-dffc.ts.net:5173",
+        "https://alys.tailnet-dffc.ts.net:5173",
         # Local machine names for development
         "http://saya.local:5173",
         "http://zelan.local:5173",
@@ -65,15 +65,27 @@ defmodule ServerWeb.Endpoint do
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
+  # SSL enforcement in production only
+  if Application.compile_env(:server, :env) == :prod do
+    plug Plug.SSL,
+      rewrite_on: [:x_forwarded_proto],
+      host: nil,
+      hsts: true,
+      preload: true
+  end
+
+  # Additional security headers
+  plug :put_secure_headers
+
   # CORS support for OpenAPI/Swagger and dashboard
   plug Corsica,
     origins: [
       "http://localhost:5173",
       "http://localhost:5174",
-      "https://saya.tailscale.net",
-      "https://zelan.tailscale.net",
-      "https://demi.tailscale.net",
-      "https://alys.tailscale.net"
+      "https://saya.tailnet-dffc.ts.net:5173",
+      "https://zelan.tailnet-dffc.ts.net:5173",
+      "https://demi.tailnet-dffc.ts.net:5173",
+      "https://alys.tailnet-dffc.ts.net:5173"
     ],
     allow_headers: ["content-type", "authorization", "x-correlation-id"],
     allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -89,4 +101,23 @@ defmodule ServerWeb.Endpoint do
   plug Plug.Head
   plug Plug.Session, @session_options
   plug ServerWeb.Router
+
+  # Add security headers to all responses
+  defp put_secure_headers(conn, _opts) do
+    conn
+    |> Plug.Conn.put_resp_header("x-frame-options", "DENY")
+    |> Plug.Conn.put_resp_header("x-content-type-options", "nosniff")
+    |> Plug.Conn.put_resp_header("x-xss-protection", "1; mode=block")
+    |> Plug.Conn.put_resp_header("referrer-policy", "strict-origin-when-cross-origin")
+    |> Plug.Conn.put_resp_header(
+      "content-security-policy",
+      "default-src 'self'; " <>
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " <>
+        "style-src 'self' 'unsafe-inline'; " <>
+        "img-src 'self' data: https:; " <>
+        "font-src 'self'; " <>
+        "connect-src 'self' ws: wss:; " <>
+        "frame-ancestors 'none'"
+    )
+  end
 end

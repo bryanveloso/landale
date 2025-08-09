@@ -151,10 +151,12 @@ defmodule ServerWeb.EventsChannel do
 
   @impl true
   def handle_info({:chat_message, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
     push(socket, "chat_message", %{
       type: "chat_message",
       data: event,
-      timestamp: event.timestamp
+      timestamp: timestamp
     })
 
     {:noreply, socket}
@@ -162,10 +164,12 @@ defmodule ServerWeb.EventsChannel do
 
   @impl true
   def handle_info({:chat_clear, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
     push(socket, "chat_clear", %{
       type: "chat_clear",
       data: event,
-      timestamp: event.timestamp
+      timestamp: timestamp
     })
 
     {:noreply, socket}
@@ -173,10 +177,12 @@ defmodule ServerWeb.EventsChannel do
 
   @impl true
   def handle_info({:message_delete, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
     push(socket, "message_delete", %{
       type: "message_delete",
       data: event,
-      timestamp: event.timestamp
+      timestamp: timestamp
     })
 
     {:noreply, socket}
@@ -184,10 +190,12 @@ defmodule ServerWeb.EventsChannel do
 
   @impl true
   def handle_info({:new_follower, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
     push(socket, "follower", %{
       type: "follower",
       data: event,
-      timestamp: event.timestamp
+      timestamp: timestamp
     })
 
     {:noreply, socket}
@@ -195,10 +203,12 @@ defmodule ServerWeb.EventsChannel do
 
   @impl true
   def handle_info({:new_subscription, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
     push(socket, "subscription", %{
       type: "subscription",
       data: event,
-      timestamp: event.timestamp
+      timestamp: timestamp
     })
 
     {:noreply, socket}
@@ -206,10 +216,12 @@ defmodule ServerWeb.EventsChannel do
 
   @impl true
   def handle_info({:gift_subscription, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
     push(socket, "gift_subscription", %{
       type: "gift_subscription",
       data: event,
-      timestamp: event.timestamp
+      timestamp: timestamp
     })
 
     {:noreply, socket}
@@ -217,10 +229,12 @@ defmodule ServerWeb.EventsChannel do
 
   @impl true
   def handle_info({:new_cheer, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
     push(socket, "cheer", %{
       type: "cheer",
       data: event,
-      timestamp: event.timestamp
+      timestamp: timestamp
     })
 
     {:noreply, socket}
@@ -236,4 +250,11 @@ defmodule ServerWeb.EventsChannel do
 
     {:noreply, socket}
   end
+
+  # Safe timestamp extraction to prevent crashes
+  defp safe_get_timestamp(event) when is_map(event) do
+    Map.get(event, :timestamp, System.system_time(:second))
+  end
+
+  defp safe_get_timestamp(_event), do: System.system_time(:second)
 end

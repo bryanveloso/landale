@@ -8,7 +8,7 @@ defmodule ServerWeb.Router do
     plug OpenApiSpex.Plug.PutApiSpec, module: ServerWeb.ApiSpec
   end
 
-  # Rate limiting only - authentication handled by Tailscale network
+  # Protected by Tailscale network security (no application auth needed)
   pipeline :protected_api do
     plug :accepts, ["json"]
     plug OpenApiSpex.Plug.PutApiSpec, module: ServerWeb.ApiSpec

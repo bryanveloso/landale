@@ -27,7 +27,7 @@ defmodule ServerWeb.UserSocket do
   # performing token verification on connect.
   @impl true
   def connect(params, socket, _connect_info) do
-    # No authentication needed - Tailscale provides network security
+    # Tailscale provides network security - no application auth needed
     # Generate a correlation ID for this connection
     correlation_id = CorrelationId.generate()
 

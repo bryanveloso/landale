@@ -64,6 +64,31 @@ config :server, :twitch,
 # OBS WebSocket configuration for all environments
 config :server, :obs_websocket_url, System.get_env("OBS_WEBSOCKET_URL", "ws://100.106.173.14:4455")
 
+# Cloak encryption key configuration - generate with `mix phx.gen.secret 32`
+# Falls back to dev key if not set (ONLY for development)
+cloak_key =
+  case config_env() do
+    :prod ->
+      System.get_env("CLOAK_SECRET_KEY") ||
+        raise """
+        environment variable CLOAK_SECRET_KEY is missing.
+        You can generate one by calling: mix phx.gen.secret 32
+        Then base64 encode it: echo -n "your_key" | base64
+        """
+
+    _ ->
+      # Development fallback key (base64 encoded) - NOT FOR PRODUCTION
+      System.get_env("CLOAK_SECRET_KEY", "OGFmMGU0ZGEwYTRlNGQyYjljN2YzZTZhNWI0YzFkOWUyZjhhOWI2YzNlMGQxZjJhNWI4Yzk=")
+  end
+
+config :server, Server.TokenVault,
+  ciphers: [
+    default: {
+      Cloak.Ciphers.AES.GCM,
+      tag: "AES.GCM.V1", key: Base.decode64!(cloak_key), iv_length: 12
+    }
+  ]
+
 # Service discovery configuration for all environments
 # Using Tailscale IPs because Docker containers can't resolve Tailscale hostnames
 # See: https://github.com/tailscale/tailscale/issues/14467#issuecomment-3155879032
