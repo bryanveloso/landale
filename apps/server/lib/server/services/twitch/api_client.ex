@@ -406,17 +406,17 @@ defmodule Server.Services.Twitch.ApiClient do
         query_string = URI.encode_query(params |> Enum.reject(fn {_k, v} -> is_nil(v) end))
         full_url = if query_string == "", do: url, else: "#{url}?#{query_string}"
 
-        HTTPoison.get(full_url, headers, timeout: 10_000, recv_timeout: 10_000)
+        Server.HttpClient.get(full_url, headers)
 
       :patch ->
         body = params |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Jason.encode!()
 
-        HTTPoison.patch(url, body, headers, timeout: 10_000, recv_timeout: 10_000)
+        Server.HttpClient.patch(url, body, headers)
 
       :post ->
         body = params |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Jason.encode!()
 
-        HTTPoison.post(url, body, headers, timeout: 10_000, recv_timeout: 10_000)
+        Server.HttpClient.post(url, body, headers)
     end
     |> case do
       {:ok, %HTTPoison.Response{status_code: status, body: body, headers: response_headers}} ->

@@ -17,7 +17,6 @@ defmodule ServerWeb.ServicesChannel do
   @nurvus_port 4001
   # zelan's IP
   @nurvus_host "100.112.39.113"
-  @http_timeout 5_000
   @allowed_services ["phononmaser", "seed"]
 
   @impl true
@@ -35,49 +34,34 @@ defmodule ServerWeb.ServicesChannel do
 
   @impl true
   def handle_in("start", %{"service" => service_name}, socket) when service_name in @allowed_services do
-    case call_nurvus(service_name, "start") do
-      {:ok, response} ->
-        broadcast_service_event(socket, service_name, "starting", response)
-        {:reply, ResponseBuilder.success(response), socket}
-
-      {:error, reason} ->
-        {:reply, ResponseBuilder.error("nurvus_error", reason), socket}
-    end
+    # Start async task and store reference
+    task = Task.async(fn -> call_nurvus(service_name, "start") end)
+    socket = assign(socket, :pending_task, {task, "start", service_name})
+    {:noreply, socket}
   end
 
   @impl true
   def handle_in("stop", %{"service" => service_name}, socket) when service_name in @allowed_services do
-    case call_nurvus(service_name, "stop") do
-      {:ok, response} ->
-        broadcast_service_event(socket, service_name, "stopping", response)
-        {:reply, ResponseBuilder.success(response), socket}
-
-      {:error, reason} ->
-        {:reply, ResponseBuilder.error("nurvus_error", reason), socket}
-    end
+    # Start async task and store reference
+    task = Task.async(fn -> call_nurvus(service_name, "stop") end)
+    socket = assign(socket, :pending_task, {task, "stop", service_name})
+    {:noreply, socket}
   end
 
   @impl true
   def handle_in("restart", %{"service" => service_name}, socket) when service_name in @allowed_services do
-    case call_nurvus(service_name, "restart") do
-      {:ok, response} ->
-        broadcast_service_event(socket, service_name, "restarting", response)
-        {:reply, ResponseBuilder.success(response), socket}
-
-      {:error, reason} ->
-        {:reply, ResponseBuilder.error("nurvus_error", reason), socket}
-    end
+    # Start async task and store reference
+    task = Task.async(fn -> call_nurvus(service_name, "restart") end)
+    socket = assign(socket, :pending_task, {task, "restart", service_name})
+    {:noreply, socket}
   end
 
   @impl true
   def handle_in("get_status", %{"service" => service_name}, socket) when service_name in @allowed_services do
-    case get_nurvus_status(service_name) do
-      {:ok, response} ->
-        {:reply, ResponseBuilder.success(response), socket}
-
-      {:error, reason} ->
-        {:reply, ResponseBuilder.error("nurvus_error", reason), socket}
-    end
+    # Start async task and store reference
+    task = Task.async(fn -> get_nurvus_status(service_name) end)
+    socket = assign(socket, :pending_task, {task, "get_status", service_name})
+    {:noreply, socket}
   end
 
   @impl true
@@ -102,6 +86,38 @@ defmodule ServerWeb.ServicesChannel do
     {:reply, ResponseBuilder.error("unknown_command", "Unknown command: #{event}"), socket}
   end
 
+  # Handle async task results for service commands
+  @impl true
+  def handle_info({ref, result}, socket) do
+    # Check if this is our pending task
+    case socket.assigns[:pending_task] do
+      {%Task{ref: ^ref}, action, service_name} ->
+        # Process task result
+        socket = handle_nurvus_result(result, action, service_name, socket)
+        # Clean up the task reference
+        Process.demonitor(ref, [:flush])
+        {:noreply, assign(socket, :pending_task, nil)}
+
+      _ ->
+        # Not our task, ignore
+        {:noreply, socket}
+    end
+  end
+
+  # Handle task failures (DOWN messages)
+  @impl true
+  def handle_info({:DOWN, ref, :process, _pid, reason}, socket) do
+    case socket.assigns[:pending_task] do
+      {%Task{ref: ^ref}, action, service_name} ->
+        Logger.error("Nurvus task failed", action: action, service: service_name, reason: inspect(reason))
+        push(socket, "error", ResponseBuilder.error("task_failed", "Service operation failed"))
+        {:noreply, assign(socket, :pending_task, nil)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
   # Catch-all handler to prevent crashes from unexpected messages
   @impl true
   def handle_info(unhandled_msg, socket) do
@@ -121,7 +137,7 @@ defmodule ServerWeb.ServicesChannel do
 
     headers = [{"Content-Type", "application/json"}]
 
-    case HTTPoison.post(url, "", headers, timeout: @http_timeout, recv_timeout: @http_timeout) do
+    case Server.HttpClient.post(url, "", headers) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         case Jason.decode(body) do
           {:ok, response} ->
@@ -149,7 +165,7 @@ defmodule ServerWeb.ServicesChannel do
   defp get_nurvus_status(service_name) do
     url = "http://#{@nurvus_host}:#{@nurvus_port}/api/processes/#{service_name}"
 
-    case HTTPoison.get(url, [], timeout: @http_timeout, recv_timeout: @http_timeout) do
+    case Server.HttpClient.get(url, []) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         case Jason.decode(body) do
           {:ok, response} ->
@@ -180,5 +196,32 @@ defmodule ServerWeb.ServicesChannel do
       response: response,
       timestamp: System.system_time(:second)
     })
+  end
+
+  defp handle_nurvus_result(result, action, service_name, socket) do
+    case result do
+      {:ok, response} ->
+        # Map action to event name
+        event_name =
+          case action do
+            "start" -> "starting"
+            "stop" -> "stopping"
+            "restart" -> "restarting"
+            "get_status" -> "status"
+            _ -> action
+          end
+
+        # Broadcast event and send response to client
+        if action != "get_status" do
+          broadcast_service_event(socket, service_name, event_name, response)
+        end
+
+        push(socket, "command_result", ResponseBuilder.success(response))
+        socket
+
+      {:error, reason} ->
+        push(socket, "command_result", ResponseBuilder.error("nurvus_error", reason))
+        socket
+    end
   end
 end

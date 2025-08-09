@@ -43,7 +43,9 @@ defmodule Server.Ironmon do
   """
   @spec list_challenges() :: [Challenge.t()]
   def list_challenges do
-    Repo.all(Challenge)
+    Challenge
+    |> preload(:checkpoints)
+    |> Repo.all()
   end
 
   @doc """
@@ -59,7 +61,11 @@ defmodule Server.Ironmon do
   - `Ecto.NoResultsError` if challenge not found
   """
   @spec get_challenge!(integer()) :: Challenge.t()
-  def get_challenge!(id), do: Repo.get!(Challenge, id)
+  def get_challenge!(id) do
+    Challenge
+    |> preload(:checkpoints)
+    |> Repo.get!(id)
+  end
 
   @doc """
   Gets a challenge by name.
@@ -72,7 +78,10 @@ defmodule Server.Ironmon do
   """
   @spec get_challenge_by_name(String.t()) :: Challenge.t() | nil
   def get_challenge_by_name(name) do
-    Repo.get_by(Challenge, name: name)
+    Challenge
+    |> where([c], c.name == ^name)
+    |> preload(:checkpoints)
+    |> Repo.one()
   end
 
   @doc """
@@ -158,7 +167,8 @@ defmodule Server.Ironmon do
   @spec list_seeds_for_challenge(integer()) :: [Seed.t()]
   def list_seeds_for_challenge(challenge_id) do
     from(s in Seed,
-      where: s.challenge_id == ^challenge_id
+      where: s.challenge_id == ^challenge_id,
+      preload: [:challenge, :results]
     )
     |> Repo.all()
   end
@@ -176,7 +186,11 @@ defmodule Server.Ironmon do
   - `Ecto.NoResultsError` if seed not found
   """
   @spec get_seed!(integer()) :: Seed.t()
-  def get_seed!(id), do: Repo.get!(Seed, id)
+  def get_seed!(id) do
+    Seed
+    |> preload([:challenge, :results])
+    |> Repo.get!(id)
+  end
 
   @doc """
   Creates a new seed.
@@ -370,7 +384,10 @@ defmodule Server.Ironmon do
         nil
 
       seed_id ->
-        seed = Repo.get(Seed, seed_id)
+        seed =
+          Seed
+          |> preload(:challenge)
+          |> Repo.get(seed_id)
 
         if seed do
           %{
@@ -396,7 +413,7 @@ defmodule Server.Ironmon do
   def get_current_checkpoint_progress do
     with seed_id when not is_nil(seed_id) <- Server.Ironmon.RunTracker.current_seed(),
          stats <- Server.Ironmon.RunTracker.current_stats(),
-         seed <- Repo.get!(Seed, seed_id) do
+         seed <- Seed |> preload(:challenge) |> Repo.get!(seed_id) do
       # Get the next uncompleted checkpoint
       cleared_checkpoint_ids =
         from(r in Result,

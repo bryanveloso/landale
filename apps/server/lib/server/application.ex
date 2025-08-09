@@ -24,6 +24,8 @@ defmodule Server.Application do
       Server.Repo,
       {DNSCluster, query: Application.get_env(:server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Server.PubSub},
+      # HTTP connection pool for external API calls
+      Server.HttpClient,
       # Token encryption vault - must start before services that use tokens
       Server.TokenVault,
       # Phoenix.Tracker for WebSocket lifecycle tracking
