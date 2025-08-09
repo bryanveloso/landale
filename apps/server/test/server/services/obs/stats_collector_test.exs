@@ -13,10 +13,14 @@ defmodule Server.Services.OBS.StatsCollectorTest do
   use ExUnit.Case, async: true
 
   alias Server.Services.OBS.StatsCollector
+  alias Server.Test.OBSTestHelper
 
-  def test_session_id, do: "test_stats_collector_#{:rand.uniform(100_000)}_#{System.unique_integer([:positive])}"
+  def test_session_id, do: OBSTestHelper.test_session_id("stats_collector")
 
   setup do
+    # Ensure OBS SessionRegistry is started
+    OBSTestHelper.ensure_registry_started()
+
     # Start PubSub if not already started
     case start_supervised({Phoenix.PubSub, name: Server.PubSub}) do
       {:ok, _} -> :ok

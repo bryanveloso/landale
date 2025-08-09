@@ -2,18 +2,22 @@ defmodule Server.Services.OBS.ConnectionTest do
   use ExUnit.Case, async: true
 
   alias Server.Services.OBS.Connection
+  alias Server.Test.OBSTestHelper
   alias Server.WebSocketConnection
 
   @moduletag :obs
 
   setup do
+    # Ensure OBS SessionRegistry is started
+    OBSTestHelper.ensure_registry_started()
+
     # Start PubSub if not already started
     case Process.whereis(Server.PubSub) do
       nil -> start_supervised!({Phoenix.PubSub, name: Server.PubSub})
       _pid -> :ok
     end
 
-    session_id = "test_session_#{System.unique_integer()}"
+    session_id = OBSTestHelper.test_session_id("connection")
 
     {:ok, session_id: session_id}
   end

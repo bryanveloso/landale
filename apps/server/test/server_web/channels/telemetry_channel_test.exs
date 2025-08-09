@@ -8,6 +8,11 @@ defmodule ServerWeb.TelemetryChannelTest do
       Registry.start_link(keys: :unique, name: Server.Services.OBS.SessionRegistry)
     end
 
+    # Start OverlayTracker for telemetry channel to use
+    unless Process.whereis(Server.OverlayTracker) do
+      start_supervised!(Server.OverlayTracker)
+    end
+
     {:ok, _, socket} =
       ServerWeb.UserSocket
       |> socket("user_id", %{some: :assign})

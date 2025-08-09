@@ -36,6 +36,9 @@ defmodule ServerWeb.ChannelCase do
       {:ok, _} = Server.Cache.start_link([])
     end
 
+    # Ensure channel infrastructure is started
+    Server.Test.ChannelTestHelper.ensure_infrastructure_started()
+
     # Verify mocks are properly stubbed before each test
     import Hammox
     verify_on_exit!()
