@@ -4,6 +4,35 @@ defmodule ServerWeb.Plugs.RateLimiter do
 
   Implements per-IP rate limiting with configurable limits.
   Personal scale: 100 requests per minute per IP.
+
+  ## ETS Table Access Configuration
+
+  **IMPORTANT**: This module uses `:public` access for its ETS table, which is an
+  EXCEPTION to the general security guideline of using `:protected` tables.
+
+  ### Why :public is Required Here
+
+  The rate limiter ETS table MUST be `:public` because:
+  1. Multiple concurrent processes need to perform atomic counter operations
+  2. The Plug runs in different processes for each request
+  3. `:ets.update_counter/3` requires the calling process to own the table or have write access
+
+  ### Why This is Safe
+
+  This security exception is acceptable because:
+  - The table only stores temporary rate limit counters (IP -> count mappings)
+  - No sensitive data is stored (no tokens, passwords, or user data)
+  - All data expires automatically after 60 seconds
+  - The system runs on a private Tailscale network
+
+  ### Other :public Tables in the System
+
+  For future reference, these tables also use `:public` access:
+  - `correlation_id_pool` - Atomic ID generation across processes
+  - `rate_limiter_buckets` - This module's rate limiting counters
+
+  All other ETS tables should remain `:protected` unless they have similar
+  requirements for atomic operations from multiple processes.
   """
 
   import Plug.Conn
@@ -13,16 +42,25 @@ defmodule ServerWeb.Plugs.RateLimiter do
   @table_name :rate_limiter_buckets
 
   def init(opts) do
-    # Create ETS table if it doesn't exist
-    if :ets.whereis(@table_name) == :undefined do
-      :ets.new(@table_name, [:set, :protected, :named_table, {:read_concurrency, true}])
-    end
+    # Ensure ETS table exists (created by application startup)
+    ensure_table_exists()
 
     %{
       max_requests: Keyword.get(opts, :max_requests, @default_limit),
       window_ms: Keyword.get(opts, :interval_seconds, 60) * 1000,
       by: Keyword.get(opts, :by, [:ip_address])
     }
+  end
+
+  @doc false
+  def ensure_table_exists do
+    if :ets.whereis(@table_name) == :undefined do
+      # EXCEPTION: Using :public access for atomic counter operations
+      # Similar to correlation_id_pool, rate limiting requires atomic updates
+      # from multiple concurrent processes. The table only stores temporary
+      # rate limit counters (no sensitive data) that expire after 60 seconds.
+      :ets.new(@table_name, [:set, :public, :named_table, {:read_concurrency, true}, {:write_concurrency, true}])
+    end
   end
 
   def call(conn, %{max_requests: limit, window_ms: window, by: by_fields}) do
