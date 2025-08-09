@@ -335,9 +335,9 @@ defmodule ServerWeb.OverlayChannel do
       system_status = SystemHelpers.get_system_status()
 
       services = %{
-        obs: get_service_status(:obs),
-        twitch: get_service_status(:twitch),
-        ironmon_tcp: get_service_status(:ironmon_tcp),
+        obs: get_service_status(obs_service()),
+        twitch: get_service_status(twitch_service()),
+        ironmon_tcp: get_service_status(ironmon_service()),
         database: get_service_status(:database)
       }
 
@@ -604,7 +604,7 @@ defmodule ServerWeb.OverlayChannel do
   defp format_error(reason), do: inspect(reason)
 
   defp get_detailed_service_info(:obs) do
-    base_status = get_service_status(:obs)
+    base_status = get_service_status(obs_service())
 
     additional_info =
       if base_status.connected do
@@ -627,7 +627,7 @@ defmodule ServerWeb.OverlayChannel do
   end
 
   defp get_detailed_service_info(:twitch) do
-    base_status = get_service_status(:twitch)
+    base_status = get_service_status(twitch_service())
 
     additional_info =
       if base_status.connected do
@@ -643,7 +643,7 @@ defmodule ServerWeb.OverlayChannel do
   end
 
   defp get_detailed_service_info(:ironmon_tcp) do
-    base_status = get_service_status(:ironmon_tcp)
+    base_status = get_service_status(ironmon_service())
 
     additional_info =
       if base_status.connected do
