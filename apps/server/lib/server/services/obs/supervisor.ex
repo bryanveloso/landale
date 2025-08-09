@@ -2,9 +2,10 @@ defmodule Server.Services.OBS.Supervisor do
   @moduledoc """
   Supervisor for individual OBS WebSocket sessions.
 
-  Uses a one_for_all strategy because all child processes depend on
-  the Connection process. If the connection dies, all other processes
-  should restart together.
+  Uses a rest_for_one strategy: if the Connection process dies, all processes
+  started after it restart. This ensures dependent processes restart when their
+  dependency fails, but allows less critical processes (like StatsCollector)
+  to crash without affecting core functionality.
   """
   use Supervisor
 

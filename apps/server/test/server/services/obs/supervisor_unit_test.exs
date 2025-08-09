@@ -156,7 +156,7 @@ defmodule Server.Services.OBS.SupervisorUnitTest do
       assert {:ok, {sup_flags, children}} = OBSSupervisor.init({session_id, opts})
 
       # Verify supervisor flags
-      assert sup_flags[:strategy] == :one_for_all
+      assert sup_flags[:strategy] == :rest_for_one
 
       # Verify we have the expected number of children
       assert length(children) == 7

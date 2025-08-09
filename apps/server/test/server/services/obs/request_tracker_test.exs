@@ -30,7 +30,7 @@ defmodule Server.Services.OBS.RequestTrackerTest do
       assert %RequestTracker{
                session_id: ^session_id,
                requests: %{},
-               next_id: 1
+               next_id: 1000
              } = state
 
       # Clean up
@@ -59,7 +59,7 @@ defmodule Server.Services.OBS.RequestTrackerTest do
 
       # Check initial state
       initial_state = :sys.get_state(pid)
-      assert initial_state.next_id == 1
+      assert initial_state.next_id == 1000
       assert map_size(initial_state.requests) == 0
 
       # The RequestTracker expects gun to be available, but we're testing the tracking logic
@@ -71,7 +71,7 @@ defmodule Server.Services.OBS.RequestTrackerTest do
       # The RequestTracker manages request IDs and tracking
       state = :sys.get_state(pid)
       assert state.session_id
-      assert state.next_id == 1
+      assert state.next_id == 1000
       assert state.requests == %{}
     end
 
@@ -281,7 +281,7 @@ defmodule Server.Services.OBS.RequestTrackerTest do
     test "maintains sequential ID counter", %{pid: pid} do
       # Check initial state
       state = :sys.get_state(pid)
-      assert state.next_id == 1
+      assert state.next_id == 1000
 
       # The ID counter would increment with each request
       # In production, this happens via track_and_send calls
