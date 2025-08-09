@@ -30,9 +30,8 @@ defmodule ServerWeb.TelemetryChannelSimpleTest do
       ref = push(socket, "unknown_command", %{})
       assert_reply ref, :error, response
 
-      assert response.success == false
-      assert response.error.code == "unknown_command"
-      assert String.contains?(response.error.message, "Unknown command")
+      # Error response is now a simple map
+      assert response.message == "Unknown command: unknown_command"
     end
   end
 

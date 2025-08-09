@@ -41,7 +41,8 @@ defmodule ServerWeb.CatchAllHandlerTest do
 
       # Should still respond to known commands
       ref = push(socket, "ping", %{})
-      assert_reply ref, :ok, %{pong: true}
+      assert_reply ref, :ok, response
+      assert response.data.pong == true
     end
 
     test "EventsChannel survives unknown handle_info messages" do
@@ -173,7 +174,8 @@ defmodule ServerWeb.CatchAllHandlerTest do
 
       # Should still work
       ref = push(socket, "ping", %{})
-      assert_reply ref, :ok, %{pong: true}
+      assert_reply ref, :ok, response
+      assert response.data.pong == true
     end
   end
 end

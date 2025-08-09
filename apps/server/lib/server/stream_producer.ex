@@ -162,6 +162,22 @@ defmodule Server.StreamProducer do
     {:reply, state, state}
   end
 
+  def handle_call({:remove_interrupt, id}, _from, state) do
+    # Remove the interrupt from the stack
+    new_stack = Enum.reject(state.interrupt_stack, fn item -> item.id == id end)
+    new_state = %{state | interrupt_stack: new_stack} |> update_metadata()
+
+    # Broadcast the updated state
+    Phoenix.PubSub.broadcast(
+      Server.PubSub,
+      "stream:state",
+      {:interrupt_removed, id}
+    )
+
+    persist_state(new_state)
+    {:reply, :ok, new_state}
+  end
+
   @impl true
   def handle_cast({:change_show, show, metadata}, state) do
     Logger.info("Show changed", show: show, metadata: metadata)

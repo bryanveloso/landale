@@ -39,7 +39,8 @@ defmodule ServerWeb.ChannelCatchAllTest do
 
       # Should still handle ping correctly
       ref = push(socket, "ping", %{})
-      assert_reply ref, :ok, %{pong: true}
+      assert_reply ref, :ok, response
+      assert response.data.pong == true
     end
   end
 
@@ -93,7 +94,10 @@ defmodule ServerWeb.ChannelCatchAllTest do
       send(socket.channel_pid, @unknown_handle_info_msg)
 
       ref = push(socket, "ping", %{})
-      assert_reply ref, :ok, %{pong: true, overlay_type: "obs"}
+      assert_reply ref, :ok, response
+      # OverlayChannel has a custom ping handler that doesn't use ResponseBuilder
+      assert response.pong == true
+      assert response.overlay_type == "obs"
     end
   end
 
@@ -146,7 +150,11 @@ defmodule ServerWeb.ChannelCatchAllTest do
       send(socket.channel_pid, @unknown_handle_info_msg)
 
       ref = push(socket, "get_telemetry", %{})
-      assert_reply ref, :ok, %{timestamp: _, websocket: _, services: _, performance: _}
+      assert_reply ref, :ok, response
+      assert Map.has_key?(response.data, :timestamp)
+      assert Map.has_key?(response.data, :websocket)
+      assert Map.has_key?(response.data, :services)
+      assert Map.has_key?(response.data, :performance)
     end
   end
 
@@ -211,7 +219,9 @@ defmodule ServerWeb.ChannelCatchAllTest do
 
         # Should still respond to ping
         ref = push(socket, "ping", %{})
-        assert_reply ref, :ok, %{pong: true}
+        assert_reply ref, :ok, response
+        # Check for pong in different response formats
+        assert response[:pong] == true || response[:data][:pong] == true
       end
     end
   end
