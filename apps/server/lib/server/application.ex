@@ -47,6 +47,8 @@ defmodule Server.Application do
             {DynamicSupervisor, name: Server.DBTaskSupervisor, strategy: :one_for_one, max_children: 10},
             # Dynamic supervisor for runtime-started services
             {DynamicSupervisor, name: Server.DynamicSupervisor, strategy: :one_for_one},
+            # Overlay tracking (must start early to create ETS table before channels)
+            Server.OverlayTracker,
             # Performance optimizations
             Server.CorrelationIdPool,
             Server.Events.BatchPublisher,

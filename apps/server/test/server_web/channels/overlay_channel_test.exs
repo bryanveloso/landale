@@ -8,7 +8,12 @@ defmodule ServerWeb.OverlayChannelTest do
   alias Server.Mocks.{IronmonTCPMock, OBSMock, RainwaveMock, TwitchMock}
 
   setup do
-    # Stub the initial state call that happens on join
+    # Don't set default expectations here since tests join different overlay types
+    :ok
+  end
+
+  test "ping replies with pong" do
+    # Join the obs overlay
     expect(OBSMock, :get_status, fn -> {:ok, %{connected: true}} end)
 
     {:ok, _, socket} =
@@ -16,10 +21,6 @@ defmodule ServerWeb.OverlayChannelTest do
       |> socket("user_id", %{some: :assign})
       |> subscribe_and_join(OverlayChannel, "overlay:obs")
 
-    %{socket: socket}
-  end
-
-  test "ping replies with pong", %{socket: socket} do
     ref = push(socket, "ping", %{"hello" => "there"})
     assert_reply ref, :ok, response
 
@@ -28,21 +29,45 @@ defmodule ServerWeb.OverlayChannelTest do
     assert is_integer(Map.get(response, :timestamp))
   end
 
-  test "obs:status returns status", %{socket: socket} do
+  test "obs:status returns status" do
+    # Set up expectations for join
+    expect(OBSMock, :get_status, fn -> {:ok, %{connected: true}} end)
+
+    {:ok, _, socket} =
+      UserSocket
+      |> socket("user_id", %{some: :assign})
+      |> subscribe_and_join(OverlayChannel, "overlay:obs")
+
     expect(OBSMock, :get_status, fn -> {:ok, %{connected: true, streaming: false}} end)
 
     ref = push(socket, "obs:status", %{})
     assert_reply ref, :ok, %{connected: true, streaming: false}
   end
 
-  test "obs:stats returns statistics", %{socket: socket} do
+  test "obs:stats returns statistics" do
+    # Set up expectations for join
+    expect(OBSMock, :get_status, fn -> {:ok, %{connected: true}} end)
+
+    {:ok, _, socket} =
+      UserSocket
+      |> socket("user_id", %{some: :assign})
+      |> subscribe_and_join(OverlayChannel, "overlay:obs")
+
     expect(OBSMock, :get_stats, fn -> {:ok, %{cpu_usage: 5.2, memory_usage: 1024}} end)
 
     ref = push(socket, "obs:stats", %{})
     assert_reply ref, :ok, %{cpu_usage: 5.2, memory_usage: 1024}
   end
 
-  test "obs:version returns version info", %{socket: socket} do
+  test "obs:version returns version info" do
+    # Set up expectations for join
+    expect(OBSMock, :get_status, fn -> {:ok, %{connected: true}} end)
+
+    {:ok, _, socket} =
+      UserSocket
+      |> socket("user_id", %{some: :assign})
+      |> subscribe_and_join(OverlayChannel, "overlay:obs")
+
     expect(OBSMock, :get_version, fn -> {:ok, %{obs_version: "30.0.0", obs_web_socket_version: "5.0.0"}} end)
 
     ref = push(socket, "obs:version", %{})
@@ -76,6 +101,7 @@ defmodule ServerWeb.OverlayChannelTest do
     # Note: system overlay doesn't call get_status on join, only when system:status is called
 
     ref = push(socket, "system:status", %{})
+    assert_reply ref, :ok, response
 
     assert %{status: status, timestamp: timestamp} = response
     assert is_binary(status)
@@ -121,7 +147,15 @@ defmodule ServerWeb.OverlayChannelTest do
     assert_reply ref, :ok, %{playing: true, current_song: "Test Song"}
   end
 
-  test "unknown command returns error", %{socket: socket} do
+  test "unknown command returns error" do
+    # Set up expectations for join
+    expect(OBSMock, :get_status, fn -> {:ok, %{connected: true}} end)
+
+    {:ok, _, socket} =
+      UserSocket
+      |> socket("user_id", %{some: :assign})
+      |> subscribe_and_join(OverlayChannel, "overlay:obs")
+
     ref = push(socket, "unknown:command", %{})
     assert_reply ref, :error, %{message: "Unknown command: unknown:command"}
   end

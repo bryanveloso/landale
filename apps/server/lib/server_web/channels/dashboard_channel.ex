@@ -155,7 +155,8 @@ defmodule ServerWeb.DashboardChannel do
       # Forward request to OBS service
       case Server.Services.OBS.get_status() do
         {:ok, status} ->
-          {:reply, ResponseBuilder.success(status), socket}
+          {:ok, response} = ResponseBuilder.success(status)
+          {:reply, {:ok, response}, socket}
 
         {:error, %Server.ServiceError{} = error} ->
           Logger.warning("OBS status request failed",
@@ -163,11 +164,13 @@ defmodule ServerWeb.DashboardChannel do
             message: error.message
           )
 
-          {:reply, ResponseBuilder.error("service_error", error.message), socket}
+          {:error, response} = ResponseBuilder.error("service_error", error.message)
+          {:reply, {:error, response}, socket}
 
         {:error, reason} ->
           Logger.warning("OBS status request failed", reason: inspect(reason))
-          {:reply, ResponseBuilder.error("service_error", inspect(reason)), socket}
+          {:error, response} = ResponseBuilder.error("service_error", inspect(reason))
+          {:reply, {:error, response}, socket}
       end
     end)
   end
@@ -176,10 +179,12 @@ defmodule ServerWeb.DashboardChannel do
   def handle_in("obs:start_streaming", _payload, socket) do
     case Server.Services.OBS.start_streaming() do
       :ok ->
-        {:reply, ResponseBuilder.success(%{operation: "start_streaming"}), socket}
+        {:ok, response} = ResponseBuilder.success(%{operation: "start_streaming"})
+        {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
-        {:reply, ResponseBuilder.error("operation_failed", reason), socket}
+        {:error, response} = ResponseBuilder.error("operation_failed", reason)
+        {:reply, {:error, response}, socket}
     end
   end
 
@@ -187,10 +192,12 @@ defmodule ServerWeb.DashboardChannel do
   def handle_in("obs:stop_streaming", _payload, socket) do
     case Server.Services.OBS.stop_streaming() do
       :ok ->
-        {:reply, ResponseBuilder.success(%{operation: "stop_streaming"}), socket}
+        {:ok, response} = ResponseBuilder.success(%{operation: "stop_streaming"})
+        {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
-        {:reply, ResponseBuilder.error("operation_failed", reason), socket}
+        {:error, response} = ResponseBuilder.error("operation_failed", reason)
+        {:reply, {:error, response}, socket}
     end
   end
 
@@ -198,10 +205,12 @@ defmodule ServerWeb.DashboardChannel do
   def handle_in("obs:start_recording", _payload, socket) do
     case Server.Services.OBS.start_recording() do
       :ok ->
-        {:reply, ResponseBuilder.success(%{operation: "start_recording"}), socket}
+        {:ok, response} = ResponseBuilder.success(%{operation: "start_recording"})
+        {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
-        {:reply, ResponseBuilder.error("operation_failed", reason), socket}
+        {:error, response} = ResponseBuilder.error("operation_failed", reason)
+        {:reply, {:error, response}, socket}
     end
   end
 
@@ -209,10 +218,12 @@ defmodule ServerWeb.DashboardChannel do
   def handle_in("obs:stop_recording", _payload, socket) do
     case Server.Services.OBS.stop_recording() do
       :ok ->
-        {:reply, ResponseBuilder.success(%{operation: "stop_recording"}), socket}
+        {:ok, response} = ResponseBuilder.success(%{operation: "stop_recording"})
+        {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
-        {:reply, ResponseBuilder.error("operation_failed", reason), socket}
+        {:error, response} = ResponseBuilder.error("operation_failed", reason)
+        {:reply, {:error, response}, socket}
     end
   end
 
@@ -220,10 +231,12 @@ defmodule ServerWeb.DashboardChannel do
   def handle_in("obs:set_current_scene", %{"scene_name" => scene_name}, socket) do
     case Server.Services.OBS.set_current_scene(scene_name) do
       :ok ->
-        {:reply, ResponseBuilder.success(%{operation: "set_current_scene"}), socket}
+        {:ok, response} = ResponseBuilder.success(%{operation: "set_current_scene"})
+        {:reply, {:ok, response}, socket}
 
       {:error, reason} ->
-        {:reply, ResponseBuilder.error("operation_failed", reason), socket}
+        {:error, response} = ResponseBuilder.error("operation_failed", reason)
+        {:reply, {:error, response}, socket}
     end
   end
 
@@ -234,11 +247,13 @@ defmodule ServerWeb.DashboardChannel do
     CorrelationId.with_context(correlation_id, fn ->
       case Server.Services.Rainwave.get_status() do
         {:ok, status} ->
-          {:reply, ResponseBuilder.success(status), socket}
+          {:ok, response} = ResponseBuilder.success(status)
+          {:reply, {:ok, response}, socket}
 
         {:error, reason} ->
           Logger.warning("Rainwave status request failed", reason: inspect(reason))
-          {:reply, ResponseBuilder.error("service_error", inspect(reason)), socket}
+          {:error, response} = ResponseBuilder.error("service_error", inspect(reason))
+          {:reply, {:error, response}, socket}
       end
     end)
   end
@@ -246,13 +261,15 @@ defmodule ServerWeb.DashboardChannel do
   @impl true
   def handle_in("rainwave:set_enabled", %{"enabled" => enabled}, socket) do
     Server.Services.Rainwave.set_enabled(enabled)
-    {:reply, ResponseBuilder.success(%{operation: "set_enabled", enabled: enabled}), socket}
+    {:ok, response} = ResponseBuilder.success(%{operation: "set_enabled", enabled: enabled})
+    {:reply, {:ok, response}, socket}
   end
 
   @impl true
   def handle_in("rainwave:set_station", %{"station_id" => station_id}, socket) do
     Server.Services.Rainwave.set_station(station_id)
-    {:reply, ResponseBuilder.success(%{operation: "set_station", station_id: station_id}), socket}
+    {:ok, response} = ResponseBuilder.success(%{operation: "set_station", station_id: station_id})
+    {:reply, {:ok, response}, socket}
   end
 
   # Test event handlers
@@ -266,6 +283,7 @@ defmodule ServerWeb.DashboardChannel do
   @impl true
   def handle_in(event, payload, socket) do
     log_unhandled_message(event, payload, socket)
-    {:reply, ResponseBuilder.error("unknown_event", "Unknown event: #{event}"), socket}
+    # DashboardChannel doesn't reply to unknown commands
+    {:noreply, socket}
   end
 end

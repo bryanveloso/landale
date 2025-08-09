@@ -93,15 +93,20 @@ defmodule ServerWeb.StreamChannel do
         # This maps to removing an interrupt by ID
         try do
           GenServer.call(StreamProducer, {:remove_interrupt, item_id}, 5000)
-          {:reply, ResponseBuilder.success(%{operation: "item_removed", id: item_id}), socket}
+          {:ok, response} = ResponseBuilder.success(%{operation: "item_removed", id: item_id})
+          {:reply, {:ok, response}, socket}
         rescue
           _ ->
-            {:reply, ResponseBuilder.error("stream_producer_unavailable", "StreamProducer service is not available"),
-             socket}
+            {:error, response} =
+              ResponseBuilder.error("stream_producer_unavailable", "StreamProducer service is not available")
+
+            {:reply, {:error, response}, socket}
         catch
           :exit, {:noproc, _} ->
-            {:reply, ResponseBuilder.error("stream_producer_not_started", "StreamProducer service is not started"),
-             socket}
+            {:error, response} =
+              ResponseBuilder.error("stream_producer_not_started", "StreamProducer service is not started")
+
+            {:reply, {:error, response}, socket}
         end
 
       {:error, reason} ->
@@ -126,7 +131,8 @@ defmodule ServerWeb.StreamChannel do
 
     # Send takeover to StreamProducer
     StreamProducer.force_content(content_type, data, duration)
-    {:reply, ResponseBuilder.success(%{operation: "override_sent", type: content_type}), socket}
+    {:ok, response} = ResponseBuilder.success(%{operation: "override_sent", type: content_type})
+    {:reply, {:ok, response}, socket}
   end
 
   @impl true
@@ -587,15 +593,7 @@ defmodule ServerWeb.StreamChannel do
 
   # Overlay tracking functions
   defp track_overlay_connection(socket, payload) do
-    table_name = :overlay_channel_tracker
-
-    # Ensure table exists
-    if :ets.whereis(table_name) == :undefined do
-      # Using :protected - shared tracking table with telemetry_channel
-      :ets.new(table_name, [:set, :protected, :named_table])
-    end
-
-    # Store overlay info with environment
+    # Use centralized overlay tracker
     overlay_info = %{
       name: Map.get(payload, "overlay_type", "Takeover"),
       joined_at: DateTime.utc_now(),
@@ -603,18 +601,13 @@ defmodule ServerWeb.StreamChannel do
       environment: Map.get(socket.assigns, :environment, "unknown")
     }
 
-    :ets.insert(table_name, {socket.assigns.correlation_id, overlay_info})
+    Server.OverlayTracker.track_overlay(socket.assigns.correlation_id, overlay_info)
   end
 
   @impl true
   def terminate(_reason, socket) do
     # Remove from tracking when channel terminates
-    table_name = :overlay_channel_tracker
-
-    if :ets.whereis(table_name) != :undefined do
-      :ets.delete(table_name, socket.assigns.correlation_id)
-    end
-
+    Server.OverlayTracker.untrack_overlay(socket.assigns.correlation_id)
     :ok
   end
 end

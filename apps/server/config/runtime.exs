@@ -92,28 +92,31 @@ config :server, Server.TokenVault,
 # Service discovery configuration for all environments
 # Using Tailscale IPs because Docker containers can't resolve Tailscale hostnames
 # See: https://github.com/tailscale/tailscale/issues/14467#issuecomment-3155879032
-config :server, :services,
-  phononmaser: [
-    # Zelan IP: 100.112.39.113
-    health_url: System.get_env("PHONONMASER_HEALTH_URL", "http://100.112.39.113:8890/health"),
-    host: System.get_env("PHONONMASER_HOST", "zelan"),
-    ip: System.get_env("PHONONMASER_IP", "100.112.39.113"),
-    port: String.to_integer(System.get_env("PHONONMASER_PORT", "8890"))
-  ],
-  seed: [
-    # Zelan IP: 100.112.39.113
-    health_url: System.get_env("SEED_HEALTH_URL", "http://100.112.39.113:8891/health"),
-    host: System.get_env("SEED_HOST", "zelan"),
-    ip: System.get_env("SEED_IP", "100.112.39.113"),
-    port: String.to_integer(System.get_env("SEED_PORT", "8891"))
-  ],
-  obs: [
-    # Demi IP: 100.106.173.14
-    health_url: System.get_env("OBS_HEALTH_URL", "http://100.106.173.14:4455/health"),
-    host: System.get_env("OBS_HOST", "demi"),
-    ip: System.get_env("OBS_IP", "100.106.173.14"),
-    port: String.to_integer(System.get_env("OBS_PORT", "4455"))
-  ]
+# Skip this config in test environment which uses mocks
+if config_env() != :test do
+  config :server, :services,
+    phononmaser: [
+      # Zelan IP: 100.112.39.113
+      health_url: System.get_env("PHONONMASER_HEALTH_URL", "http://100.112.39.113:8890/health"),
+      host: System.get_env("PHONONMASER_HOST", "zelan"),
+      ip: System.get_env("PHONONMASER_IP", "100.112.39.113"),
+      port: String.to_integer(System.get_env("PHONONMASER_PORT", "8890"))
+    ],
+    seed: [
+      # Zelan IP: 100.112.39.113
+      health_url: System.get_env("SEED_HEALTH_URL", "http://100.112.39.113:8891/health"),
+      host: System.get_env("SEED_HOST", "zelan"),
+      ip: System.get_env("SEED_IP", "100.112.39.113"),
+      port: String.to_integer(System.get_env("SEED_PORT", "8891"))
+    ],
+    obs: [
+      # Demi IP: 100.106.173.14
+      health_url: System.get_env("OBS_HEALTH_URL", "http://100.106.173.14:4455/health"),
+      host: System.get_env("OBS_HOST", "demi"),
+      ip: System.get_env("OBS_IP", "100.106.173.14"),
+      port: String.to_integer(System.get_env("OBS_PORT", "4455"))
+    ]
+end
 
 if config_env() == :prod do
   # Database is required for IronMON functionality

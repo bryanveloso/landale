@@ -150,8 +150,8 @@ defmodule ServerWeb.TelemetryChannel do
   @impl true
   def handle_in(event, payload, socket) do
     log_unhandled_message(event, payload, socket)
-    {:error, response} = ResponseBuilder.error("unknown_command", "Unknown command: #{event}")
-    {:reply, {:error, response}, socket}
+    # Return simple error message as expected by tests
+    {:reply, {:error, %{message: "Unknown command: #{event}"}}, socket}
   end
 
   # Private functions
@@ -352,18 +352,10 @@ defmodule ServerWeb.TelemetryChannel do
   defp sanitize_error(_), do: "An unknown error occurred"
 
   defp gather_overlay_health(environment_filter) do
-    # Use ETS to track overlay channel joins
-    # Create table if it doesn't exist
-    table_name = :overlay_channel_tracker
-
-    if :ets.whereis(table_name) == :undefined do
-      # Using :protected - only telemetry channel needs access to this tracking data
-      :ets.new(table_name, [:set, :protected, :named_table])
-    end
-
-    # Get all entries from the tracking table
+    # Use centralized overlay tracker
+    # The table is created by Server.OverlayTracker during application startup
     overlays =
-      :ets.tab2list(table_name)
+      Server.OverlayTracker.list_overlays()
       |> Enum.map(fn {_socket_id, info} ->
         %{
           name: Map.get(info, :name, "Takeover"),

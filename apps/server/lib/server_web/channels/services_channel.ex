@@ -68,9 +68,11 @@ defmodule ServerWeb.ServicesChannel do
   def handle_in(event, %{"service" => service_name}, socket) do
     if service_name in @allowed_services do
       log_unhandled_message(event, %{"service" => service_name}, socket)
-      {:reply, ResponseBuilder.error("unknown_command", "Unknown command: #{event}"), socket}
+      {:error, response} = ResponseBuilder.error("unknown_command", "Unknown command: #{event}")
+      {:reply, {:error, response}, socket}
     else
-      {:reply, ResponseBuilder.error("invalid_service", "Service #{service_name} is not controllable"), socket}
+      {:error, response} = ResponseBuilder.error("invalid_service", "Service #{service_name} is not controllable")
+      {:reply, {:error, response}, socket}
     end
   end
 
@@ -110,7 +112,8 @@ defmodule ServerWeb.ServicesChannel do
     case socket.assigns[:pending_task] do
       {%Task{ref: ^ref}, action, service_name} ->
         Logger.error("Nurvus task failed", action: action, service: service_name, reason: inspect(reason))
-        push(socket, "error", ResponseBuilder.error("task_failed", "Service operation failed"))
+        {:error, response} = ResponseBuilder.error("task_failed", "Service operation failed")
+        push(socket, "error", response)
         {:noreply, assign(socket, :pending_task, nil)}
 
       _ ->
@@ -216,11 +219,13 @@ defmodule ServerWeb.ServicesChannel do
           broadcast_service_event(socket, service_name, event_name, response)
         end
 
-        push(socket, "command_result", ResponseBuilder.success(response))
+        {:ok, success_response} = ResponseBuilder.success(response)
+        push(socket, "command_result", success_response)
         socket
 
       {:error, reason} ->
-        push(socket, "command_result", ResponseBuilder.error("nurvus_error", reason))
+        {:error, error_response} = ResponseBuilder.error("nurvus_error", reason)
+        push(socket, "command_result", error_response)
         socket
     end
   end
