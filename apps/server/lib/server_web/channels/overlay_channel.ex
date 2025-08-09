@@ -421,39 +421,49 @@ defmodule ServerWeb.OverlayChannel do
 
   @impl true
   def handle_info({:send_initial_state, overlay_type}, socket) do
-    # Send initial state based on overlay type
-    case overlay_type do
-      "obs" ->
-        case obs_service().get_status() do
-          {:ok, status} ->
-            push(socket, "initial_state", %{type: "obs", data: status})
-
-          _ ->
-            push(socket, "initial_state", %{type: "obs", data: %{connected: false}})
-        end
-
-      "twitch" ->
-        case twitch_service().get_status() do
-          {:ok, status} ->
-            push(socket, "initial_state", %{type: "twitch", data: status})
-
-          _ ->
-            push(socket, "initial_state", %{type: "twitch", data: %{connected: false}})
-        end
-
-      "system" ->
-        # Send system status as initial state
-        push(socket, "initial_state", %{
-          type: "system",
-          data: %{connected: true, timestamp: System.system_time(:second)}
-        })
-
-      _ ->
-        push(socket, "initial_state", %{type: overlay_type, data: %{connected: true}})
-    end
-
+    send_initial_state_for_type(overlay_type, socket)
     {:noreply, socket}
   end
+
+  defp send_initial_state_for_type("obs", socket) do
+    data = get_service_status(obs_service())
+    push(socket, "initial_state", %{type: "obs", data: data})
+  end
+
+  defp send_initial_state_for_type("twitch", socket) do
+    data = get_service_status(twitch_service())
+    push(socket, "initial_state", %{type: "twitch", data: data})
+  end
+
+  defp send_initial_state_for_type("system", socket) do
+    push(socket, "initial_state", %{
+      type: "system",
+      data: %{connected: true, timestamp: System.system_time(:second)}
+    })
+  end
+
+  defp send_initial_state_for_type(overlay_type, socket) do
+    push(socket, "initial_state", %{type: overlay_type, data: %{connected: true}})
+  end
+
+  defp get_service_status(service) when is_atom(service) do
+    if Code.ensure_loaded?(service) do
+      try do
+        case service.get_status() do
+          {:ok, status} -> status
+          _ -> %{connected: false}
+        end
+      rescue
+        _ -> %{connected: false}
+      catch
+        :exit, _ -> %{connected: false}
+      end
+    else
+      %{connected: false}
+    end
+  end
+
+  defp get_service_status(_service), do: %{connected: false}
 
   @impl true
   def handle_info({:obs_event, event}, socket) do

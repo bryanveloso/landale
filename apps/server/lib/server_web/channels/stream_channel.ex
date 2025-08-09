@@ -56,15 +56,28 @@ defmodule ServerWeb.StreamChannel do
 
   @impl true
   def handle_in("request_state", _payload, socket) do
-    current_state = StreamProducer.get_current_state()
-    push(socket, "stream_state", format_state_for_client(current_state))
+    current_state = get_stream_producer_state()
+
+    if current_state do
+      push(socket, "stream_state", format_state_for_client(current_state))
+    else
+      fallback_state = Server.ContentFallbacks.get_fallback_layer_state()
+      push(socket, "stream_state", fallback_state)
+    end
+
     {:noreply, socket}
   end
 
   @impl true
   def handle_in("request_queue_state", _payload, socket) do
-    current_state = StreamProducer.get_current_state()
-    push(socket, "queue_state", format_queue_state_for_client(current_state))
+    current_state = get_stream_producer_state()
+
+    if current_state do
+      push(socket, "queue_state", format_queue_state_for_client(current_state))
+    else
+      push(socket, "queue_state", %{queue: [], current: nil})
+    end
+
     {:noreply, socket}
   end
 
@@ -78,8 +91,18 @@ defmodule ServerWeb.StreamChannel do
     case validate_queue_item_removal(payload) do
       {:ok, item_id} ->
         # This maps to removing an interrupt by ID
-        StreamProducer.remove_interrupt(item_id)
-        {:reply, ResponseBuilder.success(%{operation: "item_removed", id: item_id}), socket}
+        try do
+          GenServer.call(StreamProducer, {:remove_interrupt, item_id}, 5000)
+          {:reply, ResponseBuilder.success(%{operation: "item_removed", id: item_id}), socket}
+        rescue
+          _ ->
+            {:reply, ResponseBuilder.error("stream_producer_unavailable", "StreamProducer service is not available"),
+             socket}
+        catch
+          :exit, {:noproc, _} ->
+            {:reply, ResponseBuilder.error("stream_producer_not_started", "StreamProducer service is not started"),
+             socket}
+        end
 
       {:error, reason} ->
         Logger.warning("Invalid queue item removal payload",
@@ -252,15 +275,14 @@ defmodule ServerWeb.StreamChannel do
   # Handle after join to send initial state
   @impl true
   def handle_info(:after_join, socket) do
-    try do
-      current_state = StreamProducer.get_current_state()
+    current_state = get_stream_producer_state()
+
+    if current_state do
       push(socket, "stream_state", format_state_for_client(current_state))
-    rescue
-      error ->
-        Logger.error("Failed to get StreamProducer state, using fallback", error: inspect(error))
-        # Send centralized fallback state
-        fallback_state = Server.ContentFallbacks.get_fallback_layer_state()
-        push(socket, "stream_state", fallback_state)
+    else
+      # Send centralized fallback state
+      fallback_state = Server.ContentFallbacks.get_fallback_layer_state()
+      push(socket, "stream_state", fallback_state)
     end
 
     {:noreply, socket}
@@ -372,6 +394,17 @@ defmodule ServerWeb.StreamChannel do
   end
 
   # Private helper functions
+
+  defp get_stream_producer_state do
+    try do
+      GenServer.call(StreamProducer, :get_state, 5000)
+    rescue
+      _ -> nil
+    catch
+      :exit, {:noproc, _} -> nil
+      :exit, _ -> nil
+    end
+  end
 
   defp format_state_for_client(state) do
     %{
