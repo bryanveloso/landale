@@ -22,14 +22,14 @@ defmodule Server.OAuthService do
         token_url: "https://id.twitch.tv/oauth2/token",
         validate_url: "https://id.twitch.tv/oauth2/validate"
       })
-      
+
       # Store tokens for a service
       OAuthService.store_tokens(:twitch, %{
         access_token: "...",
         refresh_token: "...",
         expires_at: ~U[2024-07-26 12:00:00Z]
       })
-      
+
       # Get valid token (auto-refreshes if needed)
       {:ok, token} = OAuthService.get_valid_token(:twitch)
   """
@@ -134,7 +134,110 @@ defmodule Server.OAuthService do
 
   @impl Server.Service
   def do_init(_opts) do
-    {:ok, %__MODULE__{}}
+    # Initialize empty state first
+    state = %__MODULE__{}
+    # Auto-register Twitch service if configuration is available
+    # This is fast and synchronous - just creates in-memory manager
+    final_state =
+      case build_twitch_config() do
+        nil ->
+          Logger.debug("Twitch OAuth config not available, skipping auto-registration")
+          state
+
+        config ->
+          case register_twitch_service(state, config) do
+            {:ok, new_state} ->
+              Logger.info("Twitch OAuth service auto-registered successfully")
+              new_state
+
+            {:error, reason} ->
+              Logger.warning("Failed to auto-register Twitch OAuth service",
+                reason: inspect(reason),
+                note: "Service can be registered later via API"
+              )
+
+              state
+          end
+      end
+
+    {:ok, final_state}
+  end
+
+  defp register_twitch_service(state, config) do
+    # Build proper keyword list for OAuthTokenManager
+    manager_opts = [
+      storage_key: :twitch_tokens,
+      client_id: config.client_id,
+      client_secret: config.client_secret,
+      auth_url: config.auth_url,
+      token_url: config.token_url,
+      validate_url: config.validate_url,
+      telemetry_prefix: [:server, :twitch, :oauth]
+    ]
+
+    case OAuthTokenManager.new(manager_opts) do
+      {:ok, manager} ->
+        # Load any existing tokens from storage
+        manager = OAuthTokenManager.load_tokens(manager)
+
+        # Update state with the new manager
+        new_managers = Map.put(state.managers, :twitch, manager)
+        new_state = %{state | managers: new_managers}
+
+        {:ok, new_state}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp build_twitch_config do
+    client_id = System.get_env("TWITCH_CLIENT_ID")
+    client_secret = System.get_env("TWITCH_CLIENT_SECRET")
+
+    if client_id && client_secret do
+      %{
+        client_id: client_id,
+        client_secret: client_secret,
+        auth_url: "https://id.twitch.tv/oauth2/authorize",
+        token_url: "https://id.twitch.tv/oauth2/token",
+        validate_url: "https://id.twitch.tv/oauth2/validate",
+        required_scopes: [
+          # Stream/channel management
+          "channel:read:subscriptions",
+          "channel:read:redemptions",
+          "channel:read:polls",
+          "channel:read:predictions",
+          "channel:read:hype_train",
+          "channel:read:goals",
+          "channel:read:charity",
+          "channel:read:vips",
+          "channel:read:ads",
+          "channel:manage:broadcast",
+          "channel:manage:redemptions",
+          "channel:manage:videos",
+          "channel:manage:ads",
+          "channel:edit:commercial",
+          "channel:bot",
+          # Moderation and chat
+          "moderator:read:followers",
+          "moderator:read:shoutouts",
+          "moderator:read:chat_settings",
+          "moderator:manage:announcements",
+          "user:read:chat",
+          "user:write:chat",
+          "user:bot",
+          "chat:read",
+          "chat:edit",
+          # Monetization
+          "bits:read",
+          # Content
+          "clips:edit"
+        ]
+      }
+    else
+      nil
+    end
   end
 
   @impl Server.Service
