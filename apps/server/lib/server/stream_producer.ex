@@ -55,31 +55,37 @@ defmodule Server.StreamProducer do
   end
 
   @doc "Get current stream state"
+  @spec get_current_state() :: map()
   def get_current_state do
     GenServer.call(__MODULE__, :get_state)
   end
 
   @doc "Change the current show context"
+  @spec change_show(atom(), map()) :: :ok
   def change_show(show, metadata \\ %{}) do
     GenServer.cast(__MODULE__, {:change_show, show, metadata})
   end
 
   @doc "Add a priority interrupt (alert, sub train, etc.)"
+  @spec add_interrupt(atom(), map(), keyword()) :: :ok
   def add_interrupt(type, data, opts \\ []) do
     GenServer.cast(__MODULE__, {:add_interrupt, type, data, opts})
   end
 
   @doc "Remove an interrupt by ID"
+  @spec remove_interrupt(String.t()) :: :ok
   def remove_interrupt(interrupt_id) do
     GenServer.cast(__MODULE__, {:remove_interrupt, interrupt_id})
   end
 
   @doc "Update ticker content for current show"
+  @spec update_ticker_content([map()]) :: :ok
   def update_ticker_content(content_list) do
     GenServer.cast(__MODULE__, {:update_ticker_content, content_list})
   end
 
   @doc "Force display specific content (manual override)"
+  @spec force_content(atom(), map(), pos_integer()) :: :ok
   def force_content(content_type, data, duration \\ 30_000) do
     GenServer.cast(__MODULE__, {:force_content, content_type, data, duration})
   end
