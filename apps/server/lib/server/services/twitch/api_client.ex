@@ -401,22 +401,46 @@ defmodule Server.Services.Twitch.ApiClient do
       {"User-Agent", @user_agent}
     ]
 
-    case method do
-      :get ->
-        query_string = URI.encode_query(params |> Enum.reject(fn {_k, v} -> is_nil(v) end))
-        full_url = if query_string == "", do: url, else: "#{url}?#{query_string}"
+    # Execute HTTP request with circuit breaker protection
+    result =
+      Server.CircuitBreakerServer.call(
+        "twitch-api",
+        fn ->
+          case method do
+            :get ->
+              query_string = URI.encode_query(params |> Enum.reject(fn {_k, v} -> is_nil(v) end))
+              full_url = if query_string == "", do: url, else: "#{url}?#{query_string}"
 
-        Server.HttpClient.get(full_url, headers)
+              Server.HttpClient.get(full_url, headers)
 
-      :patch ->
-        body = params |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Jason.encode!()
+            :patch ->
+              body = params |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Jason.encode!()
 
-        Server.HttpClient.patch(url, body, headers)
+              Server.HttpClient.patch(url, body, headers)
 
-      :post ->
-        body = params |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Jason.encode!()
+            :post ->
+              body = params |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Jason.encode!()
 
-        Server.HttpClient.post(url, body, headers)
+              Server.HttpClient.post(url, body, headers)
+          end
+        end,
+        %{
+          # Open circuit after 3 failures
+          failure_threshold: 3,
+          # 10 second timeout for API calls
+          timeout_ms: 10_000,
+          # Try again after 30 seconds when open
+          reset_timeout_ms: 30_000
+        }
+      )
+
+    case result do
+      {:error, :circuit_open} ->
+        Logger.warning("Twitch API circuit breaker is open", path: path)
+        {:error, "Twitch API temporarily unavailable due to repeated failures"}
+
+      response ->
+        response
     end
     |> case do
       {:ok, %HTTPoison.Response{status_code: status, body: body, headers: response_headers}} ->

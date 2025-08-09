@@ -81,6 +81,32 @@ defmodule Server.Telemetry do
   end
 
   @doc """
+  Emits telemetry event for circuit breaker state changes.
+  """
+  def circuit_breaker_state_change(service_name, old_state, new_state) do
+    :telemetry.execute(
+      [:server, :circuit_breaker, :state_change],
+      %{count: 1},
+      %{
+        service: service_name,
+        old_state: old_state,
+        new_state: new_state
+      }
+    )
+  end
+
+  @doc """
+  Emits telemetry event for circuit breaker trips.
+  """
+  def circuit_breaker_trip(service_name, failure_count) do
+    :telemetry.execute(
+      [:server, :circuit_breaker, :trip],
+      %{failure_count: failure_count},
+      %{service: service_name}
+    )
+  end
+
+  @doc """
   Measures overall system health and emits telemetry events.
   """
   def measure_system_health do
