@@ -207,7 +207,7 @@ defmodule Server.RetryStrategyTest do
           {:ok, "success"}
         end)
 
-      assert {:ok, {:ok, "success"}} = result
+      assert {:ok, "success"} = result
     end
 
     test "opens circuit after failures" do
@@ -228,8 +228,8 @@ defmodule Server.RetryStrategyTest do
             circuit_failure_threshold: 5
           )
 
-        # Retry catches the exception and returns it as an error tuple
-        assert match?({:ok, {:error, {RuntimeError, _}}}, result)
+        # After the CircuitBreakerServer fix, it returns unwrapped results
+        assert match?({:error, {RuntimeError, _}}, result)
       end
 
       # Circuit doesn't actually open because errors are wrapped by retry
@@ -239,7 +239,7 @@ defmodule Server.RetryStrategyTest do
           {:ok, "should not be called"}
         end)
 
-      assert {:ok, {:ok, "should not be called"}} = result
+      assert {:ok, "should not be called"} = result
     end
 
     test "closes circuit after successful call in half-open state" do
@@ -259,15 +259,15 @@ defmodule Server.RetryStrategyTest do
             circuit_timeout_ms: 100
           )
 
-        # Retry catches the exception and returns it as an error tuple
-        assert match?({:ok, {:error, {RuntimeError, _}}}, result)
+        # After the CircuitBreakerServer fix, it returns unwrapped results
+        assert match?({:error, {RuntimeError, _}}, result)
       end
 
       # Since exceptions are caught by retry, circuit doesn't actually open
       # This test demonstrates the consolidation works, but the error semantics
       # between retry and circuit breaker need to be aligned for full functionality
       result = RetryStrategy.retry_with_circuit_breaker(service_name, fn -> {:ok, "test"} end)
-      assert {:ok, {:ok, "test"}} = result
+      assert {:ok, "test"} = result
     end
   end
 

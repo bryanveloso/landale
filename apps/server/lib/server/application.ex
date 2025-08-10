@@ -232,28 +232,66 @@ defmodule Server.Application do
   defp wait_for_service_loop(service_module, start_time, timeout) do
     case Process.whereis(service_module) do
       nil ->
-        current_time = System.monotonic_time(:millisecond)
-
-        if current_time - start_time >= timeout do
-          {:error, :timeout}
-        else
-          Process.sleep(50)
-          wait_for_service_loop(service_module, start_time, timeout)
-        end
+        handle_service_not_found(service_module, start_time, timeout)
 
       pid ->
-        # Additional check to ensure the service is actually ready
-        try do
-          # Try a simple call to verify the service is responsive
-          case GenServer.call(pid, :get_status, 1000) do
-            {:ok, _status} -> {:ok, pid}
-            # Even if status call fails, register the service
-            _ -> {:ok, pid}
-          end
-        catch
-          # Fallback - register anyway
-          _, _ -> {:ok, pid}
+        verify_service_process(pid)
+    end
+  end
+
+  defp handle_service_not_found(service_module, start_time, timeout) do
+    current_time = System.monotonic_time(:millisecond)
+
+    if current_time - start_time >= timeout do
+      {:error, :timeout}
+    else
+      Process.sleep(50)
+      wait_for_service_loop(service_module, start_time, timeout)
+    end
+  end
+
+  defp verify_service_process(pid) do
+    if supervisor_process?(pid) do
+      verify_supervisor(pid)
+    else
+      verify_genserver(pid)
+    end
+  end
+
+  defp supervisor_process?(pid) do
+    case Process.info(pid, :dictionary) do
+      {:dictionary, dict} ->
+        initial_call = Keyword.get(dict, :"$initial_call", {})
+
+        case initial_call do
+          {Supervisor, _, _} -> true
+          {:supervisor, _, _} -> true
+          _ -> false
         end
+
+      _ ->
+        false
+    end
+  end
+
+  defp verify_supervisor(pid) do
+    if Process.alive?(pid) do
+      {:ok, pid}
+    else
+      {:error, :not_alive}
+    end
+  end
+
+  defp verify_genserver(pid) do
+    try do
+      case GenServer.call(pid, :get_status, 1000) do
+        {:ok, _status} -> {:ok, pid}
+        # Even if status call fails, register the service
+        _ -> {:ok, pid}
+      end
+    catch
+      # Fallback - register anyway
+      _, _ -> {:ok, pid}
     end
   end
 end

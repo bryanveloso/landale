@@ -35,7 +35,7 @@ defmodule Server.Services.Twitch.TokenManager do
     else
       task =
         Task.async(fn ->
-          OAuthService.validate_token("twitch")
+          OAuthService.validate_token(:twitch)
         end)
 
       %{state | token_validation_task: task}
@@ -53,7 +53,7 @@ defmodule Server.Services.Twitch.TokenManager do
     else
       task =
         Task.async(fn ->
-          OAuthService.refresh_token("twitch")
+          OAuthService.refresh_token(:twitch)
         end)
 
       %{state | token_refresh_task: task}

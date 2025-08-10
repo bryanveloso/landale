@@ -49,7 +49,8 @@ defmodule ServerWeb.WebSocketOriginTest do
       socket_config =
         config
         |> Keyword.get(:socket, [])
-        |> Keyword.get("/socket", [])
+        |> Map.new()
+        |> Map.get("/socket", [])
         |> Keyword.get(:websocket, [])
 
       # These values should match our production configuration

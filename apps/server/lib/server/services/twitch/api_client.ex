@@ -33,7 +33,6 @@ defmodule Server.Services.Twitch.ApiClient do
 
   defstruct [
     :user_id,
-    :circuit_breaker,
     last_api_call: nil,
     rate_limit_remaining: nil,
     rate_limit_reset: nil
@@ -159,17 +158,8 @@ defmodule Server.Services.Twitch.ApiClient do
       {:stop, "user_id is required"}
     end
 
-    # Initialize circuit breaker for API resilience
-    circuit_breaker = %{
-      failures: 0,
-      last_failure: nil,
-      # :closed, :open, :half_open
-      state: :closed
-    }
-
     state = %__MODULE__{
-      user_id: user_id,
-      circuit_breaker: circuit_breaker
+      user_id: user_id
     }
 
     # Verify OAuth service is registered
@@ -194,54 +184,26 @@ defmodule Server.Services.Twitch.ApiClient do
 
   @impl GenServer
   def handle_call({:modify_channel_information, opts}, _from, state) do
-    case check_circuit_breaker(state.circuit_breaker) do
-      :ok ->
-        result = do_modify_channel_information(state, opts)
-        new_state = update_circuit_breaker(state, result)
-        {:reply, result, new_state}
-
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-    end
+    result = do_modify_channel_information(state, opts)
+    {:reply, result, %{state | last_api_call: DateTime.utc_now()}}
   end
 
   @impl GenServer
   def handle_call(:get_channel_information, _from, state) do
-    case check_circuit_breaker(state.circuit_breaker) do
-      :ok ->
-        result = do_get_channel_information(state)
-        new_state = update_circuit_breaker(state, result)
-        {:reply, result, new_state}
-
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-    end
+    result = do_get_channel_information(state)
+    {:reply, result, %{state | last_api_call: DateTime.utc_now()}}
   end
 
   @impl GenServer
   def handle_call(:get_creator_goals, _from, state) do
-    case check_circuit_breaker(state.circuit_breaker) do
-      :ok ->
-        result = do_get_creator_goals(state)
-        new_state = update_circuit_breaker(state, result)
-        {:reply, result, new_state}
-
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-    end
+    result = do_get_creator_goals(state)
+    {:reply, result, %{state | last_api_call: DateTime.utc_now()}}
   end
 
   @impl GenServer
   def handle_call({:search_categories, query}, _from, state) do
-    case check_circuit_breaker(state.circuit_breaker) do
-      :ok ->
-        result = do_search_categories(state, query)
-        new_state = update_circuit_breaker(state, result)
-        {:reply, result, new_state}
-
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-    end
+    result = do_search_categories(state, query)
+    {:reply, result, %{state | last_api_call: DateTime.utc_now()}}
   end
 
   @impl GenServer
@@ -250,12 +212,7 @@ defmodule Server.Services.Twitch.ApiClient do
       user_id: state.user_id,
       last_api_call: state.last_api_call,
       rate_limit_remaining: state.rate_limit_remaining,
-      rate_limit_reset: state.rate_limit_reset,
-      circuit_breaker: %{
-        state: state.circuit_breaker.state,
-        failures: state.circuit_breaker.failures,
-        last_failure: state.circuit_breaker.last_failure
-      }
+      rate_limit_reset: state.rate_limit_reset
     }
 
     {:reply, status, state}
@@ -491,56 +448,6 @@ defmodule Server.Services.Twitch.ApiClient do
       {_k, v} -> v
       nil -> nil
     end
-  end
-
-  defp check_circuit_breaker(circuit_breaker) do
-    case circuit_breaker.state do
-      :closed ->
-        :ok
-
-      :open ->
-        # Check if we should transition to half-open
-        if circuit_breaker.last_failure &&
-             DateTime.diff(DateTime.utc_now(), circuit_breaker.last_failure, :second) > 60 do
-          # Allow one request to test if service is back
-          :ok
-        else
-          {:error, "Circuit breaker is open - API temporarily unavailable"}
-        end
-
-      :half_open ->
-        :ok
-    end
-  end
-
-  defp update_circuit_breaker(state, result) do
-    new_circuit_breaker =
-      case result do
-        {:ok, _} ->
-          # Success - reset circuit breaker
-          %{state.circuit_breaker | failures: 0, last_failure: nil, state: :closed}
-
-        :ok ->
-          # Success - reset circuit breaker
-          %{state.circuit_breaker | failures: 0, last_failure: nil, state: :closed}
-
-        {:error, _reason} ->
-          # Failure - increment counter
-          failures = state.circuit_breaker.failures + 1
-          now = DateTime.utc_now()
-
-          new_state =
-            if failures >= 3 do
-              Logger.warning("Circuit breaker opened due to repeated failures", failures: failures)
-              :open
-            else
-              state.circuit_breaker.state
-            end
-
-          %{state.circuit_breaker | failures: failures, last_failure: now, state: new_state}
-      end
-
-    %{state | circuit_breaker: new_circuit_breaker, last_api_call: DateTime.utc_now()}
   end
 
   ## GenServer Info Handlers
