@@ -25,7 +25,7 @@ defmodule Server.CircuitBreakerServerTest do
     test "successful calls keep circuit closed" do
       # Multiple successful calls
       for i <- 1..5 do
-        assert {:ok, ^i} = CircuitBreakerServer.call("test-service", fn -> i end)
+        assert ^i = CircuitBreakerServer.call("test-service", fn -> i end)
       end
 
       # Circuit should remain closed
@@ -95,7 +95,7 @@ defmodule Server.CircuitBreakerServerTest do
       Process.sleep(150)
 
       # Next call should attempt execution (half-open state)
-      assert {:ok, :success} =
+      assert :success =
                CircuitBreakerServer.call(
                  "test-service",
                  fn ->
@@ -113,8 +113,8 @@ defmodule Server.CircuitBreakerServerTest do
 
     test "get_all_metrics returns circuit breaker information" do
       # Create a few circuit breakers
-      CircuitBreakerServer.call("service-1", fn -> :ok end)
-      CircuitBreakerServer.call("service-2", fn -> :ok end)
+      assert :ok = CircuitBreakerServer.call("service-1", fn -> :ok end)
+      assert :ok = CircuitBreakerServer.call("service-2", fn -> :ok end)
 
       metrics = CircuitBreakerServer.get_all_metrics()
 
@@ -131,7 +131,7 @@ defmodule Server.CircuitBreakerServerTest do
 
     test "remove deletes circuit breaker" do
       # Create circuit breaker
-      CircuitBreakerServer.call("temp-service", fn -> :ok end)
+      assert :ok = CircuitBreakerServer.call("temp-service", fn -> :ok end)
       assert {:ok, :closed} = CircuitBreakerServer.get_state("temp-service")
 
       # Remove it

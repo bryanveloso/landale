@@ -57,11 +57,11 @@ defmodule Server.CircuitBreakerServer do
   Executes a function with circuit breaker protection.
 
   ## Examples
-      
+
       CircuitBreakerServer.call("twitch-api", fn ->
         # External API call
       end)
-      
+
       # With custom config
       CircuitBreakerServer.call("slow-service", fn ->
         # Slow operation
@@ -251,7 +251,7 @@ defmodule Server.CircuitBreakerServer do
         # Reset failure count on success
         updated_circuit = %{circuit | failure_count: 0}
         log_success(updated_circuit)
-        {{:ok, result}, updated_circuit}
+        {result, updated_circuit}
 
       :half_open ->
         # Track successes in half-open state
@@ -261,11 +261,11 @@ defmodule Server.CircuitBreakerServer do
           # Enough successes, close the circuit
           updated_circuit = transition_to_closed(circuit)
           log_circuit_closed(updated_circuit)
-          {{:ok, result}, updated_circuit}
+          {result, updated_circuit}
         else
           # Continue in half-open state
           updated_circuit = %{circuit | half_open_success_count: new_success_count}
-          {{:ok, result}, updated_circuit}
+          {result, updated_circuit}
         end
 
       :open ->
