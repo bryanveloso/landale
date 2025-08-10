@@ -50,6 +50,7 @@ defmodule Server.OAuthTokenManager do
   require Logger
 
   alias Server.Logging
+  alias Server.SafeTokenHandler
   alias Server.TokenVault
 
   @behaviour Server.OAuthTokenManagerBehaviour
@@ -289,11 +290,14 @@ defmodule Server.OAuthTokenManager do
             Logger.info("Token refresh completed", storage_key: manager.storage_key)
             emit_telemetry(manager, [:refresh, :success])
 
+            # Normalize new tokens to ensure consistent access
+            safe_tokens = SafeTokenHandler.normalize(new_tokens)
+
             # Update token info
             new_token_info = %{
-              access_token: new_tokens[:access_token],
-              refresh_token: new_tokens[:refresh_token] || refresh_token,
-              expires_at: calculate_expires_in(new_tokens[:expires_in]),
+              access_token: safe_tokens[:access_token],
+              refresh_token: safe_tokens[:refresh_token] || refresh_token,
+              expires_at: calculate_expires_in(safe_tokens[:expires_in]),
               scopes: manager.token_info.scopes,
               user_id: manager.token_info.user_id,
               client_id: manager.oauth2_client.client_id
@@ -338,13 +342,16 @@ defmodule Server.OAuthTokenManager do
 
         case Server.OAuth2Client.validate_token(manager.oauth2_client, access_token) do
           {:ok, validation_data} ->
+            # Normalize validation data to ensure consistent access
+            safe_validation = SafeTokenHandler.normalize(validation_data)
+
             # Update token info with validation data
             updated_token_info =
               Map.merge(manager.token_info, %{
-                user_id: validation_data[:user_id],
+                user_id: safe_validation[:user_id],
                 scopes:
-                  if(validation_data[:scopes],
-                    do: MapSet.new(validation_data[:scopes]),
+                  if(safe_validation[:scopes],
+                    do: MapSet.new(safe_validation[:scopes]),
                     else: manager.token_info.scopes
                   )
               })

@@ -49,6 +49,8 @@ defmodule Server.Application do
             {DynamicSupervisor, name: Server.DynamicSupervisor, strategy: :one_for_one},
             # Overlay tracking (must start early to create ETS table before channels)
             Server.OverlayTracker,
+            # Data access pattern monitoring
+            Server.PatternMonitor,
             # Performance optimizations
             Server.CorrelationIdPool,
             Server.Events.BatchPublisher,
