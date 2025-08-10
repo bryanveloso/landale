@@ -159,7 +159,7 @@ defmodule Server.PatternMonitor do
   end
 
   defp handle_telemetry(event_name, measurements, metadata, _config) do
-    send(self(), {:telemetry_event, measurements, metadata, event_name})
+    send(__MODULE__, {:telemetry_event, measurements, metadata, event_name})
   end
 
   defp handle_telemetry_event([:server, :safe_token_handler, :access_pattern], _measurements, metadata, state) do

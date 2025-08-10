@@ -282,27 +282,17 @@ defmodule Mix.Tasks.Twitch.Token do
     display_info("Exchanging authorization code for access tokens...")
     IO.puts("")
 
-    # Use the existing OAuth2Client instead of direct HTTP calls
-    oauth2_client = %{
-      auth_url: @auth_url,
-      token_url: @token_url,
-      validate_url: @validate_url,
-      client_id: config.client_id,
-      client_secret: config.client_secret,
-      timeout: 15_000,
-      telemetry_prefix: [:server, :twitch, :oauth, :cli]
+    # Make direct HTTP call for CLI context (no circuit breaker needed)
+    params = %{
+      "client_id" => config.client_id,
+      "client_secret" => config.client_secret,
+      "code" => auth_code,
+      "grant_type" => "authorization_code",
+      "redirect_uri" => "http://localhost:3000"
     }
 
-    case Server.OAuth2Client.exchange_code(oauth2_client, auth_code, "http://localhost:3000") do
-      {:ok, token_response} ->
-        # Convert OAuth2Client response to expected format
-        token_data = %{
-          "access_token" => token_response.access_token,
-          "refresh_token" => token_response.refresh_token,
-          "expires_in" => token_response.expires_in,
-          "scope" => if(token_response.scope, do: Enum.join(token_response.scope, " "), else: "")
-        }
-
+    case make_direct_token_request(@token_url, params) do
+      {:ok, token_data} ->
         step_4_validate_and_store(config, token_data)
 
       {:error, reason} ->
@@ -313,7 +303,14 @@ defmodule Mix.Tasks.Twitch.Token do
   defp step_4_validate_and_store(config, token_data) do
     access_token = token_data["access_token"]
     expires_in = token_data["expires_in"]
-    scopes = token_data["scope"] |> String.split(" ") |> Enum.sort()
+
+    scopes =
+      case token_data["scope"] do
+        scope when is_binary(scope) -> String.split(scope, " ")
+        scope when is_list(scope) -> scope
+        _ -> []
+      end
+      |> Enum.sort()
 
     display_success("Tokens received successfully")
     IO.puts("  #{dim("Expires in:")} #{expires_in} seconds #{dim("(#{Float.round(expires_in / 3_600, 1)} hours)")})")
@@ -349,7 +346,13 @@ defmodule Mix.Tasks.Twitch.Token do
 
     # Prepare token data for storage
     expires_at = DateTime.utc_now() |> DateTime.add(token_data["expires_in"], :second)
-    scopes = token_data["scope"] |> String.split(" ")
+
+    scopes =
+      case token_data["scope"] do
+        scope when is_binary(scope) -> String.split(scope, " ")
+        scope when is_list(scope) -> scope
+        _ -> []
+      end
 
     token_info = %{
       access_token: token_data["access_token"],
@@ -387,7 +390,13 @@ defmodule Mix.Tasks.Twitch.Token do
   end
 
   defp display_success_summary(user_info, token_data) do
-    scopes = token_data["scope"] |> String.split(" ") |> Enum.sort()
+    scopes =
+      case token_data["scope"] do
+        scope when is_binary(scope) -> String.split(scope, " ")
+        scope when is_list(scope) -> scope
+        _ -> []
+      end
+      |> Enum.sort()
 
     IO.puts("#{success_icon()} #{bright("Token Creation Complete!")}")
     IO.puts("")
@@ -607,24 +616,21 @@ defmodule Mix.Tasks.Twitch.Token do
         {:error, "No refresh token available - need to create new tokens interactively"}
 
       refresh_token ->
-        oauth2_client = %{
-          auth_url: @auth_url,
-          token_url: @token_url,
-          validate_url: @validate_url,
-          client_id: System.get_env("TWITCH_CLIENT_ID"),
-          client_secret: System.get_env("TWITCH_CLIENT_SECRET"),
-          timeout: 15_000,
-          telemetry_prefix: [:server, :twitch, :oauth, :refresh]
+        params = %{
+          "client_id" => System.get_env("TWITCH_CLIENT_ID"),
+          "client_secret" => System.get_env("TWITCH_CLIENT_SECRET"),
+          "grant_type" => "refresh_token",
+          "refresh_token" => refresh_token
         }
 
-        case Server.OAuth2Client.refresh_token(oauth2_client, refresh_token) do
-          {:ok, token_response} ->
-            new_expires_at = DateTime.utc_now() |> DateTime.add(token_response.expires_in, :second)
+        case make_direct_token_request(@token_url, params) do
+          {:ok, token_data} ->
+            new_expires_at = DateTime.utc_now() |> DateTime.add(token_data["expires_in"], :second)
 
             updated_token_info = %{
-              access_token: token_response.access_token,
+              access_token: token_data["access_token"],
               # Keep old refresh token if not provided
-              refresh_token: token_response.refresh_token || refresh_token,
+              refresh_token: token_data["refresh_token"] || refresh_token,
               expires_at: new_expires_at,
               scopes: token_info.scopes,
               user_id: token_info.user_id
@@ -943,18 +949,8 @@ defmodule Mix.Tasks.Twitch.Token do
   end
 
   defp validate_token_with_twitch(access_token) do
-    oauth2_client = %{
-      auth_url: @auth_url,
-      token_url: @token_url,
-      validate_url: @validate_url,
-      client_id: System.get_env("TWITCH_CLIENT_ID"),
-      client_secret: System.get_env("TWITCH_CLIENT_SECRET"),
-      timeout: 10_000,
-      telemetry_prefix: [:server, :twitch, :oauth, :cli]
-    }
-
-    case Server.OAuth2Client.validate_token(oauth2_client, access_token) do
-      {:ok, user_info} -> {:ok, Map.new(user_info, fn {k, v} -> {to_string(k), v} end)}
+    case make_direct_validate_request(@validate_url, access_token) do
+      {:ok, user_info} -> {:ok, user_info}
       {:error, reason} -> {:error, format_oauth_error(reason)}
     end
   end
@@ -977,6 +973,96 @@ defmodule Mix.Tasks.Twitch.Token do
       _error ->
         # Backup failure is not critical, just continue
         :ok
+    end
+  end
+
+  # Direct HTTP request helpers for CLI context (no circuit breaker)
+
+  # Helper to handle HTTP response body and status codes
+  defp handle_response_body(conn, stream_ref, status, timeout) do
+    case :gun.await_body(conn, stream_ref, timeout) do
+      {:ok, response_body} ->
+        :gun.close(conn)
+        decode_json_response(response_body, status)
+
+      {:error, reason} ->
+        :gun.close(conn)
+        {:error, {:network_error, reason}}
+    end
+  end
+
+  defp decode_json_response(response_body, status) do
+    case JSON.decode(response_body) do
+      {:ok, json} when status >= 200 and status < 300 ->
+        {:ok, json}
+
+      {:ok, json} ->
+        {:error, {:http_error, status, json}}
+
+      {:error, _} ->
+        {:error, {:http_error, status, response_body}}
+    end
+  end
+
+  defp make_direct_token_request(url, params) do
+    uri = URI.parse(url)
+
+    headers = [
+      {"content-type", "application/x-www-form-urlencoded"},
+      {"accept", "application/json"}
+    ]
+
+    body = URI.encode_query(params)
+
+    case :gun.open(String.to_charlist(uri.host), uri.port, %{protocols: [:http2], transport: :tls}) do
+      {:ok, conn} ->
+        stream_ref = :gun.post(conn, String.to_charlist(uri.path || "/"), headers, body)
+
+        case :gun.await(conn, stream_ref, 15_000) do
+          {:response, :fin, status, _headers} ->
+            :gun.close(conn)
+            {:error, {:http_error, status, "No response body"}}
+
+          {:response, :nofin, status, _headers} ->
+            handle_response_body(conn, stream_ref, status, 15_000)
+
+          {:error, reason} ->
+            :gun.close(conn)
+            {:error, {:network_error, reason}}
+        end
+
+      {:error, reason} ->
+        {:error, {:network_error, reason}}
+    end
+  end
+
+  defp make_direct_validate_request(url, access_token) do
+    uri = URI.parse(url)
+
+    headers = [
+      {"authorization", "Bearer #{access_token}"},
+      {"accept", "application/json"}
+    ]
+
+    case :gun.open(String.to_charlist(uri.host), uri.port, %{protocols: [:http2], transport: :tls}) do
+      {:ok, conn} ->
+        stream_ref = :gun.get(conn, String.to_charlist(uri.path || "/"), headers)
+
+        case :gun.await(conn, stream_ref, 10_000) do
+          {:response, :fin, status, _headers} ->
+            :gun.close(conn)
+            {:error, {:http_error, status, "No response body"}}
+
+          {:response, :nofin, status, _headers} ->
+            handle_response_body(conn, stream_ref, status, 10_000)
+
+          {:error, reason} ->
+            :gun.close(conn)
+            {:error, {:network_error, reason}}
+        end
+
+      {:error, reason} ->
+        {:error, {:network_error, reason}}
     end
   end
 end
