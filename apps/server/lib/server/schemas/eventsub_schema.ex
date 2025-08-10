@@ -14,8 +14,10 @@ defmodule Server.Schemas.EventSubSchema do
   @spec validate(any()) :: {:ok, map()} | {:error, term()}
   def validate(event_data) when is_map(event_data) do
     # Use BoundaryConverter to normalize to atom keys
-    normalized = Server.BoundaryConverter.from_external(event_data)
-    {:ok, normalized}
+    case Server.BoundaryConverter.from_external(event_data) do
+      {:ok, normalized} -> {:ok, normalized}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   def validate(data) do

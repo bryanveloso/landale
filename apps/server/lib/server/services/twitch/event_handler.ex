@@ -47,9 +47,13 @@ defmodule Server.Services.Twitch.EventHandler do
   """
   @spec process_event(binary(), map(), keyword()) :: :ok | {:error, term()}
   def process_event(event_type, event_data, _opts \\ []) do
+    # Use BoundaryConverter for consistent logging access
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data || %{})
+    event_id = Map.get(data, :id) || Map.get(data, :message_id)
+
     Logger.debug("Processing EventSub event",
       event_type: event_type,
-      event_id: event_data["id"] || event_data["message_id"],
+      event_id: event_id,
       event_data_keys: Map.keys(event_data || %{}),
       event_size: byte_size(:erlang.term_to_binary(event_data))
     )
@@ -66,14 +70,14 @@ defmodule Server.Services.Twitch.EventHandler do
           Logger.warning("Telemetry emission failed (non-critical)",
             error: inspect(error),
             event_type: event_type,
-            event_id: event_data["id"] || event_data["message_id"],
+            event_id: Map.get(data, :id) || Map.get(data, :message_id),
             stacktrace: Exception.format_stacktrace(__STACKTRACE__)
           )
       end
 
       Logger.debug("EventSub event processed successfully",
         event_type: event_type,
-        event_id: event_data["id"] || event_data["message_id"]
+        event_id: Map.get(data, :id) || Map.get(data, :message_id)
       )
 
       :ok
@@ -82,17 +86,20 @@ defmodule Server.Services.Twitch.EventHandler do
         Logger.error("Critical event processing failed",
           reason: inspect(reason),
           event_type: event_type,
-          event_id: event_data["id"] || event_data["message_id"]
+          event_id: Map.get(data, :id) || Map.get(data, :message_id)
         )
 
         error
     end
   rescue
     error ->
+      # Use BoundaryConverter for consistent logging access in error handler
+      {:ok, data} = Server.BoundaryConverter.from_external(event_data || %{})
+
       Logger.error("Unexpected error in event processing",
         error: inspect(error),
         event_type: event_type,
-        event_id: event_data["id"] || event_data["message_id"],
+        event_id: Map.get(data, :id) || Map.get(data, :message_id),
         stacktrace: Exception.format_stacktrace(__STACKTRACE__)
       )
 
@@ -111,12 +118,15 @@ defmodule Server.Services.Twitch.EventHandler do
   """
   @spec normalize_event(binary(), map()) :: map()
   def normalize_event(event_type, event_data) do
+    # Use BoundaryConverter for consistent atom access
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     base_event = %{
       type: event_type,
-      id: event_data["id"],
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
       timestamp: DateTime.utc_now()
     }
 
@@ -243,81 +253,91 @@ defmodule Server.Services.Twitch.EventHandler do
       fragments: fragments,
       emotes: emotes,
       native_emotes: native_emotes,
-      color: event_data["color"],
-      badges: extract_badges(event_data["badges"]),
-      message_type: event_data["message_type"],
-      cheer: event_data["cheer"],
-      reply: event_data["reply"],
-      channel_points_custom_reward_id: event_data["channel_points_custom_reward_id"],
-      source_broadcaster_user_id: event_data["source_broadcaster_user_id"],
-      source_broadcaster_user_login: event_data["source_broadcaster_user_login"],
-      source_broadcaster_user_name: event_data["source_broadcaster_user_name"],
-      source_message_id: event_data["source_message_id"],
-      source_badges: event_data["source_badges"]
+      color: Map.get(data, :color),
+      badges: extract_badges(Map.get(data, :badges)),
+      message_type: Map.get(data, :message_type),
+      cheer: Map.get(data, :cheer),
+      reply: Map.get(data, :reply),
+      channel_points_custom_reward_id: Map.get(data, :channel_points_custom_reward_id),
+      source_broadcaster_user_id: Map.get(data, :source_broadcaster_user_id),
+      source_broadcaster_user_login: Map.get(data, :source_broadcaster_user_login),
+      source_broadcaster_user_name: Map.get(data, :source_broadcaster_user_name),
+      source_message_id: Map.get(data, :source_message_id),
+      source_badges: Map.get(data, :source_badges)
     }
   end
 
   defp get_event_specific_data("channel.chat.clear", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"]
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name)
     }
   end
 
   defp get_event_specific_data("channel.chat.message_delete", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      target_user_id: event_data["target_user_id"],
-      target_user_login: event_data["target_user_login"],
-      target_user_name: event_data["target_user_name"],
-      message_id: event_data["message_id"]
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      target_user_id: Map.get(data, :target_user_id),
+      target_user_login: Map.get(data, :target_user_login),
+      target_user_name: Map.get(data, :target_user_name),
+      message_id: Map.get(data, :message_id)
     }
   end
 
   defp get_event_specific_data("channel.goal.begin", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      id: event_data["id"],
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      type: event_data["type"],
-      description: event_data["description"],
-      current_amount: event_data["current_amount"] || 0,
-      target_amount: event_data["target_amount"],
-      started_at: parse_datetime(event_data["started_at"])
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      type: Map.get(data, :type),
+      description: Map.get(data, :description),
+      current_amount: Map.get(data, :current_amount) || 0,
+      target_amount: Map.get(data, :target_amount),
+      started_at: parse_datetime(Map.get(data, :started_at))
     }
   end
 
   defp get_event_specific_data("channel.goal.progress", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      id: event_data["id"],
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      type: event_data["type"],
-      description: event_data["description"],
-      current_amount: event_data["current_amount"],
-      target_amount: event_data["target_amount"],
-      started_at: parse_datetime(event_data["started_at"])
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      type: Map.get(data, :type),
+      description: Map.get(data, :description),
+      current_amount: Map.get(data, :current_amount),
+      target_amount: Map.get(data, :target_amount),
+      started_at: parse_datetime(Map.get(data, :started_at))
     }
   end
 
   defp get_event_specific_data("channel.goal.end", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      id: event_data["id"],
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      type: event_data["type"],
-      description: event_data["description"],
-      is_achieved: event_data["is_achieved"] || false,
-      current_amount: event_data["current_amount"],
-      target_amount: event_data["target_amount"],
-      started_at: parse_datetime(event_data["started_at"]),
-      ended_at: parse_datetime(event_data["ended_at"])
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      type: Map.get(data, :type),
+      description: Map.get(data, :description),
+      is_achieved: Map.get(data, :is_achieved) || false,
+      current_amount: Map.get(data, :current_amount),
+      target_amount: Map.get(data, :target_amount),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      ended_at: parse_datetime(Map.get(data, :ended_at))
     }
   end
 
@@ -510,10 +530,13 @@ defmodule Server.Services.Twitch.EventHandler do
 
   defp extract_badges(badges) when is_list(badges) do
     Enum.map(badges, fn badge ->
+      # Use BoundaryConverter for consistent access
+      {:ok, badge_data} = Server.BoundaryConverter.from_external(badge)
+
       %{
-        set_id: badge["set_id"],
-        id: badge["id"],
-        info: badge["info"]
+        set_id: Map.get(badge_data, :set_id),
+        id: Map.get(badge_data, :id),
+        info: Map.get(badge_data, :info)
       }
     end)
   end
@@ -526,8 +549,15 @@ defmodule Server.Services.Twitch.EventHandler do
   defp extract_emotes_from_fragments(fragments) when is_list(fragments) do
     emotes =
       fragments
-      |> Enum.filter(fn fragment -> fragment["type"] == "emote" end)
-      |> Enum.map(fn fragment -> fragment["text"] end)
+      |> Enum.filter(fn fragment ->
+        # Use BoundaryConverter for consistent access
+        {:ok, fragment_data} = Server.BoundaryConverter.from_external(fragment)
+        Map.get(fragment_data, :type) == "emote"
+      end)
+      |> Enum.map(fn fragment ->
+        {:ok, fragment_data} = Server.BoundaryConverter.from_external(fragment)
+        Map.get(fragment_data, :text)
+      end)
       |> Enum.reject(&is_nil/1)
 
     {regular_emotes, native_emotes} =
