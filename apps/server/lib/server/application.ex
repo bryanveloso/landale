@@ -53,8 +53,6 @@ defmodule Server.Application do
             Server.CorrelationIdPool,
             Server.Events.BatchPublisher,
             Server.Cache,
-            # Health monitoring for system status
-            Server.Health.HealthMonitorServer,
             # Circuit breakers for external service resilience
             Server.CircuitBreakerServer,
             # Service registry for unified service discovery
@@ -69,7 +67,7 @@ defmodule Server.Application do
             {Server.SubscriptionMonitor, [storage: :subscriptions]},
             # OAuth service (must start before services that depend on it)
             Server.OAuthService,
-            # Services
+            # Services (must start before health monitor that checks them)
             Server.Services.OBS,
             Server.Services.Twitch,
             # Twitch API client (requires OAuth to be started first)
@@ -78,7 +76,9 @@ defmodule Server.Application do
                user_id: System.get_env("TWITCH_USER_ID") || Application.get_env(:server, :twitch_user_id)
              ]},
             {Server.Services.IronmonTCP, [port: Application.get_env(:server, :ironmon_tcp_port, 8080)]},
-            Server.Services.Rainwave
+            Server.Services.Rainwave,
+            # Health monitoring for system status (must start AFTER services it monitors)
+            Server.Health.HealthMonitorServer
           ]
       end
 

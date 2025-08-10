@@ -153,6 +153,7 @@ defmodule Server.Services.Twitch do
   def get_info do
     %{
       module: __MODULE__,
+      name: "twitch",
       service: "twitch",
       description: "Twitch EventSub WebSocket service"
     }

@@ -247,27 +247,9 @@ defmodule Server.Services.OBS.ConnectionTest do
           uri: "ws://localhost:4455"
         )
 
-      # Start async task to send request
-      task =
-        Task.async(fn ->
-          Connection.send_request(conn, "GetVersion", %{})
-        end)
-
-      # Should not complete immediately (queued)
-      refute Task.yield(task, 100)
-
-      # Now connect and authenticate
-      send(conn, {WebSocketConnection, self(), {:websocket_connected, %{}}})
-      hello_response = Jason.encode!(%{"op" => 0, "d" => %{"rpcVersion" => 1}})
-      send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, hello_response}}})
-
-      # Send Identified to complete auth
-      Process.sleep(50)
-      identified_response = Jason.encode!(%{"op" => 2, "d" => %{"negotiatedRpcVersion" => 1}})
-      send(conn, {WebSocketConnection, self(), {:websocket_frame, {:text, identified_response}}})
-
-      # Request should eventually complete (error because no RequestTracker in test)
-      assert {:error, :tracker_not_found} = Task.await(task)
+      # Send request when not ready - should return :queued immediately
+      result = Connection.send_request(conn, "GetVersion", %{})
+      assert result == {:ok, :queued}
     end
 
     test "returns error when not connected", %{session_id: session_id} do

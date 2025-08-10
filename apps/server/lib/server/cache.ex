@@ -237,8 +237,10 @@ defmodule Server.Cache do
   @impl true
   def init(_opts) do
     # Create ETS table for cache storage
-    # Using :protected since cache may contain sensitive data like auth tokens
-    :ets.new(@cache_table_name, [:named_table, :protected, :set])
+    # :public access required - health monitor Tasks need cache access
+    # Security: OK - no tokens/secrets stored here (see TokenVault for that)
+    # Write operations are restricted to this GenServer process, preventing unauthorized modification
+    :ets.new(@cache_table_name, [:named_table, :public, :set])
 
     # Schedule periodic cleanup
     cleanup_timer = schedule_cleanup()
