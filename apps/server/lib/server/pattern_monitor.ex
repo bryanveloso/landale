@@ -33,7 +33,12 @@ defmodule Server.PatternMonitor do
     [:server, :boundary_converter, :unknown_field],
     [:server, :channel_safety, :pattern_conversion],
     [:server, :channel_safety, :crash_prevented],
-    [:server, :channel_safety, :handle_in]
+    [:server, :channel_safety, :handle_in],
+    # DataAccessGuard events
+    [:server, :data_access_guard, :validation],
+    [:server, :data_access_guard, :warn],
+    [:server, :data_access_guard, :error],
+    [:server, :data_access_guard, :location]
   ]
 
   defmodule State do
@@ -45,7 +50,15 @@ defmodule Server.PatternMonitor do
       crash_prevention_count: 0,
       unknown_fields: MapSet.new(),
       performance_metrics: %{},
-      hourly_stats: %{}
+      hourly_stats: %{},
+      # DataAccessGuard tracking
+      data_guard_stats: %{
+        validations: 0,
+        warnings: 0,
+        errors: 0,
+        # Map of {module, function, line} -> count
+        locations: %{}
+      }
     ]
   end
 
@@ -88,7 +101,8 @@ defmodule Server.PatternMonitor do
       conversion_counts: state.conversion_counts,
       crashes_prevented: state.crash_prevention_count,
       unique_unknown_fields: MapSet.size(state.unknown_fields),
-      performance_metrics: calculate_performance_metrics(state)
+      performance_metrics: calculate_performance_metrics(state),
+      data_access_guard: state.data_guard_stats
     }
 
     {:reply, stats, state}
@@ -209,6 +223,56 @@ defmodule Server.PatternMonitor do
       )
 
     %{state | performance_metrics: updated_metrics}
+  end
+
+  defp handle_telemetry_event([:server, :data_access_guard, :validation], _measurements, _metadata, state) do
+    updated_stats =
+      state.data_guard_stats
+      |> Map.update(:validations, 1, &(&1 + 1))
+
+    %{state | data_guard_stats: updated_stats}
+  end
+
+  defp handle_telemetry_event([:server, :data_access_guard, :warn], _measurements, metadata, state) do
+    updated_stats =
+      state.data_guard_stats
+      |> Map.update(:warnings, 1, &(&1 + 1))
+
+    # Log warning for investigation
+    Logger.warning(
+      "DataAccessGuard warning at #{metadata.module}.#{elem(metadata.function, 0)}/#{elem(metadata.function, 1)}:#{metadata.line}",
+      schema: metadata.schema,
+      reason: metadata[:reason]
+    )
+
+    %{state | data_guard_stats: updated_stats}
+  end
+
+  defp handle_telemetry_event([:server, :data_access_guard, :error], _measurements, _metadata, state) do
+    updated_stats =
+      state.data_guard_stats
+      |> Map.update(:errors, 1, &(&1 + 1))
+
+    %{state | data_guard_stats: updated_stats}
+  end
+
+  defp handle_telemetry_event([:server, :data_access_guard, :location], _measurements, metadata, state) do
+    location_key = {metadata.module, metadata.function, metadata.line}
+
+    updated_locations =
+      state.data_guard_stats.locations
+      |> Map.update(location_key, 1, &(&1 + 1))
+
+    updated_stats =
+      state.data_guard_stats
+      |> Map.put(:locations, updated_locations)
+
+    # Log if this location is becoming problematic
+    if Map.get(updated_locations, location_key) == 10 do
+      Logger.warning("DataAccessGuard: Frequent validation failures at #{inspect(location_key)}")
+    end
+
+    %{state | data_guard_stats: updated_stats}
   end
 
   defp handle_telemetry_event(_event, _measurements, _metadata, state) do

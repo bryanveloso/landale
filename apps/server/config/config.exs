@@ -30,6 +30,18 @@ config :logger, :console,
 # Use native JSON module for JSON parsing in Phoenix (Elixir 1.18+)
 config :phoenix, :json_library, JSON
 
+# DataAccessGuard configuration for runtime protection
+config :server, Server.DataAccessGuard,
+  # Start with warn mode globally for gradual migration
+  default_mode: :warn,
+  # Override specific modules as they're cleaned up
+  module_overrides:
+    %{
+      # Example: Server.Services.OAuth.Client => :strict
+    },
+  # Optional: track all validations (including successful ones)
+  track_safe_accesses: false
+
 # Note: Cloak vault configuration moved to runtime.exs for security
 
 # Game ID to show mapping configuration (migrated from root config)
