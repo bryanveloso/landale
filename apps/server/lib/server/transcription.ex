@@ -29,7 +29,7 @@ defmodule Server.Transcription do
 
       iex> list_transcriptions(limit: 10)
       [%Transcription{}, ...]
-      
+
       iex> list_transcriptions(stream_session_id: "stream_2024_01_15")
       [%Transcription{}, ...]
   """
@@ -67,7 +67,7 @@ defmodule Server.Transcription do
 
       iex> create_transcription(%{text: "Hello world", duration: 1.5, timestamp: DateTime.utc_now()})
       {:ok, %Transcription{}}
-      
+
       iex> create_transcription(%{text: ""})
       {:error, %Ecto.Changeset{}}
   """
@@ -102,7 +102,8 @@ defmodule Server.Transcription do
   end
 
   def get_recent_transcriptions(minutes \\ 5) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-minutes, :minute)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -minutes, :minute)
 
     from(t in Transcription,
       where: t.timestamp >= ^cutoff,
@@ -230,7 +231,8 @@ defmodule Server.Transcription do
 
   def get_transcription_stats(opts \\ []) do
     hours = Keyword.get(opts, :hours, 24)
-    cutoff = DateTime.utc_now() |> DateTime.add(-hours, :hour)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -hours, :hour)
 
     from(t in Transcription,
       where: t.timestamp >= ^cutoff,
@@ -247,7 +249,8 @@ defmodule Server.Transcription do
   ## Cleanup Operations
 
   def delete_old_transcriptions(days_to_keep \\ 30) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-days_to_keep, :day)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -days_to_keep, :day)
 
     from(t in Transcription,
       where: t.timestamp < ^cutoff

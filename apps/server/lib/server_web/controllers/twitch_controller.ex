@@ -175,36 +175,45 @@ defmodule ServerWeb.TwitchController do
 
   Processes incoming EventSub events from Twitch CLI and forwards them
   to the existing event processing pipeline.
+
+  Security measures:
+  - Input validation and sanitization
+  - Payload size limits
+  - Event type allowlist validation
   """
   def webhook(conn, params) do
-    event_type = get_in(params, ["subscription", "type"])
-    event_data = params["event"]
+    # Validate payload structure and sanitize inputs
+    with {:ok, validated_payload} <- validate_webhook_payload(params),
+         {:ok, event_type} <- extract_event_type(validated_payload),
+         {:ok, event_data} <- extract_event_data(validated_payload),
+         :ok <- validate_event_type(event_type) do
+      Logger.info("EventSub webhook received",
+        event_type: event_type,
+        event_id: get_safe_event_id(event_data),
+        source: "twitch_cli",
+        payload_size: byte_size(:erlang.term_to_binary(params))
+      )
 
-    case {event_type, event_data} do
-      {type, data} when is_binary(type) and is_map(data) ->
-        Logger.info("EventSub webhook received",
-          event_type: type,
-          event_id: data["id"],
-          source: "twitch_cli"
+      case Server.Services.Twitch.EventHandler.process_event(event_type, event_data) do
+        :ok ->
+          json(conn, %{success: true, message: "Event processed"})
+
+        {:error, reason} ->
+          Logger.error("Event processing failed",
+            event_type: event_type,
+            reason: sanitize_error_reason(reason)
+          )
+
+          conn
+          |> put_status(:bad_request)
+          |> json(%{success: false, error: "Event processing failed"})
+      end
+    else
+      {:error, reason} ->
+        Logger.warning("Invalid EventSub webhook payload",
+          reason: reason,
+          remote_ip: get_client_ip(conn)
         )
-
-        case Server.Services.Twitch.EventHandler.process_event(type, data) do
-          :ok ->
-            json(conn, %{success: true, message: "Event processed"})
-
-          {:error, reason} ->
-            Logger.error("Event processing failed",
-              event_type: type,
-              reason: reason
-            )
-
-            conn
-            |> put_status(:bad_request)
-            |> json(%{success: false, error: "Event processing failed: #{reason}"})
-        end
-
-      _ ->
-        Logger.warning("Invalid EventSub webhook payload", params: params)
 
         conn
         |> put_status(:bad_request)
@@ -238,4 +247,108 @@ defmodule ServerWeb.TwitchController do
       400 => {"Bad Request", "application/json", Schemas.ErrorResponse}
     }
   )
+
+  # Private helper functions for webhook validation
+
+  # Maximum payload size: 1MB (Twitch EventSub payloads are typically < 10KB)
+  @max_payload_size 1_048_576
+
+  # Allowed EventSub event types (allowlist approach for security)
+  @allowed_event_types [
+    "stream.online",
+    "stream.offline",
+    "channel.follow",
+    "channel.subscribe",
+    "channel.subscription.gift",
+    "channel.cheer",
+    "channel.update",
+    "channel.chat.message",
+    "channel.chat.clear",
+    "channel.chat.message_delete",
+    "channel.goal.begin",
+    "channel.goal.progress",
+    "channel.goal.end",
+    "channel.raid",
+    "channel.channel_points_custom_reward_redemption.add",
+    "channel.poll.begin",
+    "channel.prediction.begin",
+    "channel.hype_train.begin",
+    "user.update",
+    "user.whisper.message"
+  ]
+
+  defp validate_webhook_payload(params) when is_map(params) do
+    payload_size = byte_size(:erlang.term_to_binary(params))
+
+    if payload_size > @max_payload_size do
+      {:error, "payload_too_large"}
+    else
+      # Basic structure validation
+      if Map.has_key?(params, "subscription") and Map.has_key?(params, "event") do
+        {:ok, params}
+      else
+        {:error, "missing_required_fields"}
+      end
+    end
+  end
+
+  defp validate_webhook_payload(_), do: {:error, "invalid_payload_type"}
+
+  defp extract_event_type(payload) do
+    case get_in(payload, ["subscription", "type"]) do
+      type when is_binary(type) ->
+        # Sanitize: remove null bytes and limit length
+        sanitized_type =
+          type
+          |> String.replace(<<0>>, "")
+          |> String.slice(0, 255)
+
+        {:ok, sanitized_type}
+
+      _ ->
+        {:error, "invalid_event_type"}
+    end
+  end
+
+  defp extract_event_data(payload) do
+    case payload["event"] do
+      data when is_map(data) ->
+        {:ok, data}
+
+      _ ->
+        {:error, "invalid_event_data"}
+    end
+  end
+
+  defp validate_event_type(event_type) do
+    if event_type in @allowed_event_types do
+      :ok
+    else
+      {:error, "unsupported_event_type"}
+    end
+  end
+
+  defp get_safe_event_id(event_data) when is_map(event_data) do
+    case event_data["id"] do
+      id when is_binary(id) -> String.slice(id, 0, 255)
+      _ -> "unknown"
+    end
+  end
+
+  defp get_safe_event_id(_), do: "unknown"
+
+  defp sanitize_error_reason(reason) when is_binary(reason) do
+    reason
+    |> String.replace(<<0>>, "")
+    |> String.slice(0, 500)
+  end
+
+  defp sanitize_error_reason(_reason), do: "processing_error"
+
+  defp get_client_ip(conn) do
+    case Plug.Conn.get_peer_data(conn) do
+      %{address: address} -> :inet.ntoa(address) |> to_string()
+      _ -> "unknown"
+    end
+  end
 end

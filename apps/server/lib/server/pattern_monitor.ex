@@ -128,7 +128,8 @@ defmodule Server.PatternMonitor do
     end
 
     # Update hourly stats
-    hour_key = DateTime.utc_now() |> DateTime.truncate(:hour)
+    current_time = DateTime.utc_now()
+    hour_key = DateTime.truncate(current_time, :hour)
     updated_hourly = update_hourly_stats(state.hourly_stats, hour_key, state)
 
     # Schedule next report
@@ -434,7 +435,8 @@ defmodule Server.PatternMonitor do
   end
 
   defp keep_recent_hours(hourly_stats, hours_to_keep) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-hours_to_keep, :hour)
+    current_utc = DateTime.utc_now()
+    cutoff = DateTime.add(current_utc, -hours_to_keep, :hour)
 
     hourly_stats
     |> Enum.filter(fn {hour, _} -> DateTime.compare(hour, cutoff) == :gt end)

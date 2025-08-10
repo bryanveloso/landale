@@ -121,7 +121,8 @@ defmodule Server.ActivityLog do
   """
   @spec get_recent_chat_messages(pos_integer()) :: [Event.t()]
   def get_recent_chat_messages(minutes \\ 30) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-minutes, :minute)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -minutes, :minute)
 
     from(e in Event,
       where: e.timestamp >= ^cutoff and e.event_type == "channel.chat.message",
@@ -200,7 +201,8 @@ defmodule Server.ActivityLog do
   """
   @spec get_activity_stats(pos_integer()) :: map()
   def get_activity_stats(hours \\ 24) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-hours, :hour)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -hours, :hour)
 
     from(e in Event,
       where: e.timestamp >= ^cutoff,
@@ -221,7 +223,8 @@ defmodule Server.ActivityLog do
   """
   @spec get_most_active_users(pos_integer(), pos_integer()) :: [%{user_login: String.t(), message_count: integer()}]
   def get_most_active_users(hours \\ 24, limit \\ 10) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-hours, :hour)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -hours, :hour)
 
     from(e in Event,
       where: e.timestamp >= ^cutoff and e.event_type == "channel.chat.message" and not is_nil(e.user_login),
@@ -240,7 +243,8 @@ defmodule Server.ActivityLog do
   """
   @spec delete_old_events(pos_integer()) :: {integer(), nil}
   def delete_old_events(days_to_keep \\ 90) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-days_to_keep, :day)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -days_to_keep, :day)
 
     from(e in Event,
       where: e.timestamp < ^cutoff

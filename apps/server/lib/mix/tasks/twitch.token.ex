@@ -345,7 +345,8 @@ defmodule Mix.Tasks.Twitch.Token do
     File.mkdir_p!(storage_dir)
 
     # Prepare token data for storage
-    expires_at = DateTime.utc_now() |> DateTime.add(token_data["expires_in"], :second)
+    current_utc = DateTime.utc_now()
+    expires_at = DateTime.add(current_utc, token_data["expires_in"], :second)
 
     scopes =
       case token_data["scope"] do
@@ -625,7 +626,8 @@ defmodule Mix.Tasks.Twitch.Token do
 
         case make_direct_token_request(@token_url, params) do
           {:ok, token_data} ->
-            new_expires_at = DateTime.utc_now() |> DateTime.add(token_data["expires_in"], :second)
+            current_utc = DateTime.utc_now()
+            new_expires_at = DateTime.add(current_utc, token_data["expires_in"], :second)
 
             updated_token_info = %{
               access_token: token_data["access_token"],

@@ -30,7 +30,7 @@ defmodule Server.Context do
 
       iex> list_contexts(limit: 10)
       [%Context{}, ...]
-      
+
       iex> list_contexts(session: "stream_2024_01_15")
       [%Context{}, ...]
   """
@@ -62,7 +62,7 @@ defmodule Server.Context do
 
       iex> create_context(%{started: DateTime.utc_now(), ended: DateTime.utc_now(), session: "stream_2024_01_15", transcript: "Hello world", duration: 120.0})
       {:ok, %Context{}}
-      
+
       iex> create_context(%{transcript: ""})
       {:error, %Ecto.Changeset{}}
   """
@@ -105,7 +105,8 @@ defmodule Server.Context do
   """
   @spec get_recent_contexts(pos_integer()) :: [Context.t()]
   def get_recent_contexts(minutes \\ 30) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-minutes, :minute)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -minutes, :minute)
 
     from(c in Context,
       where: c.started >= ^cutoff,
@@ -255,7 +256,8 @@ defmodule Server.Context do
   """
   @spec get_context_stats(pos_integer()) :: map()
   def get_context_stats(hours \\ 24) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-hours, :hour)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -hours, :hour)
 
     from(c in Context,
       where: c.started >= ^cutoff,
@@ -274,7 +276,8 @@ defmodule Server.Context do
   """
   @spec get_sentiment_distribution(pos_integer()) :: [%{sentiment: String.t(), count: integer()}]
   def get_sentiment_distribution(hours \\ 24) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-hours, :hour)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -hours, :hour)
 
     from(c in Context,
       where: c.started >= ^cutoff and not is_nil(c.sentiment),
@@ -289,7 +292,8 @@ defmodule Server.Context do
   """
   @spec get_popular_topics(pos_integer(), pos_integer()) :: [%{topic: String.t(), count: integer()}]
   def get_popular_topics(hours \\ 24, limit \\ 10) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-hours, :hour)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -hours, :hour)
 
     # Use PostgreSQL array functions to unnest topics and count them
     from(c in Context,
@@ -350,7 +354,8 @@ defmodule Server.Context do
   """
   @spec delete_old_contexts(pos_integer()) :: {integer(), nil}
   def delete_old_contexts(days_to_keep \\ 90) do
-    cutoff = DateTime.utc_now() |> DateTime.add(-days_to_keep, :day)
+    current_time = DateTime.utc_now()
+    cutoff = DateTime.add(current_time, -days_to_keep, :day)
 
     from(c in Context,
       where: c.started < ^cutoff
