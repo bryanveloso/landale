@@ -68,6 +68,7 @@ defmodule Server.OAuth2Client do
   require Logger
 
   alias Server.ExternalCall
+  alias Server.OAuthTypes.{TokenResponse, ValidationResponse}
 
   @type client_config :: %{
           auth_url: binary(),

@@ -291,9 +291,9 @@ defmodule Server.OAuthTokenManager do
 
             # Update token info
             new_token_info = %{
-              access_token: new_tokens.access_token,
-              refresh_token: new_tokens.refresh_token || refresh_token,
-              expires_at: calculate_expires_in(new_tokens.expires_in),
+              access_token: new_tokens[:access_token],
+              refresh_token: new_tokens[:refresh_token] || refresh_token,
+              expires_at: calculate_expires_in(new_tokens[:expires_in]),
               scopes: manager.token_info.scopes,
               user_id: manager.token_info.user_id,
               client_id: manager.oauth2_client.client_id
@@ -341,9 +341,12 @@ defmodule Server.OAuthTokenManager do
             # Update token info with validation data
             updated_token_info =
               Map.merge(manager.token_info, %{
-                user_id: validation_data.user_id,
+                user_id: validation_data[:user_id],
                 scopes:
-                  if(validation_data.scopes, do: MapSet.new(validation_data.scopes), else: manager.token_info.scopes)
+                  if(validation_data[:scopes],
+                    do: MapSet.new(validation_data[:scopes]),
+                    else: manager.token_info.scopes
+                  )
               })
 
             updated_manager = %{manager | token_info: updated_token_info}
