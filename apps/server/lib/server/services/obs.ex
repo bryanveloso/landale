@@ -35,7 +35,7 @@ defmodule Server.Services.OBS do
 
     supervisor_opts = [
       strategy: :one_for_one,
-      name: __MODULE__.Supervisor
+      name: __MODULE__
     ]
 
     case Supervisor.start_link(children, supervisor_opts) do
