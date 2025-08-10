@@ -124,104 +124,122 @@ defmodule Server.Services.Twitch.EventHandler do
   end
 
   defp get_event_specific_data("stream.online", event_data) do
+    # Use BoundaryConverter for consistent atom access
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      stream_id: event_data["id"],
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      stream_type: event_data["type"],
-      started_at: parse_datetime(event_data["started_at"])
+      stream_id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      stream_type: Map.get(data, :type),
+      started_at: parse_datetime(Map.get(data, :started_at))
     }
   end
 
   defp get_event_specific_data("stream.offline", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"]
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name)
     }
   end
 
   defp get_event_specific_data("channel.follow", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      user_id: event_data["user_id"],
-      user_login: event_data["user_login"],
-      user_name: event_data["user_name"],
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      followed_at: parse_datetime(event_data["followed_at"])
+      user_id: Map.get(data, :user_id),
+      user_login: Map.get(data, :user_login),
+      user_name: Map.get(data, :user_name),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      followed_at: parse_datetime(Map.get(data, :followed_at))
     }
   end
 
   defp get_event_specific_data("channel.subscribe", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      user_id: event_data["user_id"],
-      user_login: event_data["user_login"],
-      user_name: event_data["user_name"],
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      tier: event_data["tier"],
-      is_gift: event_data["is_gift"] || false
+      user_id: Map.get(data, :user_id),
+      user_login: Map.get(data, :user_login),
+      user_name: Map.get(data, :user_name),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      tier: Map.get(data, :tier),
+      is_gift: Map.get(data, :is_gift, false)
     }
   end
 
   defp get_event_specific_data("channel.subscription.gift", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      user_id: event_data["user_id"],
-      user_login: event_data["user_login"],
-      user_name: event_data["user_name"],
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      tier: event_data["tier"],
-      total: event_data["total"],
-      cumulative_total: event_data["cumulative_total"],
-      is_anonymous: event_data["is_anonymous"] || false
+      user_id: Map.get(data, :user_id),
+      user_login: Map.get(data, :user_login),
+      user_name: Map.get(data, :user_name),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      tier: Map.get(data, :tier),
+      total: Map.get(data, :total),
+      cumulative_total: Map.get(data, :cumulative_total),
+      is_anonymous: Map.get(data, :is_anonymous, false)
     }
   end
 
   defp get_event_specific_data("channel.cheer", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      user_id: event_data["user_id"],
-      user_login: event_data["user_login"],
-      user_name: event_data["user_name"],
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      is_anonymous: event_data["is_anonymous"] || false,
-      bits: event_data["bits"],
-      message: event_data["message"]
+      user_id: Map.get(data, :user_id),
+      user_login: Map.get(data, :user_login),
+      user_name: Map.get(data, :user_name),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      is_anonymous: Map.get(data, :is_anonymous, false),
+      bits: Map.get(data, :bits),
+      message: Map.get(data, :message)
     }
   end
 
   defp get_event_specific_data("channel.update", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
     %{
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      title: event_data["title"],
-      language: event_data["language"],
-      category_id: event_data["category_id"],
-      category_name: event_data["category_name"],
-      content_classification_labels: event_data["content_classification_labels"] || []
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      title: Map.get(data, :title),
+      language: Map.get(data, :language),
+      category_id: Map.get(data, :category_id),
+      category_name: Map.get(data, :category_name),
+      content_classification_labels: Map.get(data, :content_classification_labels, [])
     }
   end
 
   defp get_event_specific_data("channel.chat.message", event_data) do
-    fragments = event_data["message"]["fragments"] || []
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    message_data = Map.get(data, :message, %{})
+    fragments = Map.get(message_data, :fragments, [])
     {emotes, native_emotes} = extract_emotes_from_fragments(fragments)
 
     %{
-      message_id: event_data["message_id"],
-      broadcaster_user_id: event_data["broadcaster_user_id"],
-      broadcaster_user_login: event_data["broadcaster_user_login"],
-      broadcaster_user_name: event_data["broadcaster_user_name"],
-      user_id: event_data["chatter_user_id"],
-      user_login: event_data["chatter_user_login"],
-      user_name: event_data["chatter_user_name"],
-      message: event_data["message"]["text"],
+      message_id: Map.get(data, :message_id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      user_id: Map.get(data, :chatter_user_id),
+      user_login: Map.get(data, :chatter_user_login),
+      user_name: Map.get(data, :chatter_user_name),
+      message: Map.get(message_data, :text),
       fragments: fragments,
       emotes: emotes,
       native_emotes: native_emotes,
