@@ -325,7 +325,7 @@ defmodule Server.OAuth2Client do
            end,
            %{failure_threshold: 3, timeout_ms: 30_000}
          ) do
-      {:ok, result} -> result
+      {:ok, result} -> {:ok, result}
       {:error, :circuit_open} -> {:error, {:service_unavailable, "OAuth2 service circuit breaker is open"}}
       {:error, reason} -> {:error, reason}
     end
