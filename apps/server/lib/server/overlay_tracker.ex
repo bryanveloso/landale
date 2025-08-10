@@ -24,7 +24,11 @@ defmodule Server.OverlayTracker do
   Track an overlay channel join.
   """
   def track_overlay(socket_id, info) do
-    :ets.insert(@table_name, {socket_id, info})
+    # Check if table exists before attempting insert (prevents crash during startup/shutdown races)
+    if :ets.whereis(@table_name) != :undefined do
+      :ets.insert(@table_name, {socket_id, info})
+    end
+
     :ok
   end
 
@@ -32,7 +36,11 @@ defmodule Server.OverlayTracker do
   Remove an overlay channel tracking.
   """
   def untrack_overlay(socket_id) do
-    :ets.delete(@table_name, socket_id)
+    # Check if table exists before attempting delete (prevents crash during shutdown)
+    if :ets.whereis(@table_name) != :undefined do
+      :ets.delete(@table_name, socket_id)
+    end
+
     :ok
   end
 
