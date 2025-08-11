@@ -34,17 +34,8 @@ defmodule Server.TokenVault do
 
   @impl GenServer
   def init(config) do
-    # Get encryption key from environment
-    config =
-      Keyword.put(
-        config,
-        :ciphers,
-        default: {
-          Cloak.Ciphers.AES.GCM,
-          tag: "AES.GCM.V1", key: decode_key(System.get_env("LANDALE_ENCRYPTION_KEY")), iv_length: 12
-        }
-      )
-
+    # Config is already set from runtime.exs with CLOAK_SECRET_KEY
+    # Don't override it here
     {:ok, config}
   end
 
@@ -176,21 +167,6 @@ defmodule Server.TokenVault do
     case encrypt("test") do
       {:ok, _} -> true
       _ -> false
-    end
-  end
-
-  # Private functions
-
-  defp decode_key(nil) do
-    # Return nil if no key is set - will cause vault to fail gracefully
-    nil
-  end
-
-  defp decode_key(key) when is_binary(key) do
-    # Decode base64 key or use raw key if decoding fails
-    case Base.decode64(key) do
-      {:ok, decoded} -> decoded
-      :error -> key
     end
   end
 end
