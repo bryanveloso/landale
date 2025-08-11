@@ -39,17 +39,8 @@ defmodule ServerWeb.TelemetryChannel do
     # Emit telemetry for this channel join
     emit_joined_telemetry("dashboard:telemetry", socket)
 
-    # Send current health status immediately if available
-    # Handle test environment where HealthMonitorServer may not be started
-    try do
-      case Server.Health.HealthMonitorServer.get_current_status() do
-        nil -> :ok
-        status -> push(socket, "health_update", %{status: status, timestamp: System.system_time(:second)})
-      end
-    catch
-      # HealthMonitorServer not started (test environment)
-      :exit, {:noproc, _} -> :ok
-    end
+    # Schedule initial health status push after join completes
+    send(self(), :push_initial_health)
 
     # Start periodic telemetry updates (every 2 seconds)
     Process.send_after(self(), :broadcast_telemetry, 2_000)
@@ -105,6 +96,22 @@ defmodule ServerWeb.TelemetryChannel do
 
     # Schedule next broadcast
     Process.send_after(self(), :broadcast_telemetry, 2_000)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(:push_initial_health, socket) do
+    # Send current health status after join has completed
+    try do
+      case Server.Health.HealthMonitorServer.get_current_status() do
+        nil -> :ok
+        status -> push(socket, "health_update", %{status: status, timestamp: System.system_time(:second)})
+      end
+    catch
+      # HealthMonitorServer not started (test environment)
+      :exit, {:noproc, _} -> :ok
+    end
 
     {:noreply, socket}
   end

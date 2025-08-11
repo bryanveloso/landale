@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TelemetryRouteImport } from './routes/telemetry'
+import { Route as OauthRouteImport } from './routes/oauth'
 import { Route as IndexRouteImport } from './routes/index'
 
 const TelemetryRoute = TelemetryRouteImport.update({
   id: '/telemetry',
   path: '/telemetry',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthRoute = OauthRouteImport.update({
+  id: '/oauth',
+  path: '/oauth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,27 +31,31 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/oauth': typeof OauthRoute
   '/telemetry': typeof TelemetryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/oauth': typeof OauthRoute
   '/telemetry': typeof TelemetryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/oauth': typeof OauthRoute
   '/telemetry': typeof TelemetryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/telemetry'
+  fullPaths: '/' | '/oauth' | '/telemetry'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/telemetry'
-  id: '__root__' | '/' | '/telemetry'
+  to: '/' | '/oauth' | '/telemetry'
+  id: '__root__' | '/' | '/oauth' | '/telemetry'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  OauthRoute: typeof OauthRoute
   TelemetryRoute: typeof TelemetryRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/solid-router' {
       path: '/telemetry'
       fullPath: '/telemetry'
       preLoaderRoute: typeof TelemetryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oauth': {
+      id: '/oauth'
+      path: '/oauth'
+      fullPath: '/oauth'
+      preLoaderRoute: typeof OauthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,6 +87,7 @@ declare module '@tanstack/solid-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  OauthRoute: OauthRoute,
   TelemetryRoute: TelemetryRoute,
 }
 export const routeTree = rootRouteImport

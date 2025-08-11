@@ -122,5 +122,11 @@ defmodule ServerWeb.Router do
     # Activity Log events and analytics
     get "/activity/events", ActivityLogController, :events
     get "/activity/stats", ActivityLogController, :stats
+
+    # OAuth Management (NO AUTH - Tailscale secured)
+    get "/oauth/status", OAuthController, :status
+    get "/oauth/authorize", OAuthController, :authorize
+    get "/oauth/callback", OAuthController, :callback
+    post "/oauth/refresh", OAuthController, :refresh
   end
 end

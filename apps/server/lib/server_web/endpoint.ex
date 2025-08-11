@@ -85,8 +85,12 @@ defmodule ServerWeb.Endpoint do
     origins: [
       "http://localhost:5173",
       "http://localhost:5174",
+      "http://localhost:3000",
       "http://localhost:8008",
       "http://saya:8008",
+      "http://zelan:3000",
+      "http://zelan:5173",
+      "http://zelan:5174",
       "https://saya.tailnet-dffc.ts.net:5173",
       "https://zelan.tailnet-dffc.ts.net:5173",
       "https://demi.tailnet-dffc.ts.net:5173",
