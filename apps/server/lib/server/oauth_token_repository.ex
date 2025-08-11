@@ -193,6 +193,12 @@ defmodule Server.OAuthTokenRepository do
 
   defp parse_datetime(nil), do: nil
 
+  defp parse_datetime(%NaiveDateTime{} = naive) do
+    DateTime.from_naive!(naive, "Etc/UTC")
+  end
+
+  defp parse_datetime(%DateTime{} = datetime), do: datetime
+
   defp parse_datetime(datetime) when is_binary(datetime) do
     case DateTime.from_iso8601(datetime) do
       {:ok, dt, _} -> dt
@@ -200,7 +206,7 @@ defmodule Server.OAuthTokenRepository do
     end
   end
 
-  defp parse_datetime(datetime), do: datetime
+  defp parse_datetime(_), do: nil
 
   defp parse_scopes(nil), do: nil
   defp parse_scopes(scopes) when is_list(scopes), do: MapSet.new(scopes)
