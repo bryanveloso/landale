@@ -310,7 +310,7 @@ defmodule Server.OAuthMonitor do
       monitor.consecutive_failures >= @alert_threshold_failures ->
         :unhealthy
 
-      monitor.retry_count > 0 ->
+      monitor.retry_count > 0 or monitor.consecutive_failures > 0 ->
         :degraded
 
       token_expiring_soon?(monitor.token_expires_at) ->
@@ -321,7 +321,7 @@ defmodule Server.OAuthMonitor do
     end
   end
 
-  defp token_expiring_soon?(nil), do: true
+  defp token_expiring_soon?(nil), do: false
 
   defp token_expiring_soon?(expires_at) do
     case DateTime.diff(expires_at, DateTime.utc_now(), :minute) do
