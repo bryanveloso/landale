@@ -212,7 +212,9 @@ defmodule Server.OAuth2Client do
     case make_token_request(client, params) do
       {:ok, tokens} ->
         emit_telemetry(client, [:refresh, :success])
-        {:ok, tokens}
+        # Normalize the response to use 'scopes' instead of 'scope'
+        normalized_tokens = Map.put(tokens, :scopes, Map.get(tokens, :scope, []))
+        {:ok, normalized_tokens}
 
       {:error, reason} = error ->
         emit_telemetry(client, [:refresh, :failure], %{reason: inspect(reason)})
@@ -276,14 +278,17 @@ defmodule Server.OAuth2Client do
     service_name = "oauth2-#{uri.host}"
 
     # Use circuit breaker for token requests
-    case ExternalCall.http_request(
-           service_name,
-           fn ->
-             execute_token_request(client, params)
-           end,
-           %{failure_threshold: 3, timeout_ms: 30_000}
-         ) do
-      {:ok, result} -> result
+    result =
+      ExternalCall.http_request(
+        service_name,
+        fn ->
+          execute_token_request(client, params)
+        end,
+        %{failure_threshold: 3, timeout_ms: 30_000}
+      )
+
+    case result do
+      {:ok, tokens} -> {:ok, tokens}
       {:error, :circuit_open} -> {:error, {:service_unavailable, "OAuth2 service circuit breaker is open"}}
       {:error, reason} -> {:error, reason}
     end
@@ -318,14 +323,17 @@ defmodule Server.OAuth2Client do
     service_name = "oauth2-#{uri.host}"
 
     # Use circuit breaker for validation requests
-    case ExternalCall.http_request(
-           service_name,
-           fn ->
-             execute_validation_request(client, validate_url, access_token)
-           end,
-           %{failure_threshold: 3, timeout_ms: 30_000}
-         ) do
-      {:ok, result} -> {:ok, result}
+    result =
+      ExternalCall.http_request(
+        service_name,
+        fn ->
+          execute_validation_request(client, validate_url, access_token)
+        end,
+        %{failure_threshold: 3, timeout_ms: 30_000}
+      )
+
+    case result do
+      {:ok, validation} -> {:ok, validation}
       {:error, :circuit_open} -> {:error, {:service_unavailable, "OAuth2 service circuit breaker is open"}}
       {:error, reason} -> {:error, reason}
     end

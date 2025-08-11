@@ -42,14 +42,16 @@ defmodule Server.OAuthService do
 
   require Logger
 
-  alias Server.{CorrelationId, OAuthTokenManager}
+  alias Server.{CorrelationId, OAuthTokenManager, OAuthTokenRepository}
 
   # State structure
   defstruct [
     # Map of service_name => OAuthTokenManager state
     managers: %{},
     # Map of service_name => refresh timer reference
-    refresh_timers: %{}
+    refresh_timers: %{},
+    # Flag to track if migration has been attempted
+    migration_attempted: false
   ]
 
   # Client API
@@ -136,6 +138,10 @@ defmodule Server.OAuthService do
   def do_init(_opts) do
     # Initialize empty state first
     state = %__MODULE__{}
+
+    # Attempt to migrate from DETS to database if needed
+    state = maybe_migrate_from_dets(state)
+
     # Auto-register Twitch service if configuration is available
     # This is fast and synchronous - just creates in-memory manager
     final_state =
@@ -164,9 +170,9 @@ defmodule Server.OAuthService do
   end
 
   defp register_twitch_service(state, config) do
-    # Build proper keyword list for OAuthTokenManager
+    # Build proper keyword list for database-backed manager
     manager_opts = [
-      storage_key: :twitch_tokens,
+      service_name: :twitch,
       client_id: config.client_id,
       client_secret: config.client_secret,
       auth_url: config.auth_url,
@@ -177,7 +183,7 @@ defmodule Server.OAuthService do
 
     case OAuthTokenManager.new(manager_opts) do
       {:ok, manager} ->
-        # Load any existing tokens from storage
+        # Load any existing tokens from database
         manager = OAuthTokenManager.load_tokens(manager)
 
         # Update state with the new manager
@@ -247,7 +253,7 @@ defmodule Server.OAuthService do
       Process.cancel_timer(timer_ref)
     end)
 
-    # Close all DETS tables
+    # Close all managers (no-op for database backend)
     Enum.each(state.managers, fn {_service, manager} ->
       OAuthTokenManager.close(manager)
     end)
@@ -309,7 +315,7 @@ defmodule Server.OAuthService do
 
       # Create manager configuration
       manager_opts = [
-        storage_key: :"#{service_name}_tokens",
+        service_name: service_name,
         client_id: config.client_id,
         client_secret: config.client_secret,
         auth_url: config.auth_url,
@@ -500,7 +506,14 @@ defmodule Server.OAuthService do
           {:ok, updated_manager} ->
             # Update manager in state
             new_managers = Map.put(state.managers, service_name, updated_manager)
-            new_state = %{state | managers: new_managers}
+
+            # Reset retry count on successful refresh
+            new_retry_counts = Map.get(state, :retry_counts, %{}) |> Map.delete(service_name)
+
+            new_state =
+              state
+              |> Map.put(:managers, new_managers)
+              |> Map.put(:retry_counts, new_retry_counts)
 
             # Reschedule refresh
             new_state = maybe_schedule_refresh(new_state, service_name)
@@ -513,11 +526,35 @@ defmodule Server.OAuthService do
               error: inspect(reason)
             )
 
-            # Retry in 5 minutes
-            timer_ref = Process.send_after(self(), {:refresh_token, service_name}, 300_000)
-            new_timers = Map.put(state.refresh_timers, service_name, timer_ref)
+            # Implement exponential backoff with jitter
+            retry_count = Map.get(state, :retry_counts, %{}) |> Map.get(service_name, 0)
+            # 1 minute base delay
+            base_delay = 60_000
+            # 1 hour max delay
+            max_delay = 3_600_000
 
-            {:noreply, %{state | refresh_timers: new_timers}}
+            # Calculate exponential backoff with jitter
+            delay = min(base_delay * :math.pow(2, retry_count), max_delay)
+            # 10% jitter
+            jitter = :rand.uniform(trunc(delay * 0.1))
+            final_delay = trunc(delay + jitter)
+
+            Logger.info("Scheduling OAuth retry with exponential backoff",
+              service: service_name,
+              retry_count: retry_count + 1,
+              delay_ms: final_delay
+            )
+
+            timer_ref = Process.send_after(self(), {:refresh_token, service_name}, final_delay)
+            new_timers = Map.put(state.refresh_timers, service_name, timer_ref)
+            new_retry_counts = Map.put(Map.get(state, :retry_counts, %{}), service_name, retry_count + 1)
+
+            new_state =
+              state
+              |> Map.put(:refresh_timers, new_timers)
+              |> Map.put(:retry_counts, new_retry_counts)
+
+            {:noreply, new_state}
         end
     end
   end
@@ -588,6 +625,30 @@ defmodule Server.OAuthService do
         now = DateTime.utc_now()
         buffer_seconds = div(buffer_ms, 1000)
         DateTime.compare(now, DateTime.add(expires_at, -buffer_seconds, :second)) == :gt
+    end
+  end
+
+  defp maybe_migrate_from_dets(state) do
+    if state.migration_attempted do
+      state
+    else
+      Logger.info("Checking for DETS tokens to migrate to database")
+
+      case OAuthTokenRepository.migrate_from_dets() do
+        {:ok, :migrated} ->
+          Logger.info("Successfully migrated OAuth tokens from DETS to database")
+
+        {:ok, :no_tokens} ->
+          Logger.debug("No DETS tokens found to migrate")
+
+        {:error, reason} ->
+          Logger.warning("DETS migration check failed",
+            error: inspect(reason),
+            note: "This is normal if DETS file doesn't exist"
+          )
+      end
+
+      %{state | migration_attempted: true}
     end
   end
 end

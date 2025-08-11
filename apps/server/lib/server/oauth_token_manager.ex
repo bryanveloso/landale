@@ -1,57 +1,14 @@
 defmodule Server.OAuthTokenManager do
   @moduledoc """
-  Reusable OAuth2 token management with DETS persistence and auto-refresh.
+  Database-backed OAuth2 token management with auto-refresh.
 
-  Provides a standardized way to manage OAuth2 tokens with automatic refresh,
-  persistent storage using DETS, and telemetry integration. Designed to be
-  used by services that need OAuth2 authentication (e.g., Twitch, Discord, etc.).
-
-  ## Features
-
-  - Automatic token refresh before expiration
-  - DETS-based persistent storage
-  - Environment-aware storage paths (dev vs Docker)
-  - Telemetry integration for monitoring
-  - Graceful error handling and recovery
-
-  ## Usage
-
-      # Initialize token manager
-      {:ok, manager} = OAuthTokenManager.new(
-        storage_key: :twitch_tokens,
-        client_id: "your_client_id",
-        client_secret: "your_client_secret",
-        auth_url: "https://id.twitch.tv/oauth2/authorize",
-        token_url: "https://id.twitch.tv/oauth2/token",
-        validate_url: "https://id.twitch.tv/oauth2/validate",
-        telemetry_prefix: [:server, :twitch, :oauth]
-      )
-
-      # Load existing tokens
-      manager = OAuthTokenManager.load_tokens(manager)
-
-      # Get current valid token (auto-refreshes if needed)
-      case OAuthTokenManager.get_valid_token(manager) do
-        {:ok, token, updated_manager} ->
-          # Use token for API calls
-        {:error, reason} ->
-          # Handle token unavailable
-      end
-
-      # Manually refresh token
-      case OAuthTokenManager.refresh_token(manager) do
-        {:ok, updated_manager} ->
-          # Token refreshed successfully
-        {:error, reason} ->
-          # Refresh failed
-      end
+  Uses PostgreSQL for production-ready token storage instead of DETS.
+  Provides automatic token refresh, persistent storage, and telemetry integration.
   """
 
   require Logger
 
-  alias Server.Logging
-  alias Server.SafeTokenHandler
-  alias Server.TokenVault
+  alias Server.{Logging, OAuthAuditLog, OAuthTokenRepository, SafeTokenHandler}
 
   @behaviour Server.OAuthTokenManagerBehaviour
 
@@ -60,13 +17,12 @@ defmodule Server.OAuthTokenManager do
           refresh_token: binary() | nil,
           expires_at: DateTime.t() | nil,
           scopes: MapSet.t() | nil,
-          user_id: binary() | nil
+          user_id: binary() | nil,
+          client_id: binary() | nil
         }
 
   @type manager_state :: %{
-          storage_key: atom(),
-          storage_path: binary(),
-          dets_table: atom() | nil,
+          service_name: atom() | binary(),
           oauth2_client: Server.OAuth2Client.client_config(),
           token_info: token_info() | nil,
           refresh_buffer_ms: integer(),
@@ -77,33 +33,15 @@ defmodule Server.OAuthTokenManager do
   @default_refresh_buffer 300_000
 
   @doc """
-  Creates a new OAuth token manager.
-
-  ## Parameters
-  - `opts` - Configuration options
-    - `:storage_key` - Unique key for DETS storage (required)
-    - `:client_id` - OAuth2 client ID (required)
-    - `:client_secret` - OAuth2 client secret (required)
-    - `:auth_url` - OAuth2 authorization endpoint URL (required)
-    - `:token_url` - OAuth2 token endpoint URL (required)
-    - `:validate_url` - Token validation endpoint URL (optional)
-    - `:storage_path` - Custom storage path (optional, auto-detected)
-    - `:refresh_buffer_ms` - Refresh buffer time in milliseconds (default: 300000)
-    - `:telemetry_prefix` - Telemetry event prefix (default: [:server, :oauth])
-
-  ## Returns
-  - `{:ok, manager}` - Manager created successfully
-  - `{:error, reason}` - Creation failed
+  Creates a new database-backed OAuth token manager.
   """
   @spec new(keyword()) :: {:ok, manager_state()} | {:error, term()}
   def new(opts) do
-    with {:ok, storage_key} <- validate_required_opt(opts, :storage_key),
+    with {:ok, service_name} <- validate_required_opt(opts, :service_name),
          {:ok, client_id} <- validate_required_opt(opts, :client_id),
          {:ok, client_secret} <- validate_required_opt(opts, :client_secret),
          {:ok, auth_url} <- validate_required_opt(opts, :auth_url),
          {:ok, token_url} <- validate_required_opt(opts, :token_url) do
-      storage_path = Keyword.get(opts, :storage_path) || get_default_storage_path(storage_key)
-
       {:ok, oauth2_client} =
         Server.OAuth2Client.new(%{
           auth_url: auth_url,
@@ -114,9 +52,7 @@ defmodule Server.OAuthTokenManager do
         })
 
       manager = %{
-        storage_key: storage_key,
-        storage_path: storage_path,
-        dets_table: nil,
+        service_name: service_name,
         oauth2_client: oauth2_client,
         token_info: nil,
         refresh_buffer_ms: Keyword.get(opts, :refresh_buffer_ms, @default_refresh_buffer),
@@ -128,92 +64,89 @@ defmodule Server.OAuthTokenManager do
   end
 
   @doc """
-  Opens DETS storage and loads existing tokens with corruption detection and auto-recovery.
-
-  ## Parameters
-  - `manager` - Token manager state
-
-  ## Returns
-  - Updated manager with loaded tokens
+  Loads tokens from database.
   """
   @spec load_tokens(manager_state()) :: manager_state()
   def load_tokens(manager) do
-    # Ensure storage directory exists
-    storage_dir = Path.dirname(manager.storage_path)
-    File.mkdir_p!(storage_dir)
+    case OAuthTokenRepository.get_token(manager.service_name) do
+      {:ok, token} ->
+        token_info = %{
+          access_token: token.access_token,
+          refresh_token: token.refresh_token,
+          expires_at: token.expires_at,
+          scopes: if(token.scopes, do: MapSet.new(token.scopes), else: nil),
+          user_id: token.user_id,
+          client_id: token.client_id || manager.oauth2_client.client_id
+        }
 
-    # Try to open DETS table with corruption detection
-    case open_dets_with_recovery(manager) do
-      {:ok, table, token_info} ->
-        Logger.info("Tokens loaded from storage",
-          storage_key: manager.storage_key,
-          source: if(token_info, do: "dets", else: "empty")
+        Logger.info("Tokens loaded from database",
+          service: manager.service_name,
+          has_refresh: token.refresh_token != nil
         )
 
-        %{manager | dets_table: table, token_info: token_info}
+        # Audit log token access
+        OAuthAuditLog.log_event(:token_accessed, %{
+          service: manager.service_name,
+          user_id: token.user_id,
+          client_id: token.client_id
+        })
 
-      {:recovered, table, token_info} ->
-        Logger.info("Tokens recovered from JSON backup after DETS corruption",
-          storage_key: manager.storage_key
-        )
+        %{manager | token_info: token_info}
 
-        manager = %{manager | dets_table: table, token_info: token_info}
-        # Save recovered tokens back to DETS
-        save_tokens(manager)
+      {:error, :not_found} ->
+        Logger.info("No tokens found in database", service: manager.service_name)
         manager
 
       {:error, reason} ->
-        Logging.log_error("Token storage failed completely", reason,
-          storage_key: manager.storage_key,
-          path: manager.storage_path
-        )
-
+        Logging.log_error("Failed to load tokens from database", reason, service: manager.service_name)
         manager
     end
   end
 
   @doc """
-  Saves tokens to DETS storage using atomic operations to prevent corruption.
-
-  ## Parameters
-  - `manager` - Token manager state
-
-  ## Returns
-  - `:ok` - Tokens saved successfully
-  - `{:error, reason}` - Save failed
+  Saves tokens to database.
   """
   @spec save_tokens(manager_state()) :: :ok | {:error, term()}
   def save_tokens(manager) do
-    if manager.dets_table && manager.token_info do
-      # Always create JSON backup BEFORE attempting DETS write
-      # This ensures we have a reliable recovery point
-      case create_json_backup(manager) do
-        :ok ->
-          # Now attempt atomic DETS write
-          save_to_dets_atomically(manager)
+    if manager.token_info do
+      token_data = %{
+        access_token: manager.token_info.access_token,
+        refresh_token: manager.token_info.refresh_token,
+        expires_at: manager.token_info.expires_at,
+        scopes: if(manager.token_info.scopes, do: MapSet.to_list(manager.token_info.scopes), else: []),
+        user_id: manager.token_info.user_id,
+        client_id: manager.token_info.client_id || manager.oauth2_client.client_id
+      }
 
-        {:error, backup_reason} ->
-          Logger.error("JSON backup failed, skipping DETS write to prevent data loss",
-            storage_key: manager.storage_key,
-            error: backup_reason
+      case OAuthTokenRepository.save_token(manager.service_name, token_data) do
+        {:ok, _token} ->
+          Logger.debug("Tokens saved to database", service: manager.service_name)
+
+          # Audit log token storage
+          OAuthAuditLog.log_event(:token_stored, %{
+            service: manager.service_name,
+            user_id: manager.token_info.user_id,
+            client_id: manager.token_info.client_id,
+            has_refresh: manager.token_info.refresh_token != nil
+          })
+
+          :ok
+
+        {:error, reason} ->
+          Logger.error("Failed to save tokens to database",
+            service: manager.service_name,
+            error: inspect(reason)
           )
 
-          {:error, backup_reason}
+          {:error, reason}
       end
     else
-      {:error, :no_storage_or_token}
+      {:error, :no_token_to_save}
     end
   end
 
   @doc """
   Sets new token information.
-
-  ## Parameters
-  - `manager` - Token manager state
-  - `token_info` - New token information map
-
-  ## Returns
-  - Updated manager with new token info
   """
   @spec set_token(manager_state(), map()) :: manager_state()
   def set_token(manager, token_info) do
@@ -233,39 +166,25 @@ defmodule Server.OAuthTokenManager do
 
   @doc """
   Gets a valid access token, refreshing if necessary.
-
-  ## Parameters
-  - `manager` - Token manager state
-
-  ## Returns
-  - `{:ok, token, updated_manager}` - Valid token retrieved
-  - `{:error, reason}` - No valid token available
   """
   @spec get_valid_token(manager_state()) :: {:ok, map(), manager_state()} | {:error, term()}
   def get_valid_token(manager) do
     case manager.token_info do
       nil ->
-        Logger.debug("Token info unavailable", storage_key: manager.storage_key)
+        Logger.debug("Token info unavailable", service: manager.service_name)
         {:error, :no_token_available}
 
       token_info ->
         if token_needs_refresh?(token_info, manager.refresh_buffer_ms) do
           handle_token_refresh(manager, token_info)
         else
-          return_current_valid_token(manager, token_info)
+          {:ok, token_info, manager}
         end
     end
   end
 
   @doc """
   Refreshes the OAuth token using the refresh token.
-
-  ## Parameters
-  - `manager` - Token manager state
-
-  ## Returns
-  - `{:ok, updated_manager}` - Token refreshed successfully
-  - `{:error, reason}` - Refresh failed
   """
   @spec refresh_token(manager_state()) :: {:ok, manager_state()} | {:error, term()}
   def refresh_token(manager) do
@@ -273,31 +192,33 @@ defmodule Server.OAuthTokenManager do
       nil ->
         {:error, :no_token_for_refresh}
 
-      token_info when is_non_struct_map(token_info) and not is_map_key(token_info, :refresh_token) ->
-        {:error, :no_refresh_token}
-
-      token_info
-      when is_non_struct_map(token_info) and is_map_key(token_info, :refresh_token) and
-             token_info.refresh_token == nil ->
+      %{refresh_token: nil} ->
         {:error, :no_refresh_token}
 
       %{refresh_token: refresh_token} ->
-        Logger.info("Token refresh started", storage_key: manager.storage_key)
+        Logger.info("Token refresh started", service: manager.service_name)
         emit_telemetry(manager, [:refresh, :attempt])
 
         case Server.OAuth2Client.refresh_token(manager.oauth2_client, refresh_token) do
           {:ok, new_tokens} ->
-            Logger.info("Token refresh completed", storage_key: manager.storage_key)
+            Logger.info("Token refresh completed", service: manager.service_name)
             emit_telemetry(manager, [:refresh, :success])
 
-            # Normalize new tokens to ensure consistent access
+            # Audit log successful refresh
+            OAuthAuditLog.log_event(:token_refreshed, %{
+              service: manager.service_name,
+              user_id: manager.token_info.user_id,
+              client_id: manager.oauth2_client.client_id
+            })
+
+            # Normalize new tokens
             safe_tokens = SafeTokenHandler.normalize(new_tokens)
 
             # Update token info
             new_token_info = %{
               access_token: safe_tokens[:access_token],
               refresh_token: safe_tokens[:refresh_token] || refresh_token,
-              expires_at: calculate_expires_in(safe_tokens[:expires_in]),
+              expires_at: calculate_expires_at(safe_tokens[:expires_in]),
               scopes: manager.token_info.scopes,
               user_id: manager.token_info.user_id,
               client_id: manager.oauth2_client.client_id
@@ -309,9 +230,17 @@ defmodule Server.OAuthTokenManager do
             {:ok, updated_manager}
 
           {:error, reason} ->
-            Logging.log_error("Token refresh failed", inspect(reason), storage_key: manager.storage_key)
-
+            Logging.log_error("Token refresh failed", inspect(reason), service: manager.service_name)
             emit_telemetry(manager, [:refresh, :failure], %{reason: inspect(reason)})
+
+            # Audit log refresh failure
+            OAuthAuditLog.log_event(:refresh_failed, %{
+              service: manager.service_name,
+              user_id: manager.token_info.user_id,
+              client_id: manager.oauth2_client.client_id,
+              error: inspect(reason)
+            })
+
             {:error, reason}
         end
     end
@@ -319,36 +248,22 @@ defmodule Server.OAuthTokenManager do
 
   @doc """
   Validates the current access token.
-
-  ## Parameters
-  - `manager` - Token manager state
-  - `validate_url` - Token validation endpoint URL
-
-  ## Returns
-  - `{:ok, validation_data, updated_manager}` - Token is valid
-  - `{:error, reason}` - Token is invalid or validation failed
   """
   @spec validate_token(manager_state(), binary()) :: {:ok, map(), manager_state()} | {:error, term()}
-  def validate_token(manager, validate_url) do
+  def validate_token(manager, _validate_url) do
     case manager.token_info do
       nil ->
         {:error, :no_token_for_validation}
 
       %{access_token: access_token} ->
-        _headers = [
-          {"Authorization", "Bearer #{access_token}"},
-          {"Content-Type", "application/json"}
-        ]
-
         case Server.OAuth2Client.validate_token(manager.oauth2_client, access_token) do
           {:ok, validation_data} ->
-            # Normalize validation data to ensure consistent access
+            # Update token info with validation data
             safe_validation = SafeTokenHandler.normalize(validation_data)
 
-            # Update token info with validation data
             updated_token_info =
               Map.merge(manager.token_info, %{
-                user_id: safe_validation[:user_id],
+                user_id: safe_validation[:user_id] || manager.token_info.user_id,
                 scopes:
                   if(safe_validation[:scopes],
                     do: MapSet.new(safe_validation[:scopes]),
@@ -362,95 +277,19 @@ defmodule Server.OAuthTokenManager do
             {:ok, validation_data, updated_manager}
 
           {:error, reason} ->
-            Logging.log_error("Token validation failed", inspect(reason),
-              storage_key: manager.storage_key,
-              validate_url: validate_url,
-              access_token_prefix: String.slice(access_token, 0, 10)
-            )
-
+            Logging.log_error("Token validation failed", inspect(reason), service: manager.service_name)
             {:error, reason}
         end
     end
   end
 
   @doc """
-  Closes DETS storage.
-
-  ## Parameters
-  - `manager` - Token manager state
-
-  ## Returns
-  - `:ok`
+  No-op for database backend (no DETS to close).
   """
   @spec close(manager_state()) :: :ok
-  def close(manager) do
-    if manager.dets_table do
-      try do
-        # Sync before closing to ensure data is written
-        :dets.sync(manager.dets_table)
-        :dets.close(manager.dets_table)
-        Logger.debug("DETS table closed successfully", storage_key: manager.storage_key)
-      rescue
-        error ->
-          Logger.warning("DETS close failed",
-            error: inspect(error),
-            storage_key: manager.storage_key
-          )
-      end
-    end
-
-    :ok
-  end
+  def close(_manager), do: :ok
 
   # Private helper functions
-
-  defp handle_token_refresh(manager, token_info) do
-    Logger.info("Token refresh required",
-      storage_key: manager.storage_key,
-      expires_at: token_info.expires_at,
-      time_until_expiry: time_until_expiry(token_info.expires_at),
-      refresh_buffer_ms: manager.refresh_buffer_ms
-    )
-
-    case refresh_token(manager) do
-      {:ok, updated_manager} ->
-        Logger.info("Token refreshed successfully",
-          storage_key: manager.storage_key,
-          new_expires_at: updated_manager.token_info.expires_at
-        )
-
-        {:ok, updated_manager.token_info, updated_manager}
-
-      {:error, reason} ->
-        handle_failed_refresh(manager, token_info, reason)
-    end
-  end
-
-  defp handle_failed_refresh(manager, token_info, reason) do
-    Logger.warning("Token refresh failed, using existing token",
-      error: reason,
-      storage_key: manager.storage_key,
-      token_valid_for: time_until_expiry(token_info.expires_at)
-    )
-
-    # Return existing token if refresh fails but token is still valid
-    if DateTime.compare(token_info.expires_at, DateTime.utc_now()) == :gt do
-      Logger.info("Using existing valid token despite refresh failure", storage_key: manager.storage_key)
-      {:ok, token_info, manager}
-    else
-      {:error, reason}
-    end
-  end
-
-  defp return_current_valid_token(manager, token_info) do
-    Logger.debug("Token still valid",
-      storage_key: manager.storage_key,
-      time_until_expiry: time_until_expiry(token_info.expires_at)
-    )
-
-    # Return the full token info, not just the access token
-    {:ok, token_info, manager}
-  end
 
   defp validate_required_opt(opts, key) do
     case Keyword.get(opts, key) do
@@ -459,105 +298,35 @@ defmodule Server.OAuthTokenManager do
     end
   end
 
-  defp get_default_storage_path(storage_key) do
-    case Application.get_env(:server, :env, :dev) do
-      :prod ->
-        # Docker production environment
-        "/app/data/#{storage_key}.dets"
+  defp handle_token_refresh(manager, token_info) do
+    Logger.info("Token refresh required",
+      service: manager.service_name,
+      expires_at: token_info.expires_at
+    )
 
-      _ ->
-        # Development environment
-        data_dir = "./data"
-        File.mkdir_p!(data_dir)
-        Path.join(data_dir, "#{storage_key}.dets")
-    end
-  end
-
-  defp serialize_token(token_info) do
-    base_map = %{
-      access_token: token_info.access_token,
-      refresh_token: token_info.refresh_token,
-      expires_at: token_info.expires_at && DateTime.to_iso8601(token_info.expires_at),
-      scopes: token_info.scopes && MapSet.to_list(token_info.scopes),
-      user_id: token_info.user_id
-    }
-
-    # Encrypt sensitive fields
-    case TokenVault.encrypt_token_map(base_map) do
-      {:ok, encrypted_map} ->
-        encrypted_map
-
-      {:error, reason} ->
-        Logger.error("Token encryption failed, storing in plaintext (SECURITY RISK)",
-          error: inspect(reason)
+    case refresh_token(manager) do
+      {:ok, updated_manager} ->
+        Logger.info("Token refreshed successfully",
+          service: manager.service_name,
+          new_expires_at: updated_manager.token_info.expires_at
         )
 
-        base_map
+        {:ok, updated_manager.token_info, updated_manager}
+
+      {:error, reason} ->
+        Logger.warning("Token refresh failed, using existing token",
+          error: reason,
+          service: manager.service_name
+        )
+
+        # Return existing token if still valid
+        if token_info.expires_at && DateTime.compare(token_info.expires_at, DateTime.utc_now()) == :gt do
+          {:ok, token_info, manager}
+        else
+          {:error, reason}
+        end
     end
   end
-
-  defp deserialize_token(token_data) do
-    # Decrypt sensitive fields first
-    decrypted_data =
-      case TokenVault.decrypt_token_map(token_data) do
-        {:ok, decrypted} ->
-          decrypted
-
-        {:error, reason} ->
-          Logger.warning("Token decryption failed, attempting plaintext read",
-            error: inspect(reason)
-          )
-
-          token_data
-      end
-
-    %{
-      access_token: decrypted_data.access_token,
-      refresh_token: decrypted_data.refresh_token,
-      expires_at: decrypted_data.expires_at && parse_stored_datetime(decrypted_data.expires_at),
-      scopes: decrypted_data.scopes && MapSet.new(decrypted_data.scopes),
-      user_id: decrypted_data.user_id
-    }
-  end
-
-  defp parse_expires_at(%{expires_at: expires_at}) when is_integer(expires_at) do
-    DateTime.from_unix!(expires_at)
-  end
-
-  defp parse_expires_at(%{"expires_at" => expires_at}) when is_integer(expires_at) do
-    DateTime.from_unix!(expires_at)
-  end
-
-  defp parse_expires_at(%{expires_in: expires_in}) when is_integer(expires_in) do
-    DateTime.add(DateTime.utc_now(), expires_in, :second)
-  end
-
-  defp parse_expires_at(%{"expires_in" => expires_in}) when is_integer(expires_in) do
-    DateTime.add(DateTime.utc_now(), expires_in, :second)
-  end
-
-  defp parse_expires_at(_), do: nil
-
-  defp parse_scopes(%{scopes: scopes}) when is_list(scopes), do: MapSet.new(scopes)
-  defp parse_scopes(%{"scopes" => scopes}) when is_list(scopes), do: MapSet.new(scopes)
-  defp parse_scopes(%{scope: scope}) when is_binary(scope), do: MapSet.new(String.split(scope, " "))
-  defp parse_scopes(%{"scope" => scope}) when is_binary(scope), do: MapSet.new(String.split(scope, " "))
-  defp parse_scopes(_), do: nil
-
-  defp calculate_expires_in(expires_in) when is_integer(expires_in) do
-    DateTime.add(DateTime.utc_now(), expires_in, :second)
-  end
-
-  defp calculate_expires_in(_), do: nil
-
-  defp parse_stored_datetime(datetime_string) when is_binary(datetime_string) do
-    case DateTime.from_iso8601(datetime_string) do
-      {:ok, datetime, _offset} -> datetime
-      {:error, _reason} -> nil
-    end
-  end
-
-  defp parse_stored_datetime(_), do: nil
 
   defp token_needs_refresh?(token_info, buffer_ms) do
     case token_info.expires_at do
@@ -570,233 +339,38 @@ defmodule Server.OAuthTokenManager do
     end
   end
 
+  defp parse_expires_at(%{expires_at: expires_at}) when is_integer(expires_at) do
+    DateTime.from_unix!(expires_at)
+  end
+
+  defp parse_expires_at(%{"expires_at" => expires_at}) when is_integer(expires_at) do
+    DateTime.from_unix!(expires_at)
+  end
+
+  defp parse_expires_at(%{expires_in: expires_in}) when is_integer(expires_in) do
+    calculate_expires_at(expires_in)
+  end
+
+  defp parse_expires_at(%{"expires_in" => expires_in}) when is_integer(expires_in) do
+    calculate_expires_at(expires_in)
+  end
+
+  defp parse_expires_at(_), do: nil
+
+  defp calculate_expires_at(expires_in) when is_integer(expires_in) do
+    DateTime.add(DateTime.utc_now(), expires_in, :second)
+  end
+
+  defp calculate_expires_at(_), do: nil
+
+  defp parse_scopes(%{scopes: scopes}) when is_list(scopes), do: MapSet.new(scopes)
+  defp parse_scopes(%{"scopes" => scopes}) when is_list(scopes), do: MapSet.new(scopes)
+  defp parse_scopes(%{scope: scope}) when is_binary(scope), do: MapSet.new(String.split(scope, " "))
+  defp parse_scopes(%{"scope" => scope}) when is_binary(scope), do: MapSet.new(String.split(scope, " "))
+  defp parse_scopes(_), do: nil
+
   defp emit_telemetry(manager, event_suffix, metadata \\ %{}) do
     event = manager.telemetry_prefix ++ event_suffix
-    :telemetry.execute(event, %{}, Map.put(metadata, :storage_key, manager.storage_key))
-  end
-
-  defp time_until_expiry(nil), do: "unknown"
-
-  defp time_until_expiry(expires_at) do
-    case DateTime.compare(expires_at, DateTime.utc_now()) do
-      :gt ->
-        diff = DateTime.diff(expires_at, DateTime.utc_now(), :second)
-        "#{diff} seconds"
-
-      _ ->
-        "expired"
-    end
-  end
-
-  # Corruption-resistant DETS operations
-
-  # Opens DETS with corruption detection and automatic recovery
-  defp open_dets_with_recovery(manager) do
-    dets_path = String.to_charlist(manager.storage_path)
-
-    case :dets.open_file(manager.storage_key, file: dets_path) do
-      {:ok, table} ->
-        # Test if DETS is readable and has valid structure
-        case validate_dets_integrity(table) do
-          {:ok, token_info} ->
-            {:ok, table, token_info}
-
-          {:corrupted, _reason} ->
-            Logger.warning("DETS corruption detected, attempting recovery from JSON backup",
-              storage_key: manager.storage_key
-            )
-
-            :dets.close(table)
-            attempt_recovery_from_backup(manager)
-        end
-
-      {:error, {:corrupt_file, _}} ->
-        Logger.warning("DETS file corrupted, attempting recovery from JSON backup",
-          storage_key: manager.storage_key
-        )
-
-        attempt_recovery_from_backup(manager)
-
-      {:error, reason} ->
-        Logger.error("DETS open failed",
-          storage_key: manager.storage_key,
-          error: inspect(reason)
-        )
-
-        {:error, reason}
-    end
-  end
-
-  # Validates DETS table integrity by attempting to read the token
-  defp validate_dets_integrity(table) do
-    try do
-      case :dets.lookup(table, :token) do
-        [{:token, token_data}] when is_non_struct_map(token_data) ->
-          {:ok, deserialize_token(token_data)}
-
-        [] ->
-          {:ok, nil}
-
-        invalid_data ->
-          Logger.warning("Invalid token data structure in DETS", data: inspect(invalid_data))
-          {:corrupted, :invalid_structure}
-      end
-    rescue
-      error ->
-        Logger.warning("DETS read failed during integrity check", error: inspect(error))
-        {:corrupted, error}
-    end
-  end
-
-  # Attempts to recover from JSON backup after DETS corruption
-  defp attempt_recovery_from_backup(manager) do
-    backup_file = Path.join(Path.dirname(manager.storage_path), "#{manager.storage_key}_backup.json")
-
-    if File.exists?(backup_file) do
-      try do
-        json_data = File.read!(backup_file)
-        backup_data = JSON.decode!(json_data)
-
-        # Decrypt and convert backup data to token_info
-        decrypted_data =
-          case TokenVault.decrypt_token_map(backup_data) do
-            {:ok, decrypted} -> decrypted
-            {:error, _} -> backup_data
-          end
-
-        token_info = %{
-          access_token: decrypted_data["access_token"],
-          refresh_token: decrypted_data["refresh_token"],
-          expires_at: decrypted_data["expires_at"] && parse_stored_datetime(decrypted_data["expires_at"]),
-          scopes: decrypted_data["scopes"] && MapSet.new(decrypted_data["scopes"]),
-          user_id: decrypted_data["user_id"]
-        }
-
-        # Create new DETS file
-        # Remove corrupted file
-        File.rm(manager.storage_path)
-
-        case :dets.open_file(manager.storage_key, file: String.to_charlist(manager.storage_path)) do
-          {:ok, table} ->
-            {:recovered, table, token_info}
-
-          {:error, reason} ->
-            Logger.error("Failed to create new DETS file after recovery attempt",
-              storage_key: manager.storage_key,
-              error: inspect(reason)
-            )
-
-            {:error, reason}
-        end
-      rescue
-        error ->
-          Logger.error("JSON backup recovery failed",
-            storage_key: manager.storage_key,
-            backup_file: backup_file,
-            error: inspect(error)
-          )
-
-          {:error, {:backup_recovery_failed, error}}
-      end
-    else
-      Logger.error("No JSON backup found for recovery",
-        storage_key: manager.storage_key,
-        backup_file: backup_file
-      )
-
-      {:error, :no_backup_available}
-    end
-  end
-
-  # Saves to DETS atomically to prevent corruption
-  defp save_to_dets_atomically(manager) do
-    serialized = serialize_token(manager.token_info)
-
-    try do
-      # Insert the data
-      case :dets.insert(manager.dets_table, {:token, serialized}) do
-        :ok ->
-          # Force sync to disk immediately
-          case :dets.sync(manager.dets_table) do
-            :ok ->
-              Logger.debug("Tokens saved and synced to DETS storage", storage_key: manager.storage_key)
-              :ok
-
-            {:error, sync_reason} ->
-              Logger.error("DETS sync failed, token may be lost",
-                storage_key: manager.storage_key,
-                error: sync_reason
-              )
-
-              {:error, sync_reason}
-          end
-
-        {:error, reason} ->
-          Logger.error("DETS insert failed",
-            storage_key: manager.storage_key,
-            error: reason
-          )
-
-          {:error, reason}
-      end
-    rescue
-      error ->
-        Logger.error("DETS write operation crashed",
-          storage_key: manager.storage_key,
-          error: inspect(error)
-        )
-
-        {:error, error}
-    end
-  end
-
-  # Creates an automatic JSON backup to prevent DETS corruption data loss
-  defp create_json_backup(manager) do
-    try do
-      base_data = %{
-        access_token: manager.token_info.access_token,
-        refresh_token: manager.token_info.refresh_token,
-        expires_at: manager.token_info.expires_at && DateTime.to_iso8601(manager.token_info.expires_at),
-        scopes: manager.token_info.scopes && MapSet.to_list(manager.token_info.scopes),
-        user_id: manager.token_info.user_id,
-        backup_timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
-      }
-
-      # Encrypt sensitive fields in backup
-      backup_data =
-        case TokenVault.encrypt_token_map(base_data) do
-          {:ok, encrypted} ->
-            encrypted
-
-          {:error, reason} ->
-            Logger.error("Backup encryption failed, storing in plaintext (SECURITY RISK)",
-              error: inspect(reason)
-            )
-
-            base_data
-        end
-
-      # Create backup file path
-      storage_dir = Path.dirname(manager.storage_path)
-      backup_file = Path.join(storage_dir, "#{manager.storage_key}_backup.json")
-
-      json_data = JSON.encode!(backup_data)
-      File.write!(backup_file, json_data)
-
-      Logger.debug("Token backup created",
-        storage_key: manager.storage_key,
-        backup_file: backup_file
-      )
-
-      :ok
-    rescue
-      error ->
-        Logger.error("Token backup failed",
-          error: inspect(error),
-          storage_key: manager.storage_key
-        )
-
-        {:error, error}
-    end
+    :telemetry.execute(event, %{}, Map.put(metadata, :service, manager.service_name))
   end
 end
