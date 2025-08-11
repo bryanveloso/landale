@@ -153,7 +153,7 @@ defmodule Server.PatternMonitor do
       :telemetry.attach(
         handler_id,
         event,
-        {__MODULE__, :handle_telemetry},
+        &__MODULE__.handle_telemetry/4,
         nil
       )
     end)

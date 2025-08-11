@@ -119,7 +119,7 @@ defmodule Server.ConnectionManagerTelemetry do
     :telemetry.attach_many(
       "connection-manager-log-handler",
       events,
-      {__MODULE__, :handle_event},
+      &__MODULE__.handle_event/4,
       nil
     )
   end
