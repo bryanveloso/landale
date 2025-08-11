@@ -156,10 +156,13 @@ defmodule Server.DataAccessGuard do
     # Attempt validation
     validation_result =
       try do
+        # Ensure module is loaded before checking exports
+        Code.ensure_loaded(schema_module)
+
         if function_exported?(schema_module, :validate, 1) do
           schema_module.validate(data)
         else
-          {:error, {:schema_error, "#{schema_module} does not export validate/1"}}
+          {:error, {:schema_error, "#{inspect(schema_module)} does not export validate/1"}}
         end
       rescue
         error ->

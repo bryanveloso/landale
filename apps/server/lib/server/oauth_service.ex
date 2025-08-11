@@ -415,10 +415,23 @@ defmodule Server.OAuthService do
             # Reschedule refresh
             new_state = maybe_schedule_refresh(new_state, service_name)
 
+            # Track successful refresh in monitor
+            if Process.whereis(Server.OAuthMonitor) do
+              Server.OAuthMonitor.record_refresh_success(
+                service_name,
+                updated_manager.token_info.expires_at
+              )
+            end
+
             # Return the refreshed token info
             {:reply, {:ok, updated_manager.token_info}, new_state}
 
-          {:error, _reason} = error ->
+          {:error, reason} = error ->
+            # Track failed refresh in monitor
+            if Process.whereis(Server.OAuthMonitor) do
+              Server.OAuthMonitor.record_refresh_failure(service_name, reason)
+            end
+
             {:reply, error, state}
         end
     end
@@ -544,6 +557,11 @@ defmodule Server.OAuthService do
               retry_count: retry_count + 1,
               delay_ms: final_delay
             )
+
+            # Track retry count in monitor
+            if Process.whereis(Server.OAuthMonitor) do
+              Server.OAuthMonitor.record_retry_count(service_name, retry_count + 1)
+            end
 
             timer_ref = Process.send_after(self(), {:refresh_token, service_name}, final_delay)
             new_timers = Map.put(state.refresh_timers, service_name, timer_ref)

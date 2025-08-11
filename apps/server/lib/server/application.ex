@@ -69,6 +69,8 @@ defmodule Server.Application do
             {Server.SubscriptionMonitor, [storage: :subscriptions]},
             # OAuth service (must start before services that depend on it)
             Server.OAuthService,
+            # OAuth monitoring and alerting
+            Server.OAuthMonitor,
             # Services (must start before health monitor that checks them)
             Server.Services.OBS,
             Server.Services.Twitch,
