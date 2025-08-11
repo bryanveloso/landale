@@ -193,62 +193,9 @@ defmodule ServerWeb.TelemetryChannel do
   end
 
   defp gather_service_metrics do
-    services = [
-      {:obs, Server.Services.OBS},
-      {:twitch, Server.Services.Twitch},
-      {:phononmaser, {Server.HTTPServiceAdapter, get_service_health_url(:phononmaser)}},
-      {:seed, {Server.HTTPServiceAdapter, get_service_health_url(:seed)}}
-    ]
-
-    Map.new(services, fn {name, service_spec} ->
-      status =
-        case service_spec do
-          {_adapter_module, nil} ->
-            # Handle missing configuration
-            {:error, "Service URL not configured"}
-
-          {adapter_module, url} ->
-            adapter_module.get_status(url)
-
-          service_module ->
-            # Add timeout protection for service calls
-            try do
-              GenServer.call(service_module, :get_service_status, 5000)
-            rescue
-              _ ->
-                {:error, "Service unavailable"}
-            catch
-              :exit, {:noproc, _} ->
-                Logger.debug("Service not started", service: name)
-                {:error, "Service not started"}
-
-              :exit, {:timeout, _} ->
-                Logger.warning("Service status timeout", service: name)
-                {:error, "Service status timeout"}
-
-              :exit, _ ->
-                {:error, "Service error"}
-            end
-        end
-
-      formatted_status =
-        case status do
-          {:ok, data} ->
-            Map.merge(%{connected: true, phoenix_reachable: true}, data)
-
-          {:error, reason} ->
-            # Determine if this is a Phoenix connectivity issue
-            phoenix_issue = reason in [:econnrefused, :timeout, "Connection timed out", "Service unreachable"]
-
-            %{
-              connected: false,
-              error: sanitize_error(reason),
-              phoenix_reachable: not phoenix_issue
-            }
-        end
-
-      {name, formatted_status}
-    end)
+    # DISABLED - OBS is a Supervisor not a GenServer, this was crashing the server
+    # Return empty map to prevent crashes
+    %{}
   end
 
   defp gather_performance_metrics do

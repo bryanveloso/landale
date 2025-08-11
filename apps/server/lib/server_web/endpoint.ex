@@ -68,14 +68,15 @@ defmodule ServerWeb.Endpoint do
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
-  # SSL enforcement in production only
-  if Application.compile_env(:server, :env) == :prod do
-    plug Plug.SSL,
-      rewrite_on: [:x_forwarded_proto],
-      host: nil,
-      hsts: true,
-      preload: true
-  end
+  # SSL enforcement disabled for Tailscale network
+  # Tailscale provides network-level security
+  # if Application.compile_env(:server, :env) == :prod do
+  #   plug Plug.SSL,
+  #     rewrite_on: [:x_forwarded_proto],
+  #     host: nil,
+  #     hsts: true,
+  #     preload: true
+  # end
 
   # Additional security headers
   plug :put_secure_headers
