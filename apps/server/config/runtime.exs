@@ -157,7 +157,7 @@ if config_env() == :prod do
   config :server, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :server, ServerWeb.Endpoint,
-    url: [host: host, port: 443, scheme: "https"],
+    url: [host: host, port: port, scheme: "http"],
     http: [
       ip: parse_bind_ip.(System.get_env("BIND_IP", "0.0.0.0")),
       port: port
