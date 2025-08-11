@@ -20,7 +20,7 @@ defmodule Server.OAuthToken do
     field :client_id, :string
     field :encrypted, :boolean, default: true
 
-    timestamps()
+    timestamps(type: :utc_datetime)
   end
 
   @doc """
