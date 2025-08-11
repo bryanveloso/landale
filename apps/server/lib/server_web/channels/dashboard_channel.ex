@@ -38,12 +38,25 @@ defmodule ServerWeb.DashboardChannel do
 
   use ServerWeb.ChannelBase
 
+  # Backpressure and timeout configuration
+  # 5 seconds for service calls
+  @service_call_timeout 5_000
+  # Max concurrent requests per client
+  @max_concurrent_requests 10
+  # 10 second sliding window
+  @request_window_ms 10_000
+  # Max 50 requests per 10-second window
+  @max_requests_per_window 50
+
   @impl true
   def join("dashboard:" <> room_id, _payload, socket) do
     socket =
       socket
       |> setup_correlation_id()
       |> assign(:room_id, room_id)
+      |> assign(:concurrent_requests, 0)
+      |> assign(:request_history, [])
+      |> assign(:last_cleanup, System.system_time(:millisecond))
 
     # Subscribe to relevant PubSub topics for real-time updates
     subscribe_to_topics([
@@ -149,127 +162,359 @@ defmodule ServerWeb.DashboardChannel do
 
   @impl true
   def handle_in("obs:get_status", _payload, socket) do
-    correlation_id = socket.assigns.correlation_id
+    with {:ok, socket} <- check_backpressure(socket, "obs:get_status"),
+         {:ok, socket} <- increment_concurrent_requests(socket) do
+      correlation_id = socket.assigns.correlation_id
 
-    CorrelationId.with_context(correlation_id, fn ->
-      # Forward request to OBS service
-      case Server.Services.OBS.get_status() do
-        {:ok, status} ->
-          {:ok, response} = ResponseBuilder.success(status)
-          {:reply, {:ok, response}, socket}
+      CorrelationId.with_context(correlation_id, fn ->
+        # Forward request to OBS service with timeout protection
+        result =
+          call_service_with_timeout(fn ->
+            Server.Services.OBS.get_status()
+          end)
 
-        {:error, %Server.ServiceError{} = error} ->
-          Logger.warning("OBS status request failed",
-            reason: error.reason,
-            message: error.message
-          )
+        socket = decrement_concurrent_requests(socket)
 
-          {:error, response} = ResponseBuilder.error("service_error", error.message)
-          {:reply, {:error, response}, socket}
+        case result do
+          {:ok, status} ->
+            {:ok, response} = ResponseBuilder.success(status)
+            {:reply, {:ok, response}, socket}
 
-        {:error, reason} ->
-          Logger.warning("OBS status request failed", reason: inspect(reason))
-          {:error, response} = ResponseBuilder.error("service_error", inspect(reason))
-          {:reply, {:error, response}, socket}
-      end
-    end)
+          {:error, :timeout} ->
+            Logger.warning("OBS status request timed out",
+              timeout_ms: @service_call_timeout
+            )
+
+            {:error, response} = ResponseBuilder.error("service_timeout", "Service call timed out")
+            {:reply, {:error, response}, socket}
+
+          {:error, %Server.ServiceError{} = error} ->
+            Logger.warning("OBS status request failed",
+              reason: error.reason,
+              message: error.message
+            )
+
+            {:error, response} = ResponseBuilder.error("service_error", error.message)
+            {:reply, {:error, response}, socket}
+
+          {:error, reason} ->
+            Logger.warning("OBS status request failed", reason: inspect(reason))
+            {:error, response} = ResponseBuilder.error("service_error", inspect(reason))
+            {:reply, {:error, response}, socket}
+        end
+      end)
+    else
+      {:error, reason} ->
+        {:error, response} = ResponseBuilder.error("backpressure", reason)
+        {:reply, {:error, response}, socket}
+    end
   end
 
   @impl true
   def handle_in("obs:start_streaming", _payload, socket) do
-    case Server.Services.OBS.start_streaming() do
-      :ok ->
-        {:ok, response} = ResponseBuilder.success(%{operation: "start_streaming"})
-        {:reply, {:ok, response}, socket}
+    with {:ok, socket} <- check_backpressure(socket, "obs:start_streaming"),
+         {:ok, socket} <- increment_concurrent_requests(socket) do
+      result =
+        call_service_with_timeout(fn ->
+          Server.Services.OBS.start_streaming()
+        end)
 
+      socket = decrement_concurrent_requests(socket)
+
+      case result do
+        :ok ->
+          {:ok, response} = ResponseBuilder.success(%{operation: "start_streaming"})
+          {:reply, {:ok, response}, socket}
+
+        {:error, :timeout} ->
+          Logger.warning("OBS start streaming timed out",
+            timeout_ms: @service_call_timeout
+          )
+
+          {:error, response} = ResponseBuilder.error("service_timeout", "Service call timed out")
+          {:reply, {:error, response}, socket}
+
+        {:error, reason} ->
+          Logger.warning("OBS start streaming failed", reason: inspect(reason))
+          {:error, response} = ResponseBuilder.error("operation_failed", inspect(reason))
+          {:reply, {:error, response}, socket}
+      end
+    else
       {:error, reason} ->
-        {:error, response} = ResponseBuilder.error("operation_failed", reason)
+        {:error, response} = ResponseBuilder.error("backpressure", reason)
         {:reply, {:error, response}, socket}
     end
   end
 
   @impl true
   def handle_in("obs:stop_streaming", _payload, socket) do
-    case Server.Services.OBS.stop_streaming() do
-      :ok ->
-        {:ok, response} = ResponseBuilder.success(%{operation: "stop_streaming"})
-        {:reply, {:ok, response}, socket}
+    with {:ok, socket} <- check_backpressure(socket, "obs:stop_streaming"),
+         {:ok, socket} <- increment_concurrent_requests(socket) do
+      result =
+        call_service_with_timeout(fn ->
+          Server.Services.OBS.stop_streaming()
+        end)
 
+      socket = decrement_concurrent_requests(socket)
+
+      case result do
+        :ok ->
+          {:ok, response} = ResponseBuilder.success(%{operation: "stop_streaming"})
+          {:reply, {:ok, response}, socket}
+
+        {:error, :timeout} ->
+          Logger.warning("OBS stop streaming timed out",
+            timeout_ms: @service_call_timeout
+          )
+
+          {:error, response} = ResponseBuilder.error("service_timeout", "Service call timed out")
+          {:reply, {:error, response}, socket}
+
+        {:error, reason} ->
+          Logger.warning("OBS stop streaming failed", reason: inspect(reason))
+          {:error, response} = ResponseBuilder.error("operation_failed", inspect(reason))
+          {:reply, {:error, response}, socket}
+      end
+    else
       {:error, reason} ->
-        {:error, response} = ResponseBuilder.error("operation_failed", reason)
+        {:error, response} = ResponseBuilder.error("backpressure", reason)
         {:reply, {:error, response}, socket}
     end
   end
 
   @impl true
   def handle_in("obs:start_recording", _payload, socket) do
-    case Server.Services.OBS.start_recording() do
-      :ok ->
-        {:ok, response} = ResponseBuilder.success(%{operation: "start_recording"})
-        {:reply, {:ok, response}, socket}
+    with {:ok, socket} <- check_backpressure(socket, "obs:start_recording"),
+         {:ok, socket} <- increment_concurrent_requests(socket) do
+      result =
+        call_service_with_timeout(fn ->
+          Server.Services.OBS.start_recording()
+        end)
 
+      socket = decrement_concurrent_requests(socket)
+
+      case result do
+        :ok ->
+          {:ok, response} = ResponseBuilder.success(%{operation: "start_recording"})
+          {:reply, {:ok, response}, socket}
+
+        {:error, :timeout} ->
+          Logger.warning("OBS start recording timed out",
+            timeout_ms: @service_call_timeout
+          )
+
+          {:error, response} = ResponseBuilder.error("service_timeout", "Service call timed out")
+          {:reply, {:error, response}, socket}
+
+        {:error, reason} ->
+          Logger.warning("OBS start recording failed", reason: inspect(reason))
+          {:error, response} = ResponseBuilder.error("operation_failed", inspect(reason))
+          {:reply, {:error, response}, socket}
+      end
+    else
       {:error, reason} ->
-        {:error, response} = ResponseBuilder.error("operation_failed", reason)
+        {:error, response} = ResponseBuilder.error("backpressure", reason)
         {:reply, {:error, response}, socket}
     end
   end
 
   @impl true
   def handle_in("obs:stop_recording", _payload, socket) do
-    case Server.Services.OBS.stop_recording() do
-      :ok ->
-        {:ok, response} = ResponseBuilder.success(%{operation: "stop_recording"})
-        {:reply, {:ok, response}, socket}
+    with {:ok, socket} <- check_backpressure(socket, "obs:stop_recording"),
+         {:ok, socket} <- increment_concurrent_requests(socket) do
+      result =
+        call_service_with_timeout(fn ->
+          Server.Services.OBS.stop_recording()
+        end)
 
+      socket = decrement_concurrent_requests(socket)
+
+      case result do
+        :ok ->
+          {:ok, response} = ResponseBuilder.success(%{operation: "stop_recording"})
+          {:reply, {:ok, response}, socket}
+
+        {:error, :timeout} ->
+          Logger.warning("OBS stop recording timed out",
+            timeout_ms: @service_call_timeout
+          )
+
+          {:error, response} = ResponseBuilder.error("service_timeout", "Service call timed out")
+          {:reply, {:error, response}, socket}
+
+        {:error, reason} ->
+          Logger.warning("OBS stop recording failed", reason: inspect(reason))
+          {:error, response} = ResponseBuilder.error("operation_failed", inspect(reason))
+          {:reply, {:error, response}, socket}
+      end
+    else
       {:error, reason} ->
-        {:error, response} = ResponseBuilder.error("operation_failed", reason)
+        {:error, response} = ResponseBuilder.error("backpressure", reason)
         {:reply, {:error, response}, socket}
     end
   end
 
   @impl true
   def handle_in("obs:set_current_scene", %{"scene_name" => scene_name}, socket) do
-    case Server.Services.OBS.set_current_scene(scene_name) do
-      :ok ->
-        {:ok, response} = ResponseBuilder.success(%{operation: "set_current_scene"})
-        {:reply, {:ok, response}, socket}
+    with {:ok, socket} <- check_backpressure(socket, "obs:set_current_scene"),
+         {:ok, socket} <- increment_concurrent_requests(socket) do
+      result =
+        call_service_with_timeout(fn ->
+          Server.Services.OBS.set_current_scene(scene_name)
+        end)
 
+      socket = decrement_concurrent_requests(socket)
+
+      case result do
+        :ok ->
+          {:ok, response} = ResponseBuilder.success(%{operation: "set_current_scene"})
+          {:reply, {:ok, response}, socket}
+
+        {:error, :timeout} ->
+          Logger.warning("OBS set scene timed out",
+            timeout_ms: @service_call_timeout,
+            scene_name: scene_name
+          )
+
+          {:error, response} = ResponseBuilder.error("service_timeout", "Service call timed out")
+          {:reply, {:error, response}, socket}
+
+        {:error, reason} ->
+          Logger.warning("OBS set scene failed",
+            reason: inspect(reason),
+            scene_name: scene_name
+          )
+
+          {:error, response} = ResponseBuilder.error("operation_failed", inspect(reason))
+          {:reply, {:error, response}, socket}
+      end
+    else
       {:error, reason} ->
-        {:error, response} = ResponseBuilder.error("operation_failed", reason)
+        {:error, response} = ResponseBuilder.error("backpressure", reason)
         {:reply, {:error, response}, socket}
     end
   end
 
   @impl true
   def handle_in("rainwave:get_status", _payload, socket) do
-    correlation_id = socket.assigns.correlation_id
+    with {:ok, socket} <- check_backpressure(socket, "rainwave:get_status"),
+         {:ok, socket} <- increment_concurrent_requests(socket) do
+      correlation_id = socket.assigns.correlation_id
 
-    CorrelationId.with_context(correlation_id, fn ->
-      case Server.Services.Rainwave.get_status() do
-        {:ok, status} ->
-          {:ok, response} = ResponseBuilder.success(status)
-          {:reply, {:ok, response}, socket}
+      CorrelationId.with_context(correlation_id, fn ->
+        result =
+          call_service_with_timeout(fn ->
+            Server.Services.Rainwave.get_status()
+          end)
 
-        {:error, reason} ->
-          Logger.warning("Rainwave status request failed", reason: inspect(reason))
-          {:error, response} = ResponseBuilder.error("service_error", inspect(reason))
-          {:reply, {:error, response}, socket}
-      end
-    end)
+        socket = decrement_concurrent_requests(socket)
+
+        case result do
+          {:ok, status} ->
+            {:ok, response} = ResponseBuilder.success(status)
+            {:reply, {:ok, response}, socket}
+
+          {:error, :timeout} ->
+            Logger.warning("Rainwave status request timed out",
+              timeout_ms: @service_call_timeout
+            )
+
+            {:error, response} = ResponseBuilder.error("service_timeout", "Service call timed out")
+            {:reply, {:error, response}, socket}
+
+          {:error, reason} ->
+            Logger.warning("Rainwave status request failed", reason: inspect(reason))
+            {:error, response} = ResponseBuilder.error("service_error", inspect(reason))
+            {:reply, {:error, response}, socket}
+        end
+      end)
+    else
+      {:error, reason} ->
+        {:error, response} = ResponseBuilder.error("backpressure", reason)
+        {:reply, {:error, response}, socket}
+    end
   end
 
   @impl true
   def handle_in("rainwave:set_enabled", %{"enabled" => enabled}, socket) do
-    Server.Services.Rainwave.set_enabled(enabled)
-    {:ok, response} = ResponseBuilder.success(%{operation: "set_enabled", enabled: enabled})
-    {:reply, {:ok, response}, socket}
+    with {:ok, socket} <- check_backpressure(socket, "rainwave:set_enabled"),
+         {:ok, socket} <- increment_concurrent_requests(socket) do
+      result =
+        call_service_with_timeout(fn ->
+          Server.Services.Rainwave.set_enabled(enabled)
+        end)
+
+      socket = decrement_concurrent_requests(socket)
+
+      case result do
+        result when result in [:ok, nil] ->
+          {:ok, response} = ResponseBuilder.success(%{operation: "set_enabled", enabled: enabled})
+          {:reply, {:ok, response}, socket}
+
+        {:error, :timeout} ->
+          Logger.warning("Rainwave set_enabled timed out",
+            timeout_ms: @service_call_timeout,
+            enabled: enabled
+          )
+
+          {:error, response} = ResponseBuilder.error("service_timeout", "Service call timed out")
+          {:reply, {:error, response}, socket}
+
+        {:error, reason} ->
+          Logger.warning("Rainwave set_enabled failed",
+            reason: inspect(reason),
+            enabled: enabled
+          )
+
+          {:error, response} = ResponseBuilder.error("operation_failed", inspect(reason))
+          {:reply, {:error, response}, socket}
+      end
+    else
+      {:error, reason} ->
+        {:error, response} = ResponseBuilder.error("backpressure", reason)
+        {:reply, {:error, response}, socket}
+    end
   end
 
   @impl true
   def handle_in("rainwave:set_station", %{"station_id" => station_id}, socket) do
-    Server.Services.Rainwave.set_station(station_id)
-    {:ok, response} = ResponseBuilder.success(%{operation: "set_station", station_id: station_id})
-    {:reply, {:ok, response}, socket}
+    with {:ok, socket} <- check_backpressure(socket, "rainwave:set_station"),
+         {:ok, socket} <- increment_concurrent_requests(socket) do
+      result =
+        call_service_with_timeout(fn ->
+          Server.Services.Rainwave.set_station(station_id)
+        end)
+
+      socket = decrement_concurrent_requests(socket)
+
+      case result do
+        result when result in [:ok, nil] ->
+          {:ok, response} = ResponseBuilder.success(%{operation: "set_station", station_id: station_id})
+          {:reply, {:ok, response}, socket}
+
+        {:error, :timeout} ->
+          Logger.warning("Rainwave set_station timed out",
+            timeout_ms: @service_call_timeout,
+            station_id: station_id
+          )
+
+          {:error, response} = ResponseBuilder.error("service_timeout", "Service call timed out")
+          {:reply, {:error, response}, socket}
+
+        {:error, reason} ->
+          Logger.warning("Rainwave set_station failed",
+            reason: inspect(reason),
+            station_id: station_id
+          )
+
+          {:error, response} = ResponseBuilder.error("operation_failed", inspect(reason))
+          {:reply, {:error, response}, socket}
+      end
+    else
+      {:error, reason} ->
+        {:error, response} = ResponseBuilder.error("backpressure", reason)
+        {:reply, {:error, response}, socket}
+    end
   end
 
   # Test event handlers
@@ -285,5 +530,102 @@ defmodule ServerWeb.DashboardChannel do
     log_unhandled_message(event, payload, socket)
     # DashboardChannel doesn't reply to unknown commands
     {:noreply, socket}
+  end
+
+  # Private helper functions for backpressure control
+
+  defp check_backpressure(socket, command) do
+    now = System.system_time(:millisecond)
+    socket = cleanup_request_history(socket, now)
+
+    # Count requests in the current window
+    recent_requests = count_recent_requests(socket, now)
+
+    cond do
+      socket.assigns.concurrent_requests >= @max_concurrent_requests ->
+        Logger.warning("DashboardChannel backpressure: max concurrent requests",
+          concurrent: socket.assigns.concurrent_requests,
+          max_concurrent: @max_concurrent_requests,
+          command: command,
+          room_id: socket.assigns.room_id
+        )
+
+        {:error, "too_many_concurrent_requests"}
+
+      recent_requests >= @max_requests_per_window ->
+        Logger.warning("DashboardChannel backpressure: rate limit exceeded",
+          recent_requests: recent_requests,
+          max_requests: @max_requests_per_window,
+          window_ms: @request_window_ms,
+          command: command,
+          room_id: socket.assigns.room_id
+        )
+
+        {:error, "rate_limit_exceeded"}
+
+      true ->
+        # Add this request to history
+        new_history = [now | socket.assigns.request_history]
+        updated_socket = assign(socket, :request_history, new_history)
+        {:ok, updated_socket}
+    end
+  end
+
+  defp increment_concurrent_requests(socket) do
+    new_count = socket.assigns.concurrent_requests + 1
+    {:ok, assign(socket, :concurrent_requests, new_count)}
+  end
+
+  defp decrement_concurrent_requests(socket) do
+    new_count = max(socket.assigns.concurrent_requests - 1, 0)
+    assign(socket, :concurrent_requests, new_count)
+  end
+
+  defp cleanup_request_history(socket, now) do
+    # Only cleanup every few seconds to avoid overhead
+    if now - socket.assigns.last_cleanup > 5_000 do
+      cutoff = now - @request_window_ms
+
+      filtered_history =
+        socket.assigns.request_history
+        |> Enum.filter(fn timestamp -> timestamp > cutoff end)
+        # Limit history size
+        |> Enum.take(100)
+
+      socket
+      |> assign(:request_history, filtered_history)
+      |> assign(:last_cleanup, now)
+    else
+      socket
+    end
+  end
+
+  defp count_recent_requests(socket, now) do
+    cutoff = now - @request_window_ms
+
+    socket.assigns.request_history
+    |> Enum.count(fn timestamp -> timestamp > cutoff end)
+  end
+
+  defp call_service_with_timeout(service_call_fn) do
+    task = Task.async(service_call_fn)
+
+    case Task.yield(task, @service_call_timeout) do
+      {:ok, result} ->
+        result
+
+      nil ->
+        # Task didn't complete in time
+        Task.shutdown(task, :brutal_kill)
+        {:error, :timeout}
+    end
+  rescue
+    exception ->
+      Logger.error("Service call crashed",
+        error: inspect(exception),
+        stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+      )
+
+      {:error, :service_crashed}
   end
 end
