@@ -35,7 +35,8 @@ defmodule Server.Services.Twitch.TokenManager do
     else
       task =
         Task.async(fn ->
-          OAuthService.validate_token(:twitch)
+          # Use get_valid_token which handles refresh automatically
+          OAuthService.get_valid_token(:twitch)
         end)
 
       %{state | token_validation_task: task}

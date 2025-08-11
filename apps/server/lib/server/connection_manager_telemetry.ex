@@ -12,23 +12,23 @@ defmodule Server.ConnectionManagerTelemetry do
   * `[:connection_manager, :monitor, :add]` - When a monitor is added
     * Measurements: none
     * Metadata: `:pid`, `:label`
-    
+
   * `[:connection_manager, :monitor, :remove]` - When a monitor is removed
     * Measurements: none
     * Metadata: `:pid`, `:label`, `:found`
-    
+
   * `[:connection_manager, :monitor, :down]` - When a monitored process goes down
     * Measurements: none
     * Metadata: `:pid`, `:label`, `:reason`
-    
+
   * `[:connection_manager, :timer, :add]` - When a timer is added
     * Measurements: none
     * Metadata: `:label`
-    
+
   * `[:connection_manager, :timer, :cancel]` - When a timer is cancelled
     * Measurements: none
     * Metadata: `:label`, `:found`
-    
+
   * `[:connection_manager, :cleanup]` - When cleanup operations occur
     * Measurements: `:monitor_count`, `:timer_count`
     * Metadata: none
@@ -119,12 +119,12 @@ defmodule Server.ConnectionManagerTelemetry do
     :telemetry.attach_many(
       "connection-manager-log-handler",
       events,
-      &handle_event/4,
+      {__MODULE__, :handle_event},
       nil
     )
   end
 
-  defp handle_event([:connection_manager, :monitor, :down], _measurements, metadata, _config) do
+  def handle_event([:connection_manager, :monitor, :down], _measurements, metadata, _config) do
     if metadata.reason != :normal do
       Logger.warning("ConnectionManager monitored process went down",
         pid: inspect(metadata.pid),
@@ -134,7 +134,7 @@ defmodule Server.ConnectionManagerTelemetry do
     end
   end
 
-  defp handle_event([:connection_manager, :cleanup], measurements, _metadata, _config) do
+  def handle_event([:connection_manager, :cleanup], measurements, _metadata, _config) do
     if measurements.monitor_count > 0 || measurements.timer_count > 0 do
       Logger.debug("ConnectionManager cleanup performed",
         monitors_cleaned: measurements.monitor_count,
@@ -143,7 +143,7 @@ defmodule Server.ConnectionManagerTelemetry do
     end
   end
 
-  defp handle_event(_event, _measurements, _metadata, _config) do
+  def handle_event(_event, _measurements, _metadata, _config) do
     # Other events are handled silently by default
     :ok
   end

@@ -153,13 +153,13 @@ defmodule Server.PatternMonitor do
       :telemetry.attach(
         handler_id,
         event,
-        &handle_telemetry/4,
+        {__MODULE__, :handle_telemetry},
         nil
       )
     end)
   end
 
-  defp handle_telemetry(event_name, measurements, metadata, _config) do
+  def handle_telemetry(event_name, measurements, metadata, _config) do
     send(__MODULE__, {:telemetry_event, measurements, metadata, event_name})
   end
 
