@@ -106,19 +106,26 @@ defmodule Server.TokenVault do
   def encrypt_token_map(token_map) when is_map(token_map) do
     sensitive_fields = [:access_token, :refresh_token, "access_token", "refresh_token"]
 
-    encrypted_map =
-      Enum.reduce(token_map, %{}, fn {key, value}, acc ->
+    result =
+      Enum.reduce_while(token_map, {:ok, %{}}, fn {key, value}, {:ok, acc} ->
         if key in sensitive_fields and is_binary(value) do
           case encrypt(value) do
-            {:ok, encrypted} -> Map.put(acc, key, encrypted)
-            _ -> Map.put(acc, key, value)
+            {:ok, encrypted} ->
+              {:cont, {:ok, Map.put(acc, key, encrypted)}}
+
+            {:error, reason} ->
+              # Return error immediately if any encryption fails
+              {:halt, {:error, {:encryption_failed, key, reason}}}
           end
         else
-          Map.put(acc, key, value)
+          {:cont, {:ok, Map.put(acc, key, value)}}
         end
       end)
 
-    {:ok, encrypted_map}
+    case result do
+      {:ok, encrypted_map} -> {:ok, encrypted_map}
+      error -> error
+    end
   end
 
   def encrypt_token_map(_), do: {:error, :invalid_input}
@@ -137,19 +144,26 @@ defmodule Server.TokenVault do
   def decrypt_token_map(encrypted_map) when is_map(encrypted_map) do
     sensitive_fields = [:access_token, :refresh_token, "access_token", "refresh_token"]
 
-    decrypted_map =
-      Enum.reduce(encrypted_map, %{}, fn {key, value}, acc ->
+    result =
+      Enum.reduce_while(encrypted_map, {:ok, %{}}, fn {key, value}, {:ok, acc} ->
         if key in sensitive_fields and is_binary(value) do
           case decrypt(value) do
-            {:ok, decrypted} -> Map.put(acc, key, decrypted)
-            _ -> Map.put(acc, key, value)
+            {:ok, decrypted} ->
+              {:cont, {:ok, Map.put(acc, key, decrypted)}}
+
+            {:error, reason} ->
+              # Return error immediately if any decryption fails
+              {:halt, {:error, {:decryption_failed, key, reason}}}
           end
         else
-          Map.put(acc, key, value)
+          {:cont, {:ok, Map.put(acc, key, value)}}
         end
       end)
 
-    {:ok, decrypted_map}
+    case result do
+      {:ok, decrypted_map} -> {:ok, decrypted_map}
+      error -> error
+    end
   end
 
   def decrypt_token_map(_), do: {:error, :invalid_input}
