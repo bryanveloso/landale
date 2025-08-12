@@ -352,6 +352,22 @@ defmodule Server.Services.Twitch do
     {:noreply, new_state}
   end
 
+  # Gun WebSocket Upgrade
+  def handle_info({:gun_upgrade, conn_pid, stream_ref, ["websocket"], _headers}, state) do
+    if state.ws_client && state.ws_client.conn_pid == conn_pid do
+      Logger.debug("Processing WebSocket upgrade", conn_pid: inspect(conn_pid), stream_ref: inspect(stream_ref))
+      updated_client = WebSocketClient.handle_upgrade(state.ws_client, stream_ref)
+      {:noreply, %{state | ws_client: updated_client}}
+    else
+      Logger.warning("Received upgrade for unknown connection",
+        conn_pid: inspect(conn_pid),
+        expected: inspect(state.ws_client && state.ws_client.conn_pid)
+      )
+
+      {:noreply, state}
+    end
+  end
+
   # Catch-all
   def handle_info(message, state) do
     Logger.debug("Unhandled message in Twitch service: #{inspect(message)}")
