@@ -81,8 +81,17 @@ defmodule Server.Services.OBS.StatsCollector do
               # Use a shorter timeout to avoid long waits when OBS is disconnecting
               try do
                 case GenServer.call(conn, {:send_request, "GetSceneList", %{}}, 2000) do
+                  :ok ->
+                    # Request was accepted and queued - response will come via RequestTracker
+                    # For stats collection, we'll just proceed to the next step
+                    send(stats_collector_pid, {:version_received, %{obsVersion: "unknown"}})
+
+                  {:ok, :queued} ->
+                    # Request was queued for later - response will come via RequestTracker
+                    send(stats_collector_pid, {:version_received, %{obsVersion: "unknown"}})
+
                   {:ok, version_data} ->
-                    # Got the OBS response - send it to StatsCollector
+                    # Got the OBS response directly (shouldn't happen with current architecture)
                     send(stats_collector_pid, {:version_received, version_data})
 
                   {:error, reason} ->
@@ -135,8 +144,23 @@ defmodule Server.Services.OBS.StatsCollector do
         Task.start(fn ->
           try do
             case GenServer.call(conn, {:send_request, "GetStats", %{}}, 2000) do
+              :ok ->
+                # Request was accepted and queued - response will come via RequestTracker
+                # For now, we'll skip the stats update since we don't have the actual data
+                Logger.debug("GetStats request accepted - response will come via RequestTracker",
+                  service: "obs",
+                  session_id: state.session_id
+                )
+
+              {:ok, :queued} ->
+                # Request was queued for later - response will come via RequestTracker
+                Logger.debug("GetStats request queued - response will come via RequestTracker",
+                  service: "obs",
+                  session_id: state.session_id
+                )
+
               {:ok, stats} ->
-                # Got the OBS response - send it to StatsCollector
+                # Got the OBS response directly (shouldn't happen with current architecture)
                 send(stats_collector_pid, {:stats_received, stats})
 
               {:error, reason} ->
