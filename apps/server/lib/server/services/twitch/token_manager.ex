@@ -10,12 +10,14 @@ defmodule Server.Services.Twitch.TokenManager do
   """
 
   require Logger
-  alias Server.OAuthService
+  alias Server.{CircuitBreakerServer, OAuthService}
 
   # 5 minutes before expiry
   @token_refresh_buffer 300_000
   # 15 minutes
   @validation_interval 900_000
+  # 5 seconds for validation requests
+  @validation_timeout 5_000
 
   @doc """
   Schedules initial token validation after a delay.
@@ -51,6 +53,15 @@ defmodule Server.Services.Twitch.TokenManager do
   end
 
   defp validate_with_twitch(access_token) do
+    Logger.debug("Starting Twitch token validation")
+
+    # Use circuit breaker for resilience
+    CircuitBreakerServer.call(:twitch_validate, fn ->
+      perform_validation_request(access_token)
+    end)
+  end
+
+  defp perform_validation_request(access_token) do
     uri = URI.parse("https://id.twitch.tv/oauth2/validate")
     host = uri.host |> String.to_charlist()
     port = 443
@@ -61,19 +72,24 @@ defmodule Server.Services.Twitch.TokenManager do
       {"accept", "application/json"}
     ]
 
-    with {:ok, conn_pid} <- :gun.open(host, port, %{protocols: [:http2], transport: :tls}),
+    # Allow protocol negotiation instead of forcing HTTP/2
+    opts = %{protocols: [:http2, :http], transport: :tls}
+
+    with {:ok, conn_pid} <- :gun.open(host, port, opts),
          {:ok, _protocol} <- await_connection(conn_pid),
          stream_ref <- :gun.get(conn_pid, path, headers),
          {:ok, response} <- handle_validation_response(conn_pid, stream_ref) do
+      Logger.debug("Token validation successful", user_id: response[:user_id])
       response
     else
-      {:error, reason} ->
-        {:error, reason}
+      {:error, reason} = error ->
+        Logger.debug("Token validation failed", reason: inspect(reason))
+        error
     end
   end
 
   defp await_connection(conn_pid) do
-    case :gun.await_up(conn_pid, 5000) do
+    case :gun.await_up(conn_pid, @validation_timeout) do
       {:ok, _protocol} = result ->
         result
 
@@ -84,7 +100,7 @@ defmodule Server.Services.Twitch.TokenManager do
   end
 
   defp handle_validation_response(conn_pid, stream_ref) do
-    case :gun.await(conn_pid, stream_ref, 5000) do
+    case :gun.await(conn_pid, stream_ref, @validation_timeout) do
       {:response, :fin, status, _headers} ->
         :gun.close(conn_pid)
         {:error, "Empty response with status #{status}"}
@@ -99,7 +115,7 @@ defmodule Server.Services.Twitch.TokenManager do
   end
 
   defp handle_response_body(conn_pid, stream_ref, status) do
-    case :gun.await_body(conn_pid, stream_ref, 5000) do
+    case :gun.await_body(conn_pid, stream_ref, @validation_timeout) do
       {:ok, body} ->
         :gun.close(conn_pid)
 
