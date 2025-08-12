@@ -73,13 +73,17 @@ defmodule Server.Services.OBS.StatsCollector do
         # OBS is connected, try to get stats
         case get_connection(state.session_id) do
           {:ok, conn} ->
+            # Capture the StatsCollector PID before starting the Task
+            stats_collector_pid = self()
+
             Task.start(fn ->
               # Try GetSceneList first - this is a basic OBS v5 request
               # Use a shorter timeout to avoid long waits when OBS is disconnecting
               try do
                 case GenServer.call(conn, {:send_request, "GetSceneList", %{}}, 2000) do
                   {:ok, version_data} ->
-                    send(self(), {:version_received, version_data})
+                    # Got the OBS response - send it to StatsCollector
+                    send(stats_collector_pid, {:version_received, version_data})
 
                   {:error, reason} ->
                     Logger.debug("Failed to get OBS stats: #{inspect(reason)}",
@@ -125,11 +129,15 @@ defmodule Server.Services.OBS.StatsCollector do
     # Now try the actual GetStats request
     case get_connection(state.session_id) do
       {:ok, conn} ->
+        # Capture the StatsCollector PID before starting the Task
+        stats_collector_pid = self()
+
         Task.start(fn ->
           try do
             case GenServer.call(conn, {:send_request, "GetStats", %{}}, 2000) do
               {:ok, stats} ->
-                send(self(), {:stats_received, stats})
+                # Got the OBS response - send it to StatsCollector
+                send(stats_collector_pid, {:stats_received, stats})
 
               {:error, reason} ->
                 Logger.debug("GetStats failed: #{inspect(reason)}",
