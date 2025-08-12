@@ -270,5 +270,46 @@ defmodule Server.StreamProducerTest do
       state = GenServer.call(producer, :get_state)
       assert state.active_content != nil
     end
+
+    test "handles event_batch messages without crashing", %{producer: producer} do
+      # Test that the new event_batch handler processes batched Twitch events
+      batch_data = %{
+        type: :event_batch,
+        events: [
+          %{
+            type: "channel.chat.message",
+            data: %{
+              user_name: "test_user",
+              message: "Hello world!"
+            },
+            timestamp: System.system_time(:second),
+            correlation_id: "test_correlation_id"
+          },
+          %{
+            type: "channel.subscribe",
+            data: %{
+              user_name: "test_subscriber",
+              tier: "1000"
+            },
+            timestamp: System.system_time(:second),
+            correlation_id: "test_correlation_id_2"
+          }
+        ],
+        batch_size: 2,
+        batch_id: "test_batch_id",
+        timestamp: System.system_time(:second)
+      }
+
+      # Send the event_batch message
+      send(producer, {:event_batch, batch_data})
+
+      # Give time for async processing
+      Process.sleep(50)
+      assert Process.alive?(producer)
+
+      # Verify producer didn't crash - this was the original issue
+      state = GenServer.call(producer, :get_state)
+      assert is_map(state)
+    end
   end
 end

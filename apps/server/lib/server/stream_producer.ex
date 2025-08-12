@@ -334,6 +334,42 @@ defmodule Server.StreamProducer do
     {:noreply, state}
   end
 
+  # Handle batched events from BatchPublisher
+  @impl true
+  def handle_info({:event_batch, batch_data}, state) do
+    # Extract individual events from the batch and process each one
+    batch_data.events
+    |> Enum.each(fn event ->
+      # Process each event based on its type
+      case event.type do
+        "channel.chat.message" ->
+          # Forward chat message events to the existing handler
+          send(self(), {:chat_message, event})
+
+        "channel.subscribe" ->
+          # Forward subscription events to the existing handler
+          send(self(), {:new_subscription, event})
+
+        "channel.follow" ->
+          # Forward follow events (no existing handler, but log for visibility)
+          Logger.debug("Received follow event from batch", user: Map.get(event.data, :user_name, "unknown"))
+
+        "channel.update" ->
+          # Forward channel update events to the existing handler
+          send(self(), {:channel_update, event})
+
+        _ ->
+          # Log unhandled event types for visibility
+          Logger.debug("Unhandled event type in batch",
+            type: event.type,
+            batch_id: batch_data.batch_id
+          )
+      end
+    end)
+
+    {:noreply, state}
+  end
+
   # Handle Twitch channel updates for show detection
   @impl true
   def handle_info({:channel_update, event}, state) do
