@@ -163,8 +163,8 @@ defmodule Server.Services.Twitch.TokenManager do
   Handles successful token validation result.
   """
   def handle_validation_success(state, token_info) do
-    # Use DataAccessGuard to validate and normalize token data
-    case Server.DataAccessGuard.validate_with_mode(token_info, Server.Schemas.TokenSchema, :warn) do
+    # Direct pattern matching validation for Twitch validation response
+    case validate_twitch_response(token_info) do
       {:ok, validated_token} ->
         log_validation_success(validated_token)
 
@@ -184,20 +184,13 @@ defmodule Server.Services.Twitch.TokenManager do
           state
           | token_validation_task: nil,
             user_id: validated_token.user_id,
-            scopes: validated_token.scopes || MapSet.new(),
+            scopes: validated_token.scopes,
             client_id: validated_token.client_id
         }
 
       {:error, reason} ->
-        Logger.error("Token validation schema error: #{inspect(reason)}")
-        # Fall back to original behavior in case of schema error
-        %{
-          state
-          | token_validation_task: nil,
-            user_id: Map.get(token_info, "user_id"),
-            scopes: normalize_scopes(Map.get(token_info, "scopes")),
-            client_id: Map.get(token_info, "client_id")
-        }
+        Logger.error("Token validation failed: #{inspect(reason)}")
+        handle_validation_failure(state, reason)
     end
   end
 
@@ -217,26 +210,24 @@ defmodule Server.Services.Twitch.TokenManager do
   Handles successful token refresh result.
   """
   def handle_refresh_success(state, result) do
-    # Use DataAccessGuard to validate refresh result
-    case Server.DataAccessGuard.validate_with_mode(result, Server.Schemas.TokenSchema, :warn) do
+    # Direct pattern matching validation for refresh response
+    case validate_refresh_response(result) do
       {:ok, validated} ->
-        expires_in = validated.expires_in || 3600
+        expires_in = validated.expires_in
         Logger.info("Token refreshed successfully, expires in #{expires_in} seconds")
 
-      {:error, _} ->
-        # Fall back to direct access
-        expires_in = Map.get(result, "expires_in", 3600)
-        Logger.info("Token refreshed successfully, expires in #{expires_in} seconds")
+        # Schedule next refresh
+        state = schedule_token_refresh(state, validated)
+
+        # Revalidate after refresh
+        Process.send_after(self(), :validate_token, 1000)
+
+        %{state | token_refresh_task: nil}
+
+      {:error, reason} ->
+        Logger.error("Token refresh validation failed: #{inspect(reason)}")
+        handle_refresh_failure(state, reason)
     end
-
-    # Schedule next refresh
-    expires_map = %{"expires_in" => Map.get(result, "expires_in", 3600)}
-    schedule_token_refresh(state, expires_map)
-
-    # Revalidate after refresh
-    Process.send_after(self(), :validate_token, 1000)
-
-    %{state | token_refresh_task: nil}
   end
 
   @doc """
@@ -317,6 +308,95 @@ defmodule Server.Services.Twitch.TokenManager do
 
   # Private functions
 
+  # Validates Twitch token validation response structure.
+  #
+  # Expected fields from Twitch /oauth2/validate endpoint:
+  # - user_id (required): String user ID
+  # - client_id (required): String client ID
+  # - scopes (required): List of scope strings
+  # - login (optional): Username string
+  # - expires_in (optional): Seconds until expiry
+  defp validate_twitch_response(response) when is_map(response) do
+    with {:ok, user_id} <- extract_required_field(response, :user_id, "string"),
+         {:ok, client_id} <- extract_required_field(response, :client_id, "string"),
+         {:ok, scopes} <- extract_required_field(response, :scopes, "list"),
+         {:ok, normalized_scopes} <- normalize_scope_list(scopes) do
+      validated = %{
+        user_id: user_id,
+        client_id: client_id,
+        scopes: normalized_scopes,
+        login: Map.get(response, :login),
+        expires_in: Map.get(response, :expires_in)
+      }
+
+      {:ok, validated}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_twitch_response(response) do
+    {:error, "Expected map, got #{inspect(response)}"}
+  end
+
+  # Validates OAuth token refresh response structure.
+  #
+  # Expected fields from OAuth refresh endpoint:
+  # - access_token (required): New access token string
+  # - expires_in (required): Seconds until expiry
+  # - refresh_token (optional): New refresh token
+  # - token_type (optional): Token type (usually "Bearer")
+  defp validate_refresh_response(response) when is_map(response) do
+    with {:ok, access_token} <- extract_required_field(response, :access_token, "string"),
+         {:ok, expires_in} <- extract_required_field(response, :expires_in, "integer") do
+      validated = %{
+        access_token: access_token,
+        expires_in: expires_in,
+        refresh_token: Map.get(response, :refresh_token),
+        token_type: Map.get(response, :token_type, "Bearer")
+      }
+
+      {:ok, validated}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_refresh_response(response) do
+    {:error, "Expected map, got #{inspect(response)}"}
+  end
+
+  defp extract_required_field(map, field, expected_type) do
+    case Map.get(map, field) do
+      nil ->
+        {:error, "Missing required field: #{field}"}
+
+      value when expected_type == "string" and is_binary(value) ->
+        {:ok, value}
+
+      value when expected_type == "integer" and is_integer(value) ->
+        {:ok, value}
+
+      value when expected_type == "list" and is_list(value) ->
+        {:ok, value}
+
+      value ->
+        {:error, "Field #{field} expected #{expected_type}, got #{inspect(value)}"}
+    end
+  end
+
+  defp normalize_scope_list(scopes) when is_list(scopes) do
+    if Enum.all?(scopes, &is_binary/1) do
+      {:ok, MapSet.new(scopes)}
+    else
+      {:error, "Scopes list contains non-string values: #{inspect(scopes)}"}
+    end
+  end
+
+  defp normalize_scope_list(scopes) do
+    {:error, "Expected list of scopes, got #{inspect(scopes)}"}
+  end
+
   defp check_chat_scope(%{scopes: %MapSet{} = scopes}) do
     MapSet.member?(scopes, "user:read:chat")
   end
@@ -330,9 +410,6 @@ defmodule Server.Services.Twitch.TokenManager do
   end
 
   defp check_chat_scope(_), do: false
-
-  defp normalize_scopes(list) when is_list(list), do: MapSet.new(list)
-  defp normalize_scopes(_), do: MapSet.new()
 
   defp log_validation_success(token_info) do
     user_id = Map.get(token_info, :user_id) || Map.get(token_info, "user_id")
