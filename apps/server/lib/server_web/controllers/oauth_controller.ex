@@ -1,10 +1,12 @@
 defmodule ServerWeb.OAuthController do
   @moduledoc """
-  OAuth management controller for handling OAuth authorization flow.
+  OAuth token management controller.
 
-  Provides endpoints for OAuth status, authorization, callback handling,
-  and token refresh. Secured by Tailscale network - no application-level
-  authentication required.
+  Handles OAuth tokens for Twitch integration with two approaches:
+  - Direct token upload for simple single-user setup (recommended)
+  - Traditional OAuth flow with redirects (legacy, kept for compatibility)
+
+  All endpoints secured by Tailscale network boundary.
   """
 
   use ServerWeb, :controller
@@ -17,60 +19,16 @@ defmodule ServerWeb.OAuthController do
   def status(conn, _params) do
     case OAuthService.get_token_info(:twitch) do
       {:ok, info} ->
+        is_valid = DateTime.compare(info.expires_at, DateTime.utc_now()) == :gt
+
         json(conn, %{
-          connected: true,
+          connected: is_valid,
           expires_at: info.expires_at,
-          valid: DateTime.compare(info.expires_at, DateTime.utc_now()) == :gt
+          valid: is_valid
         })
 
       _ ->
         json(conn, %{connected: false})
-    end
-  end
-
-  @doc """
-  Start OAuth authorization flow - redirects to Twitch
-  """
-  def authorize(conn, _params) do
-    client_id = System.get_env("TWITCH_CLIENT_ID")
-    redirect_uri = "http://saya:7175/api/oauth/callback"
-
-    scopes =
-      "channel:read:subscriptions channel:manage:broadcast channel:read:redemptions moderator:read:followers bits:read chat:read chat:edit"
-
-    auth_url =
-      "https://id.twitch.tv/oauth2/authorize?client_id=#{client_id}&redirect_uri=#{URI.encode_www_form(redirect_uri)}&response_type=code&scope=#{URI.encode_www_form(scopes)}"
-
-    redirect(conn, external: auth_url)
-  end
-
-  @doc """
-  Handle OAuth callback from Twitch
-  """
-  def callback(conn, %{"code" => code}) do
-    client_id = System.get_env("TWITCH_CLIENT_ID")
-    client_secret = System.get_env("TWITCH_CLIENT_SECRET")
-    redirect_uri = "http://saya:7175/api/oauth/callback"
-
-    # Exchange code for tokens
-    case exchange_code_for_tokens(code, client_id, client_secret, redirect_uri) do
-      {:ok, token_data} ->
-        # Store tokens
-        expires_at = DateTime.add(DateTime.utc_now(), token_data["expires_in"], :second)
-
-        OAuthService.store_tokens(:twitch, %{
-          access_token: token_data["access_token"],
-          refresh_token: token_data["refresh_token"],
-          expires_at: expires_at,
-          scopes: String.split(token_data["scope"] || "", " ")
-        })
-
-        # Redirect to dashboard
-        redirect(conn, external: "http://zelan:3000/oauth?success=true")
-
-      {:error, reason} ->
-        Logger.error("OAuth callback failed: #{inspect(reason)}")
-        redirect(conn, external: "http://zelan:3000/oauth?error=#{URI.encode_www_form(inspect(reason))}")
     end
   end
 
@@ -89,29 +47,52 @@ defmodule ServerWeb.OAuthController do
     end
   end
 
-  defp exchange_code_for_tokens(code, client_id, client_secret, redirect_uri) do
-    url = "https://id.twitch.tv/oauth2/token"
+  @doc """
+  Upload OAuth tokens directly (bypasses OAuth flow).
+  Accepts complete token JSON from Mix CLI task.
+  """
+  def upload(conn, params) when is_map(params) do
+    with {:ok, access} <- Map.fetch(params, "access_token"),
+         {:ok, refresh} <- Map.fetch(params, "refresh_token") do
+      # Calculate expiry from expires_in or use default
+      expires_at =
+        case Map.get(params, "expires_in") do
+          nil -> DateTime.add(DateTime.utc_now(), 3600, :second)
+          expires_in -> DateTime.add(DateTime.utc_now(), expires_in, :second)
+        end
 
-    body =
-      URI.encode_query(%{
-        client_id: client_id,
-        client_secret: client_secret,
-        code: code,
-        grant_type: "authorization_code",
-        redirect_uri: redirect_uri
-      })
+      # Parse scopes - handle both string and array formats
+      scopes =
+        case Map.get(params, "scope") || Map.get(params, "scopes") do
+          nil -> []
+          scopes when is_list(scopes) -> scopes
+          scope_string when is_binary(scope_string) -> String.split(scope_string, " ")
+          _ -> []
+        end
 
-    headers = [{"Content-Type", "application/x-www-form-urlencoded"}]
+      # Store the complete token information
+      case OAuthService.store_tokens(:twitch, %{
+             access_token: access,
+             refresh_token: refresh,
+             expires_at: expires_at,
+             scopes: scopes
+           }) do
+        :ok ->
+          Logger.info("OAuth tokens uploaded successfully")
+          json(conn, %{success: true, message: "Tokens stored successfully"})
 
-    case HTTPoison.post(url, body, headers) do
-      {:ok, %HTTPoison.Response{status_code: 200, body: response_body}} ->
-        {:ok, Jason.decode!(response_body)}
+        {:error, reason} ->
+          Logger.error("Failed to store uploaded tokens: #{inspect(reason)}")
 
-      {:ok, %HTTPoison.Response{body: response_body}} ->
-        {:error, response_body}
-
-      {:error, error} ->
-        {:error, error}
+          conn
+          |> put_status(:bad_request)
+          |> json(%{success: false, error: "Failed to store tokens"})
+      end
+    else
+      :error ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{success: false, error: "Missing required fields: access_token and refresh_token"})
     end
   end
 end

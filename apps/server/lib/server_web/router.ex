@@ -124,8 +124,7 @@ defmodule ServerWeb.Router do
 
     # OAuth Management (NO AUTH - Tailscale secured)
     get "/oauth/status", OAuthController, :status
-    get "/oauth/authorize", OAuthController, :authorize
-    get "/oauth/callback", OAuthController, :callback
     post "/oauth/refresh", OAuthController, :refresh
+    post "/oauth/upload", OAuthController, :upload
   end
 end

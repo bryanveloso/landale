@@ -240,27 +240,8 @@ defmodule Server.DataAccessGuard do
     emit_location_telemetry(caller_env, schema_module, mode)
   end
 
-  defp emit_validation_telemetry(result, schema_module, duration, mode, caller_env, reason \\ nil) do
-    metadata = %{
-      result: result,
-      schema: schema_module,
-      mode: mode,
-      duration_us: duration,
-      module: caller_env.module,
-      function: caller_env.function,
-      line: caller_env.line,
-      file: caller_env.file
-    }
-
-    metadata = if reason, do: Map.put(metadata, :reason, inspect(reason)), else: metadata
-
-    # Mode-specific event for failures
-    if result == :failure do
-      event_name =
-        if mode == :warn,
-          do: [:server, :data_access_guard, :warn],
-          else: [:server, :data_access_guard, :error]
-    end
+  defp emit_validation_telemetry(_result, _schema_module, _duration, _mode, _caller_env, _reason \\ nil) do
+    :ok
   end
 
   defp emit_location_telemetry(_caller_env, _schema_module, _mode) do

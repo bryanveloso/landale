@@ -33,13 +33,8 @@ defmodule ServerWeb.HealthController do
 
   @spec check(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def check(conn, _params) do
-    start_time = System.monotonic_time(:millisecond)
-
     # Basic health check
     response = json(conn, %{status: "ok", timestamp: System.system_time(:second)})
-
-    # Emit telemetry
-    duration = System.monotonic_time(:millisecond) - start_time
 
     response
   end
@@ -61,7 +56,6 @@ defmodule ServerWeb.HealthController do
 
   @spec detailed(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def detailed(conn, _params) do
-    start_time = System.monotonic_time(:millisecond)
     # Detailed system health including all services with defensive error handling
     obs_status = safe_get_service_status(:obs)
     twitch_status = safe_get_service_status(:twitch)
@@ -94,9 +88,6 @@ defmodule ServerWeb.HealthController do
     # Return appropriate HTTP status for Docker health checks
     status_code = if overall_status == "healthy", do: 200, else: 503
 
-    # Emit telemetry
-    duration = System.monotonic_time(:millisecond) - start_time
-
     conn
     |> put_status(status_code)
     |> json(health_data)
@@ -119,7 +110,6 @@ defmodule ServerWeb.HealthController do
 
   @spec ready(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def ready(conn, _params) do
-    start_time = System.monotonic_time(:millisecond)
     # Kubernetes-style readiness probe
     # Service is ready if critical services are available
     database_status = get_database_status()
@@ -135,10 +125,6 @@ defmodule ServerWeb.HealthController do
     }
 
     status_code = if ready, do: 200, else: 503
-
-    # Emit telemetry
-    duration = System.monotonic_time(:millisecond) - start_time
-    status_string = if ready, do: "ready", else: "not_ready"
 
     conn
     |> put_status(status_code)
@@ -162,8 +148,6 @@ defmodule ServerWeb.HealthController do
 
   @spec subscriptions(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def subscriptions(conn, _params) do
-    start_time = System.monotonic_time(:millisecond)
-
     # Use the safe helper function consistently with other endpoints
     case safe_get_subscription_health() do
       {:ok, report} ->
@@ -201,17 +185,11 @@ defmodule ServerWeb.HealthController do
             _ -> 503
           end
 
-        # Emit telemetry
-        duration = System.monotonic_time(:millisecond) - start_time
-
         conn
         |> put_status(status_code)
         |> json(response)
 
       {:error, error_message} ->
-        # Emit telemetry for error
-        duration = System.monotonic_time(:millisecond) - start_time
-
         conn
         |> put_status(503)
         |> json(%{
