@@ -52,7 +52,6 @@ defmodule Server.Application do
             Server.PatternMonitor,
             # Performance optimizations
             Server.CorrelationIdPool,
-            Server.Events.BatchPublisher,
             Server.Cache,
             # Circuit breakers for external service resilience
             Server.CircuitBreakerServer,

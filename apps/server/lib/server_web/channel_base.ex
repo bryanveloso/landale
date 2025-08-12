@@ -29,7 +29,7 @@ defmodule ServerWeb.ChannelBase do
 
       import ServerWeb.ChannelHelpers
       alias Server.CorrelationId
-      alias ServerWeb.{EventBatcher, ResponseBuilder}
+      alias ServerWeb.ResponseBuilder
 
       # Wrapper functions that pass __MODULE__ to the helpers
 

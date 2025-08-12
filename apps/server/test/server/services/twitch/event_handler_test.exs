@@ -214,6 +214,62 @@ defmodule Server.Services.Twitch.EventHandlerTest do
       assert :ok = EventHandler.process_event(event_type, event_data)
     end
 
+    test "normalized events have flat canonical structure" do
+      event_type = "channel.chat.message"
+
+      event_data = %{
+        "message_id" => "msg_456",
+        "broadcaster_user_id" => "user_789",
+        "broadcaster_user_login" => "streamer",
+        "broadcaster_user_name" => "Streamer",
+        "chatter_user_id" => "chatter_456",
+        "chatter_user_login" => "viewer",
+        "chatter_user_name" => "Viewer",
+        "message" => %{
+          "text" => "Hello with emotes Kappa avalonARTSY",
+          "fragments" => [
+            %{"type" => "text", "text" => "Hello with emotes "},
+            %{"type" => "emote", "text" => "Kappa"},
+            %{"type" => "text", "text" => " "},
+            %{"type" => "emote", "text" => "avalonARTSY"}
+          ]
+        },
+        "color" => "#00B1CC",
+        "badges" => [
+          %{"set_id" => "subscriber", "id" => "12", "info" => "12 months"}
+        ],
+        "message_type" => "text"
+      }
+
+      result = EventHandler.normalize_event(event_type, event_data)
+
+      # Verify flat structure - all fields should be directly accessible
+      assert result.type == "channel.chat.message"
+      assert result.source == :twitch
+      assert result.correlation_id != nil
+      assert result.timestamp != nil
+
+      # User fields should be flat (not nested under data)
+      assert result.user_id == "chatter_456"
+      assert result.user_login == "viewer"
+      assert result.user_name == "Viewer"
+
+      # Message fields should be flat
+      assert result.message == "Hello with emotes Kappa avalonARTSY"
+      assert result.color == "#00B1CC"
+
+      # Emotes should be flat arrays
+      assert result.emotes == ["Kappa"]
+      assert result.native_emotes == ["avalonARTSY"]
+
+      # Badges should be flat
+      assert is_list(result.badges)
+      assert length(result.badges) == 1
+
+      # No nested data field should exist
+      refute Map.has_key?(result, :data)
+    end
+
     test "processes valid channel.follow event" do
       event_type = "channel.follow"
 

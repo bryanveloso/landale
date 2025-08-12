@@ -113,13 +113,6 @@ defmodule ServerWeb.DashboardChannel do
   end
 
   @impl true
-  def handle_info({:event_batch, batch}, socket) do
-    # Handle batched events efficiently
-    push(socket, "event_batch", batch)
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_info({:twitch_connected, event}, socket) do
     push(socket, "twitch_connected", event)
     {:noreply, socket}

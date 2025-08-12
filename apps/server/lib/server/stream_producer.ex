@@ -322,50 +322,14 @@ defmodule Server.StreamProducer do
          %{
            type: :emote_increment,
            data: %{
-             emotes: get_event_field(event, :emotes, []),
-             native_emotes: get_event_field(event, :native_emotes, []),
-             username: get_event_field(event, :user_name, "unknown")
+             emotes: Map.get(event, :emotes, []),
+             native_emotes: Map.get(event, :native_emotes, []),
+             username: Map.get(event, :user_name, "unknown")
            },
            timestamp: event.timestamp
          }}
       )
     end
-
-    {:noreply, state}
-  end
-
-  # Handle batched events from BatchPublisher
-  @impl true
-  def handle_info({:event_batch, batch_data}, state) do
-    # Extract individual events from the batch and process each one
-    batch_data.events
-    |> Enum.each(fn event ->
-      # Process each event based on its type
-      case event.type do
-        "channel.chat.message" ->
-          # Forward chat message events to the existing handler
-          send(self(), {:chat_message, event})
-
-        "channel.subscribe" ->
-          # Forward subscription events to the existing handler
-          send(self(), {:new_subscription, event})
-
-        "channel.follow" ->
-          # Forward follow events (no existing handler, but log for visibility)
-          Logger.debug("Received follow event from batch", user: Map.get(event.data, :user_name, "unknown"))
-
-        "channel.update" ->
-          # Forward channel update events to the existing handler
-          send(self(), {:channel_update, event})
-
-        _ ->
-          # Log unhandled event types for visibility
-          Logger.debug("Unhandled event type in batch",
-            type: event.type,
-            batch_id: batch_data.batch_id
-          )
-      end
-    end)
 
     {:noreply, state}
   end
@@ -465,10 +429,10 @@ defmodule Server.StreamProducer do
         type: :sub_train,
         priority: priority,
         data: %{
-          subscriber: get_event_field(event, :user_name, "unknown"),
-          tier: get_event_field(event, :tier, "1000"),
+          subscriber: Map.get(event, :user_name, "unknown"),
+          tier: Map.get(event, :tier, "1000"),
           count: 1,
-          total_months: get_event_field(event, :cumulative_months, 0)
+          total_months: Map.get(event, :cumulative_months, 0)
         },
         duration: duration,
         started_at: DateTime.utc_now()
@@ -495,23 +459,6 @@ defmodule Server.StreamProducer do
   end
 
   ## Private Functions
-
-  # Helper to extract fields from events that might have nested data structure
-  defp get_event_field(event, field, default) do
-    cond do
-      # Try nested data structure first (batched events)
-      Map.has_key?(event, :data) and Map.has_key?(event.data, field) ->
-        Map.get(event.data, field, default)
-
-      # Fall back to direct access (legacy/direct events)
-      Map.has_key?(event, field) ->
-        Map.get(event, field, default)
-
-      # Return default if field not found anywhere
-      true ->
-        default
-    end
-  end
 
   defp default_ticker_content(:ironmon) do
     [:ironmon_run_stats, :ironmon_progression]
@@ -681,8 +628,8 @@ defmodule Server.StreamProducer do
             | data:
                 Map.merge(interrupt.data, %{
                   count: new_count,
-                  latest_subscriber: get_event_field(event, :user_name, "unknown"),
-                  latest_tier: get_event_field(event, :tier, "1000")
+                  latest_subscriber: Map.get(event, :user_name, "unknown"),
+                  latest_tier: Map.get(event, :tier, "1000")
                 })
           }
         else

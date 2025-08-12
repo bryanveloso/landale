@@ -121,16 +121,28 @@ defmodule Server.Services.Twitch.EventHandler do
     # Use BoundaryConverter for consistent atom access
     {:ok, data} = Server.BoundaryConverter.from_external(event_data)
 
+    # Get correlation ID from pool, with fallback for tests or when pool isn't available
+    correlation_id = get_safe_correlation_id()
+
+    # Build base event with core fields that are always present
     base_event = %{
+      # Core fields (always present)
+      id: Map.get(data, :id) || Map.get(data, :message_id) || generate_event_id(),
       type: event_type,
-      id: Map.get(data, :id),
-      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
-      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
-      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
-      timestamp: DateTime.utc_now()
+      timestamp: DateTime.utc_now(),
+      correlation_id: correlation_id,
+      source: :twitch,
+
+      # Metadata
+      source_id: Map.get(data, :id) || Map.get(data, :message_id),
+      raw_type: event_type
     }
 
-    Map.merge(base_event, get_event_specific_data(event_type, event_data))
+    # Get event-specific fields (already flat)
+    event_specific = get_event_specific_data(event_type, event_data)
+
+    # Merge to create flat canonical structure
+    Map.merge(base_event, event_specific)
   end
 
   defp get_event_specific_data("stream.online", event_data) do
@@ -138,6 +150,7 @@ defmodule Server.Services.Twitch.EventHandler do
     {:ok, data} = Server.BoundaryConverter.from_external(event_data)
 
     %{
+      # Stream-specific fields (flat)
       stream_id: Map.get(data, :id),
       broadcaster_user_id: Map.get(data, :broadcaster_user_id),
       broadcaster_user_login: Map.get(data, :broadcaster_user_login),
@@ -207,12 +220,17 @@ defmodule Server.Services.Twitch.EventHandler do
     {:ok, data} = Server.BoundaryConverter.from_external(event_data)
 
     %{
+      # User fields (flat)
       user_id: Map.get(data, :user_id),
       user_login: Map.get(data, :user_login),
       user_name: Map.get(data, :user_name),
+
+      # Broadcaster fields (flat)
       broadcaster_user_id: Map.get(data, :broadcaster_user_id),
       broadcaster_user_login: Map.get(data, :broadcaster_user_login),
       broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+
+      # Cheer-specific fields (flat)
       is_anonymous: Map.get(data, :is_anonymous, false),
       bits: Map.get(data, :bits),
       message: Map.get(data, :message)
@@ -237,33 +255,67 @@ defmodule Server.Services.Twitch.EventHandler do
   defp get_event_specific_data("channel.chat.message", event_data) do
     {:ok, data} = Server.BoundaryConverter.from_external(event_data)
 
+    # Extract nested message data
     message_data = Map.get(data, :message, %{})
     fragments = Map.get(message_data, :fragments, [])
     {emotes, native_emotes} = extract_emotes_from_fragments(fragments)
 
+    # Extract reply data if present (handle nil case)
+    reply_data = Map.get(data, :reply) || %{}
+    has_reply = reply_data != %{} and reply_data != nil
+
+    # Extract cheer data if present (handle nil case)
+    cheer_data = Map.get(data, :cheer) || %{}
+    has_cheer = cheer_data != %{} and cheer_data != nil
+
     %{
+      # Message fields (all flat, no nesting)
       message_id: Map.get(data, :message_id),
       broadcaster_user_id: Map.get(data, :broadcaster_user_id),
       broadcaster_user_login: Map.get(data, :broadcaster_user_login),
       broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+
+      # User fields (using consistent naming)
       user_id: Map.get(data, :chatter_user_id),
       user_login: Map.get(data, :chatter_user_login),
       user_name: Map.get(data, :chatter_user_name),
+
+      # Message content (flat)
       message: Map.get(message_data, :text),
       fragments: fragments,
       emotes: emotes,
       native_emotes: native_emotes,
+
+      # User attributes (flat)
       color: Map.get(data, :color),
       badges: extract_badges(Map.get(data, :badges)),
+
+      # Message metadata (flat)
       message_type: Map.get(data, :message_type),
-      cheer: Map.get(data, :cheer),
-      reply: Map.get(data, :reply),
+
+      # Flatten cheer data if present
+      cheer_bits: if(has_cheer, do: Map.get(cheer_data, :bits), else: nil),
+
+      # Flatten reply data if present
+      reply_parent_message_id: if(has_reply, do: Map.get(reply_data, :parent_message_id), else: nil),
+      reply_parent_user_id: if(has_reply, do: Map.get(reply_data, :parent_user_id), else: nil),
+      reply_parent_user_login: if(has_reply, do: Map.get(reply_data, :parent_user_login), else: nil),
+      reply_parent_user_name: if(has_reply, do: Map.get(reply_data, :parent_user_name), else: nil),
+      reply_parent_message_body: if(has_reply, do: Map.get(reply_data, :parent_message_body), else: nil),
+      reply_thread_message_id: if(has_reply, do: Map.get(reply_data, :thread_message_id), else: nil),
+      reply_thread_user_id: if(has_reply, do: Map.get(reply_data, :thread_user_id), else: nil),
+      reply_thread_user_login: if(has_reply, do: Map.get(reply_data, :thread_user_login), else: nil),
+      reply_thread_user_name: if(has_reply, do: Map.get(reply_data, :thread_user_name), else: nil),
+
+      # Channel points reward (flat)
       channel_points_custom_reward_id: Map.get(data, :channel_points_custom_reward_id),
+
+      # Source data for shared messages (flat)
       source_broadcaster_user_id: Map.get(data, :source_broadcaster_user_id),
       source_broadcaster_user_login: Map.get(data, :source_broadcaster_user_login),
       source_broadcaster_user_name: Map.get(data, :source_broadcaster_user_name),
       source_message_id: Map.get(data, :source_message_id),
-      source_badges: Map.get(data, :source_badges)
+      source_badges: extract_badges(Map.get(data, :source_badges))
     }
   end
 
@@ -482,6 +534,7 @@ defmodule Server.Services.Twitch.EventHandler do
     # Only store events that are valuable for the Activity Log
     if should_store_event?(event_type) do
       # Prepare event attributes for database storage
+      # Use the correlation_id from the normalized event (already set during normalization)
       event_attrs = %{
         timestamp: normalized_event.timestamp,
         event_type: event_type,
@@ -489,7 +542,7 @@ defmodule Server.Services.Twitch.EventHandler do
         user_login: normalized_event[:user_login],
         user_name: normalized_event[:user_name],
         data: normalized_event,
-        correlation_id: generate_correlation_id()
+        correlation_id: normalized_event.correlation_id
       }
 
       Logger.debug("Storing event in ActivityLog database",
@@ -651,8 +704,24 @@ defmodule Server.Services.Twitch.EventHandler do
     )
   end
 
-  # Simple correlation ID generation for events
+  # Get correlation ID safely, with fallback for when pool isn't available
+  defp get_safe_correlation_id do
+    try do
+      Server.CorrelationIdPool.get()
+    rescue
+      ArgumentError ->
+        # Pool not available (e.g., in tests), generate one directly
+        generate_correlation_id()
+    end
+  end
+
+  # Simple correlation ID generation for events (backup when pool is unavailable)
   defp generate_correlation_id do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
+  end
+
+  # Generate a unique event ID when not provided by Twitch
+  defp generate_event_id do
+    "evt_" <> (:crypto.strong_rand_bytes(12) |> Base.encode16(case: :lower))
   end
 end
