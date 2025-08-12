@@ -77,9 +77,7 @@ defmodule ServerWeb.HealthController do
         websocket: %{connected: true}
       },
       system: %{
-        uptime:
-          System.system_time(:second) -
-            Application.get_env(:server, :start_time, System.system_time(:second)),
+        uptime: :erlang.statistics(:wall_clock) |> elem(0) |> div(1000),
         version: Application.spec(:server, :vsn) |> to_string(),
         environment: Application.get_env(:server, :env, :dev) |> to_string()
       }

@@ -105,7 +105,9 @@ defmodule ServerWeb.Endpoint do
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
-    json_decoder: Phoenix.json_library()
+    json_decoder: Phoenix.json_library(),
+    # 100KB limit for request bodies
+    length: 100_000
 
   plug Plug.MethodOverride
   plug Plug.Head

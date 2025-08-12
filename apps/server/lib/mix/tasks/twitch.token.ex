@@ -1,36 +1,19 @@
 defmodule Mix.Tasks.Twitch.Token do
   @moduledoc """
-  Professional Twitch OAuth token management CLI with production Docker support.
+  Twitch OAuth token generator for Landale.
 
-  ## Quick Start
+  ## Usage
 
-      mix twitch.token                # Interactive token creation
-      mix twitch.token refresh         # Refresh tokens (Docker-friendly)
-      mix twitch.token status          # Check token status
-      mix twitch.token help            # Full help guide
+      mix twitch.token      # Generate OAuth tokens
+      mix twitch.token help # Show help
 
-  ## Production Docker Workflows
+  ## Workflow
 
-  ### Initial Setup (One-time)
-  1. Create tokens on dev machine: `mix twitch.token`
-  2. Copy to production: `rsync ./data/twitch_tokens* server:/app/data/`
-
-  ### Ongoing Maintenance
-      # Check token status
-      docker exec landale-server mix twitch.token status
-
-      # Refresh expired tokens
-      docker exec landale-server mix twitch.token refresh
-
-  ## Features
-
-  ✅ Interactive OAuth flow with browser integration
-  ✅ Docker-friendly non-interactive token refresh
-  ✅ Token status monitoring and expiration warnings
-  ✅ Automatic DETS + JSON backup storage
-  ✅ Professional CLI styling (Astro/Vite quality)
-  ✅ Comprehensive error handling and recovery
-  ✅ Environment-aware storage paths (dev vs prod)
+  1. Run `mix twitch.token` to start OAuth flow
+  2. Authorize in your browser
+  3. Copy the JSON output
+  4. Paste in dashboard OAuth page
+  5. Click "Save Tokens"
 
   ## Required Environment Variables
 
@@ -39,20 +22,12 @@ defmodule Mix.Tasks.Twitch.Token do
 
   Get these from: https://dev.twitch.tv/console/apps
 
-  ## Scopes Included
+  ## Features
 
-  - channel:read:subscriptions (subscription events)
-  - moderator:read:followers (follow events)
-  - channel:read:redemptions (channel point redemptions)
-
-  ## Security & Storage
-
-  - Tokens stored in ./data/ (dev) or /app/data/ (Docker)
-  - Automatic refresh prevents expiration
-  - JSON backup created alongside DETS storage
-  - All operations logged for debugging
-
-  Run `mix twitch.token help` for complete usage guide.
+  ✅ Interactive OAuth flow with browser integration
+  ✅ Outputs JSON for dashboard upload
+  ✅ No file storage - just copy/paste
+  ✅ Clean, simple workflow
   """
 
   use Mix.Task
@@ -105,14 +80,8 @@ defmodule Mix.Tasks.Twitch.Token do
   def run(args) do
     # Parse command line arguments
     case parse_args(args) do
-      {:refresh} ->
-        run_token_refresh()
-
       {:interactive} ->
         run_interactive_flow()
-
-      {:status} ->
-        run_token_status()
 
       {:help} ->
         display_help()
@@ -183,7 +152,7 @@ defmodule Mix.Tasks.Twitch.Token do
 
     IO.puts(dim("  • This will open Twitch in your browser for authorization"))
     IO.puts(dim("  • You'll authorize the application with your Twitch account"))
-    IO.puts(dim("  • Tokens will be stored securely in your data directory"))
+    IO.puts(dim("  • Tokens will be outputted as JSON for dashboard upload"))
     IO.puts(dim("  • Never share these tokens or commit them to version control"))
     IO.puts("")
 
@@ -221,7 +190,7 @@ defmodule Mix.Tasks.Twitch.Token do
 
     Enum.each(@required_scopes, fn scope ->
       description = scope_description(scope)
-      IO.puts("  #{bright("•")} #{scope} #{dim("- #{description}")})")
+      IO.puts("  #{bright("•")} #{scope} #{dim("- #{description}")}")
     end)
 
     IO.puts("")
@@ -334,19 +303,9 @@ defmodule Mix.Tasks.Twitch.Token do
   end
 
   defp step_5_store_tokens(_config, token_data, user_info) do
-    display_step_header(5, "Token Storage")
+    display_step_header(5, "Token Output")
 
-    display_info("Storing tokens in application data directory...")
-    IO.puts("")
-
-    # Store tokens directly in DETS for CLI context
-    storage_path = get_storage_path()
-    storage_dir = Path.dirname(storage_path)
-    File.mkdir_p!(storage_dir)
-
-    # Prepare token data for storage
-    current_utc = DateTime.utc_now()
-    expires_at = DateTime.add(current_utc, token_data["expires_in"], :second)
+    # Prepare token data for JSON output
 
     scopes =
       case token_data["scope"] do
@@ -355,127 +314,35 @@ defmodule Mix.Tasks.Twitch.Token do
         _ -> []
       end
 
-    token_info = %{
+    token_json = %{
       access_token: token_data["access_token"],
       refresh_token: token_data["refresh_token"],
-      expires_at: DateTime.to_iso8601(expires_at),
+      expires_in: token_data["expires_in"],
       scopes: scopes,
       user_id: user_info["user_id"]
     }
 
-    # Store in DETS directly
-    case :dets.open_file(:twitch_tokens, file: String.to_charlist(storage_path)) do
-      {:ok, table} ->
-        case :dets.insert(table, {:token, token_info}) do
-          :ok ->
-            :dets.sync(table)
-            :dets.close(table)
-
-            # Also create JSON backup
-            create_json_backup(storage_dir, token_info)
-
-            display_success("Tokens stored successfully")
-            IO.puts("  #{dim("Storage location:")} #{storage_path}")
-            IO.puts("")
-
-            display_success_summary(user_info, token_data)
-
-          {:error, reason} ->
-            :dets.close(table)
-            display_error("Failed to store tokens: #{inspect(reason)}")
-        end
-
-      {:error, reason} ->
-        display_error("Failed to open token storage: #{inspect(reason)}")
-    end
-  end
-
-  defp display_success_summary(user_info, token_data) do
-    scopes =
-      case token_data["scope"] do
-        scope when is_binary(scope) -> String.split(scope, " ")
-        scope when is_list(scope) -> scope
-        _ -> []
-      end
-      |> Enum.sort()
-
-    IO.puts("#{success_icon()} #{bright("Token Creation Complete!")}")
+    display_success("Token generation complete!")
     IO.puts("")
-    IO.puts("#{bright("Summary:")}")
-    IO.puts("  #{bright("•")} User: #{user_info["login"]} #{dim("(ID: #{user_info["user_id"]})")}")
-    IO.puts("  #{bright("•")} Scopes: #{Enum.join(scopes, ", ")}")
-    IO.puts("  #{bright("•")} Auto-refresh: #{bright("Enabled")}")
-    IO.puts("  #{bright("•")} Storage: #{bright("Persistent")} #{dim("(survives server restarts)")}")
+    IO.puts("#{bright("Copy this JSON and paste it in the dashboard:")}")
+    IO.puts("")
+    IO.puts(bright("─────────────────────────────────────────────"))
+    IO.puts(JSON.encode!(token_json, pretty: true))
+    IO.puts(bright("─────────────────────────────────────────────"))
     IO.puts("")
     IO.puts("#{bright("Next Steps:")}")
-    IO.puts("  #{bright("1.")} Start/restart your Landale server")
-    IO.puts("  #{bright("2.")} Check logs for #{bright("\"Twitch service starting\"")}")
-    IO.puts("  #{bright("3.")} Verify EventSub subscriptions are created")
-    IO.puts("  #{bright("4.")} Test stream events in your dashboard")
+    IO.puts("  #{bright("1.")} Copy the JSON above")
+    IO.puts("  #{bright("2.")} Go to your dashboard OAuth page")
+    IO.puts("  #{bright("3.")} Paste the JSON in the token field")
+    IO.puts("  #{bright("4.")} Click 'Save Tokens'")
     IO.puts("")
-    IO.puts("#{info_icon()} #{dim("Tokens will automatically refresh before expiration.")}")
-    IO.puts("#{dim("No manual intervention needed for normal operation.")}")
+    IO.puts("#{info_icon()} #{dim("Tokens will be encrypted and stored in the database.")}")
+    IO.puts("#{dim("Automatic refresh will keep your connection active.")}")
     IO.puts("")
-  end
-
-  # Production-friendly token refresh functions
-
-  defp run_token_refresh do
-    start_minimal_app()
-
-    display_info("🔄 Attempting to refresh existing Twitch tokens...")
-    IO.puts("")
-
-    # Load existing tokens
-    storage_path = get_storage_path()
-
-    case load_existing_tokens(storage_path) do
-      {:ok, token_info} ->
-        case refresh_stored_tokens(token_info) do
-          {:ok, new_token_info} ->
-            store_refreshed_tokens(storage_path, new_token_info)
-            display_success("Token refresh completed successfully")
-            display_token_summary(new_token_info)
-
-          {:error, reason} ->
-            display_error("Token refresh failed: #{reason}")
-            display_refresh_help()
-            System.halt(1)
-        end
-
-      {:error, reason} ->
-        display_error("Could not load existing tokens: #{reason}")
-        display_refresh_help()
-        System.halt(1)
-    end
-  end
-
-  defp run_token_status do
-    start_minimal_app()
-
-    display_info("📊 Checking Twitch token status...")
-    IO.puts("")
-
-    storage_path = get_storage_path()
-
-    case load_existing_tokens(storage_path) do
-      {:ok, token_info} ->
-        display_token_status(token_info)
-
-      {:error, reason} ->
-        display_error("No tokens found: #{reason}")
-        IO.puts("")
-        IO.puts("#{dim("To create new tokens, run:")} #{bright("mix twitch.token")}")
-        System.halt(1)
-    end
   end
 
   # Default to interactive mode
   defp parse_args([]), do: {:interactive}
-  defp parse_args(["--refresh"]), do: {:refresh}
-  defp parse_args(["refresh"]), do: {:refresh}
-  defp parse_args(["--status"]), do: {:status}
-  defp parse_args(["status"]), do: {:status}
   defp parse_args(["--help"]), do: {:help}
   defp parse_args(["help"]), do: {:help}
   defp parse_args(["-h"]), do: {:help}
@@ -484,10 +351,8 @@ defmodule Mix.Tasks.Twitch.Token do
   defp display_quick_help do
     IO.puts("")
     IO.puts("#{bright("Available commands:")}")
-    IO.puts("  #{bright("mix twitch.token")}         #{dim("# Interactive token creation")}")
-    IO.puts("  #{bright("mix twitch.token refresh")} #{dim("# Refresh existing tokens (Docker)")}")
-    IO.puts("  #{bright("mix twitch.token status")}  #{dim("# Check token status")}")
-    IO.puts("  #{bright("mix twitch.token help")}    #{dim("# Full help & guide")}")
+    IO.puts("  #{bright("mix twitch.token")}      #{dim("# Generate OAuth tokens")}")
+    IO.puts("  #{bright("mix twitch.token help")} #{dim("# Show help")}")
     IO.puts("")
   end
 
@@ -495,274 +360,40 @@ defmodule Mix.Tasks.Twitch.Token do
     IO.puts("")
     IO.puts(bright("┌─────────────────────────────────────────────┐"))
     IO.puts(bright("│           ") <> cyan("Twitch Token Generator") <> bright("            │"))
-    IO.puts(bright("│             ") <> dim("Help & Usage Guide") <> bright("             │"))
+    IO.puts(bright("│          ") <> dim("Simple OAuth Flow for Landale") <> bright("        │"))
     IO.puts(bright("└─────────────────────────────────────────────┘"))
     IO.puts("")
 
-    IO.puts("#{bright("🎯 COMMANDS:")}")
+    IO.puts("#{bright("🎯 USAGE:")}")
     IO.puts("")
-    IO.puts("  #{bright("mix twitch.token")}                 #{dim("Interactive token creation")}")
-    IO.puts("    #{dim("• Creates new OAuth tokens with browser")}")
-    IO.puts("    #{dim("• Use for initial setup or when refresh fails")}")
-    IO.puts("")
-    IO.puts("  #{bright("mix twitch.token refresh")}         #{dim("Refresh existing tokens")}")
-    IO.puts("    #{dim("• No browser required - uses refresh token")}")
-    IO.puts("    #{dim("• Perfect for Docker/production environments")}")
-    IO.puts("")
-    IO.puts("  #{bright("mix twitch.token status")}          #{dim("Check token status")}")
-    IO.puts("    #{dim("• Shows expiration time and warnings")}")
-    IO.puts("    #{dim("• Use for monitoring and diagnostics")}")
-    IO.puts("")
-    IO.puts("  #{bright("mix twitch.token help")}            #{dim("Show this help")}")
+    IO.puts("  #{bright("mix twitch.token")}     #{dim("Generate OAuth tokens")}")
+    IO.puts("  #{bright("mix twitch.token help")} #{dim("Show this help")}")
     IO.puts("")
 
-    IO.puts("#{bright("🐳 PRODUCTION DOCKER WORKFLOWS:")}")
+    IO.puts("#{bright("📋 WORKFLOW:")}")
     IO.puts("")
-    IO.puts("#{bright("Initial Setup (One-time):")}")
-    IO.puts("  #{dim("1. On development machine:")}")
-    IO.puts("     #{bright("mix twitch.token")}  #{dim("# Interactive setup")}")
-    IO.puts("")
-    IO.puts("  #{dim("2. Copy tokens to production:")}")
-    IO.puts("     #{bright("rsync ./data/twitch_tokens* server:/app/data/")}")
-    IO.puts("")
-
-    IO.puts("#{bright("Ongoing Maintenance:")}")
-    IO.puts("  #{dim("# Check if tokens are expiring soon")}")
-    IO.puts("  #{bright("docker exec landale-server mix twitch.token status")}")
-    IO.puts("")
-    IO.puts("  #{dim("# Refresh tokens when they expire")}")
-    IO.puts("  #{bright("docker exec landale-server mix twitch.token refresh")}")
+    IO.puts("  #{bright("1.")} Run #{bright("mix twitch.token")}")
+    IO.puts("  #{bright("2.")} Authorize in browser")
+    IO.puts("  #{bright("3.")} Copy the JSON output")
+    IO.puts("  #{bright("4.")} Paste in dashboard OAuth page")
+    IO.puts("  #{bright("5.")} Click 'Save Tokens'")
     IO.puts("")
 
-    IO.puts("#{bright("Automated Monitoring (Crontab):")}")
-    IO.puts("  #{dim("# Check every 30 minutes and auto-refresh if needed")}")
-    IO.puts("  #{bright("*/30 * * * * docker exec landale-server \\")}")
-    IO.puts("  #{bright("  bash -c \"mix twitch.token status | grep -q 'expires soon' && \\")}")
-    IO.puts("  #{bright("  mix twitch.token refresh\"")}")
+    IO.puts("#{bright("🔑 ENVIRONMENT SETUP:")}")
+    IO.puts("")
+    IO.puts("  #{bright("TWITCH_CLIENT_ID")}     #{dim("Your Twitch app client ID")}")
+    IO.puts("  #{bright("TWITCH_CLIENT_SECRET")} #{dim("Your Twitch app client secret")}")
+    IO.puts("")
+    IO.puts("  Get these from: #{bright("https://dev.twitch.tv/console/apps")}")
     IO.puts("")
 
-    IO.puts("#{bright("📋 ENVIRONMENT SETUP:")}")
-    IO.puts("")
-    IO.puts("#{bright("Required Environment Variables:")}")
-    IO.puts("  #{bright("TWITCH_CLIENT_ID")}       #{dim("- Your Twitch app client ID")}")
-    IO.puts("  #{bright("TWITCH_CLIENT_SECRET")}   #{dim("- Your Twitch app client secret")}")
-    IO.puts("")
-    IO.puts("#{bright("Get Twitch Credentials:")}")
-    IO.puts("  #{dim("1. Go to:")} #{bright("https://dev.twitch.tv/console/apps")}")
-    IO.puts("  #{dim("2. Create new application or select existing")}")
-    IO.puts("  #{dim("3. Copy Client ID and generate Client Secret")}")
-    IO.puts("  #{dim("4. Set environment variables or add to .env file")}")
-    IO.puts("")
-
-    IO.puts("#{bright("🔧 TROUBLESHOOTING:")}")
-    IO.puts("")
-    IO.puts("#{error_icon()} #{bright("Refresh fails?")}")
-    IO.puts("  #{dim("• Refresh tokens can expire (usually after 6 months)")}")
-    IO.puts("  #{dim("• Solution: Create new tokens interactively")}")
-    IO.puts("  #{dim("• Run:")} #{bright("mix twitch.token")} #{dim("then copy to production")}")
-    IO.puts("")
-    IO.puts("#{error_icon()} #{bright("No browser in Docker?")}")
-    IO.puts("  #{dim("• This is expected - use refresh command instead")}")
-    IO.puts("  #{dim("• Or run interactive mode on dev machine")}")
-    IO.puts("")
-    IO.puts("#{error_icon()} #{bright("Environment variables missing?")}")
-    IO.puts("  #{dim("• Check .env file exists and has correct values")}")
-    IO.puts("  #{dim("• In Docker: ensure environment is passed to container")}")
-    IO.puts("")
-
-    IO.puts("#{bright("📁 FILE LOCATIONS:")}")
-    IO.puts("")
-    IO.puts("#{bright("Development:")}")
-    IO.puts("  #{dim("Tokens:")} ./data/twitch_tokens.dets")
-    IO.puts("  #{dim("Backup:")} ./data/twitch_tokens_backup.json")
-    IO.puts("")
-    IO.puts("#{bright("Production (Docker):")}")
-    IO.puts("  #{dim("Tokens:")} /app/data/twitch_tokens.dets")
-    IO.puts("  #{dim("Backup:")} /app/data/twitch_tokens_backup.json")
-    IO.puts("")
-
-    IO.puts("#{bright("🔐 SECURITY NOTES:")}")
+    IO.puts("#{bright("🔐 SECURITY:")}")
     IO.puts("")
     IO.puts("  #{warning_icon()} #{bright("Never commit tokens to version control")}")
-    IO.puts("  #{warning_icon()} #{bright("Keep environment variables secure")}")
-    IO.puts("  #{warning_icon()} #{bright("Tokens auto-refresh - no manual intervention needed")}")
-    IO.puts("  #{success_icon()} #{bright("Tokens are stored locally and backed up as JSON")}")
-    IO.puts("")
-
-    IO.puts("#{info_icon()} #{dim("For more help, see the Landale documentation or contact support.")}")
+    IO.puts("  #{success_icon()} #{bright("Tokens are encrypted in database")}")
+    IO.puts("  #{success_icon()} #{bright("Auto-refresh keeps connection active")}")
     IO.puts("")
   end
-
-  defp load_existing_tokens(storage_path) do
-    case :dets.open_file(:twitch_tokens_check, file: String.to_charlist(storage_path)) do
-      {:ok, table} ->
-        case :dets.lookup(table, :token) do
-          [{:token, token_data}] ->
-            :dets.close(table)
-            {:ok, deserialize_stored_token(token_data)}
-
-          [] ->
-            :dets.close(table)
-            {:error, "No tokens stored"}
-        end
-
-      {:error, reason} ->
-        {:error, "Cannot open token storage: #{inspect(reason)}"}
-    end
-  end
-
-  defp refresh_stored_tokens(token_info) do
-    case token_info.refresh_token do
-      nil ->
-        {:error, "No refresh token available - need to create new tokens interactively"}
-
-      refresh_token ->
-        params = %{
-          "client_id" => System.get_env("TWITCH_CLIENT_ID"),
-          "client_secret" => System.get_env("TWITCH_CLIENT_SECRET"),
-          "grant_type" => "refresh_token",
-          "refresh_token" => refresh_token
-        }
-
-        case make_direct_token_request(@token_url, params) do
-          {:ok, token_data} ->
-            current_utc = DateTime.utc_now()
-            new_expires_at = DateTime.add(current_utc, token_data["expires_in"], :second)
-
-            updated_token_info = %{
-              access_token: token_data["access_token"],
-              # Keep old refresh token if not provided
-              refresh_token: token_data["refresh_token"] || refresh_token,
-              expires_at: new_expires_at,
-              scopes: token_info.scopes,
-              user_id: token_info.user_id
-            }
-
-            {:ok, updated_token_info}
-
-          {:error, reason} ->
-            {:error, format_oauth_error(reason)}
-        end
-    end
-  end
-
-  defp store_refreshed_tokens(storage_path, token_info) do
-    storage_dir = Path.dirname(storage_path)
-    File.mkdir_p!(storage_dir)
-
-    # Prepare token data for storage
-    serialized_token = %{
-      access_token: token_info.access_token,
-      refresh_token: token_info.refresh_token,
-      expires_at: DateTime.to_iso8601(token_info.expires_at),
-      scopes: token_info.scopes,
-      user_id: token_info.user_id
-    }
-
-    # Store in DETS
-    case :dets.open_file(:twitch_tokens_refresh, file: String.to_charlist(storage_path)) do
-      {:ok, table} ->
-        case :dets.insert(table, {:token, serialized_token}) do
-          :ok ->
-            :dets.sync(table)
-            :dets.close(table)
-
-            # Create JSON backup
-            create_json_backup(storage_dir, serialized_token)
-            :ok
-
-          {:error, reason} ->
-            :dets.close(table)
-            {:error, reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp display_token_status(token_info) do
-    now = DateTime.utc_now()
-    time_until_expiry = DateTime.diff(token_info.expires_at, now, :second)
-
-    if time_until_expiry > 0 do
-      hours_left = Float.round(time_until_expiry / 3_600, 1)
-
-      status_icon =
-        cond do
-          # > 24 hours
-          time_until_expiry > 86_400 -> success_icon()
-          # > 1 hour
-          time_until_expiry > 3_600 -> warning_icon()
-          # < 1 hour
-          true -> error_icon()
-        end
-
-      IO.puts("#{status_icon} Token Status: #{bright("Valid")}")
-      IO.puts("  #{dim("Expires in:")} #{time_until_expiry} seconds #{dim("(#{hours_left} hours)")}")
-      IO.puts("  #{dim("User ID:")} #{token_info.user_id}")
-      IO.puts("  #{dim("Scopes:")} #{Enum.join(token_info.scopes, ", ")}")
-
-      if time_until_expiry < 3_600 do
-        IO.puts("")
-        IO.puts("#{warning_icon()} #{bright("Token expires soon!")}")
-        IO.puts("  #{dim("Run refresh command:")} #{bright("mix twitch.token refresh")}")
-      end
-    else
-      IO.puts("#{error_icon()} Token Status: #{bright("Expired")}")
-      IO.puts("  #{dim("Expired:")} #{abs(time_until_expiry)} seconds ago")
-      IO.puts("")
-      IO.puts("#{bright("Action required:")}")
-      IO.puts("  #{dim("Try refresh:")} #{bright("mix twitch.token refresh")}")
-      IO.puts("  #{dim("Or recreate:")} #{bright("mix twitch.token")}")
-    end
-
-    IO.puts("")
-  end
-
-  defp display_token_summary(token_info) do
-    time_until_expiry = DateTime.diff(token_info.expires_at, DateTime.utc_now(), :second)
-    hours_left = Float.round(time_until_expiry / 3_600, 1)
-
-    IO.puts("")
-    IO.puts("#{bright("Updated Token Summary:")}")
-    IO.puts("  #{bright("•")} User ID: #{token_info.user_id}")
-    IO.puts("  #{bright("•")} Valid for: #{hours_left} hours")
-    IO.puts("  #{bright("•")} Scopes: #{Enum.join(token_info.scopes, ", ")}")
-    IO.puts("  #{bright("•")} Auto-refresh: #{bright("Enabled")}")
-    IO.puts("")
-    IO.puts("#{info_icon()} #{dim("Token will be automatically used by the running application.")}")
-    IO.puts("")
-  end
-
-  defp display_refresh_help do
-    IO.puts("")
-    IO.puts("#{bright("Token Refresh Options:")}")
-    IO.puts("  #{bright("1.")} If you have a refresh token, it may have expired")
-    IO.puts("  #{bright("2.")} Create new tokens interactively: #{bright("mix twitch.token")}")
-    IO.puts("  #{bright("3.")} Or run on dev machine and copy tokens to production")
-    IO.puts("")
-  end
-
-  defp deserialize_stored_token(token_data) do
-    %{
-      access_token: token_data.access_token,
-      refresh_token: token_data.refresh_token,
-      expires_at: parse_stored_datetime(token_data.expires_at),
-      scopes: token_data.scopes || [],
-      user_id: token_data.user_id
-    }
-  end
-
-  defp parse_stored_datetime(datetime_string) when is_binary(datetime_string) do
-    case DateTime.from_iso8601(datetime_string) do
-      {:ok, datetime, _offset} -> datetime
-      # Fallback to now if parse fails
-      {:error, _reason} -> DateTime.utc_now()
-    end
-  end
-
-  defp parse_stored_datetime(_), do: DateTime.utc_now()
 
   # Helper functions
 
@@ -954,27 +585,6 @@ defmodule Mix.Tasks.Twitch.Token do
     case make_direct_validate_request(@validate_url, access_token) do
       {:ok, user_info} -> {:ok, user_info}
       {:error, reason} -> {:error, format_oauth_error(reason)}
-    end
-  end
-
-  defp get_storage_path do
-    case Application.get_env(:server, :env, :dev) do
-      :prod -> "/app/data/twitch_tokens.dets"
-      _ -> "./data/twitch_tokens.dets"
-    end
-  end
-
-  defp create_json_backup(storage_dir, token_info) do
-    backup_data = Map.put(token_info, :backup_timestamp, DateTime.utc_now() |> DateTime.to_iso8601())
-    backup_file = Path.join(storage_dir, "twitch_tokens_backup.json")
-
-    try do
-      json_data = JSON.encode!(backup_data)
-      File.write!(backup_file, json_data)
-    rescue
-      _error ->
-        # Backup failure is not critical, just continue
-        :ok
     end
   end
 

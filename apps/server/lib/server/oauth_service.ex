@@ -3,12 +3,12 @@ defmodule Server.OAuthService do
   Centralized OAuth token management service.
 
   Manages OAuth tokens for multiple services (Twitch, Discord, etc.) in a single
-  GenServer, providing automatic refresh, persistent storage, and a clean API.
+  GenServer, providing automatic refresh and persistent storage via PostgreSQL.
 
   ## Features
   - Multi-service token management
   - Automatic token refresh before expiration
-  - Persistent storage using DETS
+  - Persistent storage using PostgreSQL
   - Telemetry integration
   - Service isolation (tokens are namespaced by service)
 
@@ -42,16 +42,28 @@ defmodule Server.OAuthService do
 
   require Logger
 
-  alias Server.{CorrelationId, OAuthTokenManager, OAuthTokenRepository}
+  alias Server.{CircuitBreakerServer, CorrelationId, OAuthTokenRepository}
+
+  # Configuration constants
+  # 5 minutes before expiry
+  @default_refresh_buffer_ms 300_000
+  # 1 minute initial retry delay
+  @retry_base_delay_ms 60_000
+  # 1 hour max retry delay
+  @retry_max_delay_ms 3_600_000
+  # 15 seconds for token requests
+  @token_request_timeout_ms 15_000
+  # 10 seconds for validation requests
+  @validate_request_timeout_ms 10_000
 
   # State structure
   defstruct [
-    # Map of service_name => OAuthTokenManager state
-    managers: %{},
+    # Map of service_name => OAuth config
+    configs: %{},
     # Map of service_name => refresh timer reference
     refresh_timers: %{},
-    # Flag to track if migration has been attempted
-    migration_attempted: false
+    # Map of service_name => retry count for exponential backoff
+    retry_counts: %{}
   ]
 
   # Client API
@@ -102,7 +114,7 @@ defmodule Server.OAuthService do
   end
 
   @doc """
-  Validates tokens for a specific service.
+  Validates the current token for a service.
   """
   @spec validate_token(atom()) :: {:ok, map()} | {:error, term()}
   @impl true
@@ -110,40 +122,46 @@ defmodule Server.OAuthService do
     GenServer.call(__MODULE__, {:validate_token, service_name})
   end
 
-  # ServiceBehaviour implementation
-
+  @doc """
+  Gets the health status of the OAuth service.
+  """
+  @spec get_health() :: {:ok, map()} | {:error, term()}
   @impl true
   def get_health do
     GenServer.call(__MODULE__, :get_health)
   end
 
+  @doc """
+  Gets general info about the OAuth service.
+  """
+  @spec get_info() :: {:ok, map()}
   @impl true
   def get_info do
-    %{
-      name: "oauth",
-      version: "1.0.0",
-      capabilities: [:multi_service, :auto_refresh, :persistent_storage],
-      description: "Centralized OAuth token management for multiple services"
-    }
+    GenServer.call(__MODULE__, :get_info)
   end
 
+  @doc """
+  Gets the current status of the OAuth service.
+  """
+  @spec get_status() :: {:ok, map()} | {:error, term()}
   @impl true
   def get_status do
     GenServer.call(__MODULE__, :get_status)
   end
 
-  # Server.Service callbacks
+  # Server implementation
 
   @impl Server.Service
-  def do_init(_opts) do
-    # Initialize empty state first
-    state = %__MODULE__{}
+  def do_init(_args) do
+    Logger.info("OAuthService starting")
 
-    # Attempt to migrate from DETS to database if needed
-    state = maybe_migrate_from_dets(state)
+    state = %__MODULE__{
+      configs: %{},
+      refresh_timers: %{},
+      retry_counts: %{}
+    }
 
-    # Auto-register Twitch service if configuration is available
-    # This is fast and synchronous - just creates in-memory manager
+    # Auto-register Twitch service if configured
     final_state =
       case build_twitch_config() do
         nil ->
@@ -151,49 +169,33 @@ defmodule Server.OAuthService do
           state
 
         config ->
-          case register_twitch_service(state, config) do
-            {:ok, new_state} ->
-              Logger.info("Twitch OAuth service auto-registered successfully")
-              new_state
-
-            {:error, reason} ->
-              Logger.warning("Failed to auto-register Twitch OAuth service",
-                reason: inspect(reason),
-                note: "Service can be registered later via API"
-              )
-
-              state
-          end
+          {:ok, new_state} = register_twitch_service(state, config)
+          Logger.info("Twitch OAuth service auto-registered successfully")
+          new_state
       end
 
     {:ok, final_state}
   end
 
   defp register_twitch_service(state, config) do
-    # Build proper keyword list for database-backed manager
-    manager_opts = [
-      service_name: :twitch,
-      client_id: config.client_id,
-      client_secret: config.client_secret,
-      auth_url: config.auth_url,
-      token_url: config.token_url,
-      validate_url: config.validate_url,
-      telemetry_prefix: [:server, :twitch, :oauth]
-    ]
+    # Store config for the service
+    new_configs = Map.put(state.configs, :twitch, config)
+    new_state = %{state | configs: new_configs}
 
-    case OAuthTokenManager.new(manager_opts) do
-      {:ok, manager} ->
-        # Load any existing tokens from database
-        manager = OAuthTokenManager.load_tokens(manager)
+    # Load any existing tokens from database
+    new_state = load_existing_tokens(new_state, :twitch)
 
-        # Update state with the new manager
-        new_managers = Map.put(state.managers, :twitch, manager)
-        new_state = %{state | managers: new_managers}
+    {:ok, new_state}
+  end
 
-        {:ok, new_state}
+  defp load_existing_tokens(state, service_name) do
+    case OAuthTokenRepository.get_token(service_name) do
+      {:ok, token_info} ->
+        # Schedule refresh if needed
+        maybe_schedule_refresh(state, service_name, token_info)
 
-      {:error, reason} ->
-        {:error, reason}
+      {:error, :not_found} ->
+        state
     end
   end
 
@@ -204,10 +206,11 @@ defmodule Server.OAuthService do
     if client_id && client_secret do
       %{
         client_id: client_id,
-        client_secret: client_secret,
+        # Don't store client_secret in state - fetch from env when needed
         auth_url: "https://id.twitch.tv/oauth2/authorize",
         token_url: "https://id.twitch.tv/oauth2/token",
         validate_url: "https://id.twitch.tv/oauth2/validate",
+        refresh_buffer_ms: @default_refresh_buffer_ms,
         required_scopes: [
           # Stream/channel management
           "channel:read:subscriptions",
@@ -253,11 +256,6 @@ defmodule Server.OAuthService do
       Process.cancel_timer(timer_ref)
     end)
 
-    # Close all managers (no-op for database backend)
-    Enum.each(state.managers, fn {_service, manager} ->
-      OAuthTokenManager.close(manager)
-    end)
-
     :ok
   end
 
@@ -265,22 +263,21 @@ defmodule Server.OAuthService do
 
   @impl Server.Service.StatusReporter
   def do_build_status(state) do
-    services = Map.keys(state.managers)
+    services = Map.keys(state.configs)
 
     service_statuses =
       Enum.map(services, fn service ->
-        manager = Map.get(state.managers, service)
-        has_tokens = manager.token_info != nil
-
         token_status =
-          if has_tokens do
-            if token_needs_refresh?(manager.token_info, manager.refresh_buffer_ms) do
-              :expired
-            else
-              :valid
-            end
-          else
-            :no_tokens
+          case OAuthTokenRepository.get_token(service) do
+            {:ok, token_info} ->
+              if token_needs_refresh?(token_info) do
+                :expired
+              else
+                :valid
+              end
+
+            {:error, :not_found} ->
+              :no_tokens
           end
 
         {service, token_status}
@@ -298,7 +295,7 @@ defmodule Server.OAuthService do
   # Override from StatusReporter
   defp service_healthy?(state) do
     # Service is healthy if we have at least one registered service
-    map_size(state.managers) > 0
+    map_size(state.configs) > 0
   end
 
   # GenServer callbacks
@@ -313,164 +310,117 @@ defmodule Server.OAuthService do
         has_validate_url: Map.has_key?(config, :validate_url)
       )
 
-      # Create manager configuration
-      manager_opts = [
-        service_name: service_name,
-        client_id: config.client_id,
-        client_secret: config.client_secret,
-        auth_url: config.auth_url,
-        token_url: config.token_url,
-        telemetry_prefix: [:server, service_name, :oauth]
-      ]
+      # Store config for the service
+      new_configs = Map.put(state.configs, service_name, config)
+      new_state = %{state | configs: new_configs}
 
-      # Add optional validate URL
-      manager_opts =
-        if config[:validate_url] do
-          Keyword.put(manager_opts, :validate_url, config.validate_url)
-        else
-          manager_opts
-        end
+      # Load any existing tokens
+      new_state = load_existing_tokens(new_state, service_name)
 
-      case OAuthTokenManager.new(manager_opts) do
-        {:ok, manager} ->
-          # Load existing tokens
-          manager = OAuthTokenManager.load_tokens(manager)
-
-          # Store manager in state
-          new_state = %{state | managers: Map.put(state.managers, service_name, manager)}
-
-          # Schedule refresh if we have tokens
-          new_state = maybe_schedule_refresh(new_state, service_name)
-
-          {:reply, :ok, new_state}
-
-        {:error, reason} = error ->
-          Logger.error("Failed to create OAuth manager",
-            service: service_name,
-            error: inspect(reason)
-          )
-
-          {:reply, error, state}
-      end
+      {:reply, :ok, new_state}
     end)
   end
 
   @impl GenServer
   def handle_call({:get_valid_token, service_name}, _from, state) do
-    case Map.get(state.managers, service_name) do
-      nil ->
-        {:reply, {:error, :service_not_registered}, state}
+    with {:ok, _config} <- Map.fetch(state.configs, service_name),
+         {:ok, token_info} <- OAuthTokenRepository.get_token(service_name) do
+      if token_needs_refresh?(token_info) do
+        case do_refresh_token(service_name, state) do
+          {:ok, refreshed_token, new_state} ->
+            {:reply, {:ok, refreshed_token}, new_state}
 
-      manager ->
-        case OAuthTokenManager.get_valid_token(manager) do
-          {:ok, token, updated_manager} ->
-            # Update manager in state
-            new_managers = Map.put(state.managers, service_name, updated_manager)
-            new_state = %{state | managers: new_managers}
-
-            # Reschedule refresh
-            new_state = maybe_schedule_refresh(new_state, service_name)
-
-            {:reply, {:ok, token}, new_state}
-
-          {:error, _reason} = error ->
-            {:reply, error, state}
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
         end
+      else
+        {:reply, {:ok, token_info}, state}
+      end
+    else
+      :error -> {:reply, {:error, :service_not_registered}, state}
+      {:error, :not_found} -> {:reply, {:error, :no_tokens}, state}
     end
   end
 
   @impl GenServer
   def handle_call({:store_tokens, service_name, token_info}, _from, state) do
-    case Map.get(state.managers, service_name) do
+    case Map.get(state.configs, service_name) do
       nil ->
         {:reply, {:error, :service_not_registered}, state}
 
-      manager ->
-        updated_manager = OAuthTokenManager.set_token(manager, token_info)
+      _config ->
+        case OAuthTokenRepository.save_token(service_name, token_info) do
+          {:ok, _} ->
+            # Schedule refresh for new tokens
+            new_state = maybe_schedule_refresh(state, service_name, token_info)
+            {:reply, :ok, new_state}
 
-        # Update manager in state
-        new_managers = Map.put(state.managers, service_name, updated_manager)
-        new_state = %{state | managers: new_managers}
-
-        # Schedule refresh for new tokens
-        new_state = maybe_schedule_refresh(new_state, service_name)
-
-        {:reply, :ok, new_state}
-    end
-  end
-
-  @impl GenServer
-  def handle_call({:refresh_token, service_name}, _from, state) do
-    case Map.get(state.managers, service_name) do
-      nil ->
-        {:reply, {:error, :service_not_registered}, state}
-
-      manager ->
-        case OAuthTokenManager.refresh_token(manager) do
-          {:ok, updated_manager} ->
-            # Update manager in state
-            new_managers = Map.put(state.managers, service_name, updated_manager)
-            new_state = %{state | managers: new_managers}
-
-            # Reschedule refresh
-            new_state = maybe_schedule_refresh(new_state, service_name)
-
-            # Track successful refresh in monitor
-            if Process.whereis(Server.OAuthMonitor) do
-              Server.OAuthMonitor.record_refresh_success(
-                service_name,
-                updated_manager.token_info.expires_at
-              )
-            end
-
-            # Return the refreshed token info
-            {:reply, {:ok, updated_manager.token_info}, new_state}
-
-          {:error, reason} = error ->
-            # Track failed refresh in monitor
-            if Process.whereis(Server.OAuthMonitor) do
-              Server.OAuthMonitor.record_refresh_failure(service_name, reason)
-            end
-
-            {:reply, error, state}
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
         end
     end
   end
 
   @impl GenServer
+  def handle_call({:refresh_token, service_name}, _from, state) do
+    case do_refresh_token(service_name, state) do
+      {:ok, refreshed_token, new_state} ->
+        # Track successful refresh in monitor
+        if Process.whereis(Server.OAuthMonitor) do
+          Server.OAuthMonitor.record_refresh_success(
+            service_name,
+            refreshed_token.expires_at
+          )
+        end
+
+        {:reply, {:ok, refreshed_token}, new_state}
+
+      {:error, reason} ->
+        # Track failed refresh in monitor
+        if Process.whereis(Server.OAuthMonitor) do
+          Server.OAuthMonitor.record_refresh_failure(service_name, reason)
+        end
+
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  @impl GenServer
   def handle_call({:get_token_info, service_name}, _from, state) do
-    case Map.get(state.managers, service_name) do
+    case Map.get(state.configs, service_name) do
       nil ->
         {:reply, {:error, :service_not_registered}, state}
 
-      manager ->
-        if manager.token_info do
-          {:reply, {:ok, manager.token_info}, state}
-        else
-          {:reply, {:error, :no_tokens}, state}
+      _config ->
+        case OAuthTokenRepository.get_token(service_name) do
+          {:ok, token_info} ->
+            {:reply, {:ok, token_info}, state}
+
+          {:error, :not_found} ->
+            {:reply, {:error, :no_tokens}, state}
         end
     end
   end
 
   @impl GenServer
   def handle_call({:validate_token, service_name}, _from, state) do
-    case Map.get(state.managers, service_name) do
+    case Map.get(state.configs, service_name) do
       nil ->
         {:reply, {:error, :service_not_registered}, state}
 
-      manager ->
-        validate_url = manager.oauth2_client.validate_url
+      config ->
+        case OAuthTokenRepository.get_token(service_name) do
+          {:ok, token_info} ->
+            case validate_token_with_api(token_info, config) do
+              {:ok, validation_info} ->
+                {:reply, {:ok, validation_info}, state}
 
-        case OAuthTokenManager.validate_token(manager, validate_url) do
-          {:ok, token_info, updated_manager} ->
-            # Update manager in state
-            new_managers = Map.put(state.managers, service_name, updated_manager)
-            new_state = %{state | managers: new_managers}
+              {:error, reason} ->
+                {:reply, {:error, reason}, state}
+            end
 
-            {:reply, {:ok, token_info}, new_state}
-
-          {:error, _reason} = error ->
-            {:reply, error, state}
+          {:error, :not_found} ->
+            {:reply, {:error, :no_tokens}, state}
         end
     end
   end
@@ -481,12 +431,18 @@ defmodule Server.OAuthService do
 
     # Check each service's token status
     service_checks =
-      Enum.map(state.managers, fn {service, manager} ->
+      Enum.map(state.configs, fn {service, _config} ->
         status =
-          cond do
-            manager.token_info == nil -> :fail
-            !token_needs_refresh?(manager.token_info, manager.refresh_buffer_ms) -> :pass
-            true -> :warn
+          case OAuthTokenRepository.get_token(service) do
+            {:ok, token_info} ->
+              if token_needs_refresh?(token_info) do
+                :warn
+              else
+                :pass
+              end
+
+            {:error, :not_found} ->
+              :fail
           end
 
         {service, status}
@@ -497,8 +453,8 @@ defmodule Server.OAuthService do
       status: health_status,
       checks: service_checks,
       details: %{
-        registered_services: Map.keys(state.managers),
-        service_count: map_size(state.managers)
+        registered_services: Map.keys(state.configs),
+        service_count: map_size(state.configs)
       }
     }
 
@@ -506,80 +462,234 @@ defmodule Server.OAuthService do
   end
 
   @impl GenServer
+  def handle_call(:get_info, _from, state) do
+    info = %{
+      service: "OAuth Service",
+      description: "Manages OAuth tokens for multiple services",
+      registered_services: Map.keys(state.configs),
+      active_timers: map_size(state.refresh_timers)
+    }
+
+    {:reply, {:ok, info}, state}
+  end
+
+  @impl GenServer
   def handle_info({:refresh_token, service_name}, state) do
     Logger.info("Auto-refreshing OAuth token", service: service_name)
 
-    case Map.get(state.managers, service_name) do
-      nil ->
-        # Service was unregistered
-        {:noreply, state}
+    case do_refresh_token(service_name, state) do
+      {:ok, _refreshed_token, new_state} ->
+        {:noreply, new_state}
 
-      manager ->
-        case OAuthTokenManager.refresh_token(manager) do
-          {:ok, updated_manager} ->
-            # Update manager in state
-            new_managers = Map.put(state.managers, service_name, updated_manager)
+      {:error, reason} ->
+        Logger.error("OAuth token refresh failed",
+          service: service_name,
+          error: inspect(reason)
+        )
 
-            # Reset retry count on successful refresh
-            new_retry_counts = Map.get(state, :retry_counts, %{}) |> Map.delete(service_name)
+        # Implement exponential backoff with jitter
+        retry_count = Map.get(state.retry_counts, service_name, 0)
 
-            new_state =
-              state
-              |> Map.put(:managers, new_managers)
-              |> Map.put(:retry_counts, new_retry_counts)
+        # Calculate exponential backoff with jitter
+        delay = min(@retry_base_delay_ms * :math.pow(2, retry_count), @retry_max_delay_ms)
+        jitter = :rand.uniform(round(delay * 0.1))
+        final_delay = round(delay + jitter)
 
-            # Reschedule refresh
-            new_state = maybe_schedule_refresh(new_state, service_name)
+        # Schedule retry
+        timer_ref = Process.send_after(self(), {:refresh_token, service_name}, final_delay)
 
-            {:noreply, new_state}
+        # Update state with new timer and retry count
+        new_timers = Map.put(state.refresh_timers, service_name, timer_ref)
+        new_retry_counts = Map.put(state.retry_counts, service_name, retry_count + 1)
 
-          {:error, reason} ->
-            Logger.error("OAuth token refresh failed",
-              service: service_name,
-              error: inspect(reason)
-            )
+        new_state = %{state | refresh_timers: new_timers, retry_counts: new_retry_counts}
 
-            # Implement exponential backoff with jitter
-            retry_count = Map.get(state, :retry_counts, %{}) |> Map.get(service_name, 0)
-            # 1 minute base delay
-            base_delay = 60_000
-            # 1 hour max delay
-            max_delay = 3_600_000
-
-            # Calculate exponential backoff with jitter
-            delay = min(base_delay * :math.pow(2, retry_count), max_delay)
-            # 10% jitter
-            jitter = :rand.uniform(trunc(delay * 0.1))
-            final_delay = trunc(delay + jitter)
-
-            Logger.info("Scheduling OAuth retry with exponential backoff",
-              service: service_name,
-              retry_count: retry_count + 1,
-              delay_ms: final_delay
-            )
-
-            # Track retry count in monitor
-            if Process.whereis(Server.OAuthMonitor) do
-              Server.OAuthMonitor.record_retry_count(service_name, retry_count + 1)
-            end
-
-            timer_ref = Process.send_after(self(), {:refresh_token, service_name}, final_delay)
-            new_timers = Map.put(state.refresh_timers, service_name, timer_ref)
-            new_retry_counts = Map.put(Map.get(state, :retry_counts, %{}), service_name, retry_count + 1)
-
-            new_state =
-              state
-              |> Map.put(:refresh_timers, new_timers)
-              |> Map.put(:retry_counts, new_retry_counts)
-
-            {:noreply, new_state}
-        end
+        {:noreply, new_state}
     end
   end
 
   # Private helpers
 
-  defp maybe_schedule_refresh(state, service_name) do
+  defp do_refresh_token(service_name, state) do
+    with {:ok, config} <- Map.fetch(state.configs, service_name),
+         {:ok, current_token} <- OAuthTokenRepository.get_token(service_name),
+         {:ok, new_token_data} <- refresh_token_via_api(current_token, config),
+         {:ok, _} <- OAuthTokenRepository.save_token(service_name, new_token_data) do
+      # Reschedule refresh
+      new_state = maybe_schedule_refresh(state, service_name, new_token_data)
+
+      # Reset retry count on successful refresh
+      new_retry_counts = Map.delete(state.retry_counts, service_name)
+      new_state = %{new_state | retry_counts: new_retry_counts}
+
+      {:ok, new_token_data, new_state}
+    else
+      :error ->
+        {:error, :service_not_registered}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp refresh_token_via_api(current_token, config) do
+    # Fetch client secret from environment at runtime for security
+    client_secret = System.get_env("TWITCH_CLIENT_SECRET")
+
+    params = %{
+      "client_id" => config.client_id,
+      "client_secret" => client_secret,
+      "grant_type" => "refresh_token",
+      "refresh_token" => current_token.refresh_token
+    }
+
+    case CircuitBreakerServer.call(:oauth_refresh, fn ->
+           make_token_request(config.token_url, params)
+         end) do
+      {:ok, response} ->
+        # Calculate new expiry
+        expires_at = DateTime.add(DateTime.utc_now(), response["expires_in"], :second)
+
+        {:ok,
+         %{
+           access_token: response["access_token"],
+           refresh_token: response["refresh_token"] || current_token.refresh_token,
+           expires_at: expires_at,
+           scopes: parse_scopes(response["scope"])
+         }}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp validate_token_with_api(token_info, config) do
+    headers = [
+      {"authorization", "Bearer #{token_info.access_token}"},
+      {"accept", "application/json"}
+    ]
+
+    case CircuitBreakerServer.call(:oauth_validate, fn ->
+           make_get_request(config.validate_url, headers)
+         end) do
+      {:ok, response} ->
+        {:ok, response}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp make_token_request(url, params) do
+    headers = [
+      {"content-type", "application/x-www-form-urlencoded"},
+      {"accept", "application/json"}
+    ]
+
+    body = URI.encode_query(params)
+    uri = URI.parse(url)
+
+    with {:ok, conn} <- open_gun_connection(uri),
+         {:ok, response} <- post_and_await_response(conn, uri.path || "/", headers, body) do
+      response
+    end
+  end
+
+  defp open_gun_connection(uri) do
+    host = uri.host |> String.to_charlist()
+    port = uri.port || 443
+    :gun.open(host, port, %{protocols: [:http2], transport: :tls})
+  end
+
+  defp post_and_await_response(conn, path, headers, body) do
+    stream_ref = :gun.post(conn, String.to_charlist(path), headers, body)
+
+    case :gun.await(conn, stream_ref, @token_request_timeout_ms) do
+      {:response, :fin, status, _headers} ->
+        :gun.close(conn)
+        {:error, {:http_error, status, "No response body"}}
+
+      {:response, :nofin, status, _headers} ->
+        handle_response_body(conn, stream_ref, status)
+
+      {:error, reason} ->
+        :gun.close(conn)
+        {:error, {:network_error, reason}}
+    end
+  end
+
+  defp handle_response_body(conn, stream_ref, status) do
+    case :gun.await_body(conn, stream_ref, @token_request_timeout_ms) do
+      {:ok, response_body} ->
+        :gun.close(conn)
+        decode_and_handle_json(response_body, status)
+
+      {:error, reason} ->
+        :gun.close(conn)
+        {:error, {:network_error, reason}}
+    end
+  end
+
+  defp decode_and_handle_json(response_body, status) do
+    case JSON.decode(response_body) do
+      {:ok, json} when status >= 200 and status < 300 ->
+        {:ok, json}
+
+      {:ok, json} ->
+        {:error, {:http_error, status, json}}
+
+      {:error, _} ->
+        {:error, {:http_error, status, response_body}}
+    end
+  end
+
+  defp make_get_request(url, headers) do
+    uri = URI.parse(url)
+
+    with {:ok, conn} <- open_gun_connection(uri),
+         {:ok, response} <- get_and_await_response(conn, uri.path || "/", headers) do
+      response
+    end
+  end
+
+  defp get_and_await_response(conn, path, headers) do
+    stream_ref = :gun.get(conn, String.to_charlist(path), headers)
+
+    case :gun.await(conn, stream_ref, @validate_request_timeout_ms) do
+      {:response, :fin, status, _headers} ->
+        :gun.close(conn)
+        {:error, {:http_error, status, "No response body"}}
+
+      {:response, :nofin, status, _headers} ->
+        handle_get_response_body(conn, stream_ref, status)
+
+      {:error, reason} ->
+        :gun.close(conn)
+        {:error, {:network_error, reason}}
+    end
+  end
+
+  defp handle_get_response_body(conn, stream_ref, status) do
+    case :gun.await_body(conn, stream_ref, @validate_request_timeout_ms) do
+      {:ok, response_body} ->
+        :gun.close(conn)
+        decode_and_handle_json(response_body, status)
+
+      {:error, reason} ->
+        :gun.close(conn)
+        {:error, {:network_error, reason}}
+    end
+  end
+
+  defp token_needs_refresh?(token_info, buffer_ms \\ @default_refresh_buffer_ms) do
+    now = DateTime.utc_now()
+    buffer = div(buffer_ms, 1000)
+    threshold = DateTime.add(now, buffer, :second)
+
+    DateTime.compare(token_info.expires_at, threshold) == :lt
+  end
+
+  defp maybe_schedule_refresh(state, service_name, token_info) do
     # Cancel existing timer if any
     state =
       case Map.get(state.refresh_timers, service_name) do
@@ -591,82 +701,31 @@ defmodule Server.OAuthService do
           %{state | refresh_timers: Map.delete(state.refresh_timers, service_name)}
       end
 
-    # Schedule new refresh if we have tokens
-    case Map.get(state.managers, service_name) do
-      nil ->
+    # Calculate when to refresh before expiry
+    config = Map.get(state.configs, service_name)
+    buffer_ms = Map.get(config || %{}, :refresh_buffer_ms, @default_refresh_buffer_ms)
+
+    now = DateTime.utc_now()
+    expires_at = token_info.expires_at
+
+    case DateTime.diff(expires_at, now, :millisecond) do
+      diff when diff > buffer_ms ->
+        # Schedule refresh
+        refresh_in = diff - buffer_ms
+        timer_ref = Process.send_after(self(), {:refresh_token, service_name}, refresh_in)
+
+        new_timers = Map.put(state.refresh_timers, service_name, timer_ref)
+        %{state | refresh_timers: new_timers}
+
+      _ ->
+        # Token already needs refresh, schedule immediately
+        Process.send_after(self(), {:refresh_token, service_name}, 0)
         state
-
-      manager ->
-        if manager.token_info && manager.token_info.expires_at do
-          # Calculate when to refresh (5 minutes before expiry)
-          refresh_time = calculate_refresh_time(manager.token_info.expires_at)
-
-          if refresh_time > 0 do
-            timer_ref = Process.send_after(self(), {:refresh_token, service_name}, refresh_time)
-            new_timers = Map.put(state.refresh_timers, service_name, timer_ref)
-
-            Logger.debug("Scheduled OAuth refresh",
-              service: service_name,
-              refresh_in_ms: refresh_time
-            )
-
-            %{state | refresh_timers: new_timers}
-          else
-            # Token already expired, refresh immediately
-            send(self(), {:refresh_token, service_name})
-            state
-          end
-        else
-          state
-        end
     end
   end
 
-  defp calculate_refresh_time(expires_at) do
-    # Refresh 5 minutes before expiry
-    buffer_ms = 300_000
-
-    expires_ms = DateTime.to_unix(expires_at, :millisecond)
-    now_ms = System.system_time(:millisecond)
-
-    max(0, expires_ms - now_ms - buffer_ms)
-  end
-
-  defp token_needs_refresh?(nil, _buffer_ms), do: true
-
-  defp token_needs_refresh?(token_info, buffer_ms) do
-    case token_info.expires_at do
-      nil ->
-        false
-
-      expires_at ->
-        now = DateTime.utc_now()
-        buffer_seconds = div(buffer_ms, 1000)
-        DateTime.compare(now, DateTime.add(expires_at, -buffer_seconds, :second)) == :gt
-    end
-  end
-
-  defp maybe_migrate_from_dets(state) do
-    if state.migration_attempted do
-      state
-    else
-      Logger.info("Checking for DETS tokens to migrate to database")
-
-      case OAuthTokenRepository.migrate_from_dets() do
-        {:ok, :migrated} ->
-          Logger.info("Successfully migrated OAuth tokens from DETS to database")
-
-        {:ok, :no_tokens} ->
-          Logger.debug("No DETS tokens found to migrate")
-
-        {:error, reason} ->
-          Logger.warning("DETS migration check failed",
-            error: inspect(reason),
-            note: "This is normal if DETS file doesn't exist"
-          )
-      end
-
-      %{state | migration_attempted: true}
-    end
-  end
+  defp parse_scopes(nil), do: []
+  defp parse_scopes(scope_string) when is_binary(scope_string), do: String.split(scope_string, " ")
+  defp parse_scopes(scopes) when is_list(scopes), do: scopes
+  defp parse_scopes(_), do: []
 end
