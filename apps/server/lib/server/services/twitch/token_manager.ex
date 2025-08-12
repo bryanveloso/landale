@@ -51,31 +51,84 @@ defmodule Server.Services.Twitch.TokenManager do
   end
 
   defp validate_with_twitch(access_token) do
-    url = "https://id.twitch.tv/oauth2/validate"
-    headers = [{"Authorization", "OAuth #{access_token}"}]
+    uri = URI.parse("https://id.twitch.tv/oauth2/validate")
+    host = uri.host |> String.to_charlist()
+    port = 443
+    path = uri.path || "/"
 
-    case :httpc.request(:get, {String.to_charlist(url), headers}, [], []) do
-      {:ok, {{_, 200, _}, _, body}} ->
-        case Jason.decode(body) do
-          {:ok, data} ->
-            {:ok,
-             %{
-               user_id: data["user_id"],
-               login: data["login"],
-               client_id: data["client_id"],
-               scopes: data["scopes"] || [],
-               expires_in: data["expires_in"]
-             }}
+    headers = [
+      {"authorization", "OAuth #{access_token}"},
+      {"accept", "application/json"}
+    ]
 
-          {:error, _} ->
-            {:error, "Failed to parse validation response"}
-        end
+    with {:ok, conn_pid} <- :gun.open(host, port, %{protocols: [:http2], transport: :tls}),
+         {:ok, _protocol} <- await_connection(conn_pid),
+         stream_ref <- :gun.get(conn_pid, path, headers),
+         {:ok, response} <- handle_validation_response(conn_pid, stream_ref) do
+      response
+    else
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 
-      {:ok, {{_, status, _}, _, body}} ->
-        {:error, "Validation failed with status #{status}: #{body}"}
+  defp await_connection(conn_pid) do
+    case :gun.await_up(conn_pid, 5000) do
+      {:ok, _protocol} = result ->
+        result
 
       {:error, reason} ->
-        {:error, "HTTP request failed: #{inspect(reason)}"}
+        :gun.close(conn_pid)
+        {:error, "Failed to establish connection: #{inspect(reason)}"}
+    end
+  end
+
+  defp handle_validation_response(conn_pid, stream_ref) do
+    case :gun.await(conn_pid, stream_ref, 5000) do
+      {:response, :fin, status, _headers} ->
+        :gun.close(conn_pid)
+        {:error, "Empty response with status #{status}"}
+
+      {:response, :nofin, status, _headers} ->
+        handle_response_body(conn_pid, stream_ref, status)
+
+      {:error, reason} ->
+        :gun.close(conn_pid)
+        {:error, "Failed to get response: #{inspect(reason)}"}
+    end
+  end
+
+  defp handle_response_body(conn_pid, stream_ref, status) do
+    case :gun.await_body(conn_pid, stream_ref, 5000) do
+      {:ok, body} ->
+        :gun.close(conn_pid)
+
+        if status == 200 do
+          parse_validation_response(body)
+        else
+          {:error, "Validation failed with status #{status}: #{body}"}
+        end
+
+      {:error, reason} ->
+        :gun.close(conn_pid)
+        {:error, "Failed to read response body: #{inspect(reason)}"}
+    end
+  end
+
+  defp parse_validation_response(body) do
+    case Jason.decode(body) do
+      {:ok, data} ->
+        {:ok,
+         %{
+           user_id: data["user_id"],
+           login: data["login"],
+           client_id: data["client_id"],
+           scopes: data["scopes"] || [],
+           expires_in: data["expires_in"]
+         }}
+
+      {:error, _} ->
+        {:error, "Failed to parse validation response"}
     end
   end
 
