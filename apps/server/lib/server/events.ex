@@ -1,14 +1,31 @@
 defmodule Server.Events do
   @moduledoc """
-  Central event system using Phoenix PubSub to replace the TypeScript Emittery system.
+  ⚠️  DEPRECATED: This module is deprecated as of August 2025.
 
-  This module provides a clean interface for publishing and subscribing to events
-  across the application, maintaining the same event-driven architecture as the
-  original TypeScript implementation.
+  ## Migration Path
 
-  ## Direct Publishing
-  All events are now published directly via Phoenix.PubSub with no batching delay.
-  This is appropriate for a single-user system where latency matters more than throughput.
+  Use `Server.Services.Twitch.EventHandler` for all event publishing instead:
+
+  ```elixir
+  # OLD (deprecated)
+  Server.Events.publish_twitch_event("channel.follow", event_data)
+
+  # NEW (canonical)
+  normalized = Server.Services.Twitch.EventHandler.normalize_event("channel.follow", event_data)
+  Server.Services.Twitch.EventHandler.publish_event("channel.follow", normalized)
+  ```
+
+  ## Why Deprecated
+
+  This module creates nested event structures with `:data` fields, which violates
+  the Unified Event Strategy that requires flat canonical events throughout the application.
+
+  The EventHandler provides the canonical flat format defined in UNIFIED_EVENT_STRATEGY.md.
+
+  ## Legacy Support
+
+  This module remains for backward compatibility but should not be used for new code.
+  All functions still work but create events in the deprecated nested format.
   """
 
   require Logger
@@ -40,7 +57,7 @@ defmodule Server.Events do
     event = %{
       type: event_type,
       data: data,
-      timestamp: System.system_time(:second),
+      timestamp: DateTime.utc_now(),
       correlation_id: get_correlation_id()
     }
 
@@ -51,6 +68,8 @@ defmodule Server.Events do
   # Twitch Event Publishing
 
   @doc """
+  ⚠️  DEPRECATED: Use Server.Services.Twitch.EventHandler instead.
+
   Publishes a Twitch EventSub event to all subscribers.
 
   ## Parameters
@@ -58,12 +77,19 @@ defmodule Server.Events do
   - `data` - Event data payload from EventSub
   - `opts` - Options (kept for compatibility but batching is removed)
   """
+  @deprecated "Use Server.Services.Twitch.EventHandler.publish_event/2 instead"
   @spec publish_twitch_event(binary(), map(), keyword()) :: :ok
   def publish_twitch_event(event_type, data, _opts \\ []) do
+    Logger.warning(
+      "DEPRECATED: Server.Events.publish_twitch_event/3 is deprecated. Use Server.Services.Twitch.EventHandler.publish_event/2 instead.",
+      event_type: event_type,
+      caller: caller_info()
+    )
+
     event = %{
       type: event_type,
       data: data,
-      timestamp: System.system_time(:second),
+      timestamp: DateTime.utc_now(),
       correlation_id: get_correlation_id()
     }
 
@@ -86,7 +112,7 @@ defmodule Server.Events do
     event = %{
       type: event_type,
       data: data,
-      timestamp: System.system_time(:second),
+      timestamp: DateTime.utc_now(),
       correlation_id: get_correlation_id()
     }
 
@@ -133,7 +159,7 @@ defmodule Server.Events do
     event = %{
       type: event_type,
       data: data,
-      timestamp: System.system_time(:second),
+      timestamp: DateTime.utc_now(),
       correlation_id: Keyword.get(opts, :correlation_id) || get_correlation_id()
     }
 
@@ -156,7 +182,7 @@ defmodule Server.Events do
     event = %{
       type: event_type,
       data: data,
-      timestamp: System.system_time(:second),
+      timestamp: DateTime.utc_now(),
       correlation_id: get_correlation_id()
     }
 
@@ -180,7 +206,7 @@ defmodule Server.Events do
       service: service,
       status: status,
       details: details,
-      timestamp: System.system_time(:second)
+      timestamp: DateTime.utc_now()
     }
 
     Phoenix.PubSub.broadcast(@pubsub, @health_events, {:health_update, data})
@@ -202,7 +228,7 @@ defmodule Server.Events do
       metric: metric,
       value: value,
       metadata: metadata,
-      timestamp: System.system_time(:second)
+      timestamp: DateTime.utc_now()
     }
 
     Phoenix.PubSub.broadcast(@pubsub, @performance_events, {:performance_update, data})
@@ -288,6 +314,19 @@ defmodule Server.Events do
     case Process.whereis(Server.CorrelationIdPool) do
       nil -> CorrelationId.generate()
       _pid -> Server.CorrelationIdPool.get()
+    end
+  end
+
+  defp caller_info do
+    case Process.info(self(), :current_stacktrace) do
+      {:current_stacktrace, [_current | [caller | _rest]]} ->
+        case caller do
+          {module, function, arity, _} -> "#{module}.#{function}/#{arity}"
+          _ -> "unknown"
+        end
+
+      _ ->
+        "unknown"
     end
   end
 end

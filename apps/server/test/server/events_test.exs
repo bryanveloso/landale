@@ -2,8 +2,14 @@ defmodule Server.EventsTest do
   use ExUnit.Case, async: false
 
   @moduletag :unit
+  @moduletag :deprecated
 
   alias Server.Events
+
+  # NOTE: Server.Events is deprecated as of August 2025.
+  # These tests remain for backward compatibility verification only.
+  # New event functionality should use Server.Services.Twitch.EventHandler.
+  # See UNIFIED_EVENT_STRATEGY.md for canonical event format.
 
   describe "Event publishing and subscription" do
     test "publishes and receives OBS events" do

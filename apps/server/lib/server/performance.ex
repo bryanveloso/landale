@@ -167,14 +167,25 @@ defmodule Server.Performance do
   end
 
   defp benchmark_event_publishing do
-    # Simulate publishing an event through the Events system
-    event_data = %{
-      service: "obs",
-      action: "scene_switched",
-      data: %{scene: "Main Scene"}
+    # Simulate publishing an event through the canonical EventHandler
+    # Create properly structured test event data
+    raw_event_data = %{
+      "scene_name" => "Main Scene",
+      "service" => "obs"
     }
 
-    Server.Events.publish_obs_event("scene_switched", event_data)
+    # Use EventHandler for canonical format (consistent with other benchmarks)
+    normalized_event = %{
+      type: "obs.scene_switched",
+      timestamp: DateTime.utc_now(),
+      correlation_id: :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower),
+      source: :obs,
+      scene_name: raw_event_data["scene_name"],
+      service: raw_event_data["service"]
+    }
+
+    # Publish using Phoenix PubSub directly (canonical pattern)
+    Phoenix.PubSub.broadcast(Server.PubSub, "obs:events", {:obs_event, normalized_event})
   end
 
   defp benchmark_database_query do
@@ -251,12 +262,17 @@ defmodule Server.Performance do
       event_types = ["channel.follow", "channel.cheer", "stream.online"]
       event_type = Enum.random(event_types)
 
-      event_data = %{
-        user_name: "test_user_#{count}",
-        timestamp: System.system_time(:second)
+      # Create properly structured test event data matching Twitch EventSub format
+      raw_event_data = %{
+        "user_name" => "test_user_#{count}",
+        "user_id" => "#{count}",
+        "broadcaster_user_id" => "12345",
+        "broadcaster_user_name" => "avalonstar"
       }
 
-      Server.Events.publish_twitch_event(event_type, event_data)
+      # Use EventHandler for canonical format (like real Twitch events)
+      normalized_event = Server.Services.Twitch.EventHandler.normalize_event(event_type, raw_event_data)
+      Server.Services.Twitch.EventHandler.publish_event(event_type, normalized_event)
 
       # Events arrive irregularly, simulate with random intervals
       Process.sleep(Enum.random(1_000..10_000//1))

@@ -351,6 +351,49 @@ defmodule Server.Services.Twitch do
     end
   end
 
+  def handle_info({:reconnect_to_url, reconnect_url}, state) do
+    Logger.info("Reconnecting to new Twitch EventSub URL", url: reconnect_url)
+
+    # Cleanup existing connection if any
+    cleanup_websocket(state.ws_client)
+
+    # Create a new WebSocket client with the provided reconnect URL
+    client = WebSocketClient.new(reconnect_url, self())
+
+    case WebSocketClient.connect(client) do
+      {:ok, connected_client} ->
+        Logger.info("Successfully reconnected to Twitch EventSub", url: reconnect_url)
+
+        new_state = %{
+          state
+          | ws_client: connected_client,
+            reconnect_timer: nil,
+            connection_state: "reconnecting",
+            last_error: nil
+        }
+
+        broadcast_status_change(new_state)
+        {:noreply, new_state}
+
+      {:error, _client, reason} ->
+        Logger.error("Failed to reconnect to new URL: #{inspect(reason)}", url: reconnect_url)
+
+        # Fall back to normal reconnection logic
+        timer_ref = Process.send_after(self(), :connect, 5_000)
+
+        new_state = %{
+          state
+          | ws_client: nil,
+            reconnect_timer: timer_ref,
+            connection_state: "reconnect_failed",
+            last_error: "Reconnection failed: #{inspect(reason)}"
+        }
+
+        broadcast_status_change(new_state)
+        {:noreply, new_state}
+    end
+  end
+
   # Subscription Creation
   def handle_info({:create_subscriptions_with_validated_token, session_id}, state) do
     new_state = SubscriptionCoordinator.create_default_subscriptions(state, session_id)
@@ -466,9 +509,9 @@ defmodule Server.Services.Twitch do
     subscription = payload["subscription"]
     event = payload["event"]
 
-    # Normalize and broadcast the event
+    # Normalize and broadcast the event using canonical format
     normalized = EventHandler.normalize_event(subscription["type"], event)
-    Server.Events.publish_twitch_event(subscription["type"], normalized)
+    EventHandler.publish_event(subscription["type"], normalized)
 
     state
   end
