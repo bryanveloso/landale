@@ -326,10 +326,13 @@ defmodule Server.Services.Twitch do
   def handle_info(:connect, state) do
     Logger.info("Attempting to connect to Twitch EventSub WebSocket")
 
-    case WebSocketClient.connect(@eventsub_websocket_url) do
-      {:ok, client} ->
+    # Create a new WebSocket client instance
+    client = WebSocketClient.new(@eventsub_websocket_url, self())
+
+    case WebSocketClient.connect(client) do
+      {:ok, connected_client} ->
         Logger.debug("WebSocket connection initiated")
-        {:noreply, %{state | ws_client: client, reconnect_timer: nil}}
+        {:noreply, %{state | ws_client: connected_client, reconnect_timer: nil}}
 
       {:error, _client, reason} ->
         Logger.error("Failed to connect: #{inspect(reason)}")
