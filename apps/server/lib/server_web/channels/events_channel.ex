@@ -24,7 +24,9 @@ defmodule ServerWeb.EventsChannel do
             "twitch:events",
             "ironmon:events",
             "rainwave:events",
-            "system:events"
+            "system:events",
+            "goals",
+            "channel:updates"
           ]
 
         "chat" ->
@@ -233,6 +235,58 @@ defmodule ServerWeb.EventsChannel do
 
     push(socket, "cheer", %{
       type: "cheer",
+      data: event,
+      timestamp: timestamp
+    })
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:goal_begin, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
+    push(socket, "goal", %{
+      type: "goal_begin",
+      data: event,
+      timestamp: timestamp
+    })
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:goal_progress, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
+    push(socket, "goal", %{
+      type: "goal_progress",
+      data: event,
+      timestamp: timestamp
+    })
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:goal_end, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
+    push(socket, "goal", %{
+      type: "goal_end",
+      data: event,
+      timestamp: timestamp
+    })
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:channel_update, event}, socket) do
+    timestamp = safe_get_timestamp(event)
+
+    push(socket, "channel_update", %{
+      type: "channel_update",
       data: event,
       timestamp: timestamp
     })

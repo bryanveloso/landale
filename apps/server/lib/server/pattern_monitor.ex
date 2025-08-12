@@ -113,7 +113,13 @@ defmodule Server.PatternMonitor do
 
     # Update hourly stats
     current_time = DateTime.utc_now()
-    hour_key = DateTime.truncate(current_time, :hour)
+
+    hour_key =
+      current_time
+      |> Map.put(:minute, 0)
+      |> Map.put(:second, 0)
+      |> Map.put(:microsecond, {0, 0})
+
     updated_hourly = update_hourly_stats(state.hourly_stats, hour_key, state)
 
     # Schedule next report
