@@ -57,19 +57,21 @@ defmodule Server.Events.BatchPublisher do
   ## Parameters
   - `topic` - PubSub topic
   - `event` - Event data
-  - `opts` - Options including :priority (:critical or :normal)
+  - `opts` - Options including :priority (:critical or :normal), :wrapper (event wrapper atom)
   """
   @spec publish(binary(), map(), keyword()) :: :ok
   def publish(topic, event, opts \\ []) do
     priority = Keyword.get(opts, :priority, :normal)
+    wrapper = Keyword.get(opts, :wrapper)
 
     case should_batch?(event, priority) do
       true ->
-        GenServer.cast(__MODULE__, {:batch_event, topic, event})
+        GenServer.cast(__MODULE__, {:batch_event, topic, event, wrapper})
 
       false ->
-        # Publish immediately for critical events
-        Phoenix.PubSub.broadcast(Server.PubSub, topic, event)
+        # Publish immediately for critical events with proper wrapper
+        wrapped_event = if wrapper, do: {wrapper, event}, else: event
+        Phoenix.PubSub.broadcast(Server.PubSub, topic, wrapped_event)
         GenServer.cast(__MODULE__, :increment_immediate_events)
         :ok
     end
@@ -114,10 +116,10 @@ defmodule Server.Events.BatchPublisher do
   end
 
   @impl true
-  def handle_cast({:batch_event, topic, event}, state) do
-    # Add event to internal buffer with timestamp
+  def handle_cast({:batch_event, topic, event, wrapper}, state) do
+    # Add event to internal buffer with timestamp and wrapper info
     timestamp = System.monotonic_time(:millisecond)
-    event_with_meta = {event, timestamp}
+    event_with_meta = {event, timestamp, wrapper}
 
     # Update event buffer - append new event to topic's event list
     current_events = Map.get(state.event_buffer, topic, [])
@@ -183,7 +185,7 @@ defmodule Server.Events.BatchPublisher do
     Process.send_after(self(), :flush_events, @batch_window_ms)
   end
 
-  defp prepare_event_for_batch({event_map, timestamp}) when is_map(event_map) do
+  defp prepare_event_for_batch({event_map, timestamp, _wrapper}) when is_map(event_map) do
     Map.put(event_map, :batch_timestamp, timestamp)
   end
 

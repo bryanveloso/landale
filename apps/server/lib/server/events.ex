@@ -46,7 +46,7 @@ defmodule Server.Events do
 
     if should_batch do
       # Use batch publisher for dashboard efficiency
-      Server.Events.BatchPublisher.publish(@obs_events, {:obs_event, event}, priority: priority)
+      Server.Events.BatchPublisher.publish(@obs_events, event, priority: priority, wrapper: :obs_event)
     else
       # Direct publish for immediate delivery
       Phoenix.PubSub.broadcast(@pubsub, @obs_events, {:obs_event, event})
@@ -78,7 +78,7 @@ defmodule Server.Events do
 
     if should_batch do
       # Use batch publisher for dashboard efficiency
-      Server.Events.BatchPublisher.publish(@twitch_events, {:twitch_event, event}, priority: priority)
+      Server.Events.BatchPublisher.publish(@twitch_events, event, priority: priority, wrapper: :twitch_event)
     else
       # Direct publish for immediate delivery
       Phoenix.PubSub.broadcast(@pubsub, @twitch_events, {:twitch_event, event})
@@ -110,7 +110,7 @@ defmodule Server.Events do
 
     if should_batch do
       # Use batch publisher for dashboard efficiency
-      Server.Events.BatchPublisher.publish(@ironmon_events, {:ironmon_event, event}, priority: priority)
+      Server.Events.BatchPublisher.publish(@ironmon_events, event, priority: priority, wrapper: :ironmon_event)
     else
       # Direct publish for immediate delivery
       Phoenix.PubSub.broadcast(@pubsub, @ironmon_events, {:ironmon_event, event})
@@ -166,7 +166,7 @@ defmodule Server.Events do
 
     if should_batch do
       # Use batch publisher for dashboard efficiency
-      Server.Events.BatchPublisher.publish(@rainwave_events, {:rainwave_event, event}, priority: priority)
+      Server.Events.BatchPublisher.publish(@rainwave_events, event, priority: priority, wrapper: :rainwave_event)
     else
       # Direct publish for immediate delivery
       Phoenix.PubSub.broadcast(@pubsub, @rainwave_events, {:rainwave_event, event})
@@ -198,7 +198,7 @@ defmodule Server.Events do
 
     if should_batch do
       # Use batch publisher for dashboard efficiency
-      Server.Events.BatchPublisher.publish(@system_events, {:system_event, event}, priority: priority)
+      Server.Events.BatchPublisher.publish(@system_events, event, priority: priority, wrapper: :system_event)
     else
       # Direct publish for immediate delivery
       Phoenix.PubSub.broadcast(@pubsub, @system_events, {:system_event, event})
