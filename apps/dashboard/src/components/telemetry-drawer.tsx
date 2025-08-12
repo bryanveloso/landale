@@ -10,7 +10,7 @@ import { Portal } from 'solid-js/web'
 import { invoke } from '@tauri-apps/api/core'
 import { ConnectionTelemetry } from './connection-telemetry'
 import { ServiceControls } from './service-controls'
-import { TelemetryServiceProvider, useTelemetryService } from '@/services/telemetry-service'
+import { ServiceStatusProvider, useServiceStatus } from '@/services/service-status-service'
 
 interface TelemetryDrawerProps {
   isOpen: boolean
@@ -19,7 +19,7 @@ interface TelemetryDrawerProps {
 
 function TelemetryDrawerContent(props: TelemetryDrawerProps) {
   const { systemInfo, serviceMetrics, overlayHealth, requestRefresh, environmentFilter, setEnvironmentFilter } =
-    useTelemetryService()
+    useServiceStatus()
 
   // Handle escape key to close
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -218,8 +218,8 @@ function TelemetryDrawerContent(props: TelemetryDrawerProps) {
 
 export function TelemetryDrawer(props: TelemetryDrawerProps) {
   return (
-    <TelemetryServiceProvider>
+    <ServiceStatusProvider>
       <TelemetryDrawerContent {...props} />
-    </TelemetryServiceProvider>
+    </ServiceStatusProvider>
   )
 }

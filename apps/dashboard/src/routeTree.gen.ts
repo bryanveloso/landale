@@ -9,13 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TelemetryRouteImport } from './routes/telemetry'
+import { Route as ServiceStatusRouteImport } from './routes/service-status'
 import { Route as OauthRouteImport } from './routes/oauth'
 import { Route as IndexRouteImport } from './routes/index'
 
-const TelemetryRoute = TelemetryRouteImport.update({
-  id: '/telemetry',
-  path: '/telemetry',
+const ServiceStatusRoute = ServiceStatusRouteImport.update({
+  id: '/service-status',
+  path: '/service-status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OauthRoute = OauthRouteImport.update({
@@ -32,40 +32,40 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/oauth': typeof OauthRoute
-  '/telemetry': typeof TelemetryRoute
+  '/service-status': typeof ServiceStatusRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/oauth': typeof OauthRoute
-  '/telemetry': typeof TelemetryRoute
+  '/service-status': typeof ServiceStatusRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/oauth': typeof OauthRoute
-  '/telemetry': typeof TelemetryRoute
+  '/service-status': typeof ServiceStatusRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/oauth' | '/telemetry'
+  fullPaths: '/' | '/oauth' | '/service-status'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/oauth' | '/telemetry'
-  id: '__root__' | '/' | '/oauth' | '/telemetry'
+  to: '/' | '/oauth' | '/service-status'
+  id: '__root__' | '/' | '/oauth' | '/service-status'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   OauthRoute: typeof OauthRoute
-  TelemetryRoute: typeof TelemetryRoute
+  ServiceStatusRoute: typeof ServiceStatusRoute
 }
 
 declare module '@tanstack/solid-router' {
   interface FileRoutesByPath {
-    '/telemetry': {
-      id: '/telemetry'
-      path: '/telemetry'
-      fullPath: '/telemetry'
-      preLoaderRoute: typeof TelemetryRouteImport
+    '/service-status': {
+      id: '/service-status'
+      path: '/service-status'
+      fullPath: '/service-status'
+      preLoaderRoute: typeof ServiceStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/oauth': {
@@ -88,7 +88,7 @@ declare module '@tanstack/solid-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   OauthRoute: OauthRoute,
-  TelemetryRoute: TelemetryRoute,
+  ServiceStatusRoute: ServiceStatusRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
