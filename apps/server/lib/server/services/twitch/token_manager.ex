@@ -56,7 +56,7 @@ defmodule Server.Services.Twitch.TokenManager do
     Logger.debug("Starting Twitch token validation")
 
     # Use circuit breaker for resilience
-    CircuitBreakerServer.call(:twitch_validate, fn ->
+    CircuitBreakerServer.call("twitch_validate", fn ->
       perform_validation_request(access_token)
     end)
   end

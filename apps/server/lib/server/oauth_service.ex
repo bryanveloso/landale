@@ -543,7 +543,7 @@ defmodule Server.OAuthService do
       "refresh_token" => current_token.refresh_token
     }
 
-    case CircuitBreakerServer.call(:oauth_refresh, fn ->
+    case CircuitBreakerServer.call("oauth_refresh", fn ->
            make_token_request(config.token_url, params)
          end) do
       {:ok, response} ->
@@ -569,7 +569,7 @@ defmodule Server.OAuthService do
       {"accept", "application/json"}
     ]
 
-    case CircuitBreakerServer.call(:oauth_validate, fn ->
+    case CircuitBreakerServer.call("oauth_validate", fn ->
            make_get_request(config.validate_url, headers)
          end) do
       {:ok, response} ->
