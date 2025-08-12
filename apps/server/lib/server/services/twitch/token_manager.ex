@@ -79,6 +79,9 @@ defmodule Server.Services.Twitch.TokenManager do
         # Schedule token refresh if needed
         state = schedule_token_refresh(state, validated_token)
 
+        # Trigger WebSocket connection after successful token validation
+        Process.send_after(self(), :connect, 100)
+
         %{
           state
           | token_validation_task: nil,
