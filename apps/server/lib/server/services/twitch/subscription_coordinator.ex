@@ -22,6 +22,9 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
     {"channel.subscription.message", %{"broadcaster_user_id" => nil}},
     {"channel.cheer", %{"broadcaster_user_id" => nil}},
     {"channel.raid", %{"to_broadcaster_user_id" => nil}},
+    # Chat events - critical for connection stability and dashboard functionality
+    {"channel.chat.message", %{"broadcaster_user_id" => nil, "user_id" => nil}},
+    {"channel.chat.notification", %{"broadcaster_user_id" => nil, "user_id" => nil}},
     {"channel.ban", %{"broadcaster_user_id" => nil}},
     {"channel.unban", %{"broadcaster_user_id" => nil}},
     {"channel.moderator.add", %{"broadcaster_user_id" => nil}},
@@ -116,12 +119,7 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
 
       subscription ->
         # Create proper manager state for EventSubManager
-        manager_state = %{
-          service_name: :twitch,
-          session_id: state.session_id,
-          user_id: state.user_id,
-          scopes: state.scopes
-        }
+        manager_state = create_manager_state(state)
 
         case EventSubManager.delete_subscription(manager_state, subscription_id, []) do
           :ok ->
@@ -148,12 +146,7 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
   """
   def cleanup_subscriptions(subscriptions, state) do
     # Create proper manager state for EventSubManager
-    manager_state = %{
-      service_name: :twitch,
-      session_id: state.session_id,
-      user_id: state.user_id,
-      scopes: state.scopes
-    }
+    manager_state = create_manager_state(state)
 
     Enum.each(subscriptions, fn {id, _} ->
       EventSubManager.delete_subscription(manager_state, id, [])
@@ -167,10 +160,10 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
       Enum.map(@default_subscriptions, fn {event_type, condition_template} ->
         condition = fill_condition_template(condition_template, user_id)
 
-        case EventSubManager.create_subscription(event_type, condition,
-               session_id: session_id,
-               user_id: user_id
-             ) do
+        # Create proper manager state for EventSubManager
+        manager_state = create_manager_state(state, session_id)
+
+        case EventSubManager.create_subscription(manager_state, event_type, condition, []) do
           {:ok, subscription} ->
             Logger.debug("Created subscription for #{event_type}")
             {:ok, subscription}
@@ -234,13 +227,10 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
   end
 
   defp create_new_subscription(event_type, condition, opts, state) do
-    full_opts =
-      Keyword.merge(opts,
-        session_id: state.session_id,
-        user_id: state.user_id
-      )
+    # Create proper manager state for EventSubManager
+    manager_state = create_manager_state(state)
 
-    EventSubManager.create_subscription(event_type, condition, full_opts)
+    EventSubManager.create_subscription(manager_state, event_type, condition, opts)
   end
 
   defp add_subscription_to_state(subscription, _event_type, _condition, state) do
@@ -276,5 +266,20 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
 
     timer_ref = Process.send_after(self(), {:retry_default_subscriptions, session_id}, 5000)
     %{state | retry_subscription_timer: timer_ref}
+  end
+
+  # Utility function to create manager state for EventSubManager
+  # Always use state.session_id unless explicitly overridden
+  defp create_manager_state(state, session_id \\ nil) do
+    # Ensure client_id is available, fallback to config if needed
+    client_id = state.client_id || Server.Config.twitch_client_id()
+
+    %{
+      service_name: :twitch,
+      session_id: session_id || state.session_id,
+      user_id: state.user_id,
+      scopes: state.scopes,
+      client_id: client_id
+    }
   end
 end
