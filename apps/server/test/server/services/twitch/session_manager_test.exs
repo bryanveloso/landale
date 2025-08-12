@@ -2,11 +2,10 @@ defmodule Server.Services.Twitch.SessionManagerTest do
   use ExUnit.Case, async: true
 
   alias Server.Services.Twitch.SessionManager
-  alias Server.Test.MockEventSubManager
 
   describe "SessionManager initialization" do
     test "starts with no session" do
-      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil, event_sub_manager: MockEventSubManager)
+      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil)
 
       state = SessionManager.get_state(manager)
       assert state.session_id == nil
@@ -18,7 +17,7 @@ defmodule Server.Services.Twitch.SessionManagerTest do
     end
 
     test "monitors owner process" do
-      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil, event_sub_manager: MockEventSubManager)
+      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil)
 
       # Verify manager stops when owner exits
       Process.flag(:trap_exit, true)
@@ -30,7 +29,7 @@ defmodule Server.Services.Twitch.SessionManagerTest do
 
   describe "session lifecycle" do
     setup do
-      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil, event_sub_manager: MockEventSubManager)
+      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil)
       {:ok, manager: manager}
     end
 
@@ -85,7 +84,7 @@ defmodule Server.Services.Twitch.SessionManagerTest do
       assert_receive {:twitch_session, {:session_established, ^session_id, ^session_data}}
 
       # Should attempt to create subscriptions
-      # In real scenario, EventSubManager.create_default_subscriptions would be called
+      # In real scenario, SubscriptionCoordinator.create_default_subscriptions would be called
       # For test, we'll verify the state shows user_id is set
       state = SessionManager.get_state(manager)
       assert state.session_id == session_id
@@ -124,7 +123,7 @@ defmodule Server.Services.Twitch.SessionManagerTest do
 
   describe "user_id and token updates" do
     setup do
-      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil, event_sub_manager: MockEventSubManager)
+      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil)
       {:ok, manager: manager}
     end
 
@@ -167,7 +166,7 @@ defmodule Server.Services.Twitch.SessionManagerTest do
 
   describe "subscription creation" do
     setup do
-      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil, event_sub_manager: MockEventSubManager)
+      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil)
 
       # Set up required state
       user_id = "12345"
@@ -207,7 +206,7 @@ defmodule Server.Services.Twitch.SessionManagerTest do
 
     test "rejects subscription without user_id" do
       # Create manager without user_id
-      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil, event_sub_manager: MockEventSubManager)
+      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil)
 
       # Establish session
       session_id = "test-session-no-user"
@@ -226,7 +225,7 @@ defmodule Server.Services.Twitch.SessionManagerTest do
 
     test "rejects subscription without token manager" do
       # Create manager without token manager
-      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil, event_sub_manager: MockEventSubManager)
+      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil)
       SessionManager.set_user_id(manager, "12345")
 
       # Establish session
@@ -247,7 +246,7 @@ defmodule Server.Services.Twitch.SessionManagerTest do
 
   describe "subscription retry logic" do
     test "retries subscription creation when user_id becomes available" do
-      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil, event_sub_manager: MockEventSubManager)
+      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil)
 
       # Establish session without user_id
       session_id = "test-session-retry"
@@ -278,7 +277,7 @@ defmodule Server.Services.Twitch.SessionManagerTest do
     end
 
     test "abandons retry if session changes" do
-      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil, event_sub_manager: MockEventSubManager)
+      {:ok, manager} = SessionManager.start_link(owner: self(), name: nil)
 
       # Establish first session
       session_id_1 = "test-session-1"

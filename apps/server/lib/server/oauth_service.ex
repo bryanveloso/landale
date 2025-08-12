@@ -63,7 +63,11 @@ defmodule Server.OAuthService do
     # Map of service_name => refresh timer reference
     refresh_timers: %{},
     # Map of service_name => retry count for exponential backoff
-    retry_counts: %{}
+    retry_counts: %{},
+    # Map of service_name => true/false for refresh in progress
+    refresh_locks: %{},
+    # Map of service_name => list of waiting callers during refresh
+    refresh_waiters: %{}
   ]
 
   # Client API
@@ -232,6 +236,9 @@ defmodule Server.OAuthService do
           "moderator:read:followers",
           "moderator:read:shoutouts",
           "moderator:read:chat_settings",
+          "moderator:read:shield_mode",
+          "moderator:read:banned_users",
+          "moderator:read:moderators",
           "moderator:manage:announcements",
           "user:read:chat",
           "user:write:chat",
@@ -322,16 +329,38 @@ defmodule Server.OAuthService do
   end
 
   @impl GenServer
-  def handle_call({:get_valid_token, service_name}, _from, state) do
+  def handle_call({:get_valid_token, service_name}, from, state) do
     with {:ok, _config} <- Map.fetch(state.configs, service_name),
          {:ok, token_info} <- OAuthTokenRepository.get_token(service_name) do
       if token_needs_refresh?(token_info) do
-        case do_refresh_token(service_name, state) do
-          {:ok, refreshed_token, new_state} ->
-            {:reply, {:ok, refreshed_token}, new_state}
+        # Check if refresh is already in progress
+        if Map.get(state.refresh_locks, service_name, false) do
+          # Add caller to waiters list
+          waiters = Map.get(state.refresh_waiters, service_name, [])
+          new_waiters = Map.put(state.refresh_waiters, service_name, [from | waiters])
 
-          {:error, reason} ->
-            {:reply, {:error, reason}, state}
+          Logger.debug("Token refresh already in progress, queueing caller",
+            service: service_name,
+            waiters_count: length(waiters) + 1
+          )
+
+          # Don't reply now, will reply when refresh completes
+          {:noreply, %{state | refresh_waiters: new_waiters}}
+        else
+          # Acquire refresh lock
+          new_state = %{state | refresh_locks: Map.put(state.refresh_locks, service_name, true)}
+
+          case do_refresh_token(service_name, new_state) do
+            {:ok, refreshed_token, final_state} ->
+              # Release lock and notify waiters
+              final_state = release_refresh_lock(final_state, service_name, {:ok, refreshed_token})
+              {:reply, {:ok, refreshed_token}, final_state}
+
+            {:error, reason} ->
+              # Release lock and notify waiters of error
+              final_state = release_refresh_lock(new_state, service_name, {:error, reason})
+              {:reply, {:error, reason}, final_state}
+          end
         end
       else
         {:reply, {:ok, token_info}, state}
@@ -509,6 +538,30 @@ defmodule Server.OAuthService do
   end
 
   # Private helpers
+
+  defp release_refresh_lock(state, service_name, result) do
+    # Release the lock
+    new_locks = Map.delete(state.refresh_locks, service_name)
+
+    # Get and notify all waiters
+    waiters = Map.get(state.refresh_waiters, service_name, [])
+    new_waiters = Map.delete(state.refresh_waiters, service_name)
+
+    # Reply to all waiting callers
+    Enum.each(waiters, fn from ->
+      GenServer.reply(from, result)
+    end)
+
+    if length(waiters) > 0 do
+      Logger.debug("Notified waiting callers after token refresh",
+        service: service_name,
+        waiters_count: length(waiters),
+        result: elem(result, 0)
+      )
+    end
+
+    %{state | refresh_locks: new_locks, refresh_waiters: new_waiters}
+  end
 
   defp do_refresh_token(service_name, state) do
     with {:ok, config} <- Map.fetch(state.configs, service_name),

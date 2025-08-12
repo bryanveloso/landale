@@ -20,13 +20,6 @@ defmodule Server.Services.Twitch.TokenManager do
   @validation_timeout 5_000
 
   @doc """
-  Schedules initial token validation after a delay.
-  """
-  def schedule_initial_validation do
-    Process.send_after(self(), :validate_token, 100)
-  end
-
-  @doc """
   Validates the current OAuth token asynchronously.
   Returns the updated state with a validation task.
   """
