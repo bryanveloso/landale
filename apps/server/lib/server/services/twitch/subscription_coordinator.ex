@@ -500,35 +500,37 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
 
   defp create_subscription_via_api(event_type, condition, _opts, state) do
     # Use circuit breaker for external API calls
-    Server.CircuitBreakerServer.call(
-      :twitch_api,
-      fn ->
-        # Get access token from OAuth service
-        case oauth_service().get_valid_token(:twitch) do
-          {:ok, %{access_token: access_token}} ->
-            url = "https://api.twitch.tv/helix/eventsub/subscriptions"
+    case Server.CircuitBreakerServer.call(
+           :twitch_api,
+           fn ->
+             # Get access token from OAuth service
+             case oauth_service().get_valid_token(:twitch) do
+               {:ok, %{access_token: access_token}} ->
+                 url = "https://api.twitch.tv/helix/eventsub/subscriptions"
 
-            headers = [
-              {"authorization", "Bearer #{access_token}"},
-              {"client-id", get_client_id(state)},
-              {"content-type", "application/json"}
-            ]
+                 headers = [
+                   {"authorization", "Bearer #{access_token}"},
+                   {"client-id", get_client_id(state)},
+                   {"content-type", "application/json"}
+                 ]
 
-            create_subscription_with_headers(state, event_type, condition, headers, url)
+                 create_subscription_with_headers(state, event_type, condition, headers, url)
 
-          {:error, reason} ->
-            {:error, {:token_unavailable, reason}}
-        end
-      end,
-      fn error ->
-        Logger.error("Circuit breaker opened for Twitch API",
-          event_type: event_type,
-          error: inspect(error)
+               {:error, reason} ->
+                 {:error, {:token_unavailable, reason}}
+             end
+           end
+         ) do
+      {:error, :circuit_open} ->
+        Logger.error("Circuit breaker is open for Twitch API",
+          event_type: event_type
         )
 
-        {:error, {:circuit_breaker_open, error}}
-      end
-    )
+        {:error, :circuit_breaker_open}
+
+      result ->
+        result
+    end
   end
 
   defp create_subscription_with_headers(state, event_type, condition, headers, url) do
