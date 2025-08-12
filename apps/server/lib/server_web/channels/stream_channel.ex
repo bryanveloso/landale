@@ -216,11 +216,11 @@ defmodule ServerWeb.StreamChannel do
 
           {:error, reason} ->
             Logger.warning("Failed to update channel information",
-              error: reason,
+              error: inspect(reason),
               correlation_id: socket.assigns.correlation_id
             )
 
-            {:error, response} = ResponseBuilder.error("api_error", reason)
+            {:error, response} = ResponseBuilder.error("api_error", inspect(reason))
             {:reply, {:error, response}, socket}
         end
 
@@ -249,11 +249,11 @@ defmodule ServerWeb.StreamChannel do
 
       {:error, reason} ->
         Logger.warning("Failed to get channel information",
-          error: reason,
+          error: inspect(reason),
           correlation_id: socket.assigns.correlation_id
         )
 
-        {:error, response} = ResponseBuilder.error("api_error", reason)
+        {:error, response} = ResponseBuilder.error("api_error", inspect(reason))
         {:reply, {:error, response}, socket}
     end
   end
@@ -277,7 +277,7 @@ defmodule ServerWeb.StreamChannel do
           correlation_id: socket.assigns.correlation_id
         )
 
-        {:error, response} = ResponseBuilder.error("api_error", reason)
+        {:error, response} = ResponseBuilder.error("api_error", inspect(reason))
         {:reply, {:error, response}, socket}
     end
   end

@@ -576,12 +576,11 @@ defmodule Server.ContentAggregator do
         }
 
       {:error, reason} ->
-        Logger.warning("Failed to fetch creator goals", error: reason)
+        Logger.warning("Failed to fetch creator goals", error: inspect(reason))
 
         %{
           follower_goal: %{current: 0, target: 0},
-          sub_goal: %{current: 0, target: 0},
-          error: reason
+          sub_goal: %{current: 0, target: 0}
         }
     end
   end
