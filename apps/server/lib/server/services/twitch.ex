@@ -173,7 +173,8 @@ defmodule Server.Services.Twitch do
     }
 
     # Schedule initial token validation
-    TokenManager.schedule_initial_validation()
+    # Send the message to this GenServer process
+    Process.send_after(self(), :validate_token, 100)
 
     {:ok, state}
   end
@@ -258,7 +259,7 @@ defmodule Server.Services.Twitch do
     {:noreply, TokenManager.refresh_token_async(state)}
   end
 
-  def handle_info({ref, {:ok, token_info}}, %{token_validation_task: %Task{ref: ref}} = state) do
+  def handle_info({ref, token_info}, %{token_validation_task: %Task{ref: ref}} = state) when is_map(token_info) do
     new_state = TokenManager.handle_validation_success(state, token_info)
 
     # Trigger subscription creation if connected
@@ -279,6 +280,15 @@ defmodule Server.Services.Twitch do
 
   def handle_info({ref, {:error, reason}}, %{token_refresh_task: %Task{ref: ref}} = state) do
     {:noreply, TokenManager.handle_refresh_failure(state, reason)}
+  end
+
+  # Task DOWN messages for cleanup
+  def handle_info({:DOWN, ref, :process, _pid, :normal}, %{token_validation_task: %Task{ref: ref}} = state) do
+    {:noreply, %{state | token_validation_task: nil}}
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, :normal}, %{token_refresh_task: %Task{ref: ref}} = state) do
+    {:noreply, %{state | token_refresh_task: nil}}
   end
 
   # WebSocket Events
