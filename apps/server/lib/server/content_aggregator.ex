@@ -166,7 +166,10 @@ defmodule Server.ContentAggregator do
   @impl true
   def handle_info({:chat_message, event}, state) do
     try do
-      record_emote_usage(event.emotes, event.native_emotes, event.user_name)
+      emotes = get_event_field(event, :emotes, [])
+      native_emotes = get_event_field(event, :native_emotes, [])
+      user_name = get_event_field(event, :user_name, "unknown")
+      record_emote_usage(emotes, native_emotes, user_name)
     rescue
       error ->
         Logger.error("Failed to record emote usage", error: inspect(error), event: inspect(event))
@@ -607,6 +610,23 @@ defmodule Server.ContentAggregator do
     Process.put(:cached_goals, updated_goals)
 
     updated_goals
+  end
+
+  # Helper to extract fields from events that might have nested data structure
+  defp get_event_field(event, field, default) do
+    cond do
+      # Try nested data structure first (batched events)
+      Map.has_key?(event, :data) and Map.has_key?(event.data, field) ->
+        Map.get(event.data, field, default)
+
+      # Fall back to direct access (legacy/direct events)
+      Map.has_key?(event, field) ->
+        Map.get(event, field, default)
+
+      # Return default if field not found anywhere
+      true ->
+        default
+    end
   end
 
   defp goal_type_to_key("follower"), do: :follower_goal

@@ -311,5 +311,39 @@ defmodule Server.StreamProducerTest do
       state = GenServer.call(producer, :get_state)
       assert is_map(state)
     end
+
+    test "handles chat messages with emotes from batched events", %{producer: producer} do
+      # Test the specific crash scenario - batched chat message with emotes
+      batch_data = %{
+        type: :event_batch,
+        events: [
+          %{
+            type: "channel.chat.message",
+            data: %{
+              user_name: "test_user",
+              message: "Hello world!",
+              emotes: [%{name: "Kappa", count: 2}],
+              native_emotes: []
+            },
+            timestamp: System.system_time(:second),
+            correlation_id: "test_correlation_id"
+          }
+        ],
+        batch_size: 1,
+        batch_id: "test_batch_id",
+        timestamp: System.system_time(:second)
+      }
+
+      # Send the event_batch message
+      send(producer, {:event_batch, batch_data})
+
+      # Give time for async processing
+      Process.sleep(50)
+      assert Process.alive?(producer)
+
+      # Verify producer handled the event correctly without crashing
+      state = GenServer.call(producer, :get_state)
+      assert is_map(state)
+    end
   end
 end
