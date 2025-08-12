@@ -35,11 +35,47 @@ defmodule Server.Services.Twitch.TokenManager do
     else
       task =
         Task.async(fn ->
-          # Use get_valid_token which handles refresh automatically
-          OAuthService.get_valid_token(:twitch)
+          # First get the token
+          case OAuthService.get_valid_token(:twitch) do
+            {:ok, %{access_token: access_token}} ->
+              # Then validate it with Twitch to get user_id
+              validate_with_twitch(access_token)
+
+            error ->
+              error
+          end
         end)
 
       %{state | token_validation_task: task}
+    end
+  end
+
+  defp validate_with_twitch(access_token) do
+    url = "https://id.twitch.tv/oauth2/validate"
+    headers = [{"Authorization", "OAuth #{access_token}"}]
+
+    case :httpc.request(:get, {String.to_charlist(url), headers}, [], []) do
+      {:ok, {{_, 200, _}, _, body}} ->
+        case Jason.decode(body) do
+          {:ok, data} ->
+            {:ok,
+             %{
+               user_id: data["user_id"],
+               login: data["login"],
+               client_id: data["client_id"],
+               scopes: data["scopes"] || [],
+               expires_in: data["expires_in"]
+             }}
+
+          {:error, _} ->
+            {:error, "Failed to parse validation response"}
+        end
+
+      {:ok, {{_, status, _}, _, body}} ->
+        {:error, "Validation failed with status #{status}: #{body}"}
+
+      {:error, reason} ->
+        {:error, "HTTP request failed: #{inspect(reason)}"}
     end
   end
 

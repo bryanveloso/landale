@@ -591,7 +591,7 @@ defmodule Server.OAuthService do
 
     with {:ok, conn} <- open_gun_connection(uri),
          {:ok, response} <- post_and_await_response(conn, uri.path || "/", headers, body) do
-      response
+      {:ok, response}
     end
   end
 
