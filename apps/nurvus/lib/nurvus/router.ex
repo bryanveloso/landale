@@ -176,7 +176,6 @@ defmodule Nurvus.Router do
   end
 
   defp send_json_response(conn, status, data) do
-    # Emit telemetry for response timing
     if start_time = conn.assigns[:telemetry_start_time] do
       duration = System.monotonic_time() - start_time
 

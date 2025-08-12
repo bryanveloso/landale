@@ -11,7 +11,7 @@ defmodule Server.WebSocketClient do
       defmodule MyService do
         use GenServer
         alias Server.WebSocketClient
-        
+
         # In your GenServer
         def init(_opts) do
           state = %{
@@ -20,17 +20,17 @@ defmodule Server.WebSocketClient do
           }
           {:ok, state}
         end
-        
+
         def handle_info({:websocket_connected, client}, state) do
           # Handle successful connection
           {:noreply, %{state | ws_client: client}}
         end
-        
+
         def handle_info({:websocket_disconnected, client, reason}, state) do
           # Handle disconnection
           {:noreply, %{state | ws_client: client}}
         end
-        
+
         def handle_info({:websocket_message, client, message}, state) do
           # Handle incoming messages
           {:noreply, %{state | ws_client: client}}
@@ -118,8 +118,6 @@ defmodule Server.WebSocketClient do
 
   defp perform_connection(client, opts) do
     Logger.info("Connection initiated", url: client.url)
-
-    # Emit telemetry for connection attempt
     emit_telemetry(client, [:connection, :attempt], %{})
 
     host = to_charlist(client.uri.host)
@@ -300,7 +298,6 @@ defmodule Server.WebSocketClient do
     if stream_ref == client.stream_ref do
       Logger.info("Connection established", url: client.url)
 
-      # Emit telemetry for successful connection
       if client.connection_start_time do
         duration = System.monotonic_time(:millisecond) - client.connection_start_time
         emit_telemetry(client, [:connection, :success], %{duration: duration})
@@ -368,7 +365,6 @@ defmodule Server.WebSocketClient do
   def handle_connection_failure(client, reason) do
     Logger.warning("Connection lost", error: reason, url: client.url)
 
-    # Emit telemetry for connection failure
     if client.connection_start_time do
       duration = System.monotonic_time(:millisecond) - client.connection_start_time
       emit_telemetry(client, [:connection, :failure], %{duration: duration, reason: inspect(reason)})
@@ -410,8 +406,7 @@ defmodule Server.WebSocketClient do
     end
   end
 
-  defp emit_telemetry(client, event_suffix, measurements, metadata \\ %{}) do
-    event = client.telemetry_prefix ++ event_suffix
-    :telemetry.execute(event, measurements, Map.put(metadata, :url, client.url))
+  defp emit_telemetry(_client, _event_suffix, _measurements, _metadata \\ %{}) do
+    :ok
   end
 end

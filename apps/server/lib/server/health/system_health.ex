@@ -68,9 +68,13 @@ defmodule Server.Health.SystemHealth do
     end
   end
 
-  # Private helper functions moved from telemetry_channel.ex
+  # Public helper functions moved from telemetry_channel.ex
 
-  defp gather_service_metrics do
+  @doc """
+  Gathers metrics from all services for status reporting.
+  """
+  @spec gather_service_metrics() :: map()
+  def gather_service_metrics do
     services = [
       {:obs, Server.Services.OBS},
       {:twitch, Server.Services.Twitch},

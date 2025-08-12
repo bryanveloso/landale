@@ -184,15 +184,6 @@ defmodule ServerWeb.TranscriptionChannel do
               # Calculate submission latency
               duration_ms = System.monotonic_time(:millisecond) - start_time
 
-              # Emit telemetry metrics
-              Server.Telemetry.transcription_submitted(transcription.source_id || "unknown")
-              Server.Telemetry.transcription_submission_latency(duration_ms)
-
-              # Track text length if present
-              if transcription.text do
-                Server.Telemetry.transcription_text_length(String.length(transcription.text))
-              end
-
               # Broadcast to live transcription subscribers
               broadcast_transcription(transcription)
 
@@ -211,9 +202,6 @@ defmodule ServerWeb.TranscriptionChannel do
           end
 
         {:error, validation_errors} ->
-          # Emit error telemetry
-          Server.Telemetry.transcription_submission_error("validation_error")
-
           formatted_errors = Server.Transcription.Validation.format_errors(validation_errors)
 
           Logger.warning("Transcription payload validation failed",
@@ -311,9 +299,6 @@ defmodule ServerWeb.TranscriptionChannel do
   end
 
   defp handle_database_error(changeset, socket) do
-    # Emit error telemetry
-    Server.Telemetry.transcription_submission_error("database_error")
-
     formatted_errors =
       Server.Transcription.Validation.format_errors(traverse_changeset_errors(changeset))
 

@@ -1,5 +1,5 @@
 /**
- * Telemetry Route
+ * Service Status Route
  *
  * Simple service status view.
  * Uses direct Phoenix connections without telemetry wrapper.
@@ -7,19 +7,19 @@
 
 import { createFileRoute } from '@tanstack/solid-router'
 import { Show, onMount, onCleanup } from 'solid-js'
-import { TelemetryServiceProvider, useTelemetryService } from '@/services/telemetry-service'
+import { ServiceStatusProvider, useServiceStatus } from '@/services/service-status'
 import { usePhoenixService } from '@/services/phoenix-service'
 
-export const Route = createFileRoute('/telemetry')({
+export const Route = createFileRoute('/service-status')({
   component: () => (
-    <TelemetryServiceProvider>
-      <TelemetryPage />
-    </TelemetryServiceProvider>
+    <ServiceStatusProvider>
+      <ServiceStatusPage />
+    </ServiceStatusProvider>
   )
 })
 
-function TelemetryPage() {
-  const { serviceMetrics, systemInfo, requestRefresh } = useTelemetryService()
+function ServiceStatusPage() {
+  const { serviceMetrics, systemInfo, requestRefresh } = useServiceStatus()
   const { isConnected } = usePhoenixService()
 
   let intervalId: number | undefined

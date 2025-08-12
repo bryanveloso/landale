@@ -8,7 +8,7 @@ defmodule Server.SubscriptionMonitor do
 
   This module follows Elixir best practices:
   - Uses dependency injection for storage (testable)
-  - Separates business logic from data storage  
+  - Separates business logic from data storage
   - Supports multiple instances for testing
   - Proper supervision and fault tolerance
 
@@ -647,8 +647,7 @@ defmodule Server.SubscriptionMonitor do
     apply_filters(subscriptions, rest)
   end
 
-  defp emit_telemetry(event_suffix, measurements, metadata \\ %{}) do
-    event = [:server, :subscription_monitor] ++ event_suffix
-    :telemetry.execute(event, measurements, metadata)
+  defp emit_telemetry(_event_suffix, _measurements, _metadata \\ %{}) do
+    :ok
   end
 end

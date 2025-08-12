@@ -51,9 +51,6 @@ defmodule Server.Events do
       # Direct publish for immediate delivery
       Phoenix.PubSub.broadcast(@pubsub, @obs_events, {:obs_event, event})
     end
-
-    # Emit telemetry for published event
-    Server.Telemetry.event_published(event_type, "obs:events")
   end
 
   # Twitch Event Publishing
@@ -86,9 +83,6 @@ defmodule Server.Events do
       # Direct publish for immediate delivery
       Phoenix.PubSub.broadcast(@pubsub, @twitch_events, {:twitch_event, event})
     end
-
-    # Emit telemetry for published event
-    Server.Telemetry.event_published(event_type, "twitch:events")
   end
 
   # IronMON Event Publishing
@@ -121,9 +115,6 @@ defmodule Server.Events do
       # Direct publish for immediate delivery
       Phoenix.PubSub.broadcast(@pubsub, @ironmon_events, {:ironmon_event, event})
     end
-
-    # Emit telemetry for published event
-    Server.Telemetry.event_published(event_type, "ironmon:events")
   end
 
   # Rainwave Event Publishing
@@ -180,9 +171,6 @@ defmodule Server.Events do
       # Direct publish for immediate delivery
       Phoenix.PubSub.broadcast(@pubsub, @rainwave_events, {:rainwave_event, event})
     end
-
-    # Emit telemetry for published event
-    Server.Telemetry.event_published(event_type, "rainwave:events")
   end
 
   # System Event Publishing
@@ -215,9 +203,6 @@ defmodule Server.Events do
       # Direct publish for immediate delivery
       Phoenix.PubSub.broadcast(@pubsub, @system_events, {:system_event, event})
     end
-
-    # Emit telemetry for published event
-    Server.Telemetry.event_published(event_type, "system:events")
   end
 
   # Health Monitoring Events

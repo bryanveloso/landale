@@ -205,7 +205,6 @@ defmodule Server.Services.Twitch.EventSubManager do
               cost: subscription["cost"] || 1
             )
 
-            Server.Telemetry.twitch_subscription_created(event_type)
             {:ok, subscription}
 
           {:ok, response} ->
@@ -233,7 +232,6 @@ defmodule Server.Services.Twitch.EventSubManager do
           event_type: event_type
         )
 
-        Server.Telemetry.twitch_subscription_failed(event_type, inspect(reason))
         {:error, reason}
     end
   end

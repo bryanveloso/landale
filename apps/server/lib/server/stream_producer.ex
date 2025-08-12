@@ -855,20 +855,6 @@ defmodule Server.StreamProducer do
   end
 
   defp broadcast_state_update(state) do
-    # Emit telemetry for state updates
-    :telemetry.execute(
-      [:server, :stream_producer, :state_update],
-      %{
-        interrupt_count: length(state.interrupt_stack),
-        timer_count: map_size(state.timers),
-        version: state.version
-      },
-      %{
-        show: state.current_show,
-        has_active_content: not is_nil(state.active_content)
-      }
-    )
-
     # Enrich state with layer information before broadcasting
     enriched_state = enrich_state_with_layers(state)
 
@@ -916,19 +902,6 @@ defmodule Server.StreamProducer do
         stack_before: initial_stack_size,
         stack_after: length(new_interrupt_stack)
       )
-
-      # Emit cleanup telemetry
-      :telemetry.execute(
-        [:server, :stream_producer, :cleanup],
-        %{
-          stale_timers_removed: map_size(stale_timers),
-          interrupts_pruned: initial_stack_size - length(new_interrupt_stack)
-        },
-        %{
-          timer_count_before: initial_timer_count,
-          timer_count_after: map_size(new_timers)
-        }
-      )
     end
 
     new_state = %{state | timers: new_timers, interrupt_stack: new_interrupt_stack, version: state.version + 1}
@@ -945,17 +918,6 @@ defmodule Server.StreamProducer do
       Logger.warning("Timer limit exceeded, cleaning up oldest timers",
         current_count: timer_count,
         max_allowed: max_timers()
-      )
-
-      # Emit telemetry for timer limit breach
-      :telemetry.execute(
-        [:server, :stream_producer, :timer_limit_exceeded],
-        %{
-          current_count: timer_count,
-          max_allowed: max_timers(),
-          excess_count: timer_count - max_timers()
-        },
-        %{}
       )
 
       # Get oldest interrupts by started_at time

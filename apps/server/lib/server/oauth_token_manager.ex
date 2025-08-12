@@ -369,8 +369,7 @@ defmodule Server.OAuthTokenManager do
   defp parse_scopes(%{"scope" => scope}) when is_binary(scope), do: MapSet.new(String.split(scope, " "))
   defp parse_scopes(_), do: nil
 
-  defp emit_telemetry(manager, event_suffix, metadata \\ %{}) do
-    event = manager.telemetry_prefix ++ event_suffix
-    :telemetry.execute(event, %{}, Map.put(metadata, :service, manager.service_name))
+  defp emit_telemetry(_manager, _event_suffix, _metadata \\ %{}) do
+    :ok
   end
 end

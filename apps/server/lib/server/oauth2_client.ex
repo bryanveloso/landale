@@ -448,9 +448,8 @@ defmodule Server.OAuth2Client do
   defp parse_scope(scope) when is_list(scope), do: scope
   defp parse_scope(_), do: nil
 
-  defp emit_telemetry(client, event_suffix, metadata \\ %{}) do
-    event = client.telemetry_prefix ++ event_suffix
-    :telemetry.execute(event, %{}, metadata)
+  defp emit_telemetry(_client, _event_suffix, _metadata \\ %{}) do
+    :ok
   end
 
   # Safe OAuth error conversion - only allows known error types to prevent atom table exhaustion

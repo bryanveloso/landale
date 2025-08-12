@@ -254,38 +254,17 @@ defmodule Server.DataAccessGuard do
 
     metadata = if reason, do: Map.put(metadata, :reason, inspect(reason)), else: metadata
 
-    # General validation event
-    :telemetry.execute(
-      [:server, :data_access_guard, :validation],
-      %{duration: duration},
-      metadata
-    )
-
     # Mode-specific event for failures
     if result == :failure do
       event_name =
         if mode == :warn,
           do: [:server, :data_access_guard, :warn],
           else: [:server, :data_access_guard, :error]
-
-      :telemetry.execute(event_name, %{count: 1}, metadata)
     end
   end
 
-  defp emit_location_telemetry(caller_env, schema_module, mode) do
-    # Special event for PatternMonitor to track problematic locations
-    :telemetry.execute(
-      [:server, :data_access_guard, :location],
-      %{count: 1},
-      %{
-        module: caller_env.module,
-        function: caller_env.function,
-        line: caller_env.line,
-        file: caller_env.file,
-        schema: schema_module,
-        mode: mode
-      }
-    )
+  defp emit_location_telemetry(_caller_env, _schema_module, _mode) do
+    :ok
   end
 
   defp format_location(caller_env) do

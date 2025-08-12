@@ -1,6 +1,5 @@
 import { ConnectionStatus } from './connection-status'
 import { SystemStatus } from './system-status'
-import { TelemetryIndicator } from './telemetry-indicator'
 import { Link } from '@tanstack/solid-router'
 
 export function StatusBar() {
@@ -18,12 +17,11 @@ export function StatusBar() {
             OAuth
           </Link>
           <span class="text-gray-600">|</span>
-          <Link href="/telemetry" class="text-gray-400 transition-colors hover:text-white">
-            Telemetry
+          <Link href="/service-status" class="text-gray-400 transition-colors hover:text-white">
+            Service Status
           </Link>
         </div>
       </div>
-      <TelemetryIndicator />
     </div>
   )
 }

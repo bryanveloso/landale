@@ -266,11 +266,7 @@ defmodule Server.BoundaryConverter do
   defp safe_key_to_string(key) when is_binary(key), do: key
   defp safe_key_to_string(key), do: inspect(key)
 
-  defp emit_telemetry(event, metadata) do
-    :telemetry.execute(
-      [:server, :boundary_converter, event],
-      %{count: 1},
-      metadata
-    )
+  defp emit_telemetry(_event, _metadata) do
+    :ok
   end
 end

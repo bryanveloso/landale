@@ -210,11 +210,7 @@ defmodule Server.SafeTokenHandler do
     })
   end
 
-  defp emit_telemetry(event, metadata) do
-    :telemetry.execute(
-      [:server, :safe_token_handler, event],
-      %{count: 1},
-      metadata
-    )
+  defp emit_telemetry(_event, _metadata) do
+    :ok
   end
 end

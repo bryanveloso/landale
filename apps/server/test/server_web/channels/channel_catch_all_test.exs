@@ -131,7 +131,7 @@ defmodule ServerWeb.ChannelCatchAllTest do
   describe "TelemetryChannel catch-all handlers" do
     setup do
       {:ok, socket} = connect(ServerWeb.UserSocket, %{})
-      {:ok, _, socket} = subscribe_and_join(socket, ServerWeb.TelemetryChannel, "dashboard:telemetry")
+      {:ok, _, socket} = subscribe_and_join(socket, ServerWeb.ServicesChannel, "dashboard:services")
       {:ok, socket: socket}
     end
 
@@ -198,7 +198,7 @@ defmodule ServerWeb.ChannelCatchAllTest do
         {"events:all", ServerWeb.EventsChannel},
         {"overlay:obs", ServerWeb.OverlayChannel},
         {"stream:overlays", ServerWeb.StreamChannel},
-        {"dashboard:telemetry", ServerWeb.TelemetryChannel},
+        {"dashboard:services", ServerWeb.ServicesChannel},
         {"transcription:live", ServerWeb.TranscriptionChannel}
       ]
 

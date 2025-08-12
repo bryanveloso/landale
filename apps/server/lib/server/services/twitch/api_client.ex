@@ -22,8 +22,6 @@ defmodule Server.Services.Twitch.ApiClient do
   use GenServer
   require Logger
 
-  alias Server.Telemetry
-
   # Twitch API constants
   @api_base_url "https://api.twitch.tv/helix"
   @user_agent "Landale/1.0 (https://github.com/bryanveloso/landale)"
@@ -294,7 +292,6 @@ defmodule Server.Services.Twitch.ApiClient do
                 reset_in_seconds: reset_seconds
               )
 
-              Telemetry.twitch_api_call_rate_limited(reset_seconds)
               {:error, "Rate limit exceeded. Resets in #{reset_seconds} seconds"}
             end
         end
@@ -315,12 +312,10 @@ defmodule Server.Services.Twitch.ApiClient do
       # Parse response
       case response do
         %{status: 200, body: body} ->
-          Telemetry.twitch_api_call_success(method, path)
           {:ok, body}
 
         %{status: 204} ->
           # No content response (successful for PATCH requests)
-          Telemetry.twitch_api_call_success(method, path)
           :ok
 
         %{status: status, body: body} ->
@@ -331,7 +326,6 @@ defmodule Server.Services.Twitch.ApiClient do
             path: path
           )
 
-          Telemetry.twitch_api_call_error(method, path, status)
           {:error, "API error: #{status} - #{inspect(body)}"}
       end
     else
@@ -342,7 +336,6 @@ defmodule Server.Services.Twitch.ApiClient do
           path: path
         )
 
-        Telemetry.twitch_api_call_error(method, path, :token_error)
         {:error, reason}
     end
   end

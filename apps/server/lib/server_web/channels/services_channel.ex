@@ -77,6 +77,17 @@ defmodule ServerWeb.ServicesChannel do
   end
 
   @impl true
+  def handle_in("get_telemetry", _params, socket) do
+    # Gather service status data for the dashboard
+    telemetry_data = gather_telemetry_data()
+
+    # Push telemetry update to the client
+    push(socket, "telemetry_update", telemetry_data)
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_in("ping", payload, socket) do
     handle_ping(payload, socket)
   end
@@ -228,5 +239,27 @@ defmodule ServerWeb.ServicesChannel do
         push(socket, "command_result", error_response)
         socket
     end
+  end
+
+  # Gather telemetry data for the dashboard
+  defp gather_telemetry_data do
+    # Get service metrics from SystemHealth
+    services = Server.Health.SystemHealth.gather_service_metrics()
+
+    # Get system info
+    system_info = %{
+      uptime: System.monotonic_time(:second),
+      version: Application.spec(:server, :vsn) |> to_string(),
+      environment: Application.get_env(:server, :environment, "development"),
+      status: Server.Health.SystemHealth.determine_system_status()
+    }
+
+    # Return telemetry snapshot
+    %{
+      timestamp: System.system_time(:millisecond),
+      services: services,
+      system: system_info,
+      overlays: []
+    }
   end
 end

@@ -119,7 +119,6 @@ defmodule Server.ExternalCall do
 
     duration_ms = System.monotonic_time(:millisecond) - start_time
 
-    # Emit telemetry based on result
     case result do
       {:ok, _} ->
         emit_call_telemetry(service_name, call_type, :success, duration_ms)
@@ -143,17 +142,7 @@ defmodule Server.ExternalCall do
     end
   end
 
-  defp emit_call_telemetry(service_name, call_type, status, duration_ms) do
-    :telemetry.execute(
-      [:external_call, call_type],
-      %{
-        duration_ms: duration_ms,
-        count: 1
-      },
-      %{
-        service: service_name,
-        status: status
-      }
-    )
+  defp emit_call_telemetry(_service_name, _call_type, _status, _duration_ms) do
+    :ok
   end
 end

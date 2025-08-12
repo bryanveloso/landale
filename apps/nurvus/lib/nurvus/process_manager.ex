@@ -151,13 +151,6 @@ defmodule Nurvus.ProcessManager do
               "Process start config: #{inspect(%{command: config.command, args: config.args, cwd: config.cwd, env: config.env})}"
             )
 
-            # Emit telemetry event for process start
-            :telemetry.execute(
-              [:nurvus, :process, :started],
-              %{count: 1},
-              %{process_id: process_id, process_name: config.name}
-            )
-
             monitor_ref = Process.monitor(pid)
             updated_monitors = Map.put(state.monitors, process_id, {pid, monitor_ref})
             new_state = %{state | monitors: updated_monitors}
@@ -179,13 +172,6 @@ defmodule Nurvus.ProcessManager do
 
     case result do
       :ok ->
-        # Emit telemetry event for process stop
-        :telemetry.execute(
-          [:nurvus, :process, :stopped],
-          %{count: 1},
-          %{process_id: process_id}
-        )
-
         updated_monitors = Map.delete(state.monitors, process_id)
         new_state = %{state | monitors: updated_monitors}
         {:reply, :ok, new_state}
@@ -216,13 +202,6 @@ defmodule Nurvus.ProcessManager do
           {:reply, :ok, new_state} ->
             Logger.info("Successfully restarted process: #{process_id}")
             Logger.debug("Restart sequence completed: #{process_id}")
-
-            # Emit telemetry event for process restart
-            :telemetry.execute(
-              [:nurvus, :process, :restarted],
-              %{count: 1},
-              %{process_id: process_id}
-            )
 
             {:reply, :ok, new_state}
 
@@ -398,13 +377,6 @@ defmodule Nurvus.ProcessManager do
       "Process exit details - ID: #{process_id}, PID: #{inspect(pid)}, Monitor: #{inspect(monitor_ref)}"
     )
 
-    # Emit telemetry event for process crash
-    :telemetry.execute(
-      [:nurvus, :process, :crashed],
-      %{count: 1},
-      %{process_id: process_id, reason: inspect(reason)}
-    )
-
     # Remove from monitors
     updated_monitors = Map.delete(state.monitors, process_id)
     new_state = %{state | monitors: updated_monitors}
@@ -433,13 +405,6 @@ defmodule Nurvus.ProcessManager do
 
     Logger.debug(
       "Auto-restart config: #{inspect(%{max_restarts: config.max_restarts, restart_window: config.restart_window})}"
-    )
-
-    # Emit telemetry event for auto-restart
-    :telemetry.execute(
-      [:nurvus, :process, :auto_restart_scheduled],
-      %{count: 1},
-      %{process_id: process_id}
     )
 
     # Schedule restart after a delay

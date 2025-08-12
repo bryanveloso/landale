@@ -40,7 +40,6 @@ defmodule ServerWeb.HealthController do
 
     # Emit telemetry
     duration = System.monotonic_time(:millisecond) - start_time
-    Server.Telemetry.health_check("basic", duration, "healthy")
 
     response
   end
@@ -97,7 +96,6 @@ defmodule ServerWeb.HealthController do
 
     # Emit telemetry
     duration = System.monotonic_time(:millisecond) - start_time
-    Server.Telemetry.health_check("detailed", duration, overall_status)
 
     conn
     |> put_status(status_code)
@@ -141,7 +139,6 @@ defmodule ServerWeb.HealthController do
     # Emit telemetry
     duration = System.monotonic_time(:millisecond) - start_time
     status_string = if ready, do: "ready", else: "not_ready"
-    Server.Telemetry.health_check("readiness", duration, status_string)
 
     conn
     |> put_status(status_code)
@@ -206,7 +203,6 @@ defmodule ServerWeb.HealthController do
 
         # Emit telemetry
         duration = System.monotonic_time(:millisecond) - start_time
-        Server.Telemetry.health_check("subscriptions", duration, health_status)
 
         conn
         |> put_status(status_code)
@@ -215,7 +211,6 @@ defmodule ServerWeb.HealthController do
       {:error, error_message} ->
         # Emit telemetry for error
         duration = System.monotonic_time(:millisecond) - start_time
-        Server.Telemetry.health_check("subscriptions", duration, "error")
 
         conn
         |> put_status(503)

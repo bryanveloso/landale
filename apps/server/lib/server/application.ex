@@ -20,7 +20,6 @@ defmodule Server.Application do
 
     # Base children for all environments
     base_children = [
-      ServerWeb.Telemetry,
       Server.Repo,
       {DNSCluster, query: Application.get_env(:server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Server.PubSub},

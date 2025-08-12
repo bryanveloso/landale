@@ -30,13 +30,6 @@ defmodule Server.OAuthAuditLog do
     # Log to application logger with audit tag
     Logger.info("[OAUTH_AUDIT] #{format_event(event)}", log_entry)
 
-    # Emit telemetry event for external monitoring
-    :telemetry.execute(
-      [:server, :oauth, :audit, event],
-      %{timestamp: System.system_time(:millisecond)},
-      log_entry
-    )
-
     # Store in database for compliance (if needed)
     if should_persist?(event) do
       persist_audit_log(event, log_entry)
@@ -56,13 +49,6 @@ defmodule Server.OAuthAuditLog do
 
     # Always persist security violations
     persist_audit_log(:security_violation, log_entry)
-
-    # Alert monitoring systems
-    :telemetry.execute(
-      [:server, :oauth, :security_violation],
-      %{timestamp: System.system_time(:millisecond)},
-      log_entry
-    )
 
     :ok
   end

@@ -335,9 +335,8 @@ defmodule Server.RetryStrategy do
     end
   end
 
-  defp emit_telemetry(config, event_suffix, metadata \\ %{}) do
-    event = config.telemetry_prefix ++ event_suffix
-    :telemetry.execute(event, %{}, metadata)
+  defp emit_telemetry(_config, _event_suffix, _metadata \\ %{}) do
+    :ok
   end
 
   # Circuit breaker functionality has been moved to Server.CircuitBreakerServer

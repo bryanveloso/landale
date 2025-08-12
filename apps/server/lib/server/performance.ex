@@ -25,9 +25,6 @@ defmodule Server.Performance do
         "Database query" => fn ->
           benchmark_database_query()
         end,
-        "Telemetry emission" => fn ->
-          benchmark_telemetry_emission()
-        end,
         "Cache hit (ETS)" => fn ->
           benchmark_cache_hit()
         end,
@@ -192,15 +189,6 @@ defmodule Server.Performance do
     catch
       :exit, _reason -> :error
     end
-  end
-
-  defp benchmark_telemetry_emission do
-    # Benchmark telemetry overhead
-    :telemetry.execute(
-      [:server, :performance, :benchmark],
-      %{value: 1},
-      %{operation: "test"}
-    )
   end
 
   # Load simulation functions

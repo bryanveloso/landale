@@ -53,13 +53,6 @@ defmodule Server.OAuthMonitor do
   """
   def record_refresh_attempt(service_name) do
     GenServer.cast(__MODULE__, {:refresh_attempt, service_name})
-
-    # Emit telemetry
-    :telemetry.execute(
-      [:server, :oauth, :monitor, :refresh_attempt],
-      %{count: 1},
-      %{service: service_name}
-    )
   end
 
   @doc """
@@ -67,13 +60,6 @@ defmodule Server.OAuthMonitor do
   """
   def record_refresh_success(service_name, expires_at) do
     GenServer.cast(__MODULE__, {:refresh_success, service_name, expires_at})
-
-    # Emit telemetry
-    :telemetry.execute(
-      [:server, :oauth, :monitor, :refresh_success],
-      %{count: 1},
-      %{service: service_name}
-    )
   end
 
   @doc """
@@ -81,13 +67,6 @@ defmodule Server.OAuthMonitor do
   """
   def record_refresh_failure(service_name, reason) do
     GenServer.cast(__MODULE__, {:refresh_failure, service_name, reason})
-
-    # Emit telemetry
-    :telemetry.execute(
-      [:server, :oauth, :monitor, :refresh_failure],
-      %{count: 1},
-      %{service: service_name, reason: inspect(reason)}
-    )
   end
 
   @doc """
@@ -95,17 +74,6 @@ defmodule Server.OAuthMonitor do
   """
   def record_circuit_breaker_change(service_name, old_state, new_state) do
     GenServer.cast(__MODULE__, {:circuit_breaker_change, service_name, old_state, new_state})
-
-    # Emit telemetry
-    :telemetry.execute(
-      [:server, :oauth, :monitor, :circuit_breaker],
-      %{count: 1},
-      %{
-        service: service_name,
-        old_state: old_state,
-        new_state: new_state
-      }
-    )
   end
 
   @doc """
@@ -113,13 +81,6 @@ defmodule Server.OAuthMonitor do
   """
   def record_retry_count(service_name, retry_count) do
     GenServer.cast(__MODULE__, {:retry_count, service_name, retry_count})
-
-    # Emit telemetry
-    :telemetry.execute(
-      [:server, :oauth, :monitor, :retry_count],
-      %{value: retry_count},
-      %{service: service_name}
-    )
   end
 
   @doc """
@@ -144,9 +105,6 @@ defmodule Server.OAuthMonitor do
 
     # Schedule first health check
     timer = Process.send_after(self(), :check_health, @check_interval)
-
-    # Attach telemetry handlers
-    attach_telemetry_handlers()
 
     state = %State{
       monitors: %{},
@@ -375,17 +333,6 @@ defmodule Server.OAuthMonitor do
     updated_monitor = %{monitor | alert_sent: true}
     new_monitors = Map.put(state.monitors, service_name, updated_monitor)
 
-    # Emit critical telemetry event
-    :telemetry.execute(
-      [:server, :oauth, :monitor, :alert],
-      %{count: 1},
-      %{
-        service: service_name,
-        type: :refresh_failures,
-        consecutive_failures: monitor.consecutive_failures
-      }
-    )
-
     %{state | monitors: new_monitors, alerts: new_alerts}
   end
 
@@ -403,16 +350,6 @@ defmodule Server.OAuthMonitor do
     }
 
     new_alerts = Map.put(state.alerts, service_name, alert)
-
-    # Emit critical telemetry event
-    :telemetry.execute(
-      [:server, :oauth, :monitor, :alert],
-      %{count: 1},
-      %{
-        service: service_name,
-        type: :circuit_breaker_open
-      }
-    )
 
     %{state | alerts: new_alerts}
   end
@@ -446,71 +383,10 @@ defmodule Server.OAuthMonitor do
     if refresh continues to fail.
     """)
 
-    # Emit telemetry
-    :telemetry.execute(
-      [:server, :oauth, :monitor, :token_expiry],
-      %{count: 1},
-      %{
-        service: service_name,
-        type: expiry_type
-      }
-    )
-
     state
   end
 
-  defp emit_health_metrics(state) do
-    # Count services by health status
-    status_counts =
-      Enum.reduce(state.monitors, %{}, fn {_service, monitor}, acc ->
-        status = determine_health_status(monitor)
-        Map.update(acc, status, 1, &(&1 + 1))
-      end)
-
-    # Emit metrics for each status
-    Enum.each([:healthy, :warning, :degraded, :unhealthy, :critical], fn status ->
-      count = Map.get(status_counts, status, 0)
-
-      :telemetry.execute(
-        [:server, :oauth, :monitor, :health],
-        %{count: count},
-        %{status: status}
-      )
-    end)
-
-    # Emit total retry count across all services
-    total_retries =
-      Enum.reduce(state.monitors, 0, fn {_service, monitor}, acc ->
-        acc + monitor.retry_count
-      end)
-
-    :telemetry.execute(
-      [:server, :oauth, :monitor, :total_retries],
-      %{value: total_retries},
-      %{}
-    )
-  end
-
-  defp attach_telemetry_handlers do
-    # Attach to circuit breaker events
-    :telemetry.attach(
-      "oauth-monitor-circuit-breaker",
-      [:server, :circuit_breaker, :state_change],
-      &handle_circuit_breaker_telemetry/4,
-      nil
-    )
-
-    Logger.info("OAuth Monitor telemetry handlers attached")
-  end
-
-  defp handle_circuit_breaker_telemetry(_event_name, _measurements, metadata, _config) do
-    # Forward circuit breaker changes to monitor
-    if String.contains?(to_string(metadata.service), "oauth") do
-      record_circuit_breaker_change(
-        metadata.service,
-        metadata.old_state,
-        metadata.new_state
-      )
-    end
+  defp emit_health_metrics(_state) do
+    :ok
   end
 end

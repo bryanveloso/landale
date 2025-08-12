@@ -91,7 +91,7 @@ defmodule ServerWeb.CatchAllHandlerTest do
 
     test "TelemetryChannel survives unknown handle_info messages" do
       {:ok, socket} = connect(ServerWeb.UserSocket, %{})
-      {:ok, _, socket} = subscribe_and_join(socket, ServerWeb.TelemetryChannel, "dashboard:telemetry")
+      {:ok, _, socket} = subscribe_and_join(socket, ServerWeb.ServicesChannel, "dashboard:services")
 
       # Send unknown messages
       send(socket.channel_pid, :unknown_telemetry)
@@ -125,7 +125,7 @@ defmodule ServerWeb.CatchAllHandlerTest do
         {ServerWeb.EventsChannel, "events:all", :noreply},
         {ServerWeb.OverlayChannel, "overlay:system", :error},
         {ServerWeb.StreamChannel, "stream:overlays", :noreply},
-        {ServerWeb.TelemetryChannel, "dashboard:telemetry", :error},
+        {ServerWeb.ServicesChannel, "dashboard:services", :error},
         {ServerWeb.TranscriptionChannel, "transcription:live", :error}
       ]
 

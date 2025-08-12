@@ -7,7 +7,6 @@ defmodule ServerWeb.UserSocket do
 
   # Channels
   channel "dashboard:services", ServerWeb.ServicesChannel
-  channel "dashboard:telemetry", ServerWeb.TelemetryChannel
   channel "dashboard:*", ServerWeb.DashboardChannel
   channel "events:*", ServerWeb.EventsChannel
   channel "overlay:*", ServerWeb.OverlayChannel
@@ -47,16 +46,6 @@ defmodule ServerWeb.UserSocket do
 
     # Track this socket with Phoenix.Tracker
     ServerWeb.WebSocketTracker.track_socket(correlation_id, self())
-
-    # Emit telemetry event for WebSocket connection
-    :telemetry.execute(
-      [:landale, :websocket, :connected],
-      %{system_time: System.system_time(:millisecond)},
-      %{
-        socket_id: correlation_id,
-        environment: environment
-      }
-    )
 
     {:ok, socket}
   end

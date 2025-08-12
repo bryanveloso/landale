@@ -81,12 +81,6 @@ defmodule ServerWeb.Plugs.RateLimiter do
           retry_after: retry_after
         )
 
-        :telemetry.execute(
-          [:rate_limiter, :rejected],
-          %{count: 1},
-          %{path: conn.request_path}
-        )
-
         conn
         |> put_status(:too_many_requests)
         |> put_resp_header("retry-after", to_string(retry_after))

@@ -26,21 +26,6 @@ defmodule Server.PatternMonitor do
   use GenServer
   require Logger
 
-  @telemetry_events [
-    [:server, :safe_token_handler, :access_pattern],
-    [:server, :safe_token_handler, :new_atom_created],
-    [:server, :boundary_converter, :conversion],
-    [:server, :boundary_converter, :unknown_field],
-    [:server, :channel_safety, :pattern_conversion],
-    [:server, :channel_safety, :crash_prevented],
-    [:server, :channel_safety, :handle_in],
-    # DataAccessGuard events
-    [:server, :data_access_guard, :validation],
-    [:server, :data_access_guard, :warn],
-    [:server, :data_access_guard, :error],
-    [:server, :data_access_guard, :location]
-  ]
-
   defmodule State do
     @moduledoc false
     defstruct [
@@ -85,7 +70,6 @@ defmodule Server.PatternMonitor do
   @impl true
   def init(_opts) do
     # Attach telemetry handlers
-    attach_telemetry_handlers()
 
     # Schedule periodic reporting
     schedule_periodic_report()
@@ -145,23 +129,6 @@ defmodule Server.PatternMonitor do
   end
 
   # Telemetry handling
-
-  defp attach_telemetry_handlers do
-    Enum.each(@telemetry_events, fn event ->
-      handler_id = "pattern-monitor-#{Enum.join(event, "-")}"
-
-      :telemetry.attach(
-        handler_id,
-        event,
-        &__MODULE__.handle_telemetry/4,
-        nil
-      )
-    end)
-  end
-
-  def handle_telemetry(event_name, measurements, metadata, _config) do
-    send(__MODULE__, {:telemetry_event, measurements, metadata, event_name})
-  end
 
   defp handle_telemetry_event([:server, :safe_token_handler, :access_pattern], _measurements, metadata, state) do
     pattern_type = metadata[:type]

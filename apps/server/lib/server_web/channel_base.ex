@@ -45,35 +45,15 @@ defmodule ServerWeb.ChannelBase do
         ServerWeb.ChannelHelpers.push_error(socket, event, error_type, message, __MODULE__)
       end
 
-      # Helper to emit telemetry after successful join
-      def emit_joined_telemetry(topic, socket) do
-        :telemetry.execute(
-          [:landale, :channel, :joined],
-          %{system_time: System.system_time(:millisecond)},
-          %{
-            topic: topic,
-            socket_id: Map.get(socket.assigns, :correlation_id, "unknown")
-          }
-        )
+      def emit_joined_telemetry(_topic, _socket) do
+        :ok
       end
 
-      # Helper to emit telemetry on channel leave
-      def emit_left_telemetry(socket) do
-        if Map.has_key?(socket, :topic) do
-          :telemetry.execute(
-            [:landale, :channel, :left],
-            %{system_time: System.system_time(:millisecond)},
-            %{
-              topic: socket.topic,
-              socket_id: Map.get(socket.assigns, :correlation_id, "unknown")
-            }
-          )
-        end
+      def emit_left_telemetry(_socket) do
+        :ok
       end
 
-      # Default terminate implementation that emits telemetry
-      def terminate(_reason, socket) do
-        emit_left_telemetry(socket)
+      def terminate(_reason, _socket) do
         :ok
       end
 

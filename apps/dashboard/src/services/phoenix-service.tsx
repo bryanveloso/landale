@@ -96,17 +96,17 @@ export const PhoenixServiceProvider: Component<PhoenixServiceProviderProps> = (p
         })
     }
 
-    // Join telemetry channel
+    // Join service status channel (renamed from telemetry)
     if (!telemetryChannel()) {
-      const channel = phoenixSocket.channel('dashboard:telemetry', {})
+      const channel = phoenixSocket.channel('dashboard:services', {})
       channel
         .join()
         .receive('ok', () => {
-          logger.info('Joined telemetry channel')
+          logger.info('Joined service status channel')
           setTelemetryChannel(channel)
         })
         .receive('error', (resp) => {
-          logger.error('Failed to join telemetry channel', { error: resp })
+          logger.error('Failed to join service status channel', { error: resp })
         })
     }
   }

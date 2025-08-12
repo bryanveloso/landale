@@ -294,53 +294,17 @@ defmodule Server.CircuitBreakerServer do
   defp transition_to_open(circuit) do
     now = DateTime.utc_now()
 
-    # Emit telemetry
-    :telemetry.execute(
-      [:circuit_breaker, :state_change],
-      %{count: 1},
-      %{
-        name: circuit.name,
-        from_state: circuit.state,
-        to_state: :open,
-        failure_count: circuit.failure_count
-      }
-    )
-
     %{circuit | state: :open, state_changed_at: now}
   end
 
   defp transition_to_half_open(circuit) do
     now = DateTime.utc_now()
 
-    # Emit telemetry
-    :telemetry.execute(
-      [:circuit_breaker, :state_change],
-      %{count: 1},
-      %{
-        name: circuit.name,
-        from_state: circuit.state,
-        to_state: :half_open,
-        failure_count: circuit.failure_count
-      }
-    )
-
     %{circuit | state: :half_open, half_open_success_count: 0, state_changed_at: now}
   end
 
   defp transition_to_closed(circuit) do
     now = DateTime.utc_now()
-
-    # Emit telemetry
-    :telemetry.execute(
-      [:circuit_breaker, :state_change],
-      %{count: 1},
-      %{
-        name: circuit.name,
-        from_state: circuit.state,
-        to_state: :closed,
-        failure_count: 0
-      }
-    )
 
     %{
       circuit

@@ -1,7 +1,7 @@
 /**
- * Telemetry Service
+ * Service Status Service
  *
- * Centralized service for telemetry data management.
+ * Centralized service for service status monitoring.
  * Handles Phoenix channel subscription and shares data between components.
  */
 
@@ -11,7 +11,7 @@ import { logger } from '@landale/shared/logger'
 import { usePhoenixService } from './phoenix-service'
 import type { SystemInfo, ServiceMetrics, TelemetryResponse, TelemetrySnapshot, OverlayHealth } from '@/types/telemetry'
 
-interface TelemetryContextValue {
+interface ServiceStatusContextValue {
   systemInfo: () => SystemInfo | null
   serviceMetrics: () => ServiceMetrics | null
   overlayHealth: () => OverlayHealth[] | null
@@ -21,21 +21,21 @@ interface TelemetryContextValue {
   setEnvironmentFilter: (env: string | null) => void
 }
 
-const TelemetryContext = createContext<TelemetryContextValue>()
+const ServiceStatusContext = createContext<ServiceStatusContextValue>()
 
-export function useTelemetryService() {
-  const context = useContext(TelemetryContext)
+export function useServiceStatus() {
+  const context = useContext(ServiceStatusContext)
   if (!context) {
-    throw new Error('useTelemetryService must be used within TelemetryServiceProvider')
+    throw new Error('useServiceStatus must be used within ServiceStatusProvider')
   }
   return context
 }
 
-interface TelemetryServiceProviderProps {
+interface ServiceStatusProviderProps {
   children: JSX.Element
 }
 
-export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
+export function ServiceStatusProvider(props: ServiceStatusProviderProps) {
   const { telemetryChannel, isConnected } = usePhoenixService()
 
   const [systemInfo, setSystemInfo] = createSignal<SystemInfo | null>(null)
@@ -63,7 +63,7 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
     if (channel && channel.state === 'joined') {
       const filter = environmentFilter()
       const params = filter ? { environment: filter } : {}
-      logger.debug('[TelemetryService] Requesting telemetry refresh', params)
+      logger.debug('[ServiceStatus] Requesting status refresh', params)
       channel.push('get_telemetry', params)
     }
   }
@@ -75,7 +75,7 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
 
     // Set up event listener
     channel.on('telemetry_update', (response: TelemetryResponse | TelemetrySnapshot) => {
-      logger.debug('[TelemetryService] Received telemetry update')
+      logger.debug('[ServiceStatus] Received status update')
       handleTelemetryData(response)
     })
 
@@ -85,7 +85,7 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
     }
   })
 
-  const contextValue: TelemetryContextValue = {
+  const contextValue: ServiceStatusContextValue = {
     systemInfo,
     serviceMetrics,
     overlayHealth,
@@ -95,5 +95,5 @@ export function TelemetryServiceProvider(props: TelemetryServiceProviderProps) {
     setEnvironmentFilter
   }
 
-  return <TelemetryContext.Provider value={contextValue}>{props.children}</TelemetryContext.Provider>
+  return <ServiceStatusContext.Provider value={contextValue}>{props.children}</ServiceStatusContext.Provider>
 }
