@@ -368,6 +368,16 @@ defmodule Server.Services.Twitch do
     end
   end
 
+  # Gun WebSocket Messages
+  def handle_info({:gun_ws, conn_pid, stream_ref, frame}, state) do
+    if state.ws_client && state.ws_client.conn_pid == conn_pid && state.ws_client.stream_ref == stream_ref do
+      updated_client = WebSocketClient.handle_message(state.ws_client, stream_ref, frame)
+      {:noreply, %{state | ws_client: updated_client}}
+    else
+      {:noreply, state}
+    end
+  end
+
   # Catch-all
   def handle_info(message, state) do
     Logger.debug("Unhandled message in Twitch service: #{inspect(message)}")
