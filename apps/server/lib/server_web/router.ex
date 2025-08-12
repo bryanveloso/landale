@@ -12,7 +12,6 @@ defmodule ServerWeb.Router do
   pipeline :protected_api do
     plug :accepts, ["json"]
     plug OpenApiSpex.Plug.PutApiSpec, module: ServerWeb.ApiSpec
-    plug ServerWeb.Plugs.RateLimiter, max_requests: 100, interval_seconds: 60
   end
 
   pipeline :browser do
