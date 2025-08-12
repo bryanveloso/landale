@@ -327,7 +327,7 @@ defmodule Mix.Tasks.Twitch.Token do
     IO.puts("#{bright("Copy this JSON and paste it in the dashboard:")}")
     IO.puts("")
     IO.puts(bright("─────────────────────────────────────────────"))
-    IO.puts(JSON.encode!(token_json, pretty: true))
+    IO.puts(JSON.encode!(token_json))
     IO.puts(bright("─────────────────────────────────────────────"))
     IO.puts("")
     IO.puts("#{bright("Next Steps:")}")
