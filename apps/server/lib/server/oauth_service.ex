@@ -682,11 +682,18 @@ defmodule Server.OAuthService do
   end
 
   defp token_needs_refresh?(token_info, buffer_ms \\ @default_refresh_buffer_ms) do
-    now = DateTime.utc_now()
-    buffer = div(buffer_ms, 1000)
-    threshold = DateTime.add(now, buffer, :second)
+    case token_info.expires_at do
+      nil ->
+        # Token without expiry doesn't need refresh
+        false
 
-    DateTime.compare(token_info.expires_at, threshold) == :lt
+      expires_at ->
+        now = DateTime.utc_now()
+        buffer = div(buffer_ms, 1000)
+        threshold = DateTime.add(now, buffer, :second)
+
+        DateTime.compare(expires_at, threshold) == :lt
+    end
   end
 
   defp maybe_schedule_refresh(state, service_name, token_info) do
@@ -701,26 +708,33 @@ defmodule Server.OAuthService do
           %{state | refresh_timers: Map.delete(state.refresh_timers, service_name)}
       end
 
-    # Calculate when to refresh before expiry
-    config = Map.get(state.configs, service_name)
-    buffer_ms = Map.get(config || %{}, :refresh_buffer_ms, @default_refresh_buffer_ms)
-
-    now = DateTime.utc_now()
-    expires_at = token_info.expires_at
-
-    case DateTime.diff(expires_at, now, :millisecond) do
-      diff when diff > buffer_ms ->
-        # Schedule refresh
-        refresh_in = diff - buffer_ms
-        timer_ref = Process.send_after(self(), {:refresh_token, service_name}, refresh_in)
-
-        new_timers = Map.put(state.refresh_timers, service_name, timer_ref)
-        %{state | refresh_timers: new_timers}
-
-      _ ->
-        # Token already needs refresh, schedule immediately
-        Process.send_after(self(), {:refresh_token, service_name}, 0)
+    # Skip scheduling if token has no expiry date
+    case token_info.expires_at do
+      nil ->
+        Logger.debug("Token has no expiry date, skipping refresh scheduling", service: service_name)
         state
+
+      expires_at ->
+        # Calculate when to refresh before expiry
+        config = Map.get(state.configs, service_name)
+        buffer_ms = Map.get(config || %{}, :refresh_buffer_ms, @default_refresh_buffer_ms)
+
+        now = DateTime.utc_now()
+
+        case DateTime.diff(expires_at, now, :millisecond) do
+          diff when diff > buffer_ms ->
+            # Schedule refresh
+            refresh_in = diff - buffer_ms
+            timer_ref = Process.send_after(self(), {:refresh_token, service_name}, refresh_in)
+
+            new_timers = Map.put(state.refresh_timers, service_name, timer_ref)
+            %{state | refresh_timers: new_timers}
+
+          _ ->
+            # Token already needs refresh, schedule immediately
+            Process.send_after(self(), {:refresh_token, service_name}, 0)
+            state
+        end
     end
   end
 
