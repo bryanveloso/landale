@@ -67,8 +67,6 @@ defmodule Server.OAuth2Client do
 
   require Logger
 
-  alias Server.ExternalCall
-
   @type client_config :: %{
           auth_url: binary(),
           token_url: binary(),
@@ -261,25 +259,9 @@ defmodule Server.OAuth2Client do
   end
 
   defp make_token_request(client, params) do
-    # Extract service name from URL for circuit breaker
-    uri = URI.parse(client.token_url)
-    service_name = "oauth2-#{uri.host}"
-
-    # Use circuit breaker for token requests
-    result =
-      ExternalCall.http_request(
-        service_name,
-        fn ->
-          execute_token_request(client, params)
-        end,
-        %{failure_threshold: 3, timeout_ms: 30_000}
-      )
-
-    case result do
-      {:ok, tokens} -> {:ok, tokens}
-      {:error, :circuit_open} -> {:error, {:service_unavailable, "OAuth2 service circuit breaker is open"}}
-      {:error, reason} -> {:error, reason}
-    end
+    # OAuth operations must not use circuit breakers - they need persistence
+    # Use direct HTTP call to ensure authentication reliability
+    execute_token_request(client, params)
   end
 
   defp execute_token_request(client, params) do
@@ -294,7 +276,7 @@ defmodule Server.OAuth2Client do
 
     with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
          {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, client.timeout),
-         stream_ref <- :gun.post(conn_pid, String.to_charlist(uri.path), headers, body),
+         stream_ref <- :gun.post(conn_pid, String.to_charlist(uri.path || "/"), headers, body),
          {:ok, response} <- await_response(conn_pid, stream_ref, client.timeout) do
       :gun.close(conn_pid)
       parse_token_response(response)
@@ -306,25 +288,9 @@ defmodule Server.OAuth2Client do
   end
 
   defp make_validation_request(client, validate_url, access_token) do
-    # Extract service name from URL for circuit breaker
-    uri = URI.parse(validate_url)
-    service_name = "oauth2-#{uri.host}"
-
-    # Use circuit breaker for validation requests
-    result =
-      ExternalCall.http_request(
-        service_name,
-        fn ->
-          execute_validation_request(client, validate_url, access_token)
-        end,
-        %{failure_threshold: 3, timeout_ms: 30_000}
-      )
-
-    case result do
-      {:ok, validation} -> {:ok, validation}
-      {:error, :circuit_open} -> {:error, {:service_unavailable, "OAuth2 service circuit breaker is open"}}
-      {:error, reason} -> {:error, reason}
-    end
+    # OAuth operations must not use circuit breakers - they need persistence
+    # Use direct HTTP call to ensure authentication reliability
+    execute_validation_request(client, validate_url, access_token)
   end
 
   defp execute_validation_request(client, validate_url, access_token) do
@@ -337,7 +303,7 @@ defmodule Server.OAuth2Client do
 
     with {:ok, conn_pid} <- :gun.open(String.to_charlist(uri.host), uri.port, gun_opts(uri)),
          {:ok, protocol} when protocol in [:http, :http2] <- :gun.await_up(conn_pid, client.timeout),
-         stream_ref <- :gun.get(conn_pid, String.to_charlist(uri.path), headers),
+         stream_ref <- :gun.get(conn_pid, String.to_charlist(uri.path || "/"), headers),
          {:ok, response} <- await_response(conn_pid, stream_ref, client.timeout) do
       :gun.close(conn_pid)
       parse_validation_response(response)

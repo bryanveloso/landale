@@ -42,7 +42,7 @@ defmodule Server.OAuthService do
 
   require Logger
 
-  alias Server.{CircuitBreakerServer, CorrelationId, OAuthTokenRepository}
+  alias Server.{CorrelationId, OAuthTokenRepository}
 
   # Configuration constants
   # 5 minutes before expiry
@@ -596,9 +596,9 @@ defmodule Server.OAuthService do
       "refresh_token" => current_token.refresh_token
     }
 
-    case CircuitBreakerServer.call("oauth_refresh", fn ->
-           make_token_request(config.token_url, params)
-         end) do
+    # OAuth operations must not use circuit breakers - they need persistence
+    # Use direct HTTP call with existing exponential backoff retry logic
+    case make_token_request(config.token_url, params) do
       {:ok, response} ->
         # Calculate new expiry
         expires_at = DateTime.add(DateTime.utc_now(), response["expires_in"], :second)
@@ -622,9 +622,9 @@ defmodule Server.OAuthService do
       {"accept", "application/json"}
     ]
 
-    case CircuitBreakerServer.call("oauth_validate", fn ->
-           make_get_request(config.validate_url, headers)
-         end) do
+    # OAuth operations must not use circuit breakers - they need persistence
+    # Use direct HTTP call for token validation
+    case make_get_request(config.validate_url, headers) do
       {:ok, response} ->
         {:ok, response}
 
