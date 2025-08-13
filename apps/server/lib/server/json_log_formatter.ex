@@ -46,6 +46,7 @@ defmodule Server.JsonLogFormatter do
   ]
 
   # Logger.Formatter callback - used as {Module, :function} tuple in config
+  @spec format(atom(), Logger.message(), Logger.Formatter.date_time_ms(), keyword()) :: IO.chardata()
   def format(level, message, timestamp, metadata) do
     try do
       # Build the base JSON structure
@@ -70,8 +71,14 @@ defmodule Server.JsonLogFormatter do
         end
 
       # Encode to JSON with error handling
-      json_string = JSON.encode!(json_data)
-      json_string <> "\n"
+      try do
+        json_string = JSON.encode!(json_data)
+        json_string <> "\n"
+      rescue
+        _error ->
+          # If JSON encoding fails, fall back to inspect
+          safe_fallback(level, message, timestamp, metadata, "JSON encoding failed")
+      end
     rescue
       error ->
         # Emergency fallback on any formatter error
@@ -142,8 +149,25 @@ defmodule Server.JsonLogFormatter do
 
   # Format timestamp to ISO 8601 standard for machine readability
   defp format_iso8601_timestamp(timestamp) do
-    # Logger typically provides NaiveDateTime, convert to ISO 8601 string
-    NaiveDateTime.to_iso8601(timestamp)
+    try do
+      case timestamp do
+        %NaiveDateTime{} ->
+          NaiveDateTime.to_iso8601(timestamp)
+
+        %DateTime{} ->
+          DateTime.to_iso8601(timestamp)
+
+        {{year, month, day}, {hour, minute, second, millisecond}} ->
+          # Handle Logger.Formatter.date_time_ms() format
+          naive_dt = NaiveDateTime.new!(year, month, day, hour, minute, second, {millisecond * 1000, 3})
+          NaiveDateTime.to_iso8601(naive_dt)
+
+        _ ->
+          inspect(timestamp)
+      end
+    rescue
+      _ -> inspect(timestamp)
+    end
   end
 
   # Safe fallback when JSON encoding fails
