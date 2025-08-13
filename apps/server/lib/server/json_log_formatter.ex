@@ -3,7 +3,7 @@ defmodule Server.JsonLogFormatter do
   Custom JSON formatter for structured logging in production.
 
   Outputs logs in JSON format with standardized top-level fields and nested metadata.
-  Uses Jason for JSON encoding with graceful error handling to prevent logging failures.
+  Uses Elixir's built-in JSON encoding with graceful error handling to prevent logging failures.
 
   ## JSON Schema
 
@@ -70,14 +70,8 @@ defmodule Server.JsonLogFormatter do
         end
 
       # Encode to JSON with error handling
-      case Jason.encode(json_data) do
-        {:ok, json_string} ->
-          json_string <> "\n"
-
-        {:error, reason} ->
-          # Fallback to safe representation on encoding failure
-          safe_fallback(level, message, timestamp, metadata, reason)
-      end
+      json_string = JSON.encode!(json_data)
+      json_string <> "\n"
     rescue
       error ->
         # Emergency fallback on any formatter error
@@ -158,8 +152,9 @@ defmodule Server.JsonLogFormatter do
     fallback_msg = "JSON_FORMATTER_ERROR: #{inspect(error)}"
 
     formatted_time = format_iso8601_timestamp(timestamp)
+    formatted_message = extract_message_text(message)
     formatted_metadata = inspect(metadata, limit: 100, printable_limit: 200)
 
-    "#{formatted_time} [#{level}] #{message} #{formatted_metadata} (#{fallback_msg})\n"
+    "#{formatted_time} [#{level}] #{formatted_message} #{formatted_metadata} (#{fallback_msg})\n"
   end
 end
