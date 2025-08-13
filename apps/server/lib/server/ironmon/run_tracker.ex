@@ -61,6 +61,7 @@ defmodule Server.Ironmon.RunTracker do
     state = load_current_seed()
 
     Logger.info("IronMON RunTracker started",
+      service: :ironmon_run_tracker,
       current_seed_id: state.current_seed_id,
       challenge_id: state.challenge_id
     )

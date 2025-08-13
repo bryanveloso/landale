@@ -163,7 +163,7 @@ defmodule Server.Services.IronmonTCP do
 
     case start_tcp_server(state) do
       {:ok, new_state} ->
-        Logger.info("TCP server started", port: port, hostname: hostname)
+        Logger.info("TCP server started", service: :ironmon_tcp, port: port, hostname: hostname)
         {:ok, new_state}
 
       {:error, reason} ->

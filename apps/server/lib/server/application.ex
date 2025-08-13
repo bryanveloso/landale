@@ -92,7 +92,7 @@ defmodule Server.Application do
 
     case Supervisor.start_link(children, opts) do
       {:ok, _pid} = result ->
-        Logger.info("Server application started successfully")
+        Logger.info("Server application started", service: :application)
 
         # Validate database connectivity after repo is started (non-test environments)
         if Application.get_env(:server, :env) != :test do

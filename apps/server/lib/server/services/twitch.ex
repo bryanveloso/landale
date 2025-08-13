@@ -293,7 +293,7 @@ defmodule Server.Services.Twitch do
 
   # WebSocket Events
   def handle_info({:websocket_connected, client}, state) do
-    Logger.info("WebSocket connected to Twitch EventSub")
+    Logger.info("Twitch EventSub service connected", service: :twitch)
 
     new_state = %{
       state

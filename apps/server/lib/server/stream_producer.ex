@@ -94,7 +94,7 @@ defmodule Server.StreamProducer do
 
   @impl true
   def init(_opts) do
-    Logger.info("StreamProducer starting")
+    Logger.info("StreamProducer started", service: :stream_producer)
 
     # Subscribe to various event sources
     Phoenix.PubSub.subscribe(Server.PubSub, "chat")

@@ -101,7 +101,7 @@ defmodule Server.OAuthMonitor do
 
   @impl GenServer
   def init(_opts) do
-    Logger.info("OAuth Monitor starting")
+    Logger.info("OAuth Monitor started", service: :oauth_monitor)
 
     # Schedule first health check
     timer = Process.send_after(self(), :check_health, @check_interval)

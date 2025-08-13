@@ -66,7 +66,7 @@ defmodule Server.ContentAggregator do
 
   @impl true
   def init(_opts) do
-    Logger.info("ContentAggregator starting")
+    Logger.info("ContentAggregator started", service: :content_aggregator)
 
     # Create ETS tables for fast data access
     :ets.new(@emote_stats_table, [:named_table, :protected, :set])

@@ -103,7 +103,7 @@ defmodule Server.SubscriptionStorage do
         {:read_concurrency, true}
       ])
 
-    Logger.debug("SubscriptionStorage started with table: #{inspect(table_name)}")
+    Logger.info("SubscriptionStorage started", service: :subscription_storage, table_name: table_name)
     {:ok, %{table: table, table_name: table_name}}
   end
 

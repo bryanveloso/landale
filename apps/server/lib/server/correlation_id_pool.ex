@@ -93,7 +93,7 @@ defmodule Server.CorrelationIdPool do
     # Pre-fill the pool
     fill_pool()
 
-    Logger.info("Correlation ID pool started with #{@pool_size} IDs")
+    Logger.info("Correlation ID pool started", service: :correlation_id_pool, pool_size: @pool_size)
 
     {:ok, %{}}
   end

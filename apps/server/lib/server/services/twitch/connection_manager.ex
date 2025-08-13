@@ -184,7 +184,7 @@ defmodule Server.Services.Twitch.ConnectionManager do
 
   @impl true
   def handle_info({WebSocketConnection, ws_conn, {:websocket_connected, _}}, %{ws_conn: ws_conn} = state) do
-    Logger.info("[#{state.correlation_id}] WebSocket connected to Twitch EventSub")
+    Logger.info("WebSocket connection established", service: :twitch, correlation_id: state.correlation_id)
 
     state = %{state | connection_state: :connected}
     # Wait for session_welcome to transition to :ready

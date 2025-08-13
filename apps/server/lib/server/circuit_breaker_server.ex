@@ -100,6 +100,7 @@ defmodule Server.CircuitBreakerServer do
     timer_ref = schedule_cleanup()
 
     Logger.info("Circuit breaker server started", %{
+      service: :circuit_breaker_server,
       cleanup_interval_ms: @cleanup_interval
     })
 

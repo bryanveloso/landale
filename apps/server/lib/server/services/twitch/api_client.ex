@@ -163,7 +163,7 @@ defmodule Server.Services.Twitch.ApiClient do
     # Verify OAuth service is registered
     case Server.OAuthService.get_token_info(:twitch) do
       {:ok, _} ->
-        Logger.info("Twitch API client started", user_id: user_id)
+        Logger.info("Twitch API client started", service: :twitch_api, user_id: user_id)
         {:ok, state}
 
       {:error, :service_not_registered} ->
@@ -175,7 +175,7 @@ defmodule Server.Services.Twitch.ApiClient do
 
       {:error, :no_tokens} ->
         # No tokens yet, but service is registered - that's OK
-        Logger.info("Twitch API client started (no tokens yet)", user_id: user_id)
+        Logger.info("Twitch API client started (no tokens yet)", service: :twitch_api, user_id: user_id)
         {:ok, state}
     end
   end

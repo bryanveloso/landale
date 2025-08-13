@@ -157,7 +157,7 @@ defmodule Server.OAuthService do
 
   @impl Server.Service
   def do_init(_args) do
-    Logger.info("OAuthService starting")
+    Logger.info("OAuthService started", service: :oauth_service)
 
     state = %__MODULE__{
       configs: %{},

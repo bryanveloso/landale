@@ -67,7 +67,7 @@ defmodule Server.OverlayTracker do
     # The GenServer ensures the table is created only once
     :ets.new(@table_name, [:set, :public, :named_table])
 
-    Logger.info("OverlayTracker started with ETS table #{@table_name}")
+    Logger.info("OverlayTracker started", service: :overlay_tracker, table_name: @table_name)
 
     {:ok, %{table: @table_name}}
   end

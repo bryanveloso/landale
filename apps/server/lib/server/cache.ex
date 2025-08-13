@@ -246,6 +246,7 @@ defmodule Server.Cache do
     cleanup_timer = schedule_cleanup()
 
     Logger.info("Server cache started",
+      service: :cache,
       cleanup_interval_ms: @cleanup_interval_ms,
       default_ttl_seconds: @default_ttl_seconds
     )

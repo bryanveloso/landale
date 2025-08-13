@@ -273,7 +273,7 @@ defmodule Server.SubscriptionMonitor do
       health_timer: health_timer
     }
 
-    Logger.info("Subscription monitor started with storage: #{inspect(storage)}")
+    Logger.info("Subscription monitor started", service: :subscription_monitor, storage: storage)
     {:ok, state}
   end
 
