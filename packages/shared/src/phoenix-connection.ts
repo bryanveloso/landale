@@ -6,6 +6,7 @@ export interface PhoenixConnectionOptions {
   url?: string
   heartbeatIntervalMs?: number
   params?: Record<string, unknown>
+  enableDebugLogging?: boolean
 }
 
 /**
@@ -13,20 +14,26 @@ export interface PhoenixConnectionOptions {
  * Automatically includes environment detection for telemetry filtering
  */
 export function createPhoenixSocket(options: PhoenixConnectionOptions = {}) {
-  const socket = new Socket(options.url || 'ws://saya:7175/socket', {
+  const socketOptions: any = {
     heartbeatIntervalMs: options.heartbeatIntervalMs || 15000,
-    reconnectAfterMs: (tries) => {
+    reconnectAfterMs: (tries: number) => {
       // Phoenix's default exponential backoff is fine
       return [10, 50, 100, 150, 200, 250, 500, 1000, 2000, 5000][tries - 1] || 10000
-    },
-    logger: (kind, msg, data) => {
-      logger.debug(`[Phoenix ${kind}] ${msg}`, data)
     },
     params: {
       environment: currentEnvironment,
       ...options.params
     }
-  })
+  }
+
+  // Only add logger if debug logging is explicitly enabled
+  if (options.enableDebugLogging) {
+    socketOptions.logger = (kind: string, msg: string, data: any) => {
+      logger.debug(`[Phoenix ${kind}] ${msg}`, data)
+    }
+  }
+
+  const socket = new Socket(options.url || 'ws://saya:7175/socket', socketOptions)
 
   socket.connect()
   return socket

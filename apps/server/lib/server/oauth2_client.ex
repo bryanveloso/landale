@@ -166,15 +166,11 @@ defmodule Server.OAuth2Client do
       client_secret: client.client_secret
     }
 
-    emit_telemetry(client, [:exchange, :attempt])
-
     case make_token_request(client, params) do
       {:ok, tokens} ->
-        emit_telemetry(client, [:exchange, :success])
         {:ok, tokens}
 
-      {:error, reason} = error ->
-        emit_telemetry(client, [:exchange, :failure], %{reason: inspect(reason)})
+      {:error, _reason} = error ->
         error
     end
   end
@@ -207,17 +203,13 @@ defmodule Server.OAuth2Client do
       client_secret: client.client_secret
     }
 
-    emit_telemetry(client, [:refresh, :attempt])
-
     case make_token_request(client, params) do
       {:ok, tokens} ->
-        emit_telemetry(client, [:refresh, :success])
         # Normalize the response to use 'scopes' instead of 'scope'
         normalized_tokens = Map.put(tokens, :scopes, Map.get(tokens, :scope, []))
         {:ok, normalized_tokens}
 
-      {:error, reason} = error ->
-        emit_telemetry(client, [:refresh, :failure], %{reason: inspect(reason)})
+      {:error, _reason} = error ->
         error
     end
   end
@@ -248,15 +240,11 @@ defmodule Server.OAuth2Client do
         {:error, :no_validation_url}
 
       validate_url ->
-        emit_telemetry(client, [:validate, :attempt])
-
         case make_validation_request(client, validate_url, access_token) do
           {:ok, user_info} ->
-            emit_telemetry(client, [:validate, :success])
             {:ok, user_info}
 
-          {:error, reason} = error ->
-            emit_telemetry(client, [:validate, :failure], %{reason: inspect(reason)})
+          {:error, _reason} = error ->
             error
         end
     end
@@ -447,10 +435,6 @@ defmodule Server.OAuth2Client do
   defp parse_scope(scope) when is_binary(scope), do: String.split(scope, " ")
   defp parse_scope(scope) when is_list(scope), do: scope
   defp parse_scope(_), do: nil
-
-  defp emit_telemetry(_client, _event_suffix, _metadata \\ %{}) do
-    :ok
-  end
 
   # Safe OAuth error conversion - only allows known error types to prevent atom table exhaustion
   defp parse_oauth_error(error_string) when is_binary(error_string) do

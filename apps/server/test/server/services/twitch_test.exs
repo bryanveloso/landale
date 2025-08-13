@@ -15,6 +15,11 @@ defmodule Server.Services.TwitchTest do
   alias Server.Services.Twitch
 
   setup do
+    # Configure database sandbox for this test
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Server.Repo)
+    # Allow spawned processes to use the same database connection
+    Ecto.Adapters.SQL.Sandbox.mode(Server.Repo, {:shared, self()})
+
     setup_test_dependencies()
     :ok
   end

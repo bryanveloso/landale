@@ -68,8 +68,6 @@ defmodule Server.Health.SystemHealth do
     end
   end
 
-  # Public helper functions moved from telemetry_channel.ex
-
   @doc """
   Gathers metrics from all services for status reporting.
   """
@@ -93,13 +91,25 @@ defmodule Server.Health.SystemHealth do
             adapter_module.get_status(url)
 
           service_module ->
-            # Add timeout protection for service calls
+            # Add timeout and error protection for service calls
             try do
               service_module.get_status()
+            rescue
+              error ->
+                Logger.warning("Service call exception", service: name, error: inspect(error))
+                {:error, "Service exception: #{inspect(error)}"}
             catch
               :exit, {:timeout, _} ->
                 Logger.warning("Service status timeout", service: name)
                 {:error, "Service status timeout"}
+
+              :exit, {:noproc, _} ->
+                Logger.warning("Service not running", service: name)
+                {:error, "Service not running"}
+
+              :exit, reason ->
+                Logger.warning("Service call failed", service: name, reason: inspect(reason))
+                {:error, "Service call failed: #{inspect(reason)}"}
             end
         end
 

@@ -326,7 +326,7 @@ defmodule Server.StreamProducer do
              native_emotes: Map.get(event, :native_emotes, []),
              username: Map.get(event, :user_name, "unknown")
            },
-           timestamp: event.timestamp
+           timestamp: Map.get(event, :timestamp)
          }}
       )
     end

@@ -113,19 +113,37 @@ defmodule Server.JsonLogFormatter do
     top_level =
       @top_level_fields
       |> Enum.reduce(%{}, fn field, acc ->
-        case Keyword.get(metadata, field) do
+        case get_metadata_value(metadata, field) do
           nil -> acc
           value -> Map.put(acc, field, sanitize_value(value))
         end
       end)
 
     # Remove extracted fields from metadata
-    remaining = Keyword.drop(metadata, @top_level_fields)
+    remaining = drop_metadata_fields(metadata, @top_level_fields)
 
     # Sanitize remaining metadata values
     sanitized_remaining = Map.new(remaining, fn {k, v} -> {k, sanitize_value(v)} end)
 
     {top_level, sanitized_remaining}
+  end
+
+  # Handle both keyword lists and maps for metadata access
+  defp get_metadata_value(metadata, field) when is_list(metadata) do
+    Keyword.get(metadata, field)
+  end
+
+  defp get_metadata_value(metadata, field) when is_map(metadata) do
+    Map.get(metadata, field)
+  end
+
+  # Handle both keyword lists and maps for field removal
+  defp drop_metadata_fields(metadata, fields) when is_list(metadata) do
+    Keyword.drop(metadata, fields)
+  end
+
+  defp drop_metadata_fields(metadata, fields) when is_map(metadata) do
+    Map.drop(metadata, fields)
   end
 
   # Sanitize values to ensure JSON serializability

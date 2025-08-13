@@ -87,15 +87,11 @@ defmodule Server.RetryStrategy do
   def retry(fun, opts \\ []) when is_function(fun, 0) do
     config = build_config(opts)
 
-    emit_telemetry(config, [:attempt, :start])
-
     case do_retry(fun, config, 1) do
       {:ok, result} ->
-        emit_telemetry(config, [:success], %{attempts: 1})
         {:ok, result}
 
-      {:error, reason, attempts} ->
-        emit_telemetry(config, [:failure], %{attempts: attempts, reason: inspect(reason)})
+      {:error, reason, _attempts} ->
         {:error, reason}
     end
   end
@@ -180,12 +176,6 @@ defmodule Server.RetryStrategy do
             reason: inspect(reason)
           )
 
-          emit_telemetry(config, [:retry], %{
-            attempt: attempt,
-            delay: delay,
-            reason: inspect(reason)
-          })
-
           :timer.sleep(delay)
           do_retry(fun, config, attempt + 1)
         else
@@ -209,12 +199,6 @@ defmodule Server.RetryStrategy do
           delay: delay,
           exception: inspect(exception)
         )
-
-        emit_telemetry(config, [:retry], %{
-          attempt: attempt,
-          delay: delay,
-          exception: inspect(exception)
-        })
 
         :timer.sleep(delay)
         do_retry(fun, config, attempt + 1)
@@ -333,10 +317,6 @@ defmodule Server.RetryStrategy do
       _ ->
         false
     end
-  end
-
-  defp emit_telemetry(_config, _event_suffix, _metadata \\ %{}) do
-    :ok
   end
 
   # Circuit breaker functionality has been moved to Server.CircuitBreakerServer

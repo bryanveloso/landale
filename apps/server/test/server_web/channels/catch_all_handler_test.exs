@@ -89,18 +89,6 @@ defmodule ServerWeb.CatchAllHandlerTest do
       assert Process.alive?(socket.channel_pid)
     end
 
-    test "TelemetryChannel survives unknown handle_info messages" do
-      {:ok, socket} = connect(ServerWeb.UserSocket, %{})
-      {:ok, _, socket} = subscribe_and_join(socket, ServerWeb.ServicesChannel, "dashboard:services")
-
-      # Send unknown messages
-      send(socket.channel_pid, :unknown_telemetry)
-      send(socket.channel_pid, {:fake_metric, 123})
-
-      Process.sleep(50)
-      assert Process.alive?(socket.channel_pid)
-    end
-
     test "TranscriptionChannel survives unknown handle_info messages" do
       {:ok, socket} = connect(ServerWeb.UserSocket, %{})
       {:ok, _, socket} = subscribe_and_join(socket, ServerWeb.TranscriptionChannel, "transcription:live")
@@ -123,10 +111,10 @@ defmodule ServerWeb.CatchAllHandlerTest do
       channels_to_test = [
         {ServerWeb.DashboardChannel, "dashboard:main", :noreply},
         {ServerWeb.EventsChannel, "events:all", :noreply},
-        {ServerWeb.OverlayChannel, "overlay:system", :error},
+        {ServerWeb.OverlayChannel, "overlay:system", :simple_error},
         {ServerWeb.StreamChannel, "stream:overlays", :noreply},
-        {ServerWeb.ServicesChannel, "dashboard:services", :error},
-        {ServerWeb.TranscriptionChannel, "transcription:live", :error}
+        {ServerWeb.ServicesChannel, "dashboard:services", :structured_error},
+        {ServerWeb.TranscriptionChannel, "transcription:live", :simple_error}
       ]
 
       for {channel_module, topic, expected_response} <- channels_to_test do
@@ -141,9 +129,19 @@ defmodule ServerWeb.CatchAllHandlerTest do
             # Should not receive a reply for channels that just log
             refute_receive %Phoenix.Socket.Reply{ref: ^ref}, 100
 
-          :error ->
-            # Should receive error reply for channels that respond
+          :simple_error ->
+            # Should receive simple error reply (OverlayChannel, TranscriptionChannel)
             assert_reply ref, :error, %{message: "Unknown command: totally_unknown_command"}
+
+          :structured_error ->
+            # Should receive structured error reply (ServicesChannel uses ResponseBuilder)
+            assert_reply ref, :error, %{
+              success: false,
+              error: %{
+                code: "unknown_command",
+                message: "Unknown command: totally_unknown_command"
+              }
+            }
         end
 
         # Channel should still be alive

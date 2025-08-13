@@ -3,7 +3,7 @@ defmodule Server.CorrelationIdPool do
   Pre-generated correlation ID pool for high-frequency event publishing.
 
   Maintains a pool of pre-generated correlation IDs to reduce UUID generation
-  overhead during high-frequency operations like event publishing and telemetry.
+  overhead during high-frequency operations like event publishing.
   Falls back to on-demand generation when pool is empty.
 
   Optimized for single-user streaming system with moderate event throughput.

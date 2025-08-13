@@ -182,7 +182,7 @@ defmodule Server.ContentAggregator do
   @impl true
   def handle_info({:new_follower, event}, state) do
     try do
-      record_follower(event.user_name, event.timestamp)
+      record_follower(Map.get(event, :user_name), Map.get(event, :timestamp))
     rescue
       error ->
         Logger.error("Failed to record follower", error: inspect(error), event: inspect(event))

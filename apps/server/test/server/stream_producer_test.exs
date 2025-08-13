@@ -271,71 +271,64 @@ defmodule Server.StreamProducerTest do
       assert state.active_content != nil
     end
 
-    test "handles event_batch messages without crashing", %{producer: producer} do
-      # Test that the new event_batch handler processes batched Twitch events
-      batch_data = %{
-        type: :event_batch,
-        events: [
-          %{
-            type: "channel.chat.message",
-            data: %{
-              user_name: "test_user",
-              message: "Hello world!"
-            },
-            timestamp: System.system_time(:second),
-            correlation_id: "test_correlation_id"
-          },
-          %{
-            type: "channel.subscribe",
-            data: %{
-              user_name: "test_subscriber",
-              tier: "1000"
-            },
-            timestamp: System.system_time(:second),
-            correlation_id: "test_correlation_id_2"
-          }
-        ],
-        batch_size: 2,
-        batch_id: "test_batch_id",
-        timestamp: System.system_time(:second)
+    test "handles canonical chat messages without crashing", %{producer: producer} do
+      # Test that StreamProducer processes canonical chat message events
+      chat_event = %{
+        # Core fields (always present)
+        id: "msg_123",
+        type: "channel.chat.message",
+        timestamp: DateTime.utc_now(),
+        correlation_id: "test_correlation_id",
+        source: :twitch,
+        source_id: "msg_123",
+        raw_type: "channel.chat.message",
+
+        # Chat-specific fields (flat structure)
+        user_name: "test_user",
+        message: "Hello world!",
+        emotes: [],
+        native_emotes: [],
+        user_id: "user_123",
+        user_login: "test_user",
+        message_id: "msg_123"
       }
 
-      # Send the event_batch message
-      send(producer, {:event_batch, batch_data})
+      # Send the canonical chat message
+      send(producer, {:chat_message, chat_event})
 
       # Give time for async processing
       Process.sleep(50)
       assert Process.alive?(producer)
 
-      # Verify producer didn't crash - this was the original issue
+      # Verify producer didn't crash
       state = GenServer.call(producer, :get_state)
       assert is_map(state)
     end
 
-    test "handles chat messages with emotes from batched events", %{producer: producer} do
-      # Test the specific crash scenario - batched chat message with emotes
-      batch_data = %{
-        type: :event_batch,
-        events: [
-          %{
-            type: "channel.chat.message",
-            data: %{
-              user_name: "test_user",
-              message: "Hello world!",
-              emotes: [%{name: "Kappa", count: 2}],
-              native_emotes: []
-            },
-            timestamp: System.system_time(:second),
-            correlation_id: "test_correlation_id"
-          }
-        ],
-        batch_size: 1,
-        batch_id: "test_batch_id",
-        timestamp: System.system_time(:second)
+    test "handles chat messages with emotes from canonical events", %{producer: producer} do
+      # Test chat message with emotes using canonical event format
+      chat_event = %{
+        # Core fields (always present)
+        id: "msg_456",
+        type: "channel.chat.message",
+        timestamp: DateTime.utc_now(),
+        correlation_id: "test_correlation_id",
+        source: :twitch,
+        source_id: "msg_456",
+        raw_type: "channel.chat.message",
+
+        # Chat-specific fields (flat structure)
+        user_name: "test_user",
+        message: "Hello world!",
+        emotes: [%{name: "Kappa", count: 2}],
+        native_emotes: [],
+        user_id: "user_456",
+        user_login: "test_user",
+        message_id: "msg_456"
       }
 
-      # Send the event_batch message
-      send(producer, {:event_batch, batch_data})
+      # Send the canonical chat message
+      send(producer, {:chat_message, chat_event})
 
       # Give time for async processing
       Process.sleep(50)

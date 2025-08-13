@@ -10,7 +10,6 @@ defmodule Server.Cache do
 
   - TTL-based expiration with automatic cleanup
   - Configurable cache policies per service
-  - Performance metrics and telemetry integration
   - Bulk operations for efficient cache updates
   - Proactive cache refresh capabilities
 

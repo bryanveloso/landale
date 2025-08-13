@@ -128,36 +128,6 @@ defmodule ServerWeb.ChannelCatchAllTest do
     end
   end
 
-  describe "TelemetryChannel catch-all handlers" do
-    setup do
-      {:ok, socket} = connect(ServerWeb.UserSocket, %{})
-      {:ok, _, socket} = subscribe_and_join(socket, ServerWeb.ServicesChannel, "dashboard:services")
-      {:ok, socket: socket}
-    end
-
-    test "handle_in returns error for unknown commands", %{socket: socket} do
-      ref = push(socket, @unknown_handle_in_msg, @test_payload)
-      assert_reply ref, :error, %{message: "Unknown command: " <> @unknown_handle_in_msg}
-    end
-
-    test "handle_info logs and continues for unknown messages", %{socket: socket} do
-      send(socket.channel_pid, @unknown_handle_info_msg)
-      Process.sleep(50)
-      assert Process.alive?(socket.channel_pid)
-    end
-
-    test "still handles telemetry commands after unknown message", %{socket: socket} do
-      send(socket.channel_pid, @unknown_handle_info_msg)
-
-      ref = push(socket, "get_telemetry", %{})
-      assert_reply ref, :ok, response
-      assert Map.has_key?(response.data, :timestamp)
-      assert Map.has_key?(response.data, :websocket)
-      assert Map.has_key?(response.data, :services)
-      assert Map.has_key?(response.data, :performance)
-    end
-  end
-
   describe "TranscriptionChannel catch-all handlers" do
     setup do
       {:ok, socket} = connect(ServerWeb.UserSocket, %{})

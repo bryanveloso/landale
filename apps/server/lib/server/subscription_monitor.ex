@@ -297,11 +297,6 @@ defmodule Server.SubscriptionMonitor do
       event_type: event_type
     )
 
-    emit_telemetry([:subscription, :tracked], %{}, %{
-      subscription_id: subscription_id,
-      event_type: event_type
-    })
-
     {:reply, :ok, state}
   end
 
@@ -318,11 +313,6 @@ defmodule Server.SubscriptionMonitor do
           status: status
         )
 
-        emit_telemetry([:subscription, :status_updated], %{}, %{
-          subscription_id: subscription_id,
-          status: status
-        })
-
         {:reply, :ok, state}
 
       :error ->
@@ -337,10 +327,6 @@ defmodule Server.SubscriptionMonitor do
         updated_subscription = %{subscription | last_event_at: DateTime.utc_now(), last_updated: DateTime.utc_now()}
 
         SubscriptionStorage.put(state.storage, subscription_id, updated_subscription)
-
-        emit_telemetry([:subscription, :event_received], %{}, %{
-          subscription_id: subscription_id
-        })
 
         {:reply, :ok, state}
 
@@ -367,12 +353,6 @@ defmodule Server.SubscriptionMonitor do
           reason: inspect(reason)
         )
 
-        emit_telemetry([:subscription, :failure], %{count: 1}, %{
-          subscription_id: subscription_id,
-          failure_count: updated_subscription.failure_count,
-          reason: inspect(reason)
-        })
-
         {:reply, :ok, state}
 
       :error ->
@@ -385,10 +365,6 @@ defmodule Server.SubscriptionMonitor do
     SubscriptionStorage.delete(state.storage, subscription_id)
 
     Logger.debug("Untracked subscription", subscription_id: subscription_id)
-
-    emit_telemetry([:subscription, :untracked], %{}, %{
-      subscription_id: subscription_id
-    })
 
     {:reply, :ok, state}
   end
@@ -444,15 +420,6 @@ defmodule Server.SubscriptionMonitor do
 
   @impl true
   def handle_info(:emit_health_metrics, state) do
-    report = generate_health_report(state)
-
-    emit_telemetry([:health], %{
-      total_subscriptions: report.total_subscriptions,
-      enabled_subscriptions: report.enabled_subscriptions,
-      failed_subscriptions: report.failed_subscriptions,
-      orphaned_subscriptions: report.orphaned_subscriptions
-    })
-
     # Schedule next health check
     health_timer = Process.send_after(self(), :emit_health_metrics, @health_check_interval_ms)
     updated_state = %{state | health_timer: health_timer}
@@ -551,12 +518,6 @@ defmodule Server.SubscriptionMonitor do
         status: subscription.status,
         reason: get_cleanup_reason(subscription, now)
       )
-
-      emit_telemetry([:subscription, :cleaned_up], %{}, %{
-        subscription_id: subscription.id,
-        event_type: subscription.event_type,
-        status: subscription.status
-      })
     end)
 
     cleaned_count = length(to_cleanup)
@@ -645,9 +606,5 @@ defmodule Server.SubscriptionMonitor do
 
   defp apply_filters(subscriptions, [_unknown_filter | rest]) do
     apply_filters(subscriptions, rest)
-  end
-
-  defp emit_telemetry(_event_suffix, _measurements, _metadata \\ %{}) do
-    :ok
   end
 end

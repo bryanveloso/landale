@@ -107,7 +107,6 @@ defmodule Server.BoundaryConverter do
     end
 
     result = safely_convert_to_atoms(data, 0, @max_keys_from_untrusted)
-    emit_telemetry(:conversion, %{direction: :inbound, keys: map_size(data)})
     {:ok, result}
   rescue
     error ->
@@ -230,9 +229,6 @@ defmodule Server.BoundaryConverter do
         String.to_existing_atom(key)
       rescue
         ArgumentError ->
-          # Log unknown field for analysis
-          emit_telemetry(:unknown_field, %{field: key})
-
           # For unknown fields, check if it's reasonably sized
           if String.length(key) < 50 do
             String.to_atom(key)
@@ -265,8 +261,4 @@ defmodule Server.BoundaryConverter do
   defp safe_key_to_string(key) when is_atom(key), do: Atom.to_string(key)
   defp safe_key_to_string(key) when is_binary(key), do: key
   defp safe_key_to_string(key), do: inspect(key)
-
-  defp emit_telemetry(_event, _metadata) do
-    :ok
-  end
 end

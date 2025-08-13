@@ -118,7 +118,6 @@ defmodule Server.WebSocketClient do
 
   defp perform_connection(client, opts) do
     Logger.info("Connection initiated", url: client.url)
-    emit_telemetry(client, [:connection, :attempt], %{})
 
     host = to_charlist(client.uri.host)
     port = client.uri.port || default_port(client.uri.scheme)
@@ -134,7 +133,6 @@ defmodule Server.WebSocketClient do
       {:error, reason} ->
         Logging.log_error("Connection failed during open", reason, url: client.url)
 
-        emit_connection_failure(client, reason)
         {:error, client, reason}
     end
   end
@@ -159,7 +157,6 @@ defmodule Server.WebSocketClient do
         Logging.log_error("Connection failed during await_up", reason, url: client.url)
 
         :gun.close(conn_pid)
-        emit_connection_failure(client, reason)
 
         {:error, client, reason}
     end
@@ -298,11 +295,6 @@ defmodule Server.WebSocketClient do
     if stream_ref == client.stream_ref do
       Logger.info("Connection established", url: client.url)
 
-      if client.connection_start_time do
-        duration = System.monotonic_time(:millisecond) - client.connection_start_time
-        emit_telemetry(client, [:connection, :success], %{duration: duration})
-      end
-
       # Notify owner process
       send(client.owner_pid, {:websocket_connected, client})
 
@@ -365,11 +357,6 @@ defmodule Server.WebSocketClient do
   def handle_connection_failure(client, reason) do
     Logger.warning("Connection lost", error: reason, url: client.url)
 
-    if client.connection_start_time do
-      duration = System.monotonic_time(:millisecond) - client.connection_start_time
-      emit_telemetry(client, [:connection, :failure], %{duration: duration, reason: inspect(reason)})
-    end
-
     # Clean up connection state
     client = %{client | conn_pid: nil, stream_ref: nil, monitor_ref: nil, connection_start_time: nil}
 
@@ -397,16 +384,5 @@ defmodule Server.WebSocketClient do
       )
 
     %{client | reconnect_timer: nil, connection_manager: updated_connection_manager}
-  end
-
-  defp emit_connection_failure(client, reason) do
-    if client.connection_start_time do
-      duration = System.monotonic_time(:millisecond) - client.connection_start_time
-      emit_telemetry(client, [:connection, :failure], %{duration: duration, reason: inspect(reason)})
-    end
-  end
-
-  defp emit_telemetry(_client, _event_suffix, _measurements, _metadata \\ %{}) do
-    :ok
   end
 end

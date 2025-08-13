@@ -374,8 +374,6 @@ defmodule Server.ConnectionManager do
     # Demonitor all processes atomically
     cleanup_monitors(monitors_snapshot)
 
-    # Emit telemetry for cleanup
-
     Logger.debug("Resource cleanup completed")
     :ok
   end

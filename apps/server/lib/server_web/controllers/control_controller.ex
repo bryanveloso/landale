@@ -53,8 +53,6 @@ defmodule ServerWeb.ControlController do
       }
     }
 
-    # Could add telemetry here if needed
-
     json(conn, %{success: true, data: status_data})
   end
 

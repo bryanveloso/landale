@@ -10,7 +10,6 @@ defmodule Server.Services.Twitch.ApiClient do
   - Modify channel information (game category, title, language)
   - OAuth token management and automatic refresh
   - Circuit breaker pattern for API resilience
-  - Telemetry integration for monitoring
   - Comprehensive error handling and logging
 
   ## Authentication

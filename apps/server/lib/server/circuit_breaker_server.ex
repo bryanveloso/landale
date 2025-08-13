@@ -9,7 +9,6 @@ defmodule Server.CircuitBreakerServer do
   - Thread-safe state management via GenServer
   - No ETS tables - all state in process memory
   - Automatic cleanup of unused circuit breakers
-  - Telemetry integration for monitoring
 
   ## States
   - `:closed` - Normal operation, all requests allowed

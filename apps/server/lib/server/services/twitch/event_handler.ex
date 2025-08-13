@@ -10,7 +10,6 @@ defmodule Server.Services.Twitch.EventHandler do
 
   - Event type-specific processing and validation
   - Phoenix PubSub publishing for real-time updates
-  - Telemetry integration for monitoring
   - Consistent event data normalization
   - Support for all common EventSub event types
 
@@ -62,19 +61,6 @@ defmodule Server.Services.Twitch.EventHandler do
     with normalized_event <- normalize_event(event_type, event_data),
          :ok <- store_event_in_activity_log(event_type, normalized_event),
          :ok <- publish_event(event_type, normalized_event) do
-      # Telemetry is important but non-critical - its failure shouldn't fail the whole event
-      try do
-        emit_telemetry(event_type, normalized_event)
-      rescue
-        error ->
-          Logger.warning("Telemetry emission failed (non-critical)",
-            error: inspect(error),
-            event_type: event_type,
-            event_id: Map.get(data, :id) || Map.get(data, :message_id),
-            stacktrace: Exception.format_stacktrace(__STACKTRACE__)
-          )
-      end
-
       Logger.debug("EventSub event processed successfully",
         event_type: event_type,
         event_id: Map.get(data, :id) || Map.get(data, :message_id)
@@ -446,21 +432,6 @@ defmodule Server.Services.Twitch.EventHandler do
   defp legacy_event_mapping("channel.goal.progress"), do: {"goals", :goal_progress}
   defp legacy_event_mapping("channel.goal.end"), do: {"goals", :goal_end}
   defp legacy_event_mapping(_), do: nil
-
-  @doc """
-  Emits telemetry events for monitoring.
-
-  ## Parameters
-  - `event_type` - The EventSub event type
-  - `normalized_event` - Normalized event data
-
-  ## Returns
-  - `:ok`
-  """
-  @spec emit_telemetry(binary(), map()) :: :ok
-  def emit_telemetry(_event_type, _normalized_event) do
-    :ok
-  end
 
   # Private helper functions
 

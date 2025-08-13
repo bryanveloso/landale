@@ -59,17 +59,14 @@ defmodule Server.SafeTokenHandler do
     cond do
       # Already normalized - all atom keys
       Enum.empty?(string_keys) and Enum.empty?(other_keys) ->
-        log_access_pattern(:atom_map, data)
         data
 
       # String keys - convert safely
       Enum.empty?(atom_keys) and Enum.empty?(other_keys) ->
-        log_access_pattern(:string_map, data)
         safely_convert_string_keys(data)
 
       # Mixed keys - normalize everything
       true ->
-        log_access_pattern(:mixed_map, data)
         normalize_mixed_map(data)
     end
   end
@@ -185,7 +182,6 @@ defmodule Server.SafeTokenHandler do
           ArgumentError ->
             # Only create new atoms for small set of fields
             if String.length(string) < 50 do
-              emit_telemetry(:new_atom_created, %{field: string})
               String.to_atom(string)
             else
               # For large strings, keep as string to prevent data loss
@@ -202,16 +198,5 @@ defmodule Server.SafeTokenHandler do
       atom ->
         atom
     end
-  end
-
-  defp log_access_pattern(pattern_type, data) do
-    emit_telemetry(:access_pattern, %{
-      type: pattern_type,
-      sample_keys: data |> Map.keys() |> Enum.take(3) |> inspect()
-    })
-  end
-
-  defp emit_telemetry(_event, _metadata) do
-    :ok
   end
 end
