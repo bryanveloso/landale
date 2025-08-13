@@ -37,7 +37,7 @@
 - **Frontend**: SolidJS, GSAP, Phoenix JS client, Tailwind CSS
 - **Backend**: Phoenix Framework, Ecto, Oban, Phoenix PubSub
 - **Python**: aiohttp, websockets, numpy, shared utilities
-- **Monitoring**: Custom logger with Seq transport
+- **Monitoring**: Structured JSON logging
 - **Testing**: Bun test, ExUnit (Elixir)
 
 ## Core Architecture
@@ -439,8 +439,7 @@ landale/
 ├── packages/                  # Shared code
 │   ├── shared/               # TypeScript types/utilities
 │   ├── shared-python/        # Python utilities (WebSocket client, config)
-│   ├── shared-elixir/        # Elixir shared code
-│   └── logger/               # Custom logging with Seq transport
+│   └── shared-elixir/        # Elixir shared code
 ├── handbook/                  # Architecture documentation and patterns
 ├── scripts/                   # Utility scripts for development
 └── .claude/                   # Claude-specific handoffs and docs
@@ -460,7 +459,6 @@ landale/
 - **OBS WebSocket**: Stream control and scene management
 - **AI/LLM APIs**: Context generation via Seed service
 - **Audio Pipeline**: Real-time transcription processing
-- **Seq Logging**: Centralized log aggregation
 
 ### Multi-Machine Architecture
 
