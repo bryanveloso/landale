@@ -52,7 +52,7 @@ defmodule Server.JsonLogFormatter do
       json_data = %{
         timestamp: format_iso8601_timestamp(timestamp),
         level: to_string(level),
-        message: IO.iodata_to_binary(message)
+        message: extract_message_text(message)
       }
 
       # Extract top-level fields from metadata
@@ -84,6 +84,28 @@ defmodule Server.JsonLogFormatter do
         safe_fallback(level, message, timestamp, metadata, error)
     end
   end
+
+  # Extract message text from various Logger message formats
+  # Logger can send messages in different formats depending on configuration:
+  # - Binary strings: "message"
+  # - Iodata lists: ["part1", "part2"]
+  # - Tuple format: {:string, content} - used internally by Logger
+  # - Other complex formats that need string conversion
+
+  defp extract_message_text(message) when is_binary(message), do: message
+  defp extract_message_text(message) when is_list(message), do: IO.iodata_to_binary(message)
+
+  # Handle Logger's internal {:string, content} format
+  # This format was causing "FORMATTER CRASH" errors before this fix
+  defp extract_message_text({:string, content}) when is_binary(content), do: content
+  defp extract_message_text({:string, content}) when is_list(content), do: IO.iodata_to_binary(content)
+
+  # Handle other tuple formats by extracting content
+  defp extract_message_text({_type, content}) when is_binary(content), do: content
+  defp extract_message_text({_type, content}) when is_list(content), do: IO.iodata_to_binary(content)
+
+  # Fallback for any other format - convert to string representation
+  defp extract_message_text(message), do: inspect(message)
 
   # Extract configured top-level fields from metadata
   defp extract_top_level_fields(metadata) do
