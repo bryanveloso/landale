@@ -58,16 +58,22 @@ defmodule Server.Services.Rainwave.State do
   Creates a new state with default values.
   """
   def new(opts \\ []) do
+    api_key = Keyword.get(opts, :api_key)
+    user_id = Keyword.get(opts, :user_id)
+
+    # Auto-enable when valid credentials are provided
+    has_credentials = not is_nil(api_key) and not is_nil(user_id)
+
     %__MODULE__{
-      api_key: Keyword.get(opts, :api_key),
-      user_id: Keyword.get(opts, :user_id),
+      api_key: api_key,
+      user_id: user_id,
       api_base_url: Keyword.get(opts, :api_base_url, "https://rainwave.cc/api4"),
       poll_interval: Keyword.get(opts, :poll_interval, 10_000),
       # Default to Covers
       station_id: Keyword.get(opts, :station_id, 3),
       station_name: "Covers",
       current_song: nil,
-      is_enabled: false,
+      is_enabled: has_credentials,
       is_listening: false,
       api_health_status: :ok,
       last_api_call_at: nil,
