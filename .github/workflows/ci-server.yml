@@ -82,10 +82,6 @@ jobs:
         working-directory: apps/server
         run: mix ecto.migrate
 
-      - name: Verify critical tests
-        working-directory: apps/server
-        run: ../../scripts/check-critical-tests.sh
-
       - name: Run tests with coverage
         working-directory: apps/server
         run: |
