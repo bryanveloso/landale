@@ -57,8 +57,14 @@ defmodule ServerWeb.CatchAllHandlerTest do
       assert Process.alive?(socket.channel_pid)
 
       # Should still handle known events
-      send(socket.channel_pid, {:chat_message, %{text: "test", timestamp: DateTime.utc_now()}})
-      assert_push "chat_message", %{type: "chat_message"}
+      event =
+        Server.Events.Event.new("channel.chat.message", :twitch, %{
+          message: %{text: "test"},
+          user_name: "TestUser"
+        })
+
+      send(socket.channel_pid, {:event, event})
+      assert_push "chat_message", %{type: "channel.chat.message"}
     end
 
     test "OverlayChannel survives unknown handle_info messages" do

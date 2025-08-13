@@ -33,7 +33,10 @@ defmodule ServerWeb.ChannelCase do
 
     # Start cache for tests that need it
     if !Process.whereis(Server.Cache) do
-      {:ok, _} = Server.Cache.start_link([])
+      case Server.Cache.start_link([]) do
+        {:ok, _} -> :ok
+        {:error, {:already_started, _}} -> :ok
+      end
     end
 
     # Ensure channel infrastructure is started

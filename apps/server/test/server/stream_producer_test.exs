@@ -74,8 +74,14 @@ defmodule Server.StreamProducerTest do
 
   describe "sub train handling" do
     test "creates new sub train", %{producer: producer} do
-      event = %{user_name: "testuser", tier: "1000", cumulative_months: 5}
-      send(producer, {:new_subscription, event})
+      event =
+        Server.Events.Event.new("channel.subscribe", :twitch, %{
+          user_name: "testuser",
+          tier: "1000",
+          cumulative_months: 5
+        })
+
+      send(producer, {:event, event})
 
       # Give time for async processing
       Process.sleep(10)
@@ -91,13 +97,23 @@ defmodule Server.StreamProducerTest do
 
     test "extends existing sub train", %{producer: producer} do
       # Create initial sub train
-      event1 = %{user_name: "user1", tier: "1000"}
-      send(producer, {:new_subscription, event1})
+      event1 =
+        Server.Events.Event.new("channel.subscribe", :twitch, %{
+          user_name: "user1",
+          tier: "1000"
+        })
+
+      send(producer, {:event, event1})
       Process.sleep(10)
 
       # Add another subscription
-      event2 = %{user_name: "user2", tier: "2000"}
-      send(producer, {:new_subscription, event2})
+      event2 =
+        Server.Events.Event.new("channel.subscribe", :twitch, %{
+          user_name: "user2",
+          tier: "2000"
+        })
+
+      send(producer, {:event, event2})
       Process.sleep(10)
 
       state = GenServer.call(producer, :get_state)
@@ -244,7 +260,8 @@ defmodule Server.StreamProducerTest do
   describe "error handling" do
     test "handles malformed events gracefully", %{producer: producer} do
       # Send malformed subscription event (missing required fields)
-      send(producer, {:new_subscription, %{invalid: "data"}})
+      event = Server.Events.Event.new("channel.subscribe", :twitch, %{invalid: "data"})
+      send(producer, {:event, event})
 
       # Should not crash and should handle gracefully with defaults
       Process.sleep(10)

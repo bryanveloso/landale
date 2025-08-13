@@ -10,7 +10,10 @@ defmodule Server.Events.RouterTest do
 
   setup do
     # Start TaskSupervisor required by Router
-    start_supervised!({Task.Supervisor, name: Server.TaskSupervisor})
+    case start_supervised({Task.Supervisor, name: Server.TaskSupervisor}) do
+      {:ok, _} -> :ok
+      {:error, {:already_started, _}} -> :ok
+    end
 
     # Start the router with test configuration
     start_supervised!({Router, batch_types: @test_batch_types})

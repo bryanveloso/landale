@@ -23,6 +23,8 @@ defmodule Server.Application do
       Server.Repo,
       {DNSCluster, query: Application.get_env(:server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Server.PubSub},
+      # Task supervision for async operations (needed by Router in all environments)
+      {Task.Supervisor, name: Server.TaskSupervisor},
       # HTTP connection pool for external API calls
       Server.HttpClient,
       # Token encryption vault - must start before services that use tokens
@@ -40,8 +42,6 @@ defmodule Server.Application do
       else
         base_children ++
           [
-            # Task supervision for async operations
-            {Task.Supervisor, name: Server.TaskSupervisor},
             # Dynamic supervisor for runtime-started services
             {DynamicSupervisor, name: Server.DynamicSupervisor, strategy: :one_for_one},
             # Overlay tracking (must start early to create ETS table before channels)

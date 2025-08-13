@@ -62,7 +62,7 @@ defmodule Server.Test.ChannelTestHelper do
 
   defp ensure_pubsub do
     unless Process.whereis(Server.PubSub) do
-      case Phoenix.PubSub.start_link(name: Server.PubSub) do
+      case Phoenix.PubSub.Supervisor.start_link(name: Server.PubSub) do
         {:ok, _} -> :ok
         {:error, {:already_started, _}} -> :ok
       end
