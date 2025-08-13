@@ -96,7 +96,11 @@ defmodule Server.ActivityLog.Event do
       "channel.cheer",
       "channel.update",
       "stream.online",
-      "stream.offline"
+      "stream.offline",
+      "system.startup",
+      "system.shutdown",
+      "system.error",
+      "system.test"
     ]
 
     if event_type && event_type not in valid_event_types do

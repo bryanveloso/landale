@@ -31,39 +31,18 @@ export function useActivityLog() {
     setEvents((prev) => [event, ...prev].slice(0, 1000))
   }
 
-  const transformEvent = (type: string, payload: EventPayload): ActivityEvent | null => {
-    const baseEvent = {
-      id: payload.data?.id || crypto.randomUUID(),
-      timestamp: payload.timestamp || new Date().toISOString(),
-      user_id: payload.data?.user_id || null,
-      user_login: payload.data?.user_login || null,
-      user_name: payload.data?.user_name || null,
-      correlation_id: null
-    }
+  const transformUnifiedEvent = (event: any): ActivityEvent | null => {
+    if (!event || !event.type || !event.data) return null
 
-    switch (type) {
-      case 'chat_message':
-        return {
-          ...baseEvent,
-          event_type: EVENT_TYPES.CHAT_MESSAGE,
-          data: { message: payload.data?.message || '' }
-        }
-      case 'follower':
-        return { ...baseEvent, event_type: EVENT_TYPES.FOLLOW, data: {} }
-      case 'subscription':
-        return {
-          ...baseEvent,
-          event_type: EVENT_TYPES.SUBSCRIBE,
-          data: { tier: payload.data?.tier || 1 }
-        }
-      case 'cheer':
-        return {
-          ...baseEvent,
-          event_type: EVENT_TYPES.CHEER,
-          data: { bits: payload.data?.bits || 0 }
-        }
-      default:
-        return null
+    return {
+      id: event.id || crypto.randomUUID(),
+      timestamp: event.timestamp || new Date().toISOString(),
+      event_type: event.type,
+      user_id: event.data.user_id || null,
+      user_login: event.data.user_login || null,
+      user_name: event.data.user_name || null,
+      data: event.data,
+      correlation_id: event.meta?.correlation_id || null
     }
   }
 
@@ -74,24 +53,9 @@ export function useActivityLog() {
     if (connected && phoenixSocket && !eventsChannel()) {
       const channel = phoenixSocket.channel('events:all', {})
 
-      channel.on('chat_message', (payload: EventPayload) => {
-        const event = transformEvent('chat_message', payload)
-        if (event) addEvent(event)
-      })
-
-      channel.on('follower', (payload: EventPayload) => {
-        const event = transformEvent('follower', payload)
-        if (event) addEvent(event)
-      })
-
-      channel.on('subscription', (payload: EventPayload) => {
-        const event = transformEvent('subscription', payload)
-        if (event) addEvent(event)
-      })
-
-      channel.on('cheer', (payload: EventPayload) => {
-        const event = transformEvent('cheer', payload)
-        if (event) addEvent(event)
+      channel.on('unified_event', (event: any) => {
+        const activityEvent = transformUnifiedEvent(event)
+        if (activityEvent) addEvent(activityEvent)
       })
 
       channel.join()
