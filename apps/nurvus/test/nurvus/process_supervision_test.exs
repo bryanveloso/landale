@@ -126,4 +126,95 @@ defmodule Nurvus.ProcessSupervisionTest do
       assert :ok = ProcessManager.remove_process("lifecycle_test")
     end
   end
+
+  describe "list running processes with config" do
+    @tag :integration
+    test "returns running processes with their full configuration including health_check" do
+      config_with_health_check = %{
+        "id" => "test_with_health_check",
+        "name" => "Test With Health Check",
+        "command" => "sleep",
+        "args" => ["3"],
+        "cwd" => nil,
+        "env" => %{},
+        "auto_restart" => false,
+        "max_restarts" => 0,
+        "restart_window" => 60,
+        "health_check" => %{
+          "type" => "http",
+          "url" => "http://localhost:8890/health",
+          "interval" => 30,
+          "timeout" => 10
+        }
+      }
+
+      config_without_health_check = %{
+        "id" => "test_without_health_check",
+        "name" => "Test Without Health Check",
+        "command" => "sleep",
+        "args" => ["3"],
+        "cwd" => nil,
+        "env" => %{},
+        "auto_restart" => false,
+        "max_restarts" => 0,
+        "restart_window" => 60
+      }
+
+      # Add both processes
+      assert :ok = ProcessManager.add_process(config_with_health_check)
+      assert :ok = ProcessManager.add_process(config_without_health_check)
+
+      # Start both processes
+      assert :ok = ProcessManager.start_process("test_with_health_check")
+      assert :ok = ProcessManager.start_process("test_without_health_check")
+
+      # Verify both are running
+      assert {:ok, :running} = ProcessManager.get_process_status("test_with_health_check")
+      assert {:ok, :running} = ProcessManager.get_process_status("test_without_health_check")
+
+      # Get running processes with config
+      running_processes = ProcessManager.list_running_processes_with_config()
+
+      # Should have 2 running processes
+      assert length(running_processes) == 2
+
+      # Find our test processes
+      process_with_health = Enum.find(running_processes, &(&1.id == "test_with_health_check"))
+
+      process_without_health =
+        Enum.find(running_processes, &(&1.id == "test_without_health_check"))
+
+      # Verify structure and data
+      assert process_with_health != nil
+      assert process_with_health.name == "Test With Health Check"
+      assert process_with_health.status == :running
+      assert process_with_health.config.health_check != nil
+      assert process_with_health.config.health_check["url"] == "http://localhost:8890/health"
+
+      assert process_without_health != nil
+      assert process_without_health.name == "Test Without Health Check"
+      assert process_without_health.status == :running
+      assert process_without_health.config.health_check == nil
+
+      # Cleanup
+      ProcessManager.stop_process("test_with_health_check")
+      ProcessManager.stop_process("test_without_health_check")
+      ProcessManager.remove_process("test_with_health_check")
+      ProcessManager.remove_process("test_without_health_check")
+    end
+
+    @tag :integration
+    test "returns empty list when no processes are running" do
+      # Make sure no processes are running by stopping all
+      all_processes = ProcessManager.list_processes()
+
+      for process <- all_processes do
+        ProcessManager.stop_process(process.id)
+      end
+
+      # Should return empty list
+      running_processes = ProcessManager.list_running_processes_with_config()
+      assert running_processes == []
+    end
+  end
 end

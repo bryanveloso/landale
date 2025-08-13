@@ -102,8 +102,8 @@ defmodule Nurvus.ProcessMonitor do
   def handle_info(:health_check, state) do
     Logger.debug("Running health check for all processes")
 
-    # Get list of running processes
-    processes = Nurvus.ProcessManager.list_processes()
+    # Get list of running processes with their configurations
+    processes = Nurvus.ProcessManager.list_running_processes_with_config()
 
     # Collect metrics for each running process
     {new_metrics, new_alerts} = collect_metrics(processes, state.metrics, state.alerts)
@@ -153,7 +153,7 @@ defmodule Nurvus.ProcessMonitor do
   end
 
   defp handle_running_process(process, acc_metrics, acc_alerts) do
-    case collect_process_metrics(process.id) do
+    case collect_process_metrics(process) do
       {:ok, metrics} ->
         updated_metrics = update_process_metrics(acc_metrics, process.id, metrics)
         new_alerts = check_for_alerts(process.id, metrics, acc_alerts)
@@ -177,13 +177,16 @@ defmodule Nurvus.ProcessMonitor do
     Map.put(acc_metrics, process_id, updated_metrics)
   end
 
-  defp collect_process_metrics(process_id) do
+  defp collect_process_metrics(process) do
     # Get process status first
-    case Nurvus.ProcessManager.get_process_status(process_id) do
+    case Nurvus.ProcessManager.get_process_status(process.id) do
       {:ok, :running} ->
-        # For now, just return base metrics
-        # TODO: Add health check integration once ProcessManager exposes config
-        metrics = collect_base_metrics(process_id)
+        # Collect base metrics and perform health check if configured
+        base_metrics = collect_base_metrics(process.id)
+        health_status = perform_health_check(process.config)
+
+        # Merge health status into metrics
+        metrics = Map.put(base_metrics, :health_status, health_status)
         {:ok, metrics}
 
       _ ->
@@ -236,6 +239,47 @@ defmodule Nurvus.ProcessMonitor do
         alerts
       end
 
+    # Check health status
+    alerts =
+      case Map.get(metrics, :health_status, :healthy) do
+        :unhealthy ->
+          alert = %{
+            process_id: process_id,
+            type: :unhealthy,
+            message: "Process health check failed",
+            timestamp: DateTime.utc_now(),
+            severity: :critical
+          }
+
+          [alert | alerts]
+
+        :degraded ->
+          alert = %{
+            process_id: process_id,
+            type: :degraded,
+            message: "Process health is degraded",
+            timestamp: DateTime.utc_now(),
+            severity: :warning
+          }
+
+          [alert | alerts]
+
+        :unknown ->
+          alert = %{
+            process_id: process_id,
+            type: :health_unknown,
+            message: "Process health status unknown (health check failed)",
+            timestamp: DateTime.utc_now(),
+            severity: :warning
+          }
+
+          [alert | alerts]
+
+        _ ->
+          # :healthy or other statuses don't generate alerts
+          alerts
+      end
+
     # Add new alerts to existing ones (keep last 50)
     all_alerts = alerts ++ existing_alerts
     Enum.take(all_alerts, 50)
@@ -260,8 +304,21 @@ defmodule Nurvus.ProcessMonitor do
       memory_mb: :rand.uniform(100) + 50,
       # Mock uptime
       uptime_seconds: :rand.uniform(3600),
-      file_descriptors: :rand.uniform(20),
-      status: :healthy
+      file_descriptors: :rand.uniform(20)
     }
+  end
+
+  defp perform_health_check(config) do
+    case Map.get(config, "health_check") do
+      %{"type" => "http", "url" => url} ->
+        case Nurvus.HealthChecker.check_health(url, 3_000) do
+          {:ok, health_response} -> health_response.status
+          {:error, _reason} -> :unknown
+        end
+
+      _ ->
+        # No health check configured, assume healthy if process is running
+        :healthy
+    end
   end
 end

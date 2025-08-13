@@ -28,6 +28,13 @@ defmodule Nurvus.ProcessManager do
 
   @type process_status :: :running | :stopped | :failed | :unknown
 
+  @type process_with_config :: %{
+          id: String.t(),
+          name: String.t(),
+          status: process_status(),
+          config: process_config()
+        }
+
   defstruct processes: %{}, monitors: %{}
 
   ## Client API
@@ -70,6 +77,11 @@ defmodule Nurvus.ProcessManager do
   @spec list_processes() :: [%{id: String.t(), name: String.t(), status: process_status()}]
   def list_processes do
     GenServer.call(__MODULE__, :list_processes)
+  end
+
+  @spec list_running_processes_with_config() :: [process_with_config()]
+  def list_running_processes_with_config do
+    GenServer.call(__MODULE__, :list_running_processes_with_config)
   end
 
   ## GenServer Callbacks
@@ -247,6 +259,31 @@ defmodule Nurvus.ProcessManager do
           end
 
         %{id: id, name: config.name, status: status}
+      end)
+
+    {:reply, processes, state}
+  end
+
+  @impl true
+  def handle_call(:list_running_processes_with_config, _from, state) do
+    processes =
+      state.processes
+      |> Enum.filter(fn {id, _config} ->
+        case Map.get(state.monitors, id) do
+          {pid, _monitor_ref} -> Process.alive?(pid)
+          nil -> false
+        end
+      end)
+      |> Enum.map(fn {id, config} ->
+        {_reply, status, _state} = handle_call({:get_process_status, id}, nil, state)
+
+        status =
+          case status do
+            {:ok, s} -> s
+            _ -> :unknown
+          end
+
+        %{id: id, name: config.name, status: status, config: config}
       end)
 
     {:reply, processes, state}
