@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TakeoverRouteImport } from './routes/takeover'
+import { Route as RainwaveRouteImport } from './routes/rainwave'
 import { Route as OmnibarRouteImport } from './routes/omnibar'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShowsIronmonFullRouteImport } from './routes/shows/ironmon/full'
@@ -17,6 +18,11 @@ import { Route as ShowsIronmonFullRouteImport } from './routes/shows/ironmon/ful
 const TakeoverRoute = TakeoverRouteImport.update({
   id: '/takeover',
   path: '/takeover',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RainwaveRoute = RainwaveRouteImport.update({
+  id: '/rainwave',
+  path: '/rainwave',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OmnibarRoute = OmnibarRouteImport.update({
@@ -38,12 +44,14 @@ const ShowsIronmonFullRoute = ShowsIronmonFullRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/omnibar': typeof OmnibarRoute
+  '/rainwave': typeof RainwaveRoute
   '/takeover': typeof TakeoverRoute
   '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/omnibar': typeof OmnibarRoute
+  '/rainwave': typeof RainwaveRoute
   '/takeover': typeof TakeoverRoute
   '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
@@ -51,20 +59,33 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/omnibar': typeof OmnibarRoute
+  '/rainwave': typeof RainwaveRoute
   '/takeover': typeof TakeoverRoute
   '/shows/ironmon/full': typeof ShowsIronmonFullRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/omnibar' | '/takeover' | '/shows/ironmon/full'
+  fullPaths:
+    | '/'
+    | '/omnibar'
+    | '/rainwave'
+    | '/takeover'
+    | '/shows/ironmon/full'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/omnibar' | '/takeover' | '/shows/ironmon/full'
-  id: '__root__' | '/' | '/omnibar' | '/takeover' | '/shows/ironmon/full'
+  to: '/' | '/omnibar' | '/rainwave' | '/takeover' | '/shows/ironmon/full'
+  id:
+    | '__root__'
+    | '/'
+    | '/omnibar'
+    | '/rainwave'
+    | '/takeover'
+    | '/shows/ironmon/full'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   OmnibarRoute: typeof OmnibarRoute
+  RainwaveRoute: typeof RainwaveRoute
   TakeoverRoute: typeof TakeoverRoute
   ShowsIronmonFullRoute: typeof ShowsIronmonFullRoute
 }
@@ -76,6 +97,13 @@ declare module '@tanstack/solid-router' {
       path: '/takeover'
       fullPath: '/takeover'
       preLoaderRoute: typeof TakeoverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rainwave': {
+      id: '/rainwave'
+      path: '/rainwave'
+      fullPath: '/rainwave'
+      preLoaderRoute: typeof RainwaveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/omnibar': {
@@ -105,6 +133,7 @@ declare module '@tanstack/solid-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   OmnibarRoute: OmnibarRoute,
+  RainwaveRoute: RainwaveRoute,
   TakeoverRoute: TakeoverRoute,
   ShowsIronmonFullRoute: ShowsIronmonFullRoute,
 }

@@ -445,6 +445,12 @@ defmodule ServerWeb.OverlayChannel do
 
   @impl true
   def handle_info({:rainwave_event, event}, socket) do
+    Logger.info("Rainwave event forwarded to overlay",
+      overlay_type: socket.assigns.overlay_type,
+      event_type: event.type,
+      correlation_id: socket.assigns.correlation_id
+    )
+
     push(socket, "music_event", event)
     {:noreply, socket}
   end
@@ -580,6 +586,7 @@ defmodule ServerWeb.OverlayChannel do
         Phoenix.PubSub.subscribe(Server.PubSub, "ironmon:events")
 
       "music" ->
+        Logger.info("Music overlay subscribed to rainwave events")
         Phoenix.PubSub.subscribe(Server.PubSub, "rainwave:events")
 
       "system" ->

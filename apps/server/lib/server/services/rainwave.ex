@@ -526,6 +526,12 @@ defmodule Server.Services.Rainwave do
       current_song: state.current_song
     }
 
+    Logger.info("Rainwave state broadcasted",
+      listening: state.is_listening,
+      has_song: not is_nil(state.current_song),
+      station: state.station_name
+    )
+
     correlation_id = Map.get(state, :__service_meta__, %{}) |> Map.get(:correlation_id)
     Events.emit("rainwave:update", event_data, correlation_id)
   end
