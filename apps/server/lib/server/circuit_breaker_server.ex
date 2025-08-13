@@ -181,6 +181,12 @@ defmodule Server.CircuitBreakerServer do
     {:noreply, %{new_state | cleanup_timer: timer_ref}}
   end
 
+  @impl true
+  def handle_info(msg, state) do
+    Logger.debug("Ignoring unhandled message in CircuitBreakerServer", message: inspect(msg))
+    {:noreply, state}
+  end
+
   ## Private Functions
 
   defp get_or_create_circuit(state, service_name, config) do
