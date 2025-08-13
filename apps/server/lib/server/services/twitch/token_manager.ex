@@ -76,7 +76,7 @@ defmodule Server.Services.Twitch.TokenManager do
       response
     else
       {:error, reason} = error ->
-        Logger.debug("Token validation failed", reason: inspect(reason))
+        Server.Logging.log_oauth_debug("Token validation failed", reason)
         error
     end
   end

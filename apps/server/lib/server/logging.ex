@@ -122,6 +122,47 @@ defmodule Server.Logging do
     Logger.debug("Item unhandled", metadata)
   end
 
+  @doc """
+  Logs OAuth-related errors without exposing sensitive token data.
+
+  Sanitizes OAuth tokens and credentials before logging to prevent
+  credential exposure in production logs.
+  """
+  def log_oauth_error(message, reason, additional_metadata \\ []) do
+    sanitized_reason = sanitize_oauth_data(reason)
+    Logger.error(message, [error: sanitized_reason] ++ additional_metadata)
+  end
+
+  @doc """
+  Logs OAuth-related debug info without exposing sensitive token data.
+
+  Sanitizes OAuth tokens and credentials before logging. Debug logs are
+  filtered in production via compile_time_purge_matching config.
+  """
+  def log_oauth_debug(message, reason, additional_metadata \\ []) do
+    sanitized_reason = sanitize_oauth_data(reason)
+    Logger.debug(message, [reason: sanitized_reason] ++ additional_metadata)
+  end
+
+  # Private helper to sanitize OAuth data before logging
+  defp sanitize_oauth_data(data) when is_map(data) do
+    data
+    |> Map.drop([:access_token, :refresh_token, :client_secret, :password])
+    |> Map.put(:data_type, "oauth_data")
+    |> Map.put(:has_access_token, Map.has_key?(data, :access_token))
+    |> Map.put(:has_refresh_token, Map.has_key?(data, :refresh_token))
+  end
+
+  defp sanitize_oauth_data(data) when is_binary(data) do
+    # Truncate long strings to prevent log flooding
+    String.slice(data, 0, 100) <> if String.length(data) > 100, do: "...", else: ""
+  end
+
+  defp sanitize_oauth_data(data) do
+    # For other types, provide safe summary
+    "#{inspect(data.__struct__ || :unknown)}"
+  end
+
   # Private helper to summarize complex data for debugging
   defp summarize_item(item) when is_map(item) do
     keys = Map.keys(item)

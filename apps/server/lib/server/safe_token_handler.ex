@@ -77,9 +77,10 @@ defmodule Server.SafeTokenHandler do
   def normalize(nil), do: %{}
 
   def normalize(data) do
-    Logger.error("SafeTokenHandler received unexpected data type",
-      type: inspect(data),
-      data: inspect(data)
+    Server.Logging.log_oauth_error(
+      "SafeTokenHandler received unexpected data type",
+      data,
+      type: data.__struct__ || :unknown
     )
 
     %{}

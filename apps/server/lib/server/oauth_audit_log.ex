@@ -119,7 +119,7 @@ defmodule Server.OAuthAuditLog do
         :ok
       rescue
         error ->
-          Logger.error("Failed to persist audit log", error: inspect(error))
+          Server.Logging.log_oauth_error("Failed to persist audit log", error)
       end
     end)
 
