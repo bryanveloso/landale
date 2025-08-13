@@ -42,8 +42,6 @@ defmodule Server.Application do
           [
             # Task supervision for async operations
             {Task.Supervisor, name: Server.TaskSupervisor},
-            # Dynamic supervisor for async database writes with concurrency limit
-            {DynamicSupervisor, name: Server.DBTaskSupervisor, strategy: :one_for_one, max_children: 10},
             # Dynamic supervisor for runtime-started services
             {DynamicSupervisor, name: Server.DynamicSupervisor, strategy: :one_for_one},
             # Overlay tracking (must start early to create ETS table before channels)
@@ -57,6 +55,9 @@ defmodule Server.Application do
             Server.CircuitBreakerServer,
             # Service registry for unified service discovery
             Server.ServiceRegistry,
+            # Event routing system (must start before services that emit events)
+            Server.Events.Router,
+            Server.Events.BatchCollector,
             # Stream coordination
             Server.ContentAggregator,
             Server.StreamProducer,

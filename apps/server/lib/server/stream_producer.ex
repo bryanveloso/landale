@@ -14,6 +14,8 @@ defmodule Server.StreamProducer do
   use GenServer
   require Logger
 
+  alias Server.Events.Event
+
   # Priority levels
   @priority_alert 100
   @priority_sub_train 50
@@ -96,14 +98,8 @@ defmodule Server.StreamProducer do
   def init(_opts) do
     Logger.info("StreamProducer started", service: :stream_producer)
 
-    # Subscribe to various event sources
-    Phoenix.PubSub.subscribe(Server.PubSub, "chat")
-    Phoenix.PubSub.subscribe(Server.PubSub, "followers")
-    Phoenix.PubSub.subscribe(Server.PubSub, "subscriptions")
-    Phoenix.PubSub.subscribe(Server.PubSub, "cheers")
-    Phoenix.PubSub.subscribe(Server.PubSub, "twitch:events")
-    Phoenix.PubSub.subscribe(Server.PubSub, "channel:updates")
-    Phoenix.PubSub.subscribe(Server.PubSub, "ironmon:runs")
+    # Subscribe to event topics
+    Phoenix.PubSub.subscribe(Server.PubSub, "events:all")
 
     # Create persistence table (protected to prevent unauthorized writes)
     # Handle race condition in tests gracefully
@@ -310,9 +306,9 @@ defmodule Server.StreamProducer do
     {:noreply, new_state}
   end
 
-  # Handle chat events for real-time updates
+  # Handle events
   @impl true
-  def handle_info({:chat_message, event}, state) do
+  def handle_info({:event, %Event{type: "channel.chat.message", data: data} = event}, state) do
     # If emote stats are currently active, send real-time updates
     if active_content_type(state) == :emote_stats do
       Phoenix.PubSub.broadcast(
@@ -322,11 +318,11 @@ defmodule Server.StreamProducer do
          %{
            type: :emote_increment,
            data: %{
-             emotes: Map.get(event, :emotes, []),
-             native_emotes: Map.get(event, :native_emotes, []),
-             username: Map.get(event, :user_name, "unknown")
+             emotes: Map.get(data, :emotes, []),
+             native_emotes: Map.get(data, :native_emotes, []),
+             username: Map.get(data, :user_name, "unknown")
            },
-           timestamp: Map.get(event, :timestamp)
+           timestamp: event.timestamp
          }}
       )
     end
@@ -334,25 +330,24 @@ defmodule Server.StreamProducer do
     {:noreply, state}
   end
 
-  # Handle Twitch channel updates for show detection
   @impl true
-  def handle_info({:channel_update, event}, state) do
+  def handle_info({:event, %Event{type: "channel.update", data: data} = _event}, state) do
     Logger.info("Channel update received",
-      game: event.category_name,
-      category_id: event.category_id
+      game: Map.get(data, :category_name),
+      category_id: Map.get(data, :category_id)
     )
 
     # Determine show from game
-    new_show = determine_show_from_game(event.category_name, event.category_id)
+    new_show = determine_show_from_game(Map.get(data, :category_name), Map.get(data, :category_id))
 
     # Only change show if it's different
     if new_show != state.current_show do
       change_show(new_show, %{
         game: %{
-          id: event.category_id,
-          name: event.category_name
+          id: Map.get(data, :category_id),
+          name: Map.get(data, :category_name)
         },
-        title: event.title
+        title: Map.get(data, :title)
       })
     end
 
@@ -400,9 +395,8 @@ defmodule Server.StreamProducer do
     {:noreply, state}
   end
 
-  # Handle subscription events for sub trains
   @impl true
-  def handle_info({:new_subscription, event}, state) do
+  def handle_info({:event, %Event{type: "channel.subscribe", data: data} = event}, state) do
     # Check if sub train is already active (and not expired)
     now = DateTime.utc_now()
 
@@ -429,10 +423,10 @@ defmodule Server.StreamProducer do
         type: :sub_train,
         priority: priority,
         data: %{
-          subscriber: Map.get(event, :user_name, "unknown"),
-          tier: Map.get(event, :tier, "1000"),
+          subscriber: Map.get(data, :user_name, "unknown"),
+          tier: Map.get(data, :tier, "1000"),
           count: 1,
-          total_months: Map.get(event, :cumulative_months, 0)
+          total_months: Map.get(data, :cumulative_months, 0)
         },
         duration: duration,
         started_at: DateTime.utc_now()
@@ -456,6 +450,16 @@ defmodule Server.StreamProducer do
       broadcast_state_update(new_state)
       {:noreply, new_state}
     end
+  end
+
+  # Catch-all for unhandled messages
+  @impl true
+  def handle_info(unhandled_msg, state) do
+    Logger.debug("Unhandled message in StreamProducer",
+      message: inspect(unhandled_msg, limit: 50)
+    )
+
+    {:noreply, state}
   end
 
   ## Private Functions
@@ -609,7 +613,7 @@ defmodule Server.StreamProducer do
     update_active_content(new_state)
   end
 
-  defp extend_sub_train(state, sub_train_id, event) do
+  defp extend_sub_train(state, sub_train_id, %Event{data: data} = _event) do
     # Cancel existing timer atomically
     {timer_ref, new_timers} = Map.pop(state.timers, sub_train_id)
 
@@ -628,8 +632,8 @@ defmodule Server.StreamProducer do
             | data:
                 Map.merge(interrupt.data, %{
                   count: new_count,
-                  latest_subscriber: Map.get(event, :user_name, "unknown"),
-                  latest_tier: Map.get(event, :tier, "1000")
+                  latest_subscriber: Map.get(data, :user_name, "unknown"),
+                  latest_tier: Map.get(data, :tier, "1000")
                 })
           }
         else

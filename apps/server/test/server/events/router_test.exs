@@ -9,24 +9,21 @@ defmodule Server.Events.RouterTest do
   @test_batch_types ["channel.chat.message", "channel.follow"]
 
   setup do
+    # Start TaskSupervisor required by Router
+    start_supervised!({Task.Supervisor, name: Server.TaskSupervisor})
+
     # Start the router with test configuration
     start_supervised!({Router, batch_types: @test_batch_types})
 
     # Start batch collector for batching tests
     start_supervised!(BatchCollector)
 
-    # Subscribe to various topics to verify broadcasts
+    # Subscribe to event topics
     Phoenix.PubSub.subscribe(Server.PubSub, "events:all")
     Phoenix.PubSub.subscribe(Server.PubSub, "events:twitch")
+    Phoenix.PubSub.subscribe(Server.PubSub, "events:obs")
     Phoenix.PubSub.subscribe(Server.PubSub, "events:system")
     Phoenix.PubSub.subscribe(Server.PubSub, "events:batched")
-
-    # Legacy topic subscriptions for compatibility testing
-    Phoenix.PubSub.subscribe(Server.PubSub, "twitch:events")
-    Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
-    Phoenix.PubSub.subscribe(Server.PubSub, "chat")
-    Phoenix.PubSub.subscribe(Server.PubSub, "followers")
-    Phoenix.PubSub.subscribe(Server.PubSub, "channel:updates")
 
     :ok
   end
@@ -44,8 +41,8 @@ defmodule Server.Events.RouterTest do
       Router.route(event)
 
       # Should receive immediate broadcast on multiple topics
-      assert_receive {:unified_event, ^event}
-      assert_receive {:unified_event, ^event}
+      assert_receive {:event, ^event}
+      assert_receive {:event, ^event}
 
       # Should not be sent to BatchCollector (no batched event received)
       refute_receive {:batched_event, _}, 100
@@ -56,8 +53,8 @@ defmodule Server.Events.RouterTest do
 
       Router.route(event)
 
-      # Should not receive immediate unified event
-      refute_receive {:unified_event, ^event}, 100
+      # Should not receive immediate event
+      refute_receive {:event, ^event}, 100
 
       # Wait for batch flush (BatchCollector default is 50ms)
       assert_receive {:batched_event, batch_event}, 200
@@ -74,9 +71,9 @@ defmodule Server.Events.RouterTest do
       Router.route(event)
 
       # Should receive immediate broadcast
-      assert_receive {:unified_event, ^event}
+      assert_receive {:event, ^event}
       # Second one from source-specific topic
-      assert_receive {:unified_event, ^event}
+      assert_receive {:event, ^event}
 
       # Should not be batched
       refute_receive {:batched_event, _}, 100
@@ -88,10 +85,10 @@ defmodule Server.Events.RouterTest do
       Router.route(event)
 
       # Should receive on events:all
-      assert_receive {:unified_event, ^event}
+      assert_receive {:event, ^event}
 
       # Should receive on events:system
-      assert_receive {:unified_event, ^event}
+      assert_receive {:event, ^event}
     end
 
     test "updates statistics correctly" do
@@ -128,8 +125,8 @@ defmodule Server.Events.RouterTest do
     end
   end
 
-  describe "legacy compatibility broadcasts" do
-    test "broadcasts Twitch events in legacy format" do
+  describe "event broadcasts" do
+    test "broadcasts Twitch events in event format" do
       # Use channel.update which is NOT in @test_batch_types so it gets immediate broadcast
       event =
         Event.new(
@@ -140,19 +137,19 @@ defmodule Server.Events.RouterTest do
 
       Router.route(event)
 
-      # Should receive legacy format on twitch:events
-      assert_receive {:twitch_event, legacy_event}
-      assert legacy_event.type == "channel.update"
-      assert legacy_event.data.category_name == "Just Chatting"
-      assert %DateTime{} = legacy_event.timestamp
+      # Should receive event format on events:all and events:twitch
+      assert_receive {:event, received_event}
+      assert received_event.type == "channel.update"
+      assert received_event.source == :twitch
+      assert received_event.data.category_name == "Just Chatting"
+      assert received_event.data.title == "Test Stream"
+      assert %DateTime{} = received_event.timestamp
 
-      # Should also receive on specific legacy topic
-      assert_receive {:channel_update, channel_data}
-      assert channel_data.category_name == "Just Chatting"
-      assert channel_data.title == "Test Stream"
+      # Should also receive on source-specific topic
+      assert_receive {:event, ^received_event}
     end
 
-    test "broadcasts chat messages in legacy format" do
+    test "routes chat messages through batching" do
       event =
         Event.new(
           "channel.chat.message",
@@ -167,16 +164,18 @@ defmodule Server.Events.RouterTest do
 
       Router.route(event)
 
-      # Chat messages are batched, so we need to wait for the flush
-      # to get legacy compatibility broadcasts
-      assert_receive {:batched_event, _batch_event}, 200
+      # Chat messages are batched, so we should receive a batch event
+      assert_receive {:batched_event, batch_event}, 200
+      assert batch_event.type == "event.batch"
+      assert batch_event.source == :system
+      assert length(batch_event.data.events) == 1
 
-      # The legacy broadcast happens when the batch is processed
-      # For this test, we'll assume the legacy broadcast works correctly
-      # since testing the full batch cycle is complex
+      batched_event = List.first(batch_event.data.events)
+      assert batched_event.type == "channel.chat.message"
+      assert batched_event.data.user_name == "chatter123"
     end
 
-    test "broadcasts OBS events in legacy format" do
+    test "broadcasts OBS events in event format" do
       event =
         Event.new(
           "obs.StreamStarted",
@@ -186,10 +185,11 @@ defmodule Server.Events.RouterTest do
 
       Router.route(event)
 
-      # Should receive on obs:events with modified type (prefix removed)
-      assert_receive {:obs_event, legacy_event}
-      assert legacy_event.type == "StreamStarted"
-      assert legacy_event.data.output_active == true
+      # Should receive event format
+      assert_receive {:event, received_event}
+      assert received_event.type == "obs.StreamStarted"
+      assert received_event.source == :obs
+      assert received_event.data.output_active == true
     end
   end
 
@@ -301,7 +301,7 @@ defmodule Server.Events.RouterTest do
       Enum.each(critical_events, fn event ->
         Router.route(event)
         # Should receive immediate broadcast
-        assert_receive {:unified_event, ^event}
+        assert_receive {:event, ^event}
       end)
     end
 
@@ -325,7 +325,7 @@ defmodule Server.Events.RouterTest do
       Router.route(event)
 
       # Should receive immediate broadcast
-      assert_receive {:unified_event, ^event}
+      assert_receive {:event, ^event}
     end
   end
 
@@ -339,7 +339,7 @@ defmodule Server.Events.RouterTest do
 
       # Should handle normally
       assert Router.route(event) == :ok
-      assert_receive {:unified_event, ^event}
+      assert_receive {:event, ^event}
     end
 
     test "continues processing after errors" do
@@ -348,12 +348,12 @@ defmodule Server.Events.RouterTest do
       Router.route(good_event)
 
       # Should still work after any potential errors
-      assert_receive {:unified_event, ^good_event}
+      assert_receive {:event, ^good_event}
 
       # Route another event to verify system is still functional
       another_event = Event.new("another.event", :test, %{})
       Router.route(another_event)
-      assert_receive {:unified_event, ^another_event}
+      assert_receive {:event, ^another_event}
     end
   end
 
@@ -373,7 +373,7 @@ defmodule Server.Events.RouterTest do
 
       # Should receive all events (order not guaranteed due to concurrency)
       for event <- routed_events do
-        assert_receive {:unified_event, ^event}, 1000
+        assert_receive {:event, ^event}, 1000
       end
 
       # Verify statistics are correct

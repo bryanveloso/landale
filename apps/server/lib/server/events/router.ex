@@ -2,14 +2,14 @@ defmodule Server.Events.Router do
   @moduledoc """
   Central event routing system.
 
-  ALL unified events flow through this router after transformation.
+  ALL events flow through this router after transformation.
   This provides a single point for event distribution, batching decisions,
   and handler routing throughout the Landale system.
 
   ## Architecture
 
   The router operates as a GenServer that:
-  1. Receives unified events from system boundaries
+  1. Receives events from system boundaries
   2. Decides whether to batch or broadcast immediately
   3. Routes events to specific handlers based on type
   4. Stores events in activity log (async)
@@ -73,7 +73,7 @@ defmodule Server.Events.Router do
   end
 
   @doc """
-  Routes a unified event through the system.
+  Routes an event through the system.
 
   This is the main entry point for all events after transformation.
   Events are processed asynchronously to avoid blocking the caller.
@@ -176,8 +176,8 @@ defmodule Server.Events.Router do
 
   # Route event based on its type and priority
   defp handle_event_routing(%Event{} = event) do
-    # 1. Store in activity log (async, non-blocking)
-    Task.start(fn -> store_event_async(event) end)
+    # 1. Store in activity log (async with supervision)
+    Task.Supervisor.start_child(Server.TaskSupervisor, fn -> store_event_async(event) end)
 
     # 2. Determine routing strategy
     if should_batch?(event) do
@@ -210,52 +210,17 @@ defmodule Server.Events.Router do
   # Broadcast event immediately to all subscribers
   defp broadcast_immediate(%Event{} = event) do
     # Broadcast to general events topic
-    Phoenix.PubSub.broadcast(Server.PubSub, "events:all", {:unified_event, event})
+    Phoenix.PubSub.broadcast(Server.PubSub, "events:all", {:event, event})
 
     # Broadcast to source-specific topic
-    Phoenix.PubSub.broadcast(Server.PubSub, "events:#{event.source}", {:unified_event, event})
+    Phoenix.PubSub.broadcast(Server.PubSub, "events:#{event.source}", {:event, event})
   end
 
   # Route to specific handlers that need immediate notification
-  defp route_to_specific_handlers(%Event{type: "channel.chat.message"} = event) do
-    # Route to StreamProducer for emote stats and content updates
-    send_to_stream_producer({:chat_message, event})
-  end
-
-  defp route_to_specific_handlers(%Event{type: "channel.subscribe"} = event) do
-    # Route to StreamProducer for subscription celebrations
-    send_to_stream_producer({:subscription, event})
-  end
-
-  defp route_to_specific_handlers(%Event{type: "channel.follow"} = event) do
-    # Route to StreamProducer for follow notifications
-    send_to_stream_producer({:follow, event})
-  end
-
-  defp route_to_specific_handlers(%Event{type: "channel.update"} = event) do
-    # Route to StreamProducer for show detection
-    send_to_stream_producer({:channel_update, event})
-  end
-
-  defp route_to_specific_handlers(%Event{type: "ironmon." <> _} = event) do
-    # Route to StreamProducer for IronMON events
-    send_to_stream_producer({:ironmon_event, event})
-  end
-
-  defp route_to_specific_handlers(_event) do
-    # No specific routing needed
+  defp route_to_specific_handlers(%Event{} = _event) do
+    # All events are now handled via PubSub broadcasting
+    # StreamProducer subscribes to "events:all" and pattern matches on event.type
     :ok
-  end
-
-  # Send event to StreamProducer if it's running
-  defp send_to_stream_producer(message) do
-    case Process.whereis(Server.StreamProducer) do
-      nil ->
-        Logger.debug("StreamProducer not running, skipping specific routing")
-
-      pid ->
-        send(pid, message)
-    end
   end
 
   # Store event in activity log asynchronously
@@ -263,7 +228,6 @@ defmodule Server.Events.Router do
     # Check if ActivityLog module exists before trying to store
     if Code.ensure_loaded?(Server.ActivityLog) do
       try do
-        # Convert Event struct to format expected by ActivityLog
         activity_log_event = Transformer.for_activity_log(event)
         ActivityLog.store_event(activity_log_event)
       rescue

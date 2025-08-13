@@ -3,6 +3,8 @@ defmodule ServerWeb.EventsChannel do
 
   use ServerWeb.ChannelBase
 
+  alias Server.Events.{Event, Transformer}
+
   @impl true
   def join("events:" <> topic, _payload, socket) do
     socket =
@@ -10,39 +12,30 @@ defmodule ServerWeb.EventsChannel do
       |> setup_correlation_id()
       |> assign(:event_topic, topic)
 
-    # Subscribe to the specific topic or all events
-    topics_to_subscribe =
-      case topic do
-        "all" ->
-          [
-            "dashboard",
-            "chat",
-            "followers",
-            "subscriptions",
-            "cheers",
-            "obs:events",
-            "twitch:events",
-            "ironmon:events",
-            "rainwave:events",
-            "system:events",
-            "goals",
-            "channel:updates"
-          ]
+    # Subscribe to event topics
+    case topic do
+      "all" ->
+        Phoenix.PubSub.subscribe(Server.PubSub, "events:all")
 
-        "chat" ->
-          ["chat"]
+      "twitch" ->
+        Phoenix.PubSub.subscribe(Server.PubSub, "events:twitch")
 
-        "twitch" ->
-          ["dashboard", "followers", "subscriptions", "cheers"]
+      "obs" ->
+        Phoenix.PubSub.subscribe(Server.PubSub, "events:obs")
 
-        "interactions" ->
-          ["chat", "followers", "subscriptions", "cheers"]
+      "ironmon" ->
+        Phoenix.PubSub.subscribe(Server.PubSub, "events:ironmon")
 
-        specific_topic ->
-          ["#{specific_topic}:events"]
-      end
+      "system" ->
+        Phoenix.PubSub.subscribe(Server.PubSub, "events:system")
 
-    subscribe_to_topics(topics_to_subscribe)
+      source when source in ["chat", "dashboard", "goals", "interactions"] ->
+        # Legacy support - subscribe to all events and filter client-side
+        Phoenix.PubSub.subscribe(Server.PubSub, "events:all")
+
+      _ ->
+        Phoenix.PubSub.subscribe(Server.PubSub, "events:all")
+    end
 
     # Emit telemetry for channel join
     emit_joined_telemetry("events:#{topic}", socket)
@@ -63,233 +56,27 @@ defmodule ServerWeb.EventsChannel do
     {:noreply, socket}
   end
 
+  # Event handler for all events
   @impl true
-  def handle_info({:obs_event, event}, socket) do
-    push(socket, "event", %{
-      type: "obs",
-      data: event,
-      timestamp: System.system_time(:second)
-    })
+  def handle_info({:event, %Event{} = event}, socket) do
+    ws_event = Transformer.for_websocket(event)
 
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:twitch_event, event}, socket) do
-    push(socket, "event", %{
-      type: "twitch",
-      data: event,
-      timestamp: System.system_time(:second)
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:twitch_connected, event}, socket) do
-    push(socket, "event", %{
-      type: "twitch_connected",
-      data: event,
-      timestamp: System.system_time(:second)
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:twitch_disconnected, event}, socket) do
-    push(socket, "event", %{
-      type: "twitch_disconnected",
-      data: event,
-      timestamp: System.system_time(:second)
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:twitch_connection_changed, event}, socket) do
-    push(socket, "event", %{
-      type: "twitch_connection",
-      data: event,
-      timestamp: System.system_time(:second)
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:ironmon_event, event}, socket) do
-    push(socket, "event", %{
-      type: "ironmon",
-      data: event,
-      timestamp: System.system_time(:second)
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:rainwave_event, event}, socket) do
-    push(socket, "event", %{
-      type: "rainwave",
-      data: event,
-      timestamp: System.system_time(:second)
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:system_event, event}, socket) do
-    push(socket, "event", %{
-      type: "system",
-      data: event,
-      timestamp: System.system_time(:second)
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:chat_message, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "chat_message", %{
-      type: "chat_message",
-      data: event,
-      timestamp: timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:chat_clear, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "chat_clear", %{
-      type: "chat_clear",
-      data: event,
-      timestamp: timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:message_delete, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "message_delete", %{
-      type: "message_delete",
-      data: event,
-      timestamp: timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:new_follower, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "follower", %{
-      type: "follower",
-      data: event,
-      timestamp: timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:new_subscription, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "subscription", %{
-      type: "subscription",
-      data: event,
-      timestamp: timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:gift_subscription, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "gift_subscription", %{
-      type: "gift_subscription",
-      data: event,
-      timestamp: timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:new_cheer, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "cheer", %{
-      type: "cheer",
-      data: event,
-      timestamp: timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:goal_begin, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "goal", %{
-      type: "goal_begin",
-      data: event,
-      timestamp: timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:goal_progress, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "goal", %{
-      type: "goal_progress",
-      data: event,
-      timestamp: timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:goal_end, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "goal", %{
-      type: "goal_end",
-      data: event,
-      timestamp: timestamp
-    })
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:channel_update, event}, socket) do
-    timestamp = safe_get_timestamp(event)
-
-    push(socket, "channel_update", %{
-      type: "channel_update",
-      data: event,
-      timestamp: timestamp
-    })
+    # Route to appropriate channel event based on type
+    case event.type do
+      "channel.chat.message" -> push(socket, "chat_message", ws_event)
+      "channel.chat.clear" -> push(socket, "chat_clear", ws_event)
+      "channel.chat.message_delete" -> push(socket, "message_delete", ws_event)
+      "channel.follow" -> push(socket, "follower", ws_event)
+      "channel.subscribe" -> push(socket, "subscription", ws_event)
+      "channel.subscription.gift" -> push(socket, "gift_subscription", ws_event)
+      "channel.cheer" -> push(socket, "cheer", ws_event)
+      "channel.update" -> push(socket, "channel_update", ws_event)
+      "obs." <> _ -> push(socket, "obs_event", ws_event)
+      "ironmon." <> _ -> push(socket, "ironmon_event", ws_event)
+      "system." <> _ -> push(socket, "system_event", ws_event)
+      "goal." <> goal_type -> push(socket, "goal_#{goal_type}", ws_event)
+      _ -> push(socket, "event", ws_event)
+    end
 
     {:noreply, socket}
   end
@@ -304,11 +91,4 @@ defmodule ServerWeb.EventsChannel do
 
     {:noreply, socket}
   end
-
-  # Safe timestamp extraction to prevent crashes
-  defp safe_get_timestamp(event) when is_map(event) do
-    Map.get(event, :timestamp, System.system_time(:second))
-  end
-
-  defp safe_get_timestamp(_event), do: System.system_time(:second)
 end

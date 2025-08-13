@@ -6,8 +6,8 @@ defmodule Server.Services.Twitch.EventHandlerTest do
   alias Server.Services.Twitch.EventHandler
 
   setup do
-    # Start DBTaskSupervisor for tests that use process_event/2
-    case start_supervised({DynamicSupervisor, name: Server.DBTaskSupervisor, strategy: :one_for_one}) do
+    # Start TaskSupervisor for tests that use process_event/2
+    case start_supervised({Task.Supervisor, name: Server.TaskSupervisor}) do
       {:ok, _} -> :ok
       {:error, {:already_started, _}} -> :ok
     end

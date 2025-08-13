@@ -526,29 +526,10 @@ defmodule Server.Services.Twitch.EventHandler do
       )
 
       # Store the event asynchronously to avoid blocking the event pipeline
-      # Use DynamicSupervisor to limit concurrent DB writes
-      case DynamicSupervisor.start_child(
-             Server.DBTaskSupervisor,
-             {Task,
-              fn ->
-                store_event_async(event_attrs, event_type, normalized_event)
-              end}
-           ) do
-        {:ok, _pid} ->
-          :ok
-
-        {:error, :max_children} ->
-          Logger.warning("Max concurrent DB writes reached, dropping event",
-            event_type: event_type,
-            event_id: normalized_event[:id]
-          )
-
-        {:error, reason} ->
-          Logger.error("Failed to start DB write task",
-            event_type: event_type,
-            reason: inspect(reason)
-          )
-      end
+      # Use Task.Supervisor for reliable async storage
+      Task.Supervisor.start_child(Server.TaskSupervisor, fn ->
+        store_event_async(event_attrs, event_type, normalized_event)
+      end)
     else
       Logger.debug("Event not stored - not in valuable_events list", event_type: event_type)
     end
