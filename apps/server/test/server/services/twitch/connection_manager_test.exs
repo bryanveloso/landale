@@ -166,58 +166,6 @@ defmodule Server.Services.Twitch.ConnectionManagerTest do
     end
   end
 
-  describe "telemetry events" do
-    setup do
-      # Attach telemetry handler
-      :telemetry.attach_many(
-        "test-handler",
-        [
-          [:server, :twitch, :websocket, :connected],
-          [:server, :twitch, :websocket, :disconnected],
-          [:server, :twitch, :websocket, :message_received],
-          [:server, :twitch, :websocket, :error]
-        ],
-        fn event, measurements, metadata, config ->
-          send(config.test_pid, {:telemetry_event, event, measurements, metadata})
-        end,
-        %{test_pid: self()}
-      )
-
-      {:ok, manager} =
-        ConnectionManager.start_link(
-          url: @twitch_url,
-          owner: self(),
-          headers: @cloudfront_headers,
-          telemetry_prefix: [:server, :twitch, :websocket],
-          client_id: "test_client_id",
-          name: nil
-        )
-
-      on_exit(fn -> :telemetry.detach("test-handler") end)
-      {:ok, manager: manager}
-    end
-
-    @tag skip: "Telemetry events not yet implemented - see task #60"
-    test "emits connected telemetry event", %{manager: _manager} do
-      # Placeholder for future telemetry implementation
-    end
-
-    @tag skip: "Telemetry events not yet implemented - see task #60"
-    test "emits disconnected telemetry event", %{manager: _manager} do
-      # Placeholder for future telemetry implementation
-    end
-
-    @tag skip: "Telemetry events not yet implemented - see task #60"
-    test "emits message received telemetry event", %{manager: _manager} do
-      # Placeholder for future telemetry implementation
-    end
-
-    @tag skip: "Telemetry events not yet implemented - see task #60"
-    test "emits error telemetry event", %{manager: _manager} do
-      # Placeholder for future telemetry implementation
-    end
-  end
-
   describe "concurrent operations" do
     setup do
       # Use a non-reachable URL to prevent real connections

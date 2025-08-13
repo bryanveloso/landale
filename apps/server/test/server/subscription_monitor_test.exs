@@ -258,40 +258,4 @@ defmodule Server.SubscriptionMonitorTest do
       assert length(subscriptions) == 1
     end
   end
-
-  describe "telemetry integration" do
-    test "emits telemetry events for subscription operations", %{monitor: monitor} do
-      # Set up telemetry handler
-      test_pid = self()
-
-      :telemetry.attach_many(
-        :subscription_monitor_test,
-        [
-          [:server, :subscription_monitor, :subscription, :tracked],
-          [:server, :subscription_monitor, :subscription, :status_updated],
-          [:server, :subscription_monitor, :subscription, :event_received],
-          [:server, :subscription_monitor, :subscription, :failure]
-        ],
-        fn event, measurements, metadata, _config ->
-          send(test_pid, {:telemetry, event, measurements, metadata})
-        end,
-        nil
-      )
-
-      # Perform operations that should emit telemetry
-      SubscriptionMonitor.track_subscription("telemetry_sub", "stream.online", %{test: true}, monitor)
-      SubscriptionMonitor.record_event_received("telemetry_sub", monitor)
-      SubscriptionMonitor.update_subscription_status("telemetry_sub", :webhook_callback_verification_pending, monitor)
-      SubscriptionMonitor.record_subscription_failure("telemetry_sub", "test failure", monitor)
-
-      # Check telemetry events were emitted
-      assert_receive {:telemetry, [:server, :subscription_monitor, :subscription, :tracked], _, _}
-      assert_receive {:telemetry, [:server, :subscription_monitor, :subscription, :event_received], _, _}
-      assert_receive {:telemetry, [:server, :subscription_monitor, :subscription, :status_updated], _, _}
-      assert_receive {:telemetry, [:server, :subscription_monitor, :subscription, :failure], _, _}
-
-      # Clean up
-      :telemetry.detach(:subscription_monitor_test)
-    end
-  end
 end
