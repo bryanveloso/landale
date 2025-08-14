@@ -537,16 +537,21 @@ defmodule Server.Services.Twitch do
       event_keys: Map.keys(event)
     )
 
-    # Normalize and broadcast the event using canonical format
-    normalized = EventHandler.normalize_event(subscription["type"], event)
+    # Process the event through the complete pipeline (normalize, store, publish)
+    case EventHandler.process_event(subscription["type"], event) do
+      :ok ->
+        Logger.info("EventSub notification processed successfully",
+          event_type: subscription["type"],
+          event_id: event["id"] || event["message_id"]
+        )
 
-    Logger.info("Publishing normalized event",
-      event_type: subscription["type"],
-      normalized_id: normalized.id,
-      correlation_id: normalized.correlation_id
-    )
-
-    EventHandler.publish_event(subscription["type"], normalized)
+      {:error, reason} ->
+        Logger.error("EventSub notification processing failed",
+          event_type: subscription["type"],
+          event_id: event["id"] || event["message_id"],
+          reason: inspect(reason)
+        )
+    end
 
     state
   end
