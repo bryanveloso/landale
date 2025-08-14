@@ -47,8 +47,8 @@ function OAuthPage() {
       setSuccessMessage('Token refreshed successfully!')
       setTimeout(() => setSuccessMessage(null), 5000)
       await refetch()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to refresh token')
       setTimeout(() => setError(null), 5000)
     } finally {
       setIsRefreshing(false)
@@ -68,7 +68,7 @@ function OAuthPage() {
     let tokenData
     try {
       tokenData = JSON.parse(json)
-    } catch (e) {
+    } catch {
       setError('Invalid JSON format. Please paste the complete output from mix twitch.token')
       setTimeout(() => setError(null), 5000)
       return
@@ -98,8 +98,8 @@ function OAuthPage() {
       setTokenJson('')
       setTimeout(() => setSuccessMessage(null), 5000)
       await refetch()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to upload tokens')
       setTimeout(() => setError(null), 5000)
     } finally {
       setIsUploading(false)

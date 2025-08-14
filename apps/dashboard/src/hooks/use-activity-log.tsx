@@ -17,18 +17,18 @@ export function useActivityLog() {
   }
 
   // Transform flat Twitch events to ActivityEvent format
-  const transformTwitchEvent = (event: any): ActivityEvent | null => {
+  const transformTwitchEvent = (event: Record<string, unknown>): ActivityEvent | null => {
     if (!event || !event.type) return null
 
     return {
-      id: event.id || crypto.randomUUID(),
-      timestamp: event.timestamp || new Date().toISOString(),
-      event_type: event.type,
-      user_id: event.user_id || null,
-      user_login: event.user_login || null,
-      user_name: event.user_name || null,
+      id: (event.id as string) || crypto.randomUUID(),
+      timestamp: (event.timestamp as string) || new Date().toISOString(),
+      event_type: event.type as string,
+      user_id: (event.user_id as string) || null,
+      user_login: (event.user_login as string) || null,
+      user_name: (event.user_name as string) || null,
       data: event, // Store the full flat event as data
-      correlation_id: event.correlation_id || null
+      correlation_id: (event.correlation_id as string) || null
     }
   }
 
@@ -48,7 +48,6 @@ export function useActivityLog() {
         setEvents(data.data.events)
       }
     } catch (err) {
-      console.error('Failed to load initial events:', err)
       setError(err instanceof Error ? err.message : 'Failed to load events')
     } finally {
       setLoading(false)
@@ -64,7 +63,7 @@ export function useActivityLog() {
       const channel = phoenixSocket.channel('dashboard:main', {})
 
       // Listen for flat Twitch events
-      channel.on('twitch_event', (event: any) => {
+      channel.on('twitch_event', (event: Record<string, unknown>) => {
         const activityEvent = transformTwitchEvent(event)
         if (activityEvent) addEvent(activityEvent)
       })
@@ -72,12 +71,10 @@ export function useActivityLog() {
       channel
         .join()
         .receive('ok', () => {
-          console.log('Connected to dashboard channel')
           // Load initial events after successful channel join
           loadInitialEvents()
         })
-        .receive('error', (reason: any) => {
-          console.error('Failed to join dashboard channel:', reason)
+        .receive('error', (_reason: unknown) => {
           setError('Failed to connect to real-time updates')
         })
 

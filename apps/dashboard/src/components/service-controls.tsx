@@ -4,7 +4,7 @@ import { Channel } from 'phoenix'
 import { usePhoenixService } from '@/services/phoenix-service'
 
 interface ServiceControlsProps {
-  serviceMetrics: () => any
+  serviceMetrics: () => Record<string, unknown>
   requestRefresh: () => void
 }
 
@@ -40,15 +40,13 @@ export const ServiceControls: Component<ServiceControlsProps> = (props) => {
       await new Promise((resolve, reject) => {
         channel
           .push(action, { service })
-          .receive('ok', (response) => {
-            console.log(`${action} response:`, response)
+          .receive('ok', (response: unknown) => {
             resolve(response)
           })
-          .receive('error', (error) => {
-            console.error(`${action} error response:`, error)
+          .receive('error', (error: Record<string, unknown>) => {
             // Extract error message from Phoenix response
             const errorMessage = error?.reason || error?.message || error?.error || 'Unknown error'
-            reject(new Error(errorMessage))
+            reject(new Error(String(errorMessage)))
           })
           .receive('timeout', () => reject(new Error('Request timeout')))
       })
@@ -58,8 +56,7 @@ export const ServiceControls: Component<ServiceControlsProps> = (props) => {
         props.requestRefresh()
         setServiceLoading(service, null)
       }, 1500)
-    } catch (error: any) {
-      console.error(`Failed to ${action} ${service}:`, error.message || error)
+    } catch {
       setServiceLoading(service, null)
       // Could show error in UI here if needed
     }
@@ -74,21 +71,20 @@ export const ServiceControls: Component<ServiceControlsProps> = (props) => {
     channel
       .join()
       .receive('ok', () => {
-        console.log('Joined dashboard:services channel')
         setServicesChannel(channel)
       })
-      .receive('error', ({ reason }) => {
-        console.error('Failed to join dashboard:services:', reason)
+      .receive('error', ({ reason: _reason }) => {
+        // Channel join failed - services may not be available
       })
 
     // Listen for service events
-    channel.on('service_starting', ({ service }) => {
+    channel.on('service_starting', ({ service: _service }) => {
       setTimeout(() => props.requestRefresh(), 500)
     })
-    channel.on('service_stopping', ({ service }) => {
+    channel.on('service_stopping', ({ service: _service }) => {
       setTimeout(() => props.requestRefresh(), 500)
     })
-    channel.on('service_restarting', ({ service }) => {
+    channel.on('service_restarting', ({ service: _service }) => {
       setTimeout(() => props.requestRefresh(), 500)
     })
   })
