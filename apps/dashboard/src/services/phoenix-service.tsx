@@ -49,7 +49,7 @@ export const PhoenixServiceProvider: Component<PhoenixServiceProviderProps> = (p
     logger.info('Connecting to Phoenix server...')
 
     const phoenixSocket = createPhoenixSocket({
-      url: 'ws://saya:7175/socket',
+      url: 'ws://100.87.170.6:7175/socket',
       heartbeatIntervalMs: 15000
     })
 
