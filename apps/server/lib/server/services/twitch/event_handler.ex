@@ -396,14 +396,28 @@ defmodule Server.Services.Twitch.EventHandler do
   """
   @spec publish_event(binary(), map()) :: :ok
   def publish_event(event_type, normalized_event) do
+    Logger.info("Publishing event to PubSub topics",
+      event_type: event_type,
+      event_id: normalized_event.id,
+      correlation_id: normalized_event.correlation_id,
+      topics: ["dashboard", "twitch:#{event_type}"]
+    )
+
     # Publish to general dashboard topic
-    Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_event, normalized_event})
+    result1 = Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_event, normalized_event})
+    Logger.debug("Dashboard broadcast result", result: result1)
 
     # Publish to event-type-specific topic for targeted subscriptions
-    Phoenix.PubSub.broadcast(Server.PubSub, "twitch:#{event_type}", {:event, normalized_event})
+    result2 = Phoenix.PubSub.broadcast(Server.PubSub, "twitch:#{event_type}", {:event, normalized_event})
+    Logger.debug("Event-specific broadcast result", result: result2)
 
     # Publish to legacy topic structure for backward compatibility
     publish_legacy_event(event_type, normalized_event)
+
+    Logger.info("Event published successfully",
+      event_type: event_type,
+      event_id: normalized_event.id
+    )
 
     :ok
   end

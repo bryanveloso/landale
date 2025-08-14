@@ -329,6 +329,11 @@ defmodule Server.Services.Twitch do
   end
 
   def handle_info({:websocket_message, _client, message}, state) do
+    Logger.info("Received WebSocket message from Twitch EventSub",
+      message_size: byte_size(message),
+      message_preview: String.slice(message, 0, 200)
+    )
+
     {:noreply, handle_eventsub_message(state, message)}
   end
 
@@ -442,9 +447,18 @@ defmodule Server.Services.Twitch do
   # ============================================================================
 
   defp handle_eventsub_message(state, message_json) do
+    Logger.debug("Processing EventSub message",
+      message_length: byte_size(message_json)
+    )
+
     with {:ok, message} <- Jason.decode(message_json),
          metadata <- message["metadata"],
          message_type <- metadata["message_type"] do
+      Logger.info("EventSub message decoded",
+        message_type: message_type,
+        metadata: inspect(metadata)
+      )
+
       case message_type do
         "session_welcome" ->
           handle_session_welcome(state, message)
@@ -453,6 +467,11 @@ defmodule Server.Services.Twitch do
           handle_session_keepalive(state)
 
         "notification" ->
+          Logger.info("Processing EventSub notification",
+            event_type: get_in(message, ["payload", "subscription", "type"]),
+            event_id: get_in(message, ["payload", "event", "id"])
+          )
+
           handle_notification(state, message)
 
         "session_reconnect" ->
@@ -509,8 +528,24 @@ defmodule Server.Services.Twitch do
     subscription = payload["subscription"]
     event = payload["event"]
 
+    Logger.info("Handling EventSub notification",
+      event_type: subscription["type"],
+      subscription_id: subscription["id"],
+      event_id: event["id"] || event["message_id"],
+      payload_keys: Map.keys(payload),
+      subscription_keys: Map.keys(subscription),
+      event_keys: Map.keys(event)
+    )
+
     # Normalize and broadcast the event using canonical format
     normalized = EventHandler.normalize_event(subscription["type"], event)
+
+    Logger.info("Publishing normalized event",
+      event_type: subscription["type"],
+      normalized_id: normalized.id,
+      correlation_id: normalized.correlation_id
+    )
+
     EventHandler.publish_event(subscription["type"], normalized)
 
     state
