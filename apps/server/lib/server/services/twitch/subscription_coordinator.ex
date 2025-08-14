@@ -504,13 +504,14 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
            :twitch_api,
            fn ->
              # Get access token from OAuth service
-             case oauth_service().get_valid_token(:twitch) do
+             case Server.OAuthService.get_valid_token(:twitch) do
                {:ok, %{access_token: access_token}} ->
                  url = "https://api.twitch.tv/helix/eventsub/subscriptions"
+                 client_id = get_client_id(state)
 
                  headers = [
                    {"authorization", "Bearer #{access_token}"},
-                   {"client-id", get_client_id(state)},
+                   {"client-id", client_id},
                    {"content-type", "application/json"}
                  ]
 
