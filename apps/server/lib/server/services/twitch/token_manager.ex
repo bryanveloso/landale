@@ -347,20 +347,22 @@ defmodule Server.Services.Twitch.TokenManager do
   # - refresh_token (optional): New refresh token
   # - token_type (optional): Token type (usually "Bearer")
   defp validate_refresh_response(response) when is_map(response) do
-    with {:ok, access_token} <- extract_required_field(response, :access_token, "string") do
-      # expires_in is optional in refresh responses - Twitch often omits it
-      expires_in = Map.get(response, :expires_in) || Map.get(response, "expires_in") || 3600
-      
-      validated = %{
-        access_token: access_token,
-        expires_in: expires_in,
-        refresh_token: Map.get(response, :refresh_token),
-        token_type: Map.get(response, :token_type, "Bearer")
-      }
+    case extract_required_field(response, :access_token, "string") do
+      {:ok, access_token} ->
+        # expires_in is optional in refresh responses - Twitch often omits it
+        expires_in = Map.get(response, :expires_in) || Map.get(response, "expires_in") || 3600
 
-      {:ok, validated}
-    else
-      {:error, reason} -> {:error, reason}
+        validated = %{
+          access_token: access_token,
+          expires_in: expires_in,
+          refresh_token: Map.get(response, :refresh_token),
+          token_type: Map.get(response, :token_type, "Bearer")
+        }
+
+        {:ok, validated}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

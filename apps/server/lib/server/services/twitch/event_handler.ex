@@ -511,13 +511,6 @@ defmodule Server.Services.Twitch.EventHandler do
   # Excludes ephemeral events that don't need long-term storage.
   @spec store_event_in_activity_log(binary(), map()) :: :ok
   defp store_event_in_activity_log(event_type, normalized_event) do
-    Logger.info("ACTIVITYLOG: Checking if event should be stored",
-      event_type: event_type,
-      should_store: should_store_event?(event_type),
-      event_id: normalized_event[:id],
-      correlation_id: normalized_event[:correlation_id]
-    )
-
     # Only store events that are valuable for the Activity Log
     if should_store_event?(event_type) do
       # Prepare event attributes for database storage
@@ -541,26 +534,19 @@ defmodule Server.Services.Twitch.EventHandler do
         timestamp: event_attrs[:timestamp]
       )
 
-      Logger.info("ACTIVITYLOG: Starting async storage task",
-        event_type: event_type,
-        event_id: normalized_event[:id],
-        correlation_id: event_attrs[:correlation_id]
-      )
-
       # Store the event asynchronously to avoid blocking the event pipeline
       # Use Task.Supervisor for reliable async storage
       case Task.Supervisor.start_child(Server.TaskSupervisor, fn ->
              store_event_async(event_attrs, event_type, normalized_event)
            end) do
-        {:ok, pid} ->
-          Logger.info("ACTIVITYLOG: Async storage task started successfully",
-            task_pid: inspect(pid),
+        {:ok, _pid} ->
+          Logger.debug("Async storage task started successfully",
             event_type: event_type,
             correlation_id: event_attrs[:correlation_id]
           )
 
         {:error, reason} ->
-          Logger.error("ACTIVITYLOG: Failed to start async storage task",
+          Logger.error("Failed to start async storage task",
             reason: inspect(reason),
             event_type: event_type,
             correlation_id: event_attrs[:correlation_id]
@@ -596,13 +582,6 @@ defmodule Server.Services.Twitch.EventHandler do
 
   # Async storage of event with user upsert - atomic transaction
   defp store_event_async(event_attrs, event_type, normalized_event) do
-    Logger.info("ASYNC STORAGE: Starting database storage task",
-      event_type: event_type,
-      correlation_id: event_attrs[:correlation_id],
-      event_id: normalized_event[:id],
-      user_id: event_attrs[:user_id]
-    )
-
     # Wrap both operations in a transaction for atomicity
     result =
       Server.Repo.transaction(fn ->
@@ -612,7 +591,7 @@ defmodule Server.Services.Twitch.EventHandler do
     log_transaction_result(result, event_type, event_attrs[:correlation_id])
   rescue
     error ->
-      Logger.error("ASYNC STORAGE: Task crashed during database storage",
+      Logger.error("Database storage task crashed",
         event_type: event_type,
         correlation_id: event_attrs[:correlation_id],
         error: inspect(error),
