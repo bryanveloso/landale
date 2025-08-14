@@ -59,14 +59,21 @@ defmodule ServerWeb.DashboardChannel do
       |> assign(:last_cleanup, System.system_time(:millisecond))
 
     # Subscribe to relevant PubSub topics for real-time updates
-    subscribe_to_topics([
+    topics = [
       # For Twitch connection events
       "dashboard",
       "obs:events",
       "rainwave:events",
       "system:health",
       "system:performance"
-    ])
+    ]
+
+    Logger.info("DashboardChannel subscribing to PubSub topics",
+      topics: topics,
+      room_id: room_id
+    )
+
+    subscribe_to_topics(topics)
 
     # Send initial state after join
     send_after_join(socket, :send_initial_state)
@@ -132,6 +139,13 @@ defmodule ServerWeb.DashboardChannel do
 
   @impl true
   def handle_info({:twitch_event, event}, socket) do
+    Logger.info("DashboardChannel received twitch_event from PubSub",
+      event_type: event[:type],
+      event_id: event[:id],
+      correlation_id: event[:correlation_id],
+      room_id: socket.assigns[:room_id]
+    )
+
     push(socket, "twitch_event", event)
     {:noreply, socket}
   end
