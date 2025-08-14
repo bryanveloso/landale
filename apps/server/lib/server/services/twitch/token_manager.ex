@@ -246,7 +246,7 @@ defmodule Server.Services.Twitch.TokenManager do
   Schedules token refresh based on expiry time.
   """
   def schedule_token_refresh(state, token_data) do
-    expires_in = Map.get(token_data, "expires_in") || Map.get(token_data, :expires_in)
+    expires_in = Map.get(token_data, "expires_in") || Map.get(token_data, :expires_in) || 3600
     schedule_token_refresh_with_expiry(state, expires_in)
   end
 
@@ -343,12 +343,14 @@ defmodule Server.Services.Twitch.TokenManager do
   #
   # Expected fields from OAuth refresh endpoint:
   # - access_token (required): New access token string
-  # - expires_in (required): Seconds until expiry
+  # - expires_in (optional): Seconds until expiry (Twitch often omits this in refresh responses)
   # - refresh_token (optional): New refresh token
   # - token_type (optional): Token type (usually "Bearer")
   defp validate_refresh_response(response) when is_map(response) do
-    with {:ok, access_token} <- extract_required_field(response, :access_token, "string"),
-         {:ok, expires_in} <- extract_required_field(response, :expires_in, "integer") do
+    with {:ok, access_token} <- extract_required_field(response, :access_token, "string") do
+      # expires_in is optional in refresh responses - Twitch often omits it
+      expires_in = Map.get(response, :expires_in) || Map.get(response, "expires_in") || 3600
+      
       validated = %{
         access_token: access_token,
         expires_in: expires_in,
