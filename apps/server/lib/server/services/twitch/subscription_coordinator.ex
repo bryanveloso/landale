@@ -475,6 +475,16 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
       total_attempted: total_attempted
     )
 
+    # Also log failures at info level for debugging
+    if length(results.failed) > 0 do
+      Logger.info("Failed subscriptions details",
+        failed_events:
+          Enum.map(results.failed, fn {event, reason} ->
+            %{event: event, reason: reason}
+          end)
+      )
+    end
+
     # Log failures at debug level with details
     if length(results.failed) > 0 do
       Logger.debug("Failed subscriptions",
@@ -552,11 +562,13 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
 
     json_body = JSON.encode!(body)
 
-    Logger.debug("Subscription creation started",
+    Logger.info("Creating EventSub subscription with details",
       event_type: event_type,
       condition: condition,
       session_id: state.session_id,
-      version: version
+      version: version,
+      body: body,
+      client_id: get_client_id(state)
     )
 
     # Use retry strategy for rate limit handling
