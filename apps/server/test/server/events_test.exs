@@ -6,10 +6,9 @@ defmodule Server.EventsTest do
 
   alias Server.Events
 
-  # NOTE: Server.Events is deprecated as of August 2025.
-  # These tests remain for backward compatibility verification only.
-  # New event functionality should use Server.Services.Twitch.EventHandler.
-  # See UNIFIED_EVENT_STRATEGY.md for canonical event format.
+  # NOTE: Server.Events handles non-Twitch events as of August 2025.
+  # These tests verify OBS, IronMON, system, and other event functionality.
+  # Twitch events should use Server.Services.Twitch.EventHandler.
 
   describe "Event publishing and subscription" do
     test "publishes and receives OBS events" do
@@ -20,18 +19,6 @@ defmodule Server.EventsTest do
       assert_receive {:obs_event, event}
       assert event.type == "test_event"
       assert event.data == %{test: "data"}
-      assert Map.has_key?(event, :timestamp)
-      assert Map.has_key?(event, :correlation_id)
-    end
-
-    test "publishes and receives Twitch events" do
-      Events.subscribe_to_twitch_events()
-
-      Events.publish_twitch_event("channel.update", %{broadcaster_user_name: "test"}, batch: false)
-
-      assert_receive {:twitch_event, event}
-      assert event.type == "channel.update"
-      assert event.data == %{broadcaster_user_name: "test"}
       assert Map.has_key?(event, :timestamp)
       assert Map.has_key?(event, :correlation_id)
     end

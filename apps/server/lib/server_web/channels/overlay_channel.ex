@@ -580,7 +580,7 @@ defmodule ServerWeb.OverlayChannel do
         Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
 
       "twitch" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "twitch:events")
+        Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
       "ironmon" ->
         Phoenix.PubSub.subscribe(Server.PubSub, "ironmon:events")

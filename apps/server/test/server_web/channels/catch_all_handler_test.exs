@@ -56,14 +56,15 @@ defmodule ServerWeb.CatchAllHandlerTest do
       Process.sleep(50)
       assert Process.alive?(socket.channel_pid)
 
-      # Should still handle known events
-      event =
-        Server.Events.Event.new("channel.chat.message", :twitch, %{
-          message: %{text: "test"},
-          user_name: "TestUser"
-        })
+      # Should still handle known events (using canonical flat format)
+      event = %{
+        type: "channel.chat.message",
+        user_name: "TestUser",
+        message: "test",
+        timestamp: DateTime.utc_now()
+      }
 
-      send(socket.channel_pid, {:event, event})
+      send(socket.channel_pid, {:twitch_event, event})
       assert_push "chat_message", %{type: "channel.chat.message"}
     end
 

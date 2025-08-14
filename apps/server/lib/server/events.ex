@@ -2,30 +2,14 @@ defmodule Server.Events do
   @moduledoc """
   ⚠️  DEPRECATED: This module is deprecated as of August 2025.
 
-  ## Migration Path
+  ## Current Status
 
-  Use `Server.Services.Twitch.EventHandler` for all event publishing instead:
+  This module provides event publishing for non-Twitch services (OBS, IronMON, Rainwave, system events).
 
-  ```elixir
-  # OLD (deprecated)
-  Server.Events.publish_twitch_event("channel.follow", event_data)
+  Twitch events should use `Server.Services.Twitch.EventHandler` for the canonical flat format.
 
-  # NEW (canonical)
-  normalized = Server.Services.Twitch.EventHandler.normalize_event("channel.follow", event_data)
-  Server.Services.Twitch.EventHandler.publish_event("channel.follow", normalized)
-  ```
-
-  ## Why Deprecated
-
-  This module creates nested event structures with `:data` fields, which violates
-  the Unified Event Strategy that requires flat canonical events throughout the application.
-
-  The EventHandler provides the canonical flat format defined in UNIFIED_EVENT_STRATEGY.md.
-
-  ## Legacy Support
-
-  This module remains for backward compatibility but should not be used for new code.
-  All functions still work but create events in the deprecated nested format.
+  All other events continue to use this module and the nested format for backwards compatibility
+  with existing overlay and dashboard components.
   """
 
   require Logger
@@ -35,7 +19,6 @@ defmodule Server.Events do
 
   # Event topic constants to maintain consistency
   @obs_events "obs:events"
-  @twitch_events "twitch:events"
   @ironmon_events "ironmon:events"
   @rainwave_events "rainwave:events"
   @system_events "system:events"
@@ -63,38 +46,6 @@ defmodule Server.Events do
 
     # Direct publish - no batching
     Phoenix.PubSub.broadcast(@pubsub, @obs_events, {:obs_event, event})
-  end
-
-  # Twitch Event Publishing
-
-  @doc """
-  ⚠️  DEPRECATED: Use Server.Services.Twitch.EventHandler instead.
-
-  Publishes a Twitch EventSub event to all subscribers.
-
-  ## Parameters
-  - `event_type` - Type of Twitch event (e.g. "channel.update", "stream.online")
-  - `data` - Event data payload from EventSub
-  - `opts` - Options (kept for compatibility but batching is removed)
-  """
-  @deprecated "Use Server.Services.Twitch.EventHandler.publish_event/2 instead"
-  @spec publish_twitch_event(binary(), map(), keyword()) :: :ok
-  def publish_twitch_event(event_type, data, _opts \\ []) do
-    Logger.warning(
-      "DEPRECATED: Server.Events.publish_twitch_event/3 is deprecated. Use Server.Services.Twitch.EventHandler.publish_event/2 instead.",
-      event_type: event_type,
-      caller: caller_info()
-    )
-
-    event = %{
-      type: event_type,
-      data: data,
-      timestamp: DateTime.utc_now(),
-      correlation_id: get_correlation_id()
-    }
-
-    # Direct publish - no batching
-    Phoenix.PubSub.broadcast(@pubsub, @twitch_events, {:twitch_event, event})
   end
 
   # IronMON Event Publishing
@@ -242,12 +193,6 @@ defmodule Server.Events do
     Phoenix.PubSub.subscribe(@pubsub, @obs_events)
   end
 
-  @doc "Subscribes the current process to Twitch events."
-  @spec subscribe_to_twitch_events() :: :ok
-  def subscribe_to_twitch_events do
-    Phoenix.PubSub.subscribe(@pubsub, @twitch_events)
-  end
-
   @doc "Subscribes the current process to IronMON events."
   @spec subscribe_to_ironmon_events() :: :ok
   def subscribe_to_ironmon_events do
@@ -283,10 +228,6 @@ defmodule Server.Events do
     Phoenix.PubSub.unsubscribe(@pubsub, @obs_events)
   end
 
-  def unsubscribe_from_twitch_events do
-    Phoenix.PubSub.unsubscribe(@pubsub, @twitch_events)
-  end
-
   def unsubscribe_from_ironmon_events do
     Phoenix.PubSub.unsubscribe(@pubsub, @ironmon_events)
   end
@@ -314,19 +255,6 @@ defmodule Server.Events do
     case Process.whereis(Server.CorrelationIdPool) do
       nil -> CorrelationId.generate()
       _pid -> Server.CorrelationIdPool.get()
-    end
-  end
-
-  defp caller_info do
-    case Process.info(self(), :current_stacktrace) do
-      {:current_stacktrace, [_current | [caller | _rest]]} ->
-        case caller do
-          {module, function, arity, _} -> "#{module}.#{function}/#{arity}"
-          _ -> "unknown"
-        end
-
-      _ ->
-        "unknown"
     end
   end
 end

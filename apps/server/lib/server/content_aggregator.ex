@@ -73,10 +73,8 @@ defmodule Server.ContentAggregator do
     :ets.new(@followers_table, [:named_table, :protected, :ordered_set])
     :ets.new(@daily_stats_table, [:named_table, :protected, :set])
 
-    # Subscribe to relevant events
-    Phoenix.PubSub.subscribe(Server.PubSub, "chat")
-    Phoenix.PubSub.subscribe(Server.PubSub, "followers")
-    Phoenix.PubSub.subscribe(Server.PubSub, "goals")
+    # Subscribe to dashboard topic for Twitch events
+    Phoenix.PubSub.subscribe(Server.PubSub, "dashboard")
 
     # Initialize daily stats
     reset_daily_stats()
@@ -162,113 +160,60 @@ defmodule Server.ContentAggregator do
     {:noreply, state}
   end
 
-  # Handle chat messages for emote extraction
+  # Handle unified Twitch events from dashboard topic
   @impl true
-  def handle_info({:chat_message, event}, state) do
+  def handle_info({:twitch_event, event}, state) do
     try do
-      emotes = Map.get(event, :emotes, [])
-      native_emotes = Map.get(event, :native_emotes, [])
-      user_name = Map.get(event, :user_name, "unknown")
-      record_emote_usage(emotes, native_emotes, user_name)
+      updated_state =
+        case Map.get(event, :type) do
+          "channel.chat.message" ->
+            emotes = Map.get(event, :emotes, [])
+            native_emotes = Map.get(event, :native_emotes, [])
+            user_name = Map.get(event, :user_name, "unknown")
+            record_emote_usage(emotes, native_emotes, user_name)
+            state
+
+          "channel.follow" ->
+            record_follower(Map.get(event, :user_name), Map.get(event, :timestamp))
+            state
+
+          goal_event when goal_event in ["channel.goal.begin", "channel.goal.progress", "channel.goal.end"] ->
+            Logger.info("Goal event received", goal_type: Map.get(event, :type), event_id: Map.get(event, :id))
+
+            # Update cached goals
+            updated_goals = update_goal_cache(event)
+            new_state = Map.put(state, :cached_goals, updated_goals)
+
+            # Broadcast updated goals to overlays
+            Phoenix.PubSub.broadcast(
+              Server.PubSub,
+              "stream:updates",
+              {:content_update,
+               %{
+                 type: "goals_update",
+                 data: updated_goals,
+                 timestamp: DateTime.utc_now()
+               }}
+            )
+
+            new_state
+
+          _ ->
+            # Ignore other event types
+            state
+        end
+
+      {:noreply, updated_state}
     rescue
       error ->
-        Logger.error("Failed to record emote usage", error: inspect(error), event: inspect(event))
+        Logger.error("Failed to process twitch event",
+          error: inspect(error),
+          event: inspect(event),
+          event_type: Map.get(event, :type)
+        )
+
+        {:noreply, state}
     end
-
-    {:noreply, state}
-  end
-
-  # Handle new followers
-  @impl true
-  def handle_info({:new_follower, event}, state) do
-    try do
-      record_follower(Map.get(event, :user_name), Map.get(event, :timestamp))
-    rescue
-      error ->
-        Logger.error("Failed to record follower", error: inspect(error), event: inspect(event))
-    end
-
-    {:noreply, state}
-  end
-
-  # Handle goal events
-  @impl true
-  def handle_info({:goal_begin, event}, state) do
-    Logger.info("Goal started", goal_type: event.type, target: event.target_amount)
-
-    # Update cached goals
-    updated_goals = update_goal_cache(event)
-    new_state = Map.put(state, :cached_goals, updated_goals)
-
-    # Broadcast updated goals to overlays
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "stream:updates",
-      {:content_update,
-       %{
-         type: "goals_update",
-         data: updated_goals,
-         timestamp: DateTime.utc_now()
-       }}
-    )
-
-    {:noreply, new_state}
-  end
-
-  @impl true
-  def handle_info({:goal_progress, event}, state) do
-    Logger.debug("Goal progress",
-      goal_type: event.type,
-      current: event.current_amount,
-      target: event.target_amount
-    )
-
-    # Update cached goals
-    updated_goals = update_goal_cache(event)
-    new_state = Map.put(state, :cached_goals, updated_goals)
-
-    # Broadcast updated goals to overlays
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "stream:updates",
-      {:content_update,
-       %{
-         type: "goals_update",
-         data: updated_goals,
-         timestamp: DateTime.utc_now()
-       }}
-    )
-
-    {:noreply, new_state}
-  end
-
-  @impl true
-  def handle_info({:goal_end, event}, state) do
-    Logger.info("Goal ended",
-      goal_type: event.type,
-      achieved: event.is_achieved,
-      final_amount: event.current_amount
-    )
-
-    # Remove from cached goals
-    cached_goals = Map.get(state, :cached_goals, %{})
-    goal_key = goal_type_to_key(event.type)
-    updated_goals = Map.delete(cached_goals, goal_key)
-    new_state = Map.put(state, :cached_goals, updated_goals)
-
-    # Broadcast updated goals to overlays
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "stream:updates",
-      {:content_update,
-       %{
-         type: "goals_update",
-         data: updated_goals,
-         timestamp: DateTime.utc_now()
-       }}
-    )
-
-    {:noreply, new_state}
   end
 
   # Handle daily reset

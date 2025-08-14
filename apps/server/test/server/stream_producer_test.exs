@@ -74,14 +74,17 @@ defmodule Server.StreamProducerTest do
 
   describe "sub train handling" do
     test "creates new sub train", %{producer: producer} do
-      event =
-        Server.Events.Event.new("channel.subscribe", :twitch, %{
+      event = %{
+        type: "channel.subscribe",
+        data: %{
           user_name: "testuser",
           tier: "1000",
           cumulative_months: 5
-        })
+        },
+        timestamp: DateTime.utc_now()
+      }
 
-      send(producer, {:event, event})
+      send(producer, {:twitch_event, event})
 
       # Give time for async processing
       Process.sleep(10)
@@ -97,23 +100,29 @@ defmodule Server.StreamProducerTest do
 
     test "extends existing sub train", %{producer: producer} do
       # Create initial sub train
-      event1 =
-        Server.Events.Event.new("channel.subscribe", :twitch, %{
+      event1 = %{
+        type: "channel.subscribe",
+        data: %{
           user_name: "user1",
           tier: "1000"
-        })
+        },
+        timestamp: DateTime.utc_now()
+      }
 
-      send(producer, {:event, event1})
+      send(producer, {:twitch_event, event1})
       Process.sleep(10)
 
       # Add another subscription
-      event2 =
-        Server.Events.Event.new("channel.subscribe", :twitch, %{
+      event2 = %{
+        type: "channel.subscribe",
+        data: %{
           user_name: "user2",
           tier: "2000"
-        })
+        },
+        timestamp: DateTime.utc_now()
+      }
 
-      send(producer, {:event, event2})
+      send(producer, {:twitch_event, event2})
       Process.sleep(10)
 
       state = GenServer.call(producer, :get_state)
@@ -260,8 +269,13 @@ defmodule Server.StreamProducerTest do
   describe "error handling" do
     test "handles malformed events gracefully", %{producer: producer} do
       # Send malformed subscription event (missing required fields)
-      event = Server.Events.Event.new("channel.subscribe", :twitch, %{invalid: "data"})
-      send(producer, {:event, event})
+      event = %{
+        type: "channel.subscribe",
+        data: %{invalid: "data"},
+        timestamp: DateTime.utc_now()
+      }
+
+      send(producer, {:twitch_event, event})
 
       # Should not crash and should handle gracefully with defaults
       Process.sleep(10)

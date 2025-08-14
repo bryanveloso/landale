@@ -3,8 +3,6 @@ defmodule ServerWeb.EventsChannel do
 
   use ServerWeb.ChannelBase
 
-  alias Server.Events.{Event, Transformer}
-
   @impl true
   def join("events:" <> topic, _payload, socket) do
     socket =
@@ -12,29 +10,28 @@ defmodule ServerWeb.EventsChannel do
       |> setup_correlation_id()
       |> assign(:event_topic, topic)
 
-    # Subscribe to event topics
+    # Subscribe to appropriate event streams
     case topic do
       "all" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "events:all")
+        Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
       "twitch" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "events:twitch")
+        Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
       "obs" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "events:obs")
+        Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
 
       "ironmon" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "events:ironmon")
+        Phoenix.PubSub.subscribe(Server.PubSub, "ironmon:events")
 
       "system" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "events:system")
+        Phoenix.PubSub.subscribe(Server.PubSub, "system:events")
 
       source when source in ["chat", "dashboard", "goals", "interactions"] ->
-        # Legacy support - subscribe to all events and filter client-side
-        Phoenix.PubSub.subscribe(Server.PubSub, "events:all")
+        Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
       _ ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "events:all")
+        Phoenix.PubSub.subscribe(Server.PubSub, "events")
     end
 
     # Emit telemetry for channel join
@@ -56,28 +53,46 @@ defmodule ServerWeb.EventsChannel do
     {:noreply, socket}
   end
 
-  # Event handler for all events
+  # Event handlers for different event sources
   @impl true
-  def handle_info({:event, %Event{} = event}, socket) do
-    ws_event = Transformer.for_websocket(event)
-
+  def handle_info({:twitch_event, event}, socket) do
     # Route to appropriate channel event based on type
     case event.type do
-      "channel.chat.message" -> push(socket, "chat_message", ws_event)
-      "channel.chat.clear" -> push(socket, "chat_clear", ws_event)
-      "channel.chat.message_delete" -> push(socket, "message_delete", ws_event)
-      "channel.follow" -> push(socket, "follower", ws_event)
-      "channel.subscribe" -> push(socket, "subscription", ws_event)
-      "channel.subscription.gift" -> push(socket, "gift_subscription", ws_event)
-      "channel.cheer" -> push(socket, "cheer", ws_event)
-      "channel.update" -> push(socket, "channel_update", ws_event)
-      "obs." <> _ -> push(socket, "obs_event", ws_event)
-      "ironmon." <> _ -> push(socket, "ironmon_event", ws_event)
-      "system." <> _ -> push(socket, "system_event", ws_event)
-      "goal." <> goal_type -> push(socket, "goal_#{goal_type}", ws_event)
-      _ -> push(socket, "event", ws_event)
+      "channel.chat.message" -> push(socket, "chat_message", event)
+      "channel.chat.clear" -> push(socket, "chat_clear", event)
+      "channel.chat.message_delete" -> push(socket, "message_delete", event)
+      "channel.follow" -> push(socket, "follower", event)
+      "channel.subscribe" -> push(socket, "subscription", event)
+      "channel.subscription.gift" -> push(socket, "gift_subscription", event)
+      "channel.cheer" -> push(socket, "cheer", event)
+      "channel.update" -> push(socket, "channel_update", event)
+      _ -> push(socket, "twitch_event", event)
     end
 
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:obs_event, event}, socket) do
+    push(socket, "obs_event", event)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:ironmon_event, event}, socket) do
+    push(socket, "ironmon_event", event)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:system_event, event}, socket) do
+    push(socket, "system_event", event)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:rainwave_event, event}, socket) do
+    push(socket, "rainwave_event", event)
     {:noreply, socket}
   end
 

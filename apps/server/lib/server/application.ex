@@ -55,9 +55,6 @@ defmodule Server.Application do
             Server.CircuitBreakerServer,
             # Service registry for unified service discovery
             Server.ServiceRegistry,
-            # Event routing system (must start before services that emit events)
-            Server.Events.Router,
-            Server.Events.BatchCollector,
             # Stream coordination
             Server.ContentAggregator,
             Server.StreamProducer,

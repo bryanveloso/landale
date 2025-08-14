@@ -14,8 +14,6 @@ defmodule Server.StreamProducer do
   use GenServer
   require Logger
 
-  alias Server.Events.Event
-
   # Priority levels
   @priority_alert 100
   @priority_sub_train 50
@@ -98,8 +96,8 @@ defmodule Server.StreamProducer do
   def init(_opts) do
     Logger.info("StreamProducer started", service: :stream_producer)
 
-    # Subscribe to event topics
-    Phoenix.PubSub.subscribe(Server.PubSub, "events:all")
+    # Subscribe to event stream
+    Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
     # Create persistence table (protected to prevent unauthorized writes)
     # Handle race condition in tests gracefully
@@ -308,7 +306,7 @@ defmodule Server.StreamProducer do
 
   # Handle events
   @impl true
-  def handle_info({:event, %Event{type: "channel.chat.message", data: data} = event}, state) do
+  def handle_info({:twitch_event, %{type: "channel.chat.message", data: data, timestamp: timestamp}}, state) do
     # If emote stats are currently active, send real-time updates
     if active_content_type(state) == :emote_stats do
       Phoenix.PubSub.broadcast(
@@ -322,7 +320,7 @@ defmodule Server.StreamProducer do
              native_emotes: Map.get(data, :native_emotes, []),
              username: Map.get(data, :user_name, "unknown")
            },
-           timestamp: event.timestamp
+           timestamp: timestamp
          }}
       )
     end
@@ -331,7 +329,7 @@ defmodule Server.StreamProducer do
   end
 
   @impl true
-  def handle_info({:event, %Event{type: "channel.update", data: data} = _event}, state) do
+  def handle_info({:twitch_event, %{type: "channel.update", data: data}}, state) do
     Logger.info("Channel update received",
       game: Map.get(data, :category_name),
       category_id: Map.get(data, :category_id)
@@ -396,7 +394,7 @@ defmodule Server.StreamProducer do
   end
 
   @impl true
-  def handle_info({:event, %Event{type: "channel.subscribe", data: data} = event}, state) do
+  def handle_info({:twitch_event, %{type: "channel.subscribe", data: data, timestamp: timestamp}}, state) do
     # Check if sub train is already active (and not expired)
     now = DateTime.utc_now()
 
@@ -409,7 +407,7 @@ defmodule Server.StreamProducer do
 
     if existing_sub_train do
       # Extend existing sub train
-      new_state = extend_sub_train(state, existing_sub_train.id, event)
+      new_state = extend_sub_train(state, existing_sub_train.id, %{data: data, timestamp: timestamp})
       broadcast_state_update(new_state)
       {:noreply, new_state}
     else
@@ -613,7 +611,7 @@ defmodule Server.StreamProducer do
     update_active_content(new_state)
   end
 
-  defp extend_sub_train(state, sub_train_id, %Event{data: data} = _event) do
+  defp extend_sub_train(state, sub_train_id, event) do
     # Cancel existing timer atomically
     {timer_ref, new_timers} = Map.pop(state.timers, sub_train_id)
 
@@ -632,8 +630,8 @@ defmodule Server.StreamProducer do
             | data:
                 Map.merge(interrupt.data, %{
                   count: new_count,
-                  latest_subscriber: Map.get(data, :user_name, "unknown"),
-                  latest_tier: Map.get(data, :tier, "1000")
+                  latest_subscriber: Map.get(event.data, :user_name, "unknown"),
+                  latest_tier: Map.get(event.data, :tier, "1000")
                 })
           }
         else

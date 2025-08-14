@@ -400,19 +400,16 @@ defmodule Server.Services.Twitch.EventHandler do
       event_type: event_type,
       event_id: normalized_event.id,
       correlation_id: normalized_event.correlation_id,
-      topics: ["dashboard", "twitch:#{event_type}"]
+      topics: ["events", "dashboard"]
     )
 
-    # Publish to general dashboard topic
-    result1 = Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_event, normalized_event})
-    Logger.debug("Dashboard broadcast result", result: result1)
+    # Publish to unified events topic
+    result1 = Phoenix.PubSub.broadcast(Server.PubSub, "events", {:event, normalized_event})
+    Logger.debug("Events broadcast result", result: result1)
 
-    # Publish to event-type-specific topic for targeted subscriptions
-    result2 = Phoenix.PubSub.broadcast(Server.PubSub, "twitch:#{event_type}", {:event, normalized_event})
-    Logger.debug("Event-specific broadcast result", result: result2)
-
-    # Publish to legacy topic structure for backward compatibility
-    publish_legacy_event(event_type, normalized_event)
+    # Publish to dashboard topic for dashboard-specific subscribers
+    result2 = Phoenix.PubSub.broadcast(Server.PubSub, "dashboard", {:twitch_event, normalized_event})
+    Logger.debug("Dashboard broadcast result", result: result2)
 
     Logger.info("Event published successfully",
       event_type: event_type,
@@ -421,31 +418,6 @@ defmodule Server.Services.Twitch.EventHandler do
 
     :ok
   end
-
-  defp publish_legacy_event(event_type, normalized_event) do
-    case legacy_event_mapping(event_type) do
-      {topic, event_name} ->
-        Phoenix.PubSub.broadcast(Server.PubSub, topic, {event_name, normalized_event})
-
-      nil ->
-        :ok
-    end
-  end
-
-  defp legacy_event_mapping("stream.online"), do: {"stream_status", :stream_online}
-  defp legacy_event_mapping("stream.offline"), do: {"stream_status", :stream_offline}
-  defp legacy_event_mapping("channel.follow"), do: {"followers", :new_follower}
-  defp legacy_event_mapping("channel.subscribe"), do: {"subscriptions", :new_subscription}
-  defp legacy_event_mapping("channel.subscription.gift"), do: {"subscriptions", :gift_subscription}
-  defp legacy_event_mapping("channel.cheer"), do: {"cheers", :new_cheer}
-  defp legacy_event_mapping("channel.chat.message"), do: {"chat", :chat_message}
-  defp legacy_event_mapping("channel.chat.clear"), do: {"chat", :chat_clear}
-  defp legacy_event_mapping("channel.chat.message_delete"), do: {"chat", :message_delete}
-  defp legacy_event_mapping("channel.update"), do: {"channel:updates", :channel_update}
-  defp legacy_event_mapping("channel.goal.begin"), do: {"goals", :goal_begin}
-  defp legacy_event_mapping("channel.goal.progress"), do: {"goals", :goal_progress}
-  defp legacy_event_mapping("channel.goal.end"), do: {"goals", :goal_end}
-  defp legacy_event_mapping(_), do: nil
 
   # Private helper functions
 

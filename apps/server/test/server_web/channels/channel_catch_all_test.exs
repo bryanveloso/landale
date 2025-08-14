@@ -67,13 +67,14 @@ defmodule ServerWeb.ChannelCatchAllTest do
       send(socket.channel_pid, @unknown_handle_info_msg)
 
       # Should still receive proper events
-      event =
-        Server.Events.Event.new("channel.chat.message", :twitch, %{
-          message: %{text: "test"},
-          user_name: "TestUser"
-        })
+      event = %{
+        type: "channel.chat.message",
+        user_name: "TestUser",
+        message: "test",
+        timestamp: DateTime.utc_now()
+      }
 
-      send(socket.channel_pid, {:event, event})
+      send(socket.channel_pid, {:twitch_event, event})
       assert_push "chat_message", %{type: "channel.chat.message"}
     end
   end
