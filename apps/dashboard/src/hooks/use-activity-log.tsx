@@ -36,13 +36,13 @@ export function useActivityLog() {
   const loadInitialEvents = async () => {
     setLoading(true)
     setError(null)
-    
+
     try {
       const response = await fetch('http://saya:7175/api/activity/events?limit=50')
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
-      
+
       const data = await response.json()
       if (data.success && data.data?.events) {
         setEvents(data.data.events)
@@ -69,7 +69,8 @@ export function useActivityLog() {
         if (activityEvent) addEvent(activityEvent)
       })
 
-      channel.join()
+      channel
+        .join()
         .receive('ok', () => {
           console.log('Connected to dashboard channel')
           // Load initial events after successful channel join

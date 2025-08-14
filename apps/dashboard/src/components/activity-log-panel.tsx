@@ -22,9 +22,15 @@ export function ActivityLogPanel() {
   }
 
   const formatEventContent = (event: ActivityEvent) => {
+    // Handle flat event format where data properties are directly on the event
+    const eventData = event.data as Record<string, unknown>
+
     switch (event.event_type) {
-      case EVENT_TYPES.CHAT_MESSAGE:
-        return `${event.user_name}: ${(event.data as ChatMessageData).message}`
+      case EVENT_TYPES.CHAT_MESSAGE: {
+        // In flat format, message is directly in the data object
+        const message = eventData.message || (eventData as ChatMessageData).message
+        return `${event.user_name}: ${message}`
+      }
 
       case EVENT_TYPES.FOLLOW:
         return `${event.user_name} followed`
@@ -32,8 +38,11 @@ export function ActivityLogPanel() {
       case EVENT_TYPES.SUBSCRIBE:
         return `${event.user_name} subscribed`
 
-      case EVENT_TYPES.CHEER:
-        return `${event.user_name} cheered ${(event.data as CheerData).bits} bits`
+      case EVENT_TYPES.CHEER: {
+        // In flat format, bits is directly in the data object
+        const bits = eventData.bits || eventData.cheer_bits || (eventData as CheerData).bits
+        return `${event.user_name} cheered ${bits} bits`
+      }
 
       case EVENT_TYPES.STREAM_ONLINE:
         return 'Stream went online'
