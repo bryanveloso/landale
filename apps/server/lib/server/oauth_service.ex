@@ -503,6 +503,12 @@ defmodule Server.OAuthService do
   end
 
   @impl GenServer
+  def handle_info(msg, state) when is_tuple(msg) and elem(msg, 0) in [:gun_up, :gun_down, :gun_error] do
+    Logger.debug("Ignoring unhandled Gun message in OAuthService", message: inspect(msg))
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_info({:refresh_token, service_name}, state) do
     Logger.info("Auto-refreshing OAuth token", service: service_name)
 
