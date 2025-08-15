@@ -659,7 +659,7 @@ defmodule Server.Services.IronmonTCP do
       game: game_name
     )
 
-    Events.publish_ironmon_event("init", event_data, batch: false)
+    Server.Events.process_event("ironmon.init", event_data)
   end
 
   defp handle_event_by_type("seed", event_data, metadata, correlation_id) do
@@ -670,7 +670,7 @@ defmodule Server.Services.IronmonTCP do
     )
 
     handle_seed_creation(metadata, correlation_id)
-    Events.publish_ironmon_event("seed", event_data, batch: false)
+    Server.Events.process_event("ironmon.seed", event_data)
   end
 
   defp handle_event_by_type("checkpoint", event_data, metadata, correlation_id) do
@@ -683,7 +683,7 @@ defmodule Server.Services.IronmonTCP do
     )
 
     handle_checkpoint_recording(metadata, correlation_id)
-    Events.publish_ironmon_event("checkpoint", event_data, batch: false)
+    Server.Events.process_event("ironmon.checkpoint", event_data)
   end
 
   defp handle_event_by_type("location", event_data, metadata, correlation_id) do
@@ -693,7 +693,7 @@ defmodule Server.Services.IronmonTCP do
       location_id: metadata.id
     )
 
-    Events.publish_ironmon_event("location", event_data, batch: false)
+    Server.Events.process_event("ironmon.location", event_data)
   end
 
   defp handle_event_by_type("battle_start", event_data, metadata, correlation_id) do
@@ -704,7 +704,7 @@ defmodule Server.Services.IronmonTCP do
       pokemon_count: length(metadata.pokemon)
     )
 
-    Events.publish_ironmon_event("battle_start", event_data, batch: false)
+    Server.Events.process_event("ironmon.battle_start", event_data)
   end
 
   defp handle_event_by_type("battle_end", event_data, metadata, correlation_id) do
@@ -715,7 +715,7 @@ defmodule Server.Services.IronmonTCP do
       pokemon_count: length(metadata.pokemon)
     )
 
-    Events.publish_ironmon_event("battle_end", event_data, batch: false)
+    Server.Events.process_event("ironmon.battle_end", event_data)
   end
 
   defp handle_event_by_type("pokemon_update", event_data, metadata, correlation_id) do
@@ -725,7 +725,7 @@ defmodule Server.Services.IronmonTCP do
       team_size: length(metadata.team)
     )
 
-    Events.publish_ironmon_event("pokemon_update", event_data, batch: false)
+    Server.Events.process_event("ironmon.pokemon_update", event_data)
   end
 
   defp handle_event_by_type("item_update", event_data, metadata, correlation_id) do
@@ -735,7 +735,7 @@ defmodule Server.Services.IronmonTCP do
       item_count: length(metadata.items)
     )
 
-    Events.publish_ironmon_event("item_update", event_data, batch: false)
+    Server.Events.process_event("ironmon.item_update", event_data)
   end
 
   defp handle_event_by_type("stats_update", event_data, _metadata, correlation_id) do
@@ -744,7 +744,7 @@ defmodule Server.Services.IronmonTCP do
       correlation_id: correlation_id
     )
 
-    Events.publish_ironmon_event("stats_update", event_data, batch: false)
+    Server.Events.process_event("ironmon.stats_update", event_data)
   end
 
   defp handle_event_by_type("error", event_data, metadata, correlation_id) do
@@ -755,7 +755,7 @@ defmodule Server.Services.IronmonTCP do
       error_message: metadata.message
     )
 
-    Events.publish_ironmon_event("error", event_data, batch: false)
+    Server.Events.process_event("ironmon.error", event_data)
   end
 
   defp handle_event_by_type("heartbeat", _event_data, _metadata, correlation_id) do

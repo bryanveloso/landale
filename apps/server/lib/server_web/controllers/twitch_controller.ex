@@ -194,7 +194,7 @@ defmodule ServerWeb.TwitchController do
         payload_size: byte_size(:erlang.term_to_binary(params))
       )
 
-      case Server.Services.Twitch.EventHandler.process_event(event_type, event_data) do
+      case Server.Events.process_event(event_type, event_data) do
         :ok ->
           json(conn, %{success: true, message: "Event processed"})
 

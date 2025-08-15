@@ -174,18 +174,12 @@ defmodule Server.Performance do
       "service" => "obs"
     }
 
-    # Use EventHandler for canonical format (consistent with other benchmarks)
-    normalized_event = %{
-      type: "obs.scene_switched",
-      timestamp: DateTime.utc_now(),
-      correlation_id: :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower),
-      source: :obs,
-      scene_name: raw_event_data["scene_name"],
-      service: raw_event_data["service"]
-    }
+    # Use unified event publishing through Server.Events
+    event_type = "obs.scene_switched"
 
-    # Publish using Phoenix PubSub directly (canonical pattern)
-    Phoenix.PubSub.broadcast(Server.PubSub, "obs:events", {:obs_event, normalized_event})
+    # Use Events module for canonical format (consistent with other benchmarks)
+    normalized_event = Server.Events.normalize_event(event_type, raw_event_data)
+    Server.Events.publish_event(event_type, normalized_event)
   end
 
   defp benchmark_database_query do
@@ -270,9 +264,9 @@ defmodule Server.Performance do
         "broadcaster_user_name" => "avalonstar"
       }
 
-      # Use EventHandler for canonical format (like real Twitch events)
-      normalized_event = Server.Services.Twitch.EventHandler.normalize_event(event_type, raw_event_data)
-      Server.Services.Twitch.EventHandler.publish_event(event_type, normalized_event)
+      # Use Events module for canonical format (like real Twitch events)
+      normalized_event = Server.Events.normalize_event(event_type, raw_event_data)
+      Server.Events.publish_event(event_type, normalized_event)
 
       # Events arrive irregularly, simulate with random intervals
       Process.sleep(Enum.random(1_000..10_000//1))

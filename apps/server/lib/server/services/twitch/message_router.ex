@@ -24,7 +24,7 @@ defmodule Server.Services.Twitch.MessageRouter do
 
   require Logger
 
-  alias Server.Services.Twitch.{EventHandler, Protocol, SessionManager}
+  alias Server.Services.Twitch.{Protocol, SessionManager}
 
   @type router_state :: %{
           session_manager: pid() | nil,
@@ -37,12 +37,12 @@ defmodule Server.Services.Twitch.MessageRouter do
 
   ## Options
   - `:session_manager` - SessionManager pid
-  - `:event_handler` - EventHandler module (defaults to EventHandler)
+  - `:event_handler` - EventHandler module (defaults to Server.Events)
   """
   def new(opts \\ []) do
     %{
       session_manager: Keyword.get(opts, :session_manager),
-      event_handler: Keyword.get(opts, :event_handler, EventHandler),
+      event_handler: Keyword.get(opts, :event_handler, Server.Events),
       metrics: %{
         messages_routed: 0,
         messages_by_type: %{},

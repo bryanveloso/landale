@@ -532,7 +532,7 @@ defmodule Server.Services.Rainwave do
       station: state.station_name
     )
 
-    correlation_id = Map.get(state, :__service_meta__, %{}) |> Map.get(:correlation_id)
-    Events.emit("rainwave:update", event_data, correlation_id)
+    _correlation_id = Map.get(state, :__service_meta__, %{}) |> Map.get(:correlation_id)
+    Server.Events.process_event("rainwave.update", event_data)
   end
 end

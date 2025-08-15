@@ -7,11 +7,8 @@ defmodule ServerWeb.DashboardChannel do
   performance metrics.
 
   ## Events Subscribed To
-  - `dashboard` - Twitch connection and event updates
-  - `obs:events` - OBS WebSocket state changes and events
-  - `rainwave:events` - Rainwave music service updates
-  - `system:health` - System health status updates
-  - `system:performance` - Performance metrics updates
+  - `events` - Unified event stream from all services (OBS, Twitch, Rainwave, System)
+  - `dashboard` - Dashboard-specific events
 
   ## Events Sent to Client
   - `initial_state` - Current system state on connection
@@ -23,6 +20,8 @@ defmodule ServerWeb.DashboardChannel do
   - `twitch_disconnected` - Twitch EventSub connection lost
   - `twitch_connection_changed` - Twitch connection state changes
   - `twitch_event` - General Twitch events (follows, subs, etc.)
+  - `ironmon_event` - Ironmon game events
+  - `system_event` - General system events
 
   ## Incoming Commands
   - `obs:get_status` - Request current OBS status
@@ -60,12 +59,10 @@ defmodule ServerWeb.DashboardChannel do
 
     # Subscribe to relevant PubSub topics for real-time updates
     topics = [
-      # For Twitch connection events
-      "dashboard",
-      "obs:events",
-      "rainwave:events",
-      "system:health",
-      "system:performance"
+      # Unified events topic - all service events come through here
+      "events",
+      # Dashboard-specific events
+      "dashboard"
     ]
 
     Logger.info("DashboardChannel subscribing to PubSub topics",
@@ -95,58 +92,58 @@ defmodule ServerWeb.DashboardChannel do
     {:noreply, socket}
   end
 
+  # Unified event handler - handles all events from unified topic
   @impl true
-  def handle_info({:obs_event, event}, socket) do
-    push(socket, "obs_event", event)
-    {:noreply, socket}
-  end
+  def handle_info({:event, event}, socket) do
+    event_source = Map.get(event, :source)
+    event_type = Map.get(event, :type, "")
 
-  @impl true
-  def handle_info({:health_update, data}, socket) do
-    push(socket, "health_update", data)
-    {:noreply, socket}
-  end
+    case event_source do
+      :obs ->
+        push(socket, "obs_event", event)
 
-  @impl true
-  def handle_info({:performance_update, data}, socket) do
-    push(socket, "performance_update", data)
-    {:noreply, socket}
-  end
+      :twitch ->
+        # Handle specific Twitch connection events
+        case event_type do
+          "twitch.connection_established" ->
+            push(socket, "twitch_connected", event)
 
-  @impl true
-  def handle_info({:rainwave_event, event}, socket) do
-    push(socket, "rainwave_event", event)
-    {:noreply, socket}
-  end
+          "twitch.connection_lost" ->
+            push(socket, "twitch_disconnected", event)
 
-  @impl true
-  def handle_info({:twitch_connected, event}, socket) do
-    push(socket, "twitch_connected", event)
-    {:noreply, socket}
-  end
+          "twitch.connection_changed" ->
+            push(socket, "twitch_connection_changed", event)
 
-  @impl true
-  def handle_info({:twitch_disconnected, event}, socket) do
-    push(socket, "twitch_disconnected", event)
-    {:noreply, socket}
-  end
+          _ ->
+            push(socket, "twitch_event", event)
+        end
 
-  @impl true
-  def handle_info({:twitch_connection_changed, event}, socket) do
-    push(socket, "twitch_connection_changed", event)
-    {:noreply, socket}
-  end
+      :ironmon ->
+        push(socket, "ironmon_event", event)
 
-  @impl true
-  def handle_info({:twitch_event, event}, socket) do
-    Logger.info("DashboardChannel received twitch_event from PubSub",
-      event_type: event[:type],
-      event_id: event[:id],
-      correlation_id: event[:correlation_id],
-      room_id: socket.assigns[:room_id]
-    )
+      :rainwave ->
+        push(socket, "rainwave_event", event)
 
-    push(socket, "twitch_event", event)
+      :system ->
+        case event_type do
+          "system.health_check" ->
+            push(socket, "health_update", event)
+
+          "system.performance_metric" ->
+            push(socket, "performance_update", event)
+
+          _ ->
+            push(socket, "system_event", event)
+        end
+
+      _ ->
+        # Unknown event source - log and ignore
+        Logger.debug("Unknown event source in DashboardChannel",
+          source: event_source,
+          type: event_type
+        )
+    end
+
     {:noreply, socket}
   end
 

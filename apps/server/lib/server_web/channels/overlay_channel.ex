@@ -425,6 +425,43 @@ defmodule ServerWeb.OverlayChannel do
     {:noreply, socket}
   end
 
+  # Unified event handler - filters events by overlay type
+  @impl true
+  def handle_info({:event, event}, socket) do
+    overlay_type = socket.assigns.overlay_type
+    event_source = Map.get(event, :source)
+
+    case {overlay_type, event_source} do
+      {"obs", :obs} ->
+        push(socket, "obs_event", event)
+
+      {"twitch", :twitch} ->
+        push(socket, "twitch_event", event)
+
+      {"ironmon", :ironmon} ->
+        push(socket, "ironmon_event", event)
+
+      {"music", :rainwave} ->
+        Logger.info("Rainwave event forwarded to overlay",
+          overlay_type: overlay_type,
+          event_type: event.type,
+          correlation_id: socket.assigns.correlation_id
+        )
+
+        push(socket, "music_event", event)
+
+      {"system", :system} ->
+        push(socket, "system_event", event)
+
+      _ ->
+        # Event doesn't match this overlay type - ignore
+        :ok
+    end
+
+    {:noreply, socket}
+  end
+
+  # Legacy event handlers - maintain backward compatibility during migration
   @impl true
   def handle_info({:obs_event, event}, socket) do
     push(socket, "obs_event", event)
@@ -577,27 +614,29 @@ defmodule ServerWeb.OverlayChannel do
   defp subscribe_to_events(overlay_type) do
     case overlay_type do
       "obs" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "obs:events")
+        Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
       "twitch" ->
         Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
       "ironmon" ->
-        Phoenix.PubSub.subscribe(Server.PubSub, "ironmon:events")
+        Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
       "music" ->
-        Logger.info("Music overlay subscribed to rainwave events")
-        Phoenix.PubSub.subscribe(Server.PubSub, "rainwave:events")
+        Logger.info("Music overlay subscribed to unified events")
+        Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
       "system" ->
+        Phoenix.PubSub.subscribe(Server.PubSub, "events")
+        # Also subscribe to legacy system topics for now during migration
         subscribe_to_topics([
           "system:health",
-          "system:performance",
-          "system:events"
+          "system:performance"
         ])
 
       _ ->
         Logger.warning("Unknown overlay type for event subscription", overlay_type: overlay_type)
+        Phoenix.PubSub.subscribe(Server.PubSub, "events")
     end
   end
 

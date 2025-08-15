@@ -16,7 +16,7 @@ defmodule Server.Services.Twitch.MessageRouterTest do
       router_state = MessageRouter.new()
 
       assert router_state.session_manager == nil
-      assert router_state.event_handler == Server.Services.Twitch.EventHandler
+      assert router_state.event_handler == Server.Events
       assert router_state.metrics.messages_routed == 0
       assert router_state.metrics.messages_by_type == %{}
       assert router_state.metrics.errors == 0
