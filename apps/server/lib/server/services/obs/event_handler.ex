@@ -88,11 +88,13 @@ defmodule Server.Services.OBS.EventHandler do
         last_event_type: "CurrentProgramSceneChanged"
     }
 
-    # Publish scene change event
-    Phoenix.PubSub.broadcast(Server.PubSub, "overlay:scene_changed", %{
-      scene: scene_name,
-      session_id: state.session_id
-    })
+    # Route through unified system ONLY
+    unified_data = %{scene_name: scene_name, session_id: state.session_id}
+
+    case Server.Events.process_event("obs.scene_changed", unified_data) do
+      :ok -> Logger.debug("OBS scene change routed through unified system")
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason)
+    end
 
     # Log event
     Logger.info("Scene changed to: #{scene_name}",
@@ -105,23 +107,31 @@ defmodule Server.Services.OBS.EventHandler do
 
   defp handle_obs_event(%{eventType: "StreamStateChanged"} = event, state) do
     stream_active = event[:eventData][:outputActive]
+    output_state = event[:eventData][:outputState]
 
     # Update state
     new_state = %{state | stream_active: stream_active, last_event_type: "StreamStateChanged"}
 
-    # Publish stream state change event
-    Phoenix.PubSub.broadcast(Server.PubSub, "overlay:stream_state", %{
-      active: stream_active,
-      state: event[:eventData][:outputState],
+    # Route through unified system ONLY - map to appropriate started/stopped event
+    event_type = if stream_active, do: "obs.stream_started", else: "obs.stream_stopped"
+
+    unified_data = %{
+      output_active: stream_active,
+      output_state: output_state,
       session_id: state.session_id
-    })
+    }
+
+    case Server.Events.process_event(event_type, unified_data) do
+      :ok -> Logger.debug("OBS stream state change routed through unified system", event_type: event_type)
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason, event_type: event_type)
+    end
 
     # Log event
     Logger.info("Stream state changed",
       service: "obs",
       session_id: state.session_id,
       active: stream_active,
-      state: event[:eventData][:outputState]
+      state: output_state
     )
 
     new_state
@@ -129,23 +139,31 @@ defmodule Server.Services.OBS.EventHandler do
 
   defp handle_obs_event(%{eventType: "RecordStateChanged"} = event, state) do
     record_active = event[:eventData][:outputActive]
+    output_state = event[:eventData][:outputState]
 
     # Update state
     new_state = %{state | record_active: record_active, last_event_type: "RecordStateChanged"}
 
-    # Publish record state change event
-    Phoenix.PubSub.broadcast(Server.PubSub, "overlay:record_state", %{
-      active: record_active,
-      state: event[:eventData][:outputState],
+    # Route through unified system ONLY - map to appropriate started/stopped event
+    event_type = if record_active, do: "obs.recording_started", else: "obs.recording_stopped"
+
+    unified_data = %{
+      output_active: record_active,
+      output_state: output_state,
       session_id: state.session_id
-    })
+    }
+
+    case Server.Events.process_event(event_type, unified_data) do
+      :ok -> Logger.debug("OBS record state change routed through unified system", event_type: event_type)
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason, event_type: event_type)
+    end
 
     # Log event
     Logger.info("Record state changed",
       service: "obs",
       session_id: state.session_id,
       active: record_active,
-      state: event[:eventData][:outputState]
+      state: output_state
     )
 
     new_state
@@ -157,11 +175,17 @@ defmodule Server.Services.OBS.EventHandler do
     # Update state to track unhandled events
     new_state = %{state | last_event_type: event_type}
 
-    # Publish unhandled event
-    Phoenix.PubSub.broadcast(Server.PubSub, "overlay:unhandled_event", %{
+    # Route unknown OBS events through unified system ONLY
+    unified_data = %{
       event_type: event_type,
+      event_data: event[:eventData] || %{},
       session_id: state.session_id
-    })
+    }
+
+    case Server.Events.process_event("obs.unknown_event", unified_data) do
+      :ok -> Logger.debug("OBS unknown event routed through unified system", event_type: event_type)
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason, event_type: event_type)
+    end
 
     # Log generic event handling
     Logger.debug("Unhandled OBS event",

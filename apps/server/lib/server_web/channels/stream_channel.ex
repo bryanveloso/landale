@@ -23,8 +23,8 @@ defmodule ServerWeb.StreamChannel do
     # Track this overlay connection
     track_overlay_connection(socket, payload)
 
-    # Subscribe to stream events
-    Phoenix.PubSub.subscribe(Server.PubSub, "stream:updates")
+    # Subscribe to unified events topic and filter for stream events
+    Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
     # Send initial state after join completes
     send_after_join(socket, :after_join)
@@ -40,8 +40,8 @@ defmodule ServerWeb.StreamChannel do
       correlation_id: socket.assigns.correlation_id
     )
 
-    # Subscribe to queue events (same pubsub topic as overlays for now)
-    Phoenix.PubSub.subscribe(Server.PubSub, "stream:updates")
+    # Subscribe to unified events topic and filter for stream events
+    Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
     # Send initial queue state after join completes
     send_after_join(socket, :after_queue_join)
@@ -153,18 +153,13 @@ defmodule ServerWeb.StreamChannel do
           correlation_id: socket.assigns.correlation_id
         )
 
-        # Broadcast takeover to all overlay clients
-        Phoenix.PubSub.broadcast(
-          Server.PubSub,
-          "stream:updates",
-          {:takeover,
-           %{
-             type: takeover_type,
-             message: message,
-             duration: duration,
-             timestamp: DateTime.utc_now()
-           }}
-        )
+        # Process takeover through unified event system
+        Server.Events.process_event("stream.takeover_started", %{
+          takeover_type: takeover_type,
+          message: message,
+          duration: duration,
+          timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+        })
 
         {:ok, response} = ResponseBuilder.success(%{operation: "takeover_sent", type: takeover_type})
         {:reply, {:ok, response}, socket}
@@ -188,12 +183,10 @@ defmodule ServerWeb.StreamChannel do
       correlation_id: socket.assigns.correlation_id
     )
 
-    # Broadcast takeover clear to all overlay clients
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "stream:updates",
-      {:takeover_clear, %{timestamp: DateTime.utc_now()}}
-    )
+    # Process takeover clear through unified event system
+    Server.Events.process_event("stream.takeover_cleared", %{
+      timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+    })
 
     {:ok, response} = ResponseBuilder.success(%{operation: "takeover_cleared"})
     {:reply, {:ok, response}, socket}
@@ -323,80 +316,121 @@ defmodule ServerWeb.StreamChannel do
     {:noreply, socket}
   end
 
-  # Handle stream updates from StreamProducer
+  # Handle unified events from Server.Events
   @impl true
-  def handle_info({:stream_update, state}, socket) do
+  def handle_info({:event, %{type: "stream.state_updated"} = event}, socket) do
+    # Extract state data from unified event format
+    state_data = %{
+      current_show: event.current_show,
+      active_content: event.active_content,
+      interrupt_stack: event.interrupt_stack,
+      ticker_rotation: event.ticker_rotation,
+      version: event.version,
+      metadata: event.metadata
+    }
+
     # Send overlay state to stream:overlays channels
     if socket.topic == "stream:overlays" do
-      push(socket, "stream_state", format_state_for_client(state))
+      push(socket, "stream_state", format_state_for_client(state_data))
     end
 
     # Send queue state to stream:queue channels
     if socket.topic == "stream:queue" do
-      push(socket, "queue_state", format_queue_state_for_client(state))
+      push(socket, "queue_state", format_queue_state_for_client(state_data))
     end
 
     {:noreply, socket}
   end
 
-  # Handle show changes from Twitch EventSub
+  # Handle show changes from unified events
   @impl true
-  def handle_info({:show_change, show_data}, socket) do
+  def handle_info({:event, %{type: "stream.show_changed"} = event}, socket) do
     push(socket, "show_changed", %{
-      show: show_data.show,
-      game: show_data.game,
-      changed_at: show_data.changed_at
+      show: event.show,
+      game: %{
+        id: event.game_id,
+        name: event.game_name
+      },
+      title: event.title,
+      changed_at: event.changed_at
     })
 
     {:noreply, socket}
   end
 
-  # Handle priority interrupts (alerts, sub trains, etc.)
+  # Handle emote increments from unified events
   @impl true
-  def handle_info({:priority_interrupt, interrupt_data}, socket) do
-    push(socket, "interrupt", %{
-      type: interrupt_data.type,
-      priority: interrupt_data.priority,
-      data: interrupt_data.data,
-      duration: interrupt_data.duration,
-      id: interrupt_data.id
-    })
-
-    {:noreply, socket}
-  end
-
-  # Handle real-time content updates (emote increments, etc.)
-  @impl true
-  def handle_info({:content_update, update_data}, socket) do
+  def handle_info({:event, %{type: "stream.emote_increment"} = event}, socket) do
     push(socket, "content_update", %{
-      type: update_data.type,
-      data: update_data.data,
-      timestamp: update_data.timestamp
+      type: "emote_increment",
+      data: %{
+        emotes: event.emotes,
+        native_emotes: event.native_emotes,
+        username: event.user_name
+      },
+      timestamp: event.timestamp
     })
 
     {:noreply, socket}
   end
 
-  # Handle takeover overlay events
+  # Handle takeover events from unified events
   @impl true
-  def handle_info({:takeover, takeover_data}, socket) do
+  def handle_info({:event, %{type: "stream.takeover_started"} = event}, socket) do
     push(socket, "takeover", %{
-      type: takeover_data.type,
-      message: takeover_data.message,
-      duration: takeover_data.duration,
-      timestamp: takeover_data.timestamp
+      type: event.takeover_type,
+      message: event.message,
+      duration: event.duration,
+      timestamp: event.timestamp
     })
 
     {:noreply, socket}
   end
 
   @impl true
-  def handle_info({:takeover_clear, clear_data}, socket) do
+  def handle_info({:event, %{type: "stream.takeover_cleared"} = event}, socket) do
     push(socket, "takeover_clear", %{
-      timestamp: clear_data.timestamp
+      timestamp: event.timestamp
     })
 
     {:noreply, socket}
+  end
+
+  # Handle interrupt removal events from unified events
+  @impl true
+  def handle_info({:event, %{type: "stream.interrupt_removed"} = _event}, socket) do
+    # For now, we'll trigger a state refresh when interrupts are removed
+    # This ensures the UI stays in sync
+    current_state = get_stream_producer_state()
+
+    if current_state do
+      if socket.topic == "stream:overlays" do
+        push(socket, "stream_state", format_state_for_client(current_state))
+      end
+
+      if socket.topic == "stream:queue" do
+        push(socket, "queue_state", format_queue_state_for_client(current_state))
+      end
+    end
+
+    {:noreply, socket}
+  end
+
+  # Filter out non-stream events from unified events topic
+  @impl true
+  def handle_info({:event, %{type: event_type}}, socket) when not is_nil(event_type) do
+    # Ignore events that aren't stream-related
+    if String.starts_with?(event_type, "stream.") do
+      # Log unhandled stream events for debugging
+      Logger.debug("Unhandled stream event in StreamChannel",
+        event_type: event_type,
+        topic: socket.topic
+      )
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
   end
 
   # Catch-all handler to prevent crashes from unexpected messages

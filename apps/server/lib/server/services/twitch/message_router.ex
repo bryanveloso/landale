@@ -18,7 +18,7 @@ defmodule Server.Services.Twitch.MessageRouter do
   - `session_welcome` - Routed to SessionManager
   - `session_keepalive` - Handled internally (no-op)
   - `session_reconnect` - Routed to SessionManager
-  - `notification` - Routed to EventHandler
+  - `notification` - Routed to Server.Events
   - `revocation` - Logged and forwarded
   """
 
@@ -37,7 +37,7 @@ defmodule Server.Services.Twitch.MessageRouter do
 
   ## Options
   - `:session_manager` - SessionManager pid
-  - `:event_handler` - EventHandler module (defaults to Server.Events)
+  - `:event_handler` - Event processing module (defaults to Server.Events)
   """
   def new(opts \\ []) do
     %{
@@ -160,18 +160,18 @@ defmodule Server.Services.Twitch.MessageRouter do
     event_type = get_in(message, ["metadata", "subscription_type"])
     event_data = message["payload"]["event"]
 
-    Logger.debug("Routing notification to EventHandler",
+    Logger.debug("Routing notification to event processor",
       event_type: event_type,
       event_id: event_data["id"] || get_in(message, ["metadata", "message_id"])
     )
 
-    # Process event through EventHandler
+    # Process event through event processor
     case event_handler.process_event(event_type, event_data) do
       :ok ->
         :ok
 
       {:error, reason} ->
-        Logger.error("EventHandler failed to process event",
+        Logger.error("Event processor failed to process event",
           event_type: event_type,
           error: inspect(reason)
         )

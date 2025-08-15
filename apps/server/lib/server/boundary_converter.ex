@@ -195,16 +195,21 @@ defmodule Server.BoundaryConverter do
   end
 
   defp safely_convert_to_atoms(map, converted_count, max_count) when is_map(map) do
-    Enum.reduce(map, %{}, fn {key, value}, acc ->
-      if converted_count >= max_count do
-        # Keep as string key
-        Map.put(acc, key, value)
-      else
-        atom_key = safe_string_to_atom(key)
-        converted_value = safely_convert_nested(value, converted_count + 1, max_count)
-        Map.put(acc, atom_key, converted_value)
-      end
-    end)
+    # Check if this is a DateTime struct and handle it specially
+    if match?(%DateTime{}, map) do
+      DateTime.to_iso8601(map)
+    else
+      Enum.reduce(map, %{}, fn {key, value}, acc ->
+        if converted_count >= max_count do
+          # Keep as string key
+          Map.put(acc, key, value)
+        else
+          atom_key = safe_string_to_atom(key)
+          converted_value = safely_convert_nested(value, converted_count + 1, max_count)
+          Map.put(acc, atom_key, converted_value)
+        end
+      end)
+    end
   end
 
   defp safely_convert_to_atoms(data, _count, _max), do: data
@@ -215,6 +220,11 @@ defmodule Server.BoundaryConverter do
 
   defp safely_convert_nested(list, count, max) when is_list(list) do
     Enum.map(list, fn item -> safely_convert_nested(item, count, max) end)
+  end
+
+  defp safely_convert_nested(%DateTime{} = datetime, _count, _max) do
+    # Convert DateTime structs to ISO8601 strings for consistency
+    DateTime.to_iso8601(datetime)
   end
 
   defp safely_convert_nested(data, _count, _max), do: data

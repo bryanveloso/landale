@@ -124,20 +124,6 @@ defmodule ServerWeb.EventsChannel do
     {:noreply, socket}
   end
 
-  # Helper function to determine if an event should be forwarded based on topic
-  defp should_forward_event?(topic, event_source) do
-    case {topic, event_source} do
-      {"all", _} -> true
-      {"twitch", :twitch} -> true
-      {"obs", :obs} -> true
-      {"ironmon", :ironmon} -> true
-      {"system", :system} -> true
-      {"rainwave", :rainwave} -> true
-      {"music", :rainwave} -> true
-      _ -> false
-    end
-  end
-
   # Enhanced event filtering that considers both topic and event type for specific subscriptions
   defp should_forward_event?(topic, event_source, event_type) do
     case {topic, event_source} do

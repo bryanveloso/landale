@@ -161,12 +161,11 @@ defmodule Server.StreamProducer do
     new_stack = Enum.reject(state.interrupt_stack, fn item -> item.id == id end)
     new_state = %{state | interrupt_stack: new_stack} |> update_metadata()
 
-    # Broadcast the updated state
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "stream:state",
-      {:interrupt_removed, id}
-    )
+    # Process interrupt removal through unified event system
+    Server.Events.process_event("stream.interrupt_removed", %{
+      interrupt_id: id,
+      timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+    })
 
     persist_state(new_state)
     {:reply, :ok, new_state}
@@ -185,17 +184,14 @@ defmodule Server.StreamProducer do
       }
       |> update_metadata()
 
-    # Broadcast show change
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "stream:updates",
-      {:show_change,
-       %{
-         show: show,
-         game: metadata[:game],
-         changed_at: DateTime.utc_now()
-       }}
-    )
+    # Process show change through unified event system
+    Server.Events.process_event("stream.show_changed", %{
+      show: show,
+      game_id: get_in(metadata, [:game, :id]),
+      game_name: get_in(metadata, [:game, :name]),
+      title: metadata[:title],
+      changed_at: DateTime.utc_now() |> DateTime.to_iso8601()
+    })
 
     broadcast_state_update(new_state)
     {:noreply, new_state}
@@ -307,22 +303,14 @@ defmodule Server.StreamProducer do
   # Handle events
   @impl true
   def handle_info({:twitch_event, %{type: "channel.chat.message", data: data, timestamp: timestamp}}, state) do
-    # If emote stats are currently active, send real-time updates
+    # If emote stats are currently active, send real-time updates through unified event system
     if active_content_type(state) == :emote_stats do
-      Phoenix.PubSub.broadcast(
-        Server.PubSub,
-        "stream:updates",
-        {:content_update,
-         %{
-           type: :emote_increment,
-           data: %{
-             emotes: Map.get(data, :emotes, []),
-             native_emotes: Map.get(data, :native_emotes, []),
-             username: Map.get(data, :user_name, "unknown")
-           },
-           timestamp: timestamp
-         }}
-      )
+      Server.Events.process_event("stream.emote_increment", %{
+        emotes: Map.get(data, :emotes, []),
+        native_emotes: Map.get(data, :native_emotes, []),
+        user_name: Map.get(data, :user_name, "unknown"),
+        timestamp: if(is_binary(timestamp), do: timestamp, else: DateTime.to_iso8601(timestamp))
+      })
     end
 
     {:noreply, state}
@@ -862,7 +850,16 @@ defmodule Server.StreamProducer do
 
     # Persist state whenever we broadcast it
     persist_state(state)
-    Phoenix.PubSub.broadcast(Server.PubSub, "stream:updates", {:stream_update, enriched_state})
+
+    # Process stream state update through unified event system
+    Server.Events.process_event("stream.state_updated", %{
+      current_show: enriched_state.current_show,
+      active_content: enriched_state.active_content,
+      interrupt_stack: enriched_state.interrupt_stack,
+      ticker_rotation: enriched_state.ticker_rotation,
+      version: enriched_state.version,
+      metadata: enriched_state.metadata
+    })
   end
 
   defp schedule_cleanup do

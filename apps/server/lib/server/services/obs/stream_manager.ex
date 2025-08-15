@@ -3,6 +3,11 @@ defmodule Server.Services.OBS.StreamManager do
   Manages OBS streaming and recording state.
 
   Tracks streaming status, recording status, and related metrics.
+
+  ## Events Published
+
+  Routes state change events through the unified Server.Events system
+  using event types like "obs.stream_started", "obs.recording_started".
   """
   use GenServer
   require Logger
@@ -138,18 +143,18 @@ defmodule Server.Services.OBS.StreamManager do
     active = data[:outputActive]
     state = %{state | streaming_active: active}
 
-    # Broadcast state change
-    event_type = if active, do: :stream_started, else: :stream_stopped
+    # Route through unified system ONLY
+    event_type = if active, do: "obs.stream_started", else: "obs.stream_stopped"
 
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "obs:events",
-      {event_type,
-       %{
-         session_id: state.session_id,
-         active: active
-       }}
-    )
+    unified_data = %{
+      output_active: active,
+      session_id: state.session_id
+    }
+
+    case Server.Events.process_event(event_type, unified_data) do
+      :ok -> Logger.debug("OBS stream state routed through unified system", event_type: event_type)
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason, event_type: event_type)
+    end
 
     Logger.info("Stream state changed: #{if active, do: "started", else: "stopped"}",
       service: "obs",
@@ -163,18 +168,18 @@ defmodule Server.Services.OBS.StreamManager do
     active = data[:outputActive]
     state = %{state | recording_active: active}
 
-    # Broadcast state change
-    event_type = if active, do: :record_started, else: :record_stopped
+    # Route through unified system ONLY
+    event_type = if active, do: "obs.recording_started", else: "obs.recording_stopped"
 
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "obs:events",
-      {event_type,
-       %{
-         session_id: state.session_id,
-         active: active
-       }}
-    )
+    unified_data = %{
+      output_active: active,
+      session_id: state.session_id
+    }
+
+    case Server.Events.process_event(event_type, unified_data) do
+      :ok -> Logger.debug("OBS record state routed through unified system", event_type: event_type)
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason, event_type: event_type)
+    end
 
     Logger.info("Record state changed: #{if active, do: "started", else: "stopped"}",
       service: "obs",

@@ -4,6 +4,11 @@ defmodule Server.Services.OBS.SceneManager do
 
   Maintains the list of scenes, current scene, and preview scene.
   Updates state based on OBS events.
+
+  ## Events Published
+
+  Routes scene change events through the unified Server.Events system
+  using the "obs.scene_changed" event type.
   """
   use GenServer
   require Logger
@@ -158,16 +163,16 @@ defmodule Server.Services.OBS.SceneManager do
     # Update ETS cache
     :ets.insert(state.ets_table, {:current_scene, scene_name})
 
-    # Broadcast scene change
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "obs:events",
-      {:scene_current_changed,
-       %{
-         session_id: state.session_id,
-         scene_name: scene_name
-       }}
-    )
+    # Route through unified system ONLY
+    unified_data = %{
+      scene_name: scene_name,
+      session_id: state.session_id
+    }
+
+    case Server.Events.process_event("obs.scene_changed", unified_data) do
+      :ok -> Logger.debug("OBS scene change routed through unified system", scene_name: scene_name)
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason, scene_name: scene_name)
+    end
 
     {:noreply, state}
   end

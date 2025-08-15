@@ -461,43 +461,6 @@ defmodule ServerWeb.OverlayChannel do
     {:noreply, socket}
   end
 
-  # Legacy event handlers - maintain backward compatibility during migration
-  @impl true
-  def handle_info({:obs_event, event}, socket) do
-    push(socket, "obs_event", event)
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:twitch_event, event}, socket) do
-    push(socket, "twitch_event", event)
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:ironmon_event, event}, socket) do
-    push(socket, "ironmon_event", event)
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:rainwave_event, event}, socket) do
-    Logger.info("Rainwave event forwarded to overlay",
-      overlay_type: socket.assigns.overlay_type,
-      event_type: event.type,
-      correlation_id: socket.assigns.correlation_id
-    )
-
-    push(socket, "music_event", event)
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:system_event, event}, socket) do
-    push(socket, "system_event", event)
-    {:noreply, socket}
-  end
-
   @impl true
   def handle_info({:health_update, data}, socket) do
     push(socket, "health_update", data)
@@ -628,11 +591,6 @@ defmodule ServerWeb.OverlayChannel do
 
       "system" ->
         Phoenix.PubSub.subscribe(Server.PubSub, "events")
-        # Also subscribe to legacy system topics for now during migration
-        subscribe_to_topics([
-          "system:health",
-          "system:performance"
-        ])
 
       _ ->
         Logger.warning("Unknown overlay type for event subscription", overlay_type: overlay_type)

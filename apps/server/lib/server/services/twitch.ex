@@ -6,7 +6,7 @@ defmodule Server.Services.Twitch do
   - `TokenManager` for OAuth token management
   - `HealthChecker` for health status reporting
   - `SubscriptionCoordinator` for subscription lifecycle
-  - `EventHandler` for event processing
+  - `Server.Events` for event processing
   - `WebSocketClient` for connection handling
   """
 
@@ -19,7 +19,6 @@ defmodule Server.Services.Twitch do
   require Logger
 
   alias Server.Services.Twitch.{
-    EventHandler,
     HealthChecker,
     SubscriptionCoordinator,
     TokenManager
@@ -538,7 +537,7 @@ defmodule Server.Services.Twitch do
     )
 
     # Process the event through the complete pipeline (normalize, store, publish)
-    case EventHandler.process_event(subscription["type"], event) do
+    case Server.Events.process_event(subscription["type"], event) do
       :ok ->
         Logger.info("EventSub notification processed successfully",
           event_type: subscription["type"],
@@ -606,7 +605,13 @@ defmodule Server.Services.Twitch do
   end
 
   defp broadcast_status_change(state) do
-    Phoenix.PubSub.broadcast(Server.PubSub, "service:status", {:service_status, do_build_status(state)})
+    # Route through unified system ONLY
+    status_data = do_build_status(state)
+
+    case Server.Events.process_event("twitch.service_status", status_data) do
+      :ok -> Logger.debug("Twitch service status routed through unified system")
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason)
+    end
   end
 
   defp schedule_keepalive_timeout(seconds) do

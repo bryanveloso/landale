@@ -220,12 +220,13 @@ defmodule Server.Services.OBS.StatsCollector do
 
     :ets.insert(state.ets_table, {:stats, stats_map})
 
-    # Broadcast stats update
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "obs:stats",
-      {:stats_updated, Map.put(stats_map, :session_id, state.session_id)}
-    )
+    # Route through unified system ONLY
+    unified_data = Map.put(stats_map, :session_id, state.session_id)
+
+    case Server.Events.process_event("obs.stats_updated", unified_data) do
+      :ok -> Logger.debug("OBS stats update routed through unified system", session_id: state.session_id)
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason, session_id: state.session_id)
+    end
 
     {:noreply, state}
   end

@@ -139,6 +139,7 @@ defmodule Server.Events.Validation do
   defp get_validation_schema("obs.stream_stopped"), do: &validate_obs_stream_stopped/1
   defp get_validation_schema("obs.recording_started"), do: &validate_obs_recording_started/1
   defp get_validation_schema("obs.recording_stopped"), do: &validate_obs_recording_stopped/1
+  defp get_validation_schema("obs.websocket_event"), do: &validate_obs_websocket_event/1
 
   # IronMON Events (medium priority - game data)
   defp get_validation_schema("ironmon.init"), do: &validate_ironmon_init/1
@@ -160,6 +161,15 @@ defmodule Server.Events.Validation do
   defp get_validation_schema("system.service_stopped"), do: &validate_system_service_stopped/1
   defp get_validation_schema("system.health_check"), do: &validate_system_health_check/1
   defp get_validation_schema("system.performance_metric"), do: &validate_system_performance_metric/1
+
+  # Stream Events (internal stream system)
+  defp get_validation_schema("stream.state_updated"), do: &validate_stream_state_updated/1
+  defp get_validation_schema("stream.show_changed"), do: &validate_stream_show_changed/1
+  defp get_validation_schema("stream.interrupt_removed"), do: &validate_stream_interrupt_removed/1
+  defp get_validation_schema("stream.emote_increment"), do: &validate_stream_emote_increment/1
+  defp get_validation_schema("stream.takeover_started"), do: &validate_stream_takeover_started/1
+  defp get_validation_schema("stream.takeover_cleared"), do: &validate_stream_takeover_cleared/1
+  defp get_validation_schema("stream.goals_updated"), do: &validate_stream_goals_updated/1
 
   # Default: pass-through validation for unknown event types (allows extensibility)
   defp get_validation_schema(_unknown_type), do: &validate_unknown_event/1
@@ -593,6 +603,20 @@ defmodule Server.Events.Validation do
     |> validate_data_size()
   end
 
+  defp validate_obs_websocket_event(params) do
+    field_types = %{
+      eventType: :string,
+      eventData: :map,
+      session_id: :string
+    }
+
+    create_changeset(params, field_types)
+    |> validate_required([:eventType])
+    |> validate_safe_string(:eventType)
+    |> validate_safe_string(:session_id)
+    |> validate_data_size()
+  end
+
   # System Event Validation Functions
 
   defp validate_system_service_started(params) do
@@ -859,6 +883,112 @@ defmodule Server.Events.Validation do
     create_changeset(params, field_types)
     |> validate_positive_integer(:station_id)
     |> validate_safe_string(:station_name)
+    |> validate_data_size()
+  end
+
+  # Stream event validation functions
+  defp validate_stream_state_updated(params) do
+    field_types = %{
+      current_show: :string,
+      active_content: :map,
+      interrupt_stack: {:array, :map},
+      ticker_rotation: {:array, :string},
+      version: :integer,
+      metadata: :map
+    }
+
+    create_changeset(params, field_types)
+    |> validate_safe_string(:current_show)
+    |> validate_data_size()
+  end
+
+  defp validate_stream_show_changed(params) do
+    field_types = %{
+      show: :string,
+      game_id: :string,
+      game_name: :string,
+      title: :string,
+      changed_at: :string
+    }
+
+    create_changeset(params, field_types)
+    |> validate_required([:show])
+    |> validate_safe_string(:show)
+    |> validate_safe_string(:game_id)
+    |> validate_safe_string(:game_name)
+    |> validate_safe_string(:title)
+    |> validate_iso8601_datetime(:changed_at)
+    |> validate_data_size()
+  end
+
+  defp validate_stream_interrupt_removed(params) do
+    field_types = %{
+      interrupt_id: :string,
+      interrupt_type: :string,
+      removed_at: :utc_datetime
+    }
+
+    create_changeset(params, field_types)
+    |> validate_safe_string(:interrupt_id)
+    |> validate_safe_string(:interrupt_type)
+    |> validate_data_size()
+  end
+
+  defp validate_stream_emote_increment(params) do
+    field_types = %{
+      emotes: {:array, :string},
+      native_emotes: {:array, :string},
+      user_name: :string,
+      timestamp: :string
+    }
+
+    create_changeset(params, field_types)
+    |> validate_required([:emotes, :user_name])
+    |> validate_string_list(:emotes)
+    |> validate_string_list(:native_emotes)
+    |> validate_safe_string(:user_name)
+    |> validate_iso8601_datetime(:timestamp)
+    |> validate_data_size()
+  end
+
+  defp validate_stream_takeover_started(params) do
+    field_types = %{
+      takeover_type: :string,
+      message: :string,
+      duration: :integer,
+      timestamp: :string
+    }
+
+    create_changeset(params, field_types)
+    |> validate_required([:takeover_type])
+    |> validate_safe_string(:takeover_type)
+    |> validate_inclusion(:takeover_type, ["alert", "screen-cover", "manual_override"])
+    |> validate_safe_string(:message)
+    |> validate_positive_integer(:duration)
+    |> validate_iso8601_datetime(:timestamp)
+    |> validate_data_size()
+  end
+
+  defp validate_stream_takeover_cleared(params) do
+    field_types = %{
+      timestamp: :string
+    }
+
+    create_changeset(params, field_types)
+    |> validate_iso8601_datetime(:timestamp)
+    |> validate_data_size()
+  end
+
+  defp validate_stream_goals_updated(params) do
+    field_types = %{
+      follower_goal: :map,
+      sub_goal: :map,
+      new_sub_goal: :map,
+      timestamp: :string
+    }
+
+    create_changeset(params, field_types)
+    |> validate_iso8601_datetime(:timestamp)
     |> validate_data_size()
   end
 

@@ -28,6 +28,7 @@ defmodule Server.Events do
   - `channel.goal.begin` - Goal creation
   - `channel.goal.progress` - Goal progress updates
   - `channel.goal.end` - Goal completion
+  - `twitch.service_status` - Service connection status updates
 
   ### OBS Events
   - `obs.connection_established` / `obs.connection_lost` - WebSocket connection state
@@ -41,6 +42,8 @@ defmodule Server.Events do
   - `ironmon.checkpoint` - Checkpoint progress with location data
   - `ironmon.battle_start` / `ironmon.battle_end` - Battle encounters
   - `ironmon.pokemon_update` - Team composition changes
+  - `ironmon.run_started` - New run/seed started
+  - `ironmon.run_checkpoint` - Checkpoint completed in a run
 
   ### Rainwave Events
   - `rainwave.song_changed` - Current song updates
@@ -51,6 +54,14 @@ defmodule Server.Events do
   - `system.service_started` / `system.service_stopped` - Service lifecycle
   - `system.health_check` - Health status updates
   - `system.performance_metric` - Performance monitoring data
+
+  ### Stream Events
+  - `stream.state_updated` - Stream overlay state changes
+  - `stream.show_changed` - Show context transitions
+  - `stream.interrupt_removed` - Priority interrupt removal
+  - `stream.emote_increment` - Real-time emote usage
+  - `stream.takeover_started` / `stream.takeover_cleared` - Overlay takeover events
+  - `stream.goals_updated` - Creator goal progress updates
 
   ## Event Format
 
@@ -220,6 +231,81 @@ defmodule Server.Events do
       broadcaster_user_id: Map.get(data, :broadcaster_user_id),
       broadcaster_user_login: Map.get(data, :broadcaster_user_login),
       broadcaster_user_name: Map.get(data, :broadcaster_user_name)
+    }
+  end
+
+  defp get_event_specific_data("stream.state_updated", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      current_show: Map.get(data, :current_show),
+      active_content: Map.get(data, :active_content),
+      interrupt_stack: Map.get(data, :interrupt_stack),
+      ticker_rotation: Map.get(data, :ticker_rotation),
+      version: Map.get(data, :version),
+      metadata: Map.get(data, :metadata)
+    }
+  end
+
+  defp get_event_specific_data("stream.show_changed", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      show: Map.get(data, :show),
+      game_id: Map.get(data, :game_id),
+      game_name: Map.get(data, :game_name),
+      title: Map.get(data, :title),
+      changed_at: parse_datetime(Map.get(data, :changed_at))
+    }
+  end
+
+  defp get_event_specific_data("stream.interrupt_removed", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      interrupt_id: Map.get(data, :interrupt_id),
+      removal_timestamp: parse_datetime(Map.get(data, :timestamp))
+    }
+  end
+
+  defp get_event_specific_data("stream.emote_increment", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      emotes: Map.get(data, :emotes, []),
+      native_emotes: Map.get(data, :native_emotes, []),
+      user_name: Map.get(data, :user_name),
+      increment_timestamp: parse_datetime(Map.get(data, :timestamp))
+    }
+  end
+
+  defp get_event_specific_data("stream.takeover_started", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      takeover_type: Map.get(data, :takeover_type),
+      message: Map.get(data, :message),
+      duration: Map.get(data, :duration),
+      takeover_timestamp: parse_datetime(Map.get(data, :timestamp))
+    }
+  end
+
+  defp get_event_specific_data("stream.takeover_cleared", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      clear_timestamp: parse_datetime(Map.get(data, :timestamp))
+    }
+  end
+
+  defp get_event_specific_data("stream.goals_updated", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      follower_goal: Map.get(data, :follower_goal, %{}),
+      sub_goal: Map.get(data, :sub_goal, %{}),
+      new_sub_goal: Map.get(data, :new_sub_goal, %{}),
+      goals_timestamp: parse_datetime(Map.get(data, :timestamp))
     }
   end
 
@@ -446,6 +532,21 @@ defmodule Server.Events do
     }
   end
 
+  defp get_event_specific_data("twitch.service_status", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      service_name: "twitch",
+      connected: Map.get(data, :connected),
+      connection_state: Map.get(data, :connection_state),
+      session_id: Map.get(data, :session_id),
+      last_connected: Map.get(data, :last_connected),
+      last_error: Map.get(data, :last_error),
+      subscription_count: Map.get(data, :subscription_count),
+      websocket_url: Map.get(data, :websocket_url)
+    }
+  end
+
   # OBS Event Normalization
 
   defp get_event_specific_data("obs.connection_established", event_data) do
@@ -525,6 +626,29 @@ defmodule Server.Events do
     }
   end
 
+  defp get_event_specific_data("obs.websocket_event", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      event_type: Map.get(data, :eventType),
+      session_id: Map.get(data, :session_id),
+      raw_data: Map.get(data, :eventData)
+    }
+  end
+
+  defp get_event_specific_data("obs.unknown_event", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    # BoundaryConverter wraps the data in a raw_data field, so we need to access it
+    raw_data = Map.get(data, :raw_data, %{})
+
+    %{
+      obs_event_type: Map.get(raw_data, :event_type),
+      obs_event_data: Map.get(raw_data, :event_data, %{}),
+      session_id: Map.get(raw_data, :session_id)
+    }
+  end
+
   # IronMON Event Normalization
 
   defp get_event_specific_data("ironmon.init", event_data) do
@@ -591,6 +715,27 @@ defmodule Server.Events do
       pokemon_hp: Map.get(data, :pokemon_hp),
       pokemon_status: Map.get(data, :pokemon_status),
       run_id: Map.get(data, :run_id)
+    }
+  end
+
+  defp get_event_specific_data("ironmon.run_started", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      seed_id: Map.get(data, :seed_id),
+      challenge_id: Map.get(data, :challenge_id),
+      run_id: Map.get(data, :seed_id)
+    }
+  end
+
+  defp get_event_specific_data("ironmon.run_checkpoint", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      seed_id: Map.get(data, :seed_id),
+      checkpoint: Map.get(data, :checkpoint),
+      passed: Map.get(data, :passed),
+      run_id: Map.get(data, :seed_id)
     }
   end
 
@@ -728,8 +873,9 @@ defmodule Server.Events do
     }
   end
 
-  defp get_event_specific_data(_event_type, event_data) do
+  defp get_event_specific_data(event_type, event_data) do
     # For unknown event types, include all original data
+    Logger.debug("Catch-all handler for event type", event_type: event_type)
     %{raw_data: event_data}
   end
 
@@ -778,20 +924,48 @@ defmodule Server.Events do
   # Determines the source of an event based on its type
   defp determine_event_source(event_type) do
     cond do
-      # Twitch events
-      String.starts_with?(event_type, "stream.") -> :twitch
-      String.starts_with?(event_type, "channel.") -> :twitch
-      String.starts_with?(event_type, "user.") -> :twitch
+      # Stream events (internal stream system)
+      String.starts_with?(event_type, "stream.") and
+          event_type in [
+            "stream.state_updated",
+            "stream.show_changed",
+            "stream.interrupt_removed",
+            "stream.emote_increment",
+            "stream.takeover_started",
+            "stream.takeover_cleared",
+            "stream.goals_updated"
+          ] ->
+        :stream
+
+      # Twitch events (external from Twitch API)
+      String.starts_with?(event_type, "stream.") ->
+        :twitch
+
+      String.starts_with?(event_type, "channel.") ->
+        :twitch
+
+      String.starts_with?(event_type, "user.") ->
+        :twitch
+
       # OBS events
-      String.starts_with?(event_type, "obs.") -> :obs
+      String.starts_with?(event_type, "obs.") ->
+        :obs
+
       # IronMON events
-      String.starts_with?(event_type, "ironmon.") -> :ironmon
+      String.starts_with?(event_type, "ironmon.") ->
+        :ironmon
+
       # Rainwave events
-      String.starts_with?(event_type, "rainwave.") -> :rainwave
+      String.starts_with?(event_type, "rainwave.") ->
+        :rainwave
+
       # System events
-      String.starts_with?(event_type, "system.") -> :system
+      String.starts_with?(event_type, "system.") ->
+        :system
+
       # Default to twitch for backward compatibility
-      true -> :twitch
+      true ->
+        :twitch
     end
   end
 
@@ -930,12 +1104,15 @@ defmodule Server.Events do
       "obs.recording_started",
       "obs.recording_stopped",
       "obs.scene_changed",
+      "obs.websocket_event",
 
       # IronMON events (valuable for game tracking)
       "ironmon.init",
       "ironmon.checkpoint",
       "ironmon.battle_start",
       "ironmon.battle_end",
+      "ironmon.run_started",
+      "ironmon.run_checkpoint",
 
       # Rainwave events (valuable for music correlation)
       "rainwave.song_changed",

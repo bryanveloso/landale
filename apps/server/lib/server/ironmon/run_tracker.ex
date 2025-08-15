@@ -100,12 +100,14 @@ defmodule Server.Ironmon.RunTracker do
           challenge_id: challenge_id
         )
 
-        # Broadcast new run event
-        Phoenix.PubSub.broadcast(
-          Server.PubSub,
-          "ironmon:runs",
-          {:new_run, %{seed_id: seed.id, challenge_id: challenge_id}}
-        )
+        # Broadcast new run event through unified system
+        case Server.Events.process_event("ironmon.run_started", %{
+               seed_id: seed.id,
+               challenge_id: challenge_id
+             }) do
+          :ok -> Logger.debug("IronMON new run routed through unified system")
+          {:error, reason} -> Logger.warning("Unified routing failed", reason: reason)
+        end
 
         {:reply, {:ok, seed.id}, new_state}
 
@@ -142,17 +144,15 @@ defmodule Server.Ironmon.RunTracker do
           passed: passed
         )
 
-        # Broadcast checkpoint event
-        Phoenix.PubSub.broadcast(
-          Server.PubSub,
-          "ironmon:runs",
-          {:checkpoint_result,
-           %{
-             seed_id: state.current_seed_id,
-             checkpoint: checkpoint_name,
-             passed: passed
-           }}
-        )
+        # Broadcast checkpoint event through unified system
+        case Server.Events.process_event("ironmon.run_checkpoint", %{
+               seed_id: state.current_seed_id,
+               checkpoint: checkpoint_name,
+               passed: passed
+             }) do
+          :ok -> Logger.debug("IronMON checkpoint routed through unified system")
+          {:error, reason} -> Logger.warning("Unified routing failed", reason: reason)
+        end
 
         {:reply, :ok, state}
       else

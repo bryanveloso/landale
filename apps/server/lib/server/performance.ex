@@ -167,19 +167,14 @@ defmodule Server.Performance do
   end
 
   defp benchmark_event_publishing do
-    # Simulate publishing an event through the canonical EventHandler
-    # Create properly structured test event data
+    # Simulate publishing an event through the canonical Server.Events pipeline
     raw_event_data = %{
-      "scene_name" => "Main Scene",
-      "service" => "obs"
+      "sceneName" => "Main Scene",
+      "session_id" => "benchmark_session"
     }
 
-    # Use unified event publishing through Server.Events
-    event_type = "obs.scene_switched"
-
-    # Use Events module for canonical format (consistent with other benchmarks)
-    normalized_event = Server.Events.normalize_event(event_type, raw_event_data)
-    Server.Events.publish_event(event_type, normalized_event)
+    # Use the unified event processing entry point to measure full pipeline
+    Server.Events.process_event("obs.scene_changed", raw_event_data)
   end
 
   defp benchmark_database_query do

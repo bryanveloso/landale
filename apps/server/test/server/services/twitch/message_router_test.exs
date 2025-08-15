@@ -3,7 +3,7 @@ defmodule Server.Services.Twitch.MessageRouterTest do
 
   alias Server.Services.Twitch.{MessageRouter, SessionManager}
 
-  defmodule MockEventHandler do
+  defmodule MockEventProcessor do
     @moduledoc false
 
     def process_event("test.success", _data), do: :ok
@@ -28,11 +28,11 @@ defmodule Server.Services.Twitch.MessageRouterTest do
       router_state =
         MessageRouter.new(
           session_manager: session_manager,
-          event_handler: MockEventHandler
+          event_handler: MockEventProcessor
         )
 
       assert router_state.session_manager == session_manager
-      assert router_state.event_handler == MockEventHandler
+      assert router_state.event_handler == MockEventProcessor
     end
   end
 
@@ -43,7 +43,7 @@ defmodule Server.Services.Twitch.MessageRouterTest do
       router_state =
         MessageRouter.new(
           session_manager: session_manager,
-          event_handler: MockEventHandler
+          event_handler: MockEventProcessor
         )
 
       {:ok, router_state: router_state}
@@ -221,7 +221,7 @@ defmodule Server.Services.Twitch.MessageRouterTest do
 
   describe "frame routing" do
     setup do
-      router_state = MessageRouter.new(event_handler: MockEventHandler)
+      router_state = MessageRouter.new(event_handler: MockEventProcessor)
       {:ok, router_state: router_state}
     end
 
@@ -253,7 +253,7 @@ defmodule Server.Services.Twitch.MessageRouterTest do
 
   describe "metrics" do
     test "tracks multiple messages" do
-      router_state = MessageRouter.new(event_handler: MockEventHandler)
+      router_state = MessageRouter.new(event_handler: MockEventProcessor)
 
       messages = [
         %{

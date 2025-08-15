@@ -27,8 +27,9 @@ defmodule Server.Services.IronmonTCP do
 
   ## Events Published
 
-  All processed messages are published via Phoenix.PubSub on the
-  "ironmon:events" topic for consumption by the dashboard and overlays.
+  All processed messages are published via Phoenix.PubSub on the unified
+  "events" topic for consumption by the dashboard and overlays. Events are
+  published with namespaced event types (e.g., "ironmon.init", "ironmon.checkpoint").
   """
 
   use Server.Service,

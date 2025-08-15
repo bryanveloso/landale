@@ -23,7 +23,7 @@ defmodule Server.ActivityLog do
   Stores a new event in the activity log.
 
   ## Parameters
-  - `event_attrs` - Map containing event data from EventHandler
+  - `event_attrs` - Map containing event data from Server.Events
 
   ## Examples
 

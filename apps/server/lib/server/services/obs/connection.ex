@@ -235,7 +235,13 @@ defmodule Server.Services.OBS.Connection do
         :ok
     end
 
-    broadcast_event(state, :connection_lost, %{reason: reason})
+    case Server.Events.process_event("obs.connection_lost", %{
+           session_id: state.session_id,
+           reason: inspect(reason)
+         }) do
+      :ok -> Logger.debug("OBS connection lost routed through unified system")
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason)
+    end
 
     # Clean up and reset state
     state =
@@ -417,10 +423,14 @@ defmodule Server.Services.OBS.Connection do
     )
 
     # Broadcast connection established
-    broadcast_event(state, :connection_established, %{
-      session_id: state.session_id,
-      rpc_version: state.rpc_version
-    })
+    case Server.Events.process_event("obs.connection_established", %{
+           session_id: state.session_id,
+           rpc_version: state.rpc_version,
+           authentication: state.authentication_required
+         }) do
+      :ok -> Logger.debug("OBS connection established routed through unified system")
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason)
+    end
 
     # Process any queued messages
     state = process_pending_messages(state)
@@ -557,29 +567,18 @@ defmodule Server.Services.OBS.Connection do
     }
   end
 
-  defp broadcast_event(state, event_type, data) do
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "obs:#{state.session_id}",
-      {event_type, data}
-    )
-  end
-
   defp broadcast_obs_event(state, event_data) do
-    event_type = event_data.eventType
+    # Route through unified system instead of direct PubSub broadcast
+    unified_data =
+      Map.merge(event_data, %{
+        session_id: state.session_id,
+        source: :obs
+      })
 
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "obs:#{state.session_id}:events",
-      {:obs_event, event_type, event_data}
-    )
-
-    # Also broadcast to session-specific event channel
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "obs:#{state.session_id}:#{event_type}",
-      {:obs_event, event_data}
-    )
+    case Server.Events.process_event("obs.websocket_event", unified_data) do
+      :ok -> Logger.debug("OBS WebSocket event routed through unified system", event_type: event_data[:eventType])
+      {:error, reason} -> Logger.warning("Unified routing failed", reason: reason, event_type: event_data[:eventType])
+    end
   end
 
   defp forward_response(state, response_data) do

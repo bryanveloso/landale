@@ -184,17 +184,13 @@ defmodule Server.ContentAggregator do
             updated_goals = update_goal_cache(event)
             new_state = Map.put(state, :cached_goals, updated_goals)
 
-            # Broadcast updated goals to overlays
-            Phoenix.PubSub.broadcast(
-              Server.PubSub,
-              "stream:updates",
-              {:content_update,
-               %{
-                 type: "goals_update",
-                 data: updated_goals,
-                 timestamp: DateTime.utc_now()
-               }}
-            )
+            # Process goals update through unified event system
+            Server.Events.process_event("stream.goals_updated", %{
+              follower_goal: Map.get(updated_goals, :follower_goal, %{}),
+              sub_goal: Map.get(updated_goals, :sub_goal, %{}),
+              new_sub_goal: Map.get(updated_goals, :new_sub_goal, %{}),
+              timestamp: DateTime.utc_now() |> DateTime.to_iso8601()
+            })
 
             new_state
 
