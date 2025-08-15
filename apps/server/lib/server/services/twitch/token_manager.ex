@@ -178,7 +178,10 @@ defmodule Server.Services.Twitch.TokenManager do
         state = schedule_token_refresh(state, validated_token)
 
         # Trigger WebSocket connection after successful token validation
-        Process.send_after(self(), :connect, 100)
+        # Only connect if not already connected to prevent unnecessary reconnections
+        unless state.connected do
+          Process.send_after(self(), :connect, 100)
+        end
 
         %{
           state
