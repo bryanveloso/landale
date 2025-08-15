@@ -858,9 +858,11 @@ defmodule Server.StreamProducer do
       interrupt_stack: enriched_state.interrupt_stack,
       ticker_rotation:
         Enum.map(enriched_state.ticker_rotation, fn
+          %{type: type} when is_binary(type) -> type
           ticker when is_atom(ticker) -> Atom.to_string(ticker)
-          # Handle cases where it's already a string/map
-          ticker -> ticker
+          ticker when is_binary(ticker) -> ticker
+          # Fallback for any other cases
+          ticker -> to_string(ticker)
         end),
       version: enriched_state.version,
       metadata: enriched_state.metadata
