@@ -1152,7 +1152,16 @@ defmodule Server.Events.Validation do
   defp format_validation_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
       Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
+        formatted_value =
+          case value do
+            val when is_binary(val) or is_number(val) or is_atom(val) ->
+              to_string(val)
+
+            val ->
+              inspect(val)
+          end
+
+        String.replace(acc, "%{#{key}}", formatted_value)
       end)
     end)
   end

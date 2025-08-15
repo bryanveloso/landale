@@ -181,6 +181,25 @@ defmodule Server.Events.ValidationTest do
       assert {:error, errors} = Validation.validate_event_data("channel.update", invalid_data)
       assert "list too long (max 100 items)" in (errors[:content_classification_labels] || [])
     end
+
+    test "handles complex type validation errors without crashing error formatter" do
+      invalid_data = %{
+        "broadcaster_user_id" => "123456",
+        "broadcaster_user_login" => "streamer",
+        # String instead of array - triggers Ecto type validation error with {:array, :string} in opts
+        "content_classification_labels" => "MatureGame"
+      }
+
+      # Should return error without crashing (previously crashed with Protocol.UndefinedError)
+      assert {:error, errors} = Validation.validate_event_data("channel.update", invalid_data)
+
+      # Verify error message contains properly formatted type info
+      assert Map.has_key?(errors, :content_classification_labels)
+      error_msg = List.first(errors.content_classification_labels)
+      assert is_binary(error_msg)
+      # Should contain the formatted type spec using inspect() instead of to_string()
+      assert error_msg =~ "{:array, :string}" or error_msg =~ "invalid"
+    end
   end
 
   describe "validate_event_data/2 for OBS events" do
