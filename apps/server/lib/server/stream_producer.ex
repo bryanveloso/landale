@@ -853,10 +853,15 @@ defmodule Server.StreamProducer do
 
     # Process stream state update through unified event system
     Server.Events.process_event("stream.state_updated", %{
-      current_show: enriched_state.current_show,
+      current_show: Atom.to_string(enriched_state.current_show),
       active_content: enriched_state.active_content,
       interrupt_stack: enriched_state.interrupt_stack,
-      ticker_rotation: enriched_state.ticker_rotation,
+      ticker_rotation:
+        Enum.map(enriched_state.ticker_rotation, fn
+          ticker when is_atom(ticker) -> Atom.to_string(ticker)
+          # Handle cases where it's already a string/map
+          ticker -> ticker
+        end),
       version: enriched_state.version,
       metadata: enriched_state.metadata
     })
