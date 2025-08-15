@@ -503,14 +503,14 @@ defmodule Server.Events.Validation do
     field_types = %{
       session_id: :string,
       websocket_version: :string,
-      rpc_version: :string,
+      rpc_version: :integer,
       authentication: :boolean
     }
 
     create_changeset(params, field_types)
     |> validate_safe_string(:session_id)
     |> validate_safe_string(:websocket_version, max_length: 20)
-    |> validate_safe_string(:rpc_version, max_length: 20)
+    |> validate_positive_integer(:rpc_version)
     |> validate_data_size()
   end
 

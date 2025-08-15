@@ -73,8 +73,8 @@ defmodule Server.ContentAggregator do
     :ets.new(@followers_table, [:named_table, :protected, :ordered_set])
     :ets.new(@daily_stats_table, [:named_table, :protected, :set])
 
-    # Subscribe to dashboard topic for Twitch events
-    Phoenix.PubSub.subscribe(Server.PubSub, "dashboard")
+    # Subscribe to events topic for unified event format
+    Phoenix.PubSub.subscribe(Server.PubSub, "events")
 
     # Initialize daily stats
     reset_daily_stats()
@@ -160,12 +160,12 @@ defmodule Server.ContentAggregator do
     {:noreply, state}
   end
 
-  # Handle unified Twitch events from dashboard topic
+  # Handle unified events from events topic
   @impl true
-  def handle_info({:twitch_event, event}, state) do
+  def handle_info({:event, event}, state) do
     try do
       updated_state =
-        case Map.get(event, :type) do
+        case event.type do
           "channel.chat.message" ->
             emotes = Map.get(event, :emotes, [])
             native_emotes = Map.get(event, :native_emotes, [])
@@ -178,7 +178,7 @@ defmodule Server.ContentAggregator do
             state
 
           goal_event when goal_event in ["channel.goal.begin", "channel.goal.progress", "channel.goal.end"] ->
-            Logger.info("Goal event received", goal_type: Map.get(event, :type), event_id: Map.get(event, :id))
+            Logger.info("Goal event received", goal_type: event.type, event_id: Map.get(event, :id))
 
             # Update cached goals
             updated_goals = update_goal_cache(event)
@@ -202,7 +202,7 @@ defmodule Server.ContentAggregator do
       {:noreply, updated_state}
     rescue
       error ->
-        Logger.error("Failed to process twitch event",
+        Logger.error("Failed to process event",
           error: inspect(error),
           event: inspect(event),
           event_type: Map.get(event, :type)
