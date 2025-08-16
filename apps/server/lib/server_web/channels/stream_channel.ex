@@ -236,9 +236,43 @@ defmodule ServerWeb.StreamChannel do
     )
 
     case Server.Services.Twitch.ApiClient.get_channel_information() do
-      {:ok, channel_info} ->
+      {:ok, %{"data" => [channel_info | _]} = api_response} ->
+        Logger.info("DEBUG: Raw Twitch API response",
+          correlation_id: socket.assigns.correlation_id,
+          api_response: inspect(api_response, limit: :infinity)
+        )
+
+        Logger.info("DEBUG: Extracted channel info",
+          correlation_id: socket.assigns.correlation_id,
+          channel_info: inspect(channel_info, limit: :infinity)
+        )
+
+        # Extract first channel info from Twitch API response array
         {:ok, response} = ResponseBuilder.success(channel_info)
+
+        Logger.info("DEBUG: Final ResponseBuilder response",
+          correlation_id: socket.assigns.correlation_id,
+          response: inspect(response, limit: :infinity)
+        )
+
         {:reply, {:ok, response}, socket}
+
+      {:ok, %{"data" => []}} ->
+        Logger.warning("No channel information found",
+          correlation_id: socket.assigns.correlation_id
+        )
+
+        {:error, response} = ResponseBuilder.error("no_data", "No channel information available")
+        {:reply, {:error, response}, socket}
+
+      {:ok, unexpected_response} ->
+        Logger.warning("DEBUG: Unexpected API response format",
+          correlation_id: socket.assigns.correlation_id,
+          response: inspect(unexpected_response, limit: :infinity)
+        )
+
+        {:error, response} = ResponseBuilder.error("unexpected_format", "Unexpected API response format")
+        {:reply, {:error, response}, socket}
 
       {:error, reason} ->
         Logger.warning("Failed to get channel information",
@@ -259,8 +293,14 @@ defmodule ServerWeb.StreamChannel do
     )
 
     case Server.Services.Twitch.ApiClient.search_categories(query) do
-      {:ok, categories} ->
+      {:ok, %{"data" => categories}} when is_list(categories) ->
+        # Extract categories array from Twitch API response
         {:ok, response} = ResponseBuilder.success(categories)
+        {:reply, {:ok, response}, socket}
+
+      {:ok, %{"data" => []}} ->
+        # Return empty array for no results
+        {:ok, response} = ResponseBuilder.success([])
         {:reply, {:ok, response}, socket}
 
       {:error, reason} ->

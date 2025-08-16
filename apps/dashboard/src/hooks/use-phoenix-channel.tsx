@@ -83,7 +83,7 @@ export function useOverlayChannel() {
           logger.info('Takeover sent successfully', { response: resp })
           resolve({
             status: 'ok',
-            data: resp,
+            data: resp.data, // Extract actual data from ResponseBuilder response
             timestamp: new Date().toISOString()
           })
         })
@@ -110,7 +110,7 @@ export function useOverlayChannel() {
           logger.info('Takeover cleared successfully', { response: resp })
           resolve({
             status: 'ok',
-            data: resp,
+            data: resp.data, // Extract actual data from ResponseBuilder response
             timestamp: new Date().toISOString()
           })
         })
@@ -137,7 +137,7 @@ export function useOverlayChannel() {
           logger.info('Channel info retrieved successfully', { response: resp })
           resolve({
             status: 'ok',
-            data: resp,
+            data: resp.data, // Extract actual data from ResponseBuilder response
             timestamp: new Date().toISOString()
           })
         })
@@ -164,7 +164,7 @@ export function useOverlayChannel() {
           logger.info('Categories search successful', { response: resp })
           resolve({
             status: 'ok',
-            data: resp,
+            data: resp.data, // Extract actual data from ResponseBuilder response
             timestamp: new Date().toISOString()
           })
         })
@@ -191,7 +191,7 @@ export function useOverlayChannel() {
           logger.info('Channel info updated successfully', { response: resp })
           resolve({
             status: 'ok',
-            data: resp,
+            data: resp.data, // Extract actual data from ResponseBuilder response
             timestamp: new Date().toISOString()
           })
         })
@@ -262,7 +262,7 @@ export function useQueueChannel() {
           logger.info('Item removed successfully', { response: resp })
           resolve({
             status: 'ok',
-            data: resp,
+            data: resp.data, // Extract actual data from ResponseBuilder response
             timestamp: new Date().toISOString()
           })
         })
