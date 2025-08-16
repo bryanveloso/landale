@@ -237,23 +237,18 @@ defmodule ServerWeb.StreamChannel do
 
     case Server.Services.Twitch.ApiClient.get_channel_information() do
       {:ok, %{"data" => [channel_info | _]} = api_response} ->
-        Logger.info("DEBUG: Raw Twitch API response",
-          correlation_id: socket.assigns.correlation_id,
-          api_response: inspect(api_response, limit: :infinity)
-        )
+        # Debug logging to trace data flow
+        IO.puts("=== DEBUG: Raw Twitch API response ===")
+        IO.inspect(api_response, label: "API Response", limit: :infinity)
 
-        Logger.info("DEBUG: Extracted channel info",
-          correlation_id: socket.assigns.correlation_id,
-          channel_info: inspect(channel_info, limit: :infinity)
-        )
+        IO.puts("=== DEBUG: Extracted channel info ===")
+        IO.inspect(channel_info, label: "Channel Info", limit: :infinity)
 
         # Extract first channel info from Twitch API response array
         {:ok, response} = ResponseBuilder.success(channel_info)
 
-        Logger.info("DEBUG: Final ResponseBuilder response",
-          correlation_id: socket.assigns.correlation_id,
-          response: inspect(response, limit: :infinity)
-        )
+        IO.puts("=== DEBUG: Final ResponseBuilder response ===")
+        IO.inspect(response, label: "ResponseBuilder", limit: :infinity)
 
         {:reply, {:ok, response}, socket}
 
