@@ -36,61 +36,66 @@ defmodule Server.P0EventValidationTest do
       # Test critical event types from each service
       test_events = [
         # Twitch events
-        {"channel.follow", %{
-          "user_id" => "123456",
-          "user_login" => "follower",
-          "user_name" => "Follower",
-          "broadcaster_user_id" => "789012",
-          "broadcaster_user_login" => "streamer",
-          "broadcaster_user_name" => "Streamer",
-          "followed_at" => "2023-01-01T12:00:00Z"
-        }, "follower"},
-        
-        {"channel.subscribe", %{
-          "user_id" => "123457",
-          "user_login" => "subscriber",
-          "user_name" => "Subscriber",
-          "broadcaster_user_id" => "789012",
-          "broadcaster_user_login" => "streamer",
-          "broadcaster_user_name" => "Streamer",
-          "tier" => "1000",
-          "is_gift" => false
-        }, "subscription"},
+        {"channel.follow",
+         %{
+           "user_id" => "123456",
+           "user_login" => "follower",
+           "user_name" => "Follower",
+           "broadcaster_user_id" => "789012",
+           "broadcaster_user_login" => "streamer",
+           "broadcaster_user_name" => "Streamer",
+           "followed_at" => "2023-01-01T12:00:00Z"
+         }, "follower"},
+        {"channel.subscribe",
+         %{
+           "user_id" => "123457",
+           "user_login" => "subscriber",
+           "user_name" => "Subscriber",
+           "broadcaster_user_id" => "789012",
+           "broadcaster_user_login" => "streamer",
+           "broadcaster_user_name" => "Streamer",
+           "tier" => "1000",
+           "is_gift" => false
+         }, "subscription"},
 
         # OBS events
-        {"obs.stream_started", %{
-          "session_id" => "obs123",
-          "output_active" => true
-        }, "obs_event"},
+        {"obs.stream_started",
+         %{
+           "session_id" => "obs123",
+           "output_active" => true
+         }, "obs_event"},
 
         # System events
-        {"system.service_started", %{
-          "service" => "test_service",
-          "version" => "1.0.0"
-        }, "system_event"},
+        {"system.service_started",
+         %{
+           "service" => "test_service",
+           "version" => "1.0.0"
+         }, "system_event"},
 
         # Stream events (internal)
-        {"stream.state_updated", %{
-          "current_show" => "test_show",
-          "version" => 1
-        }, "stream_event"}
+        {"stream.state_updated",
+         %{
+           "current_show" => "test_show",
+           "version" => 1
+         }, "stream_event"}
       ]
 
       for {event_type, event_data, expected_event_name} <- test_events do
         # Process through unified system
-        assert :ok = Events.process_event(event_type, event_data), 
+        assert :ok = Events.process_event(event_type, event_data),
                "Event #{event_type} failed to process through unified system"
 
         # Verify unified "events" topic receives the event
         assert_receive %Phoenix.Socket.Message{
-          topic: "events:all",
-          event: ^expected_event_name,
-          payload: payload
-        }, 1000
+                         topic: "events:all",
+                         event: ^expected_event_name,
+                         payload: payload
+                       },
+                       1000
 
         # Validate event structure compliance
         assert_event_structure_compliance(payload, event_type)
-        
+
         # Verify correlation ID is properly set
         assert is_binary(payload.correlation_id)
         assert String.length(payload.correlation_id) == 16
@@ -98,6 +103,7 @@ defmodule Server.P0EventValidationTest do
 
         # Verify event source mapping is correct
         expected_source = determine_expected_source(event_type)
+
         assert payload.source == expected_source,
                "Event #{event_type} has incorrect source. Expected #{expected_source}, got #{payload.source}"
 
@@ -150,43 +156,49 @@ defmodule Server.P0EventValidationTest do
     test "security validation prevents malicious payloads" do
       malicious_payloads = [
         # Oversized payload
-        {"channel.chat.message", %{
-          "message_id" => "evil_msg",
-          "chatter_user_id" => "123456",
-          "broadcaster_user_id" => "789012",
-          "message" => %{"text" => String.duplicate("x", 101_000)}
-        }},
-        
+        {"channel.chat.message",
+         %{
+           "message_id" => "evil_msg",
+           "chatter_user_id" => "123456",
+           "broadcaster_user_id" => "789012",
+           "message" => %{"text" => String.duplicate("x", 101_000)}
+         }},
+
         # Control character injection
-        {"channel.follow", %{
-          "user_login" => "test\\x00user",
-          "user_id" => "123456",
-          "broadcaster_user_id" => "789012"
-        }},
-        
+        {"channel.follow",
+         %{
+           "user_login" => "test\\x00user",
+           "user_id" => "123456",
+           "broadcaster_user_id" => "789012"
+         }},
+
         # Invalid data types
-        {"stream.online", %{
-          "broadcaster_user_id" => 123,  # should be string
-          "started_at" => "invalid_date"
-        }}
+        {"stream.online",
+         %{
+           # should be string
+           "broadcaster_user_id" => 123,
+           "started_at" => "invalid_date"
+         }}
       ]
 
       for {event_type, malicious_data} <- malicious_payloads do
-        log_output = capture_log(fn ->
-          result = Events.process_event(event_type, malicious_data)
-          
-          # Should either reject with validation error or handle gracefully
-          case result do
-            {:error, {:validation_failed, _errors}} -> :ok
-            {:error, _other_reason} -> :ok
-            :ok -> :ok  # May pass if sanitized
-          end
-        end)
+        log_output =
+          capture_log(fn ->
+            result = Events.process_event(event_type, malicious_data)
+
+            # Should either reject with validation error or handle gracefully
+            case result do
+              {:error, {:validation_failed, _errors}} -> :ok
+              {:error, _other_reason} -> :ok
+              # May pass if sanitized
+              :ok -> :ok
+            end
+          end)
 
         # Should log appropriate warnings for rejected payloads
         if String.contains?(log_output, "validation failed") do
-          assert String.contains?(log_output, "validation") or 
-                 String.contains?(log_output, "rejected"),
+          assert String.contains?(log_output, "validation") or
+                   String.contains?(log_output, "rejected"),
                  "Malicious payload #{event_type} was not properly logged as security concern"
         end
       end
@@ -203,6 +215,7 @@ defmodule Server.P0EventValidationTest do
 
       # Test with a valuable event that triggers all pipeline components
       event_type = "channel.subscribe"
+
       event_data = %{
         "user_id" => "123456",
         "user_login" => "pipeline_tester",
@@ -220,10 +233,11 @@ defmodule Server.P0EventValidationTest do
 
       # 1. Verify EventsChannel receives properly formatted event
       assert_receive %Phoenix.Socket.Message{
-        topic: "events:twitch",
-        event: "subscription",
-        payload: events_payload
-      }, 1000
+                       topic: "events:twitch",
+                       event: "subscription",
+                       payload: events_payload
+                     },
+                     1000
 
       assert events_payload.type == event_type
       assert events_payload.source == :twitch
@@ -234,10 +248,11 @@ defmodule Server.P0EventValidationTest do
 
       # 2. Verify DashboardChannel receives event
       assert_receive %Phoenix.Socket.Message{
-        topic: "dashboard:main",
-        event: "twitch_event",
-        payload: dashboard_payload
-      }, 1000
+                       topic: "dashboard:main",
+                       event: "twitch_event",
+                       payload: dashboard_payload
+                     },
+                     1000
 
       assert dashboard_payload.type == event_type
       assert dashboard_payload.source == :twitch
@@ -263,6 +278,7 @@ defmodule Server.P0EventValidationTest do
       {:ok, _, socket} = subscribe_and_join(socket, ServerWeb.EventsChannel, "events:all")
 
       test_event_type = "channel.follow"
+
       test_event_data = %{
         "user_id" => "123456",
         "user_login" => "correlation_tester",
@@ -276,10 +292,11 @@ defmodule Server.P0EventValidationTest do
 
       # Verify correlation ID is maintained in PubSub broadcast
       assert_receive %Phoenix.Socket.Message{
-        topic: "events:all",
-        event: "follower",
-        payload: payload
-      }, 1000
+                       topic: "events:all",
+                       event: "follower",
+                       payload: payload
+                     },
+                     1000
 
       # Verify correlation ID format and capture it for later checks
       correlation_id = payload.correlation_id
@@ -293,7 +310,7 @@ defmodule Server.P0EventValidationTest do
       # Verify correlation ID is maintained in ActivityLog storage
       stored_events = ActivityLog.list_recent_events(limit: 1)
       assert length(stored_events) > 0
-      
+
       stored_event = List.first(stored_events)
       assert stored_event.correlation_id == correlation_id
     end
@@ -302,8 +319,21 @@ defmodule Server.P0EventValidationTest do
     test "activity log filtering compliance" do
       # Test valuable vs ephemeral event filtering
       valuable_events = [
-        {"channel.follow", %{"user_id" => "123456", "user_login" => "follower", "broadcaster_user_id" => "789012", "broadcaster_user_login" => "streamer"}},
-        {"channel.subscribe", %{"user_id" => "123457", "user_login" => "subscriber", "broadcaster_user_id" => "789012", "tier" => "1000", "broadcaster_user_login" => "streamer"}},
+        {"channel.follow",
+         %{
+           "user_id" => "123456",
+           "user_login" => "follower",
+           "broadcaster_user_id" => "789012",
+           "broadcaster_user_login" => "streamer"
+         }},
+        {"channel.subscribe",
+         %{
+           "user_id" => "123457",
+           "user_login" => "subscriber",
+           "broadcaster_user_id" => "789012",
+           "tier" => "1000",
+           "broadcaster_user_login" => "streamer"
+         }},
         {"obs.stream_started", %{"session_id" => "obs123"}},
         {"system.service_started", %{"service" => "test_service"}}
       ]
@@ -321,7 +351,7 @@ defmodule Server.P0EventValidationTest do
         assert :ok = Events.process_event(event_type, event_data)
       end
 
-      # Process ephemeral events  
+      # Process ephemeral events
       for {event_type, event_data} <- ephemeral_events do
         assert :ok = Events.process_event(event_type, event_data)
       end
@@ -331,9 +361,10 @@ defmodule Server.P0EventValidationTest do
 
       final_events = ActivityLog.list_recent_events()
       final_count = length(final_events)
-      
+
       # Only valuable events should have been stored
       expected_count = initial_count + length(valuable_events)
+
       assert final_count == expected_count,
              "Expected #{expected_count} events stored, got #{final_count}. Only valuable events should be stored."
     end
@@ -345,28 +376,30 @@ defmodule Server.P0EventValidationTest do
       concurrent_tasks = 5
 
       # Create concurrent tasks that each process multiple events
-      tasks = for task_id <- 1..concurrent_tasks do
-        Task.async(fn ->
-          for event_id <- 1..div(event_count, concurrent_tasks) do
-            event_type = "channel.follow"
-            event_data = %{
-              "user_id" => "#{100000 + task_id * 1000 + event_id}",
-              "user_login" => "load_user_#{task_id}_#{event_id}",
-              "broadcaster_user_id" => "789012",
-              "broadcaster_user_login" => "test_broadcaster"
-            }
+      tasks =
+        for task_id <- 1..concurrent_tasks do
+          Task.async(fn ->
+            for event_id <- 1..div(event_count, concurrent_tasks) do
+              event_type = "channel.follow"
 
-            result = Events.process_event(event_type, event_data)
-            assert result == :ok, "Event processing failed under load: #{inspect(result)}"
-          end
-          
-          :ok
-        end)
-      end
+              event_data = %{
+                "user_id" => "#{100_000 + task_id * 1000 + event_id}",
+                "user_login" => "load_user_#{task_id}_#{event_id}",
+                "broadcaster_user_id" => "789012",
+                "broadcaster_user_login" => "test_broadcaster"
+              }
+
+              result = Events.process_event(event_type, event_data)
+              assert result == :ok, "Event processing failed under load: #{inspect(result)}"
+            end
+
+            :ok
+          end)
+        end
 
       # Wait for all tasks to complete
       results = Task.await_many(tasks, 10_000)
-      
+
       # All tasks should complete successfully
       assert Enum.all?(results, &(&1 == :ok)), "Some concurrent tasks failed"
     end
@@ -379,7 +412,7 @@ defmodule Server.P0EventValidationTest do
   defp assert_event_structure_compliance(event, event_type) do
     # Core fields that should always be present
     required_fields = [:id, :type, :timestamp, :correlation_id, :source, :raw_type]
-    
+
     for field <- required_fields do
       assert Map.has_key?(event, field),
              "Event #{event_type} missing required field: #{field}"
@@ -401,33 +434,62 @@ defmodule Server.P0EventValidationTest do
   defp determine_expected_source(event_type) do
     cond do
       String.starts_with?(event_type, "stream.") and
-        event_type in [
-          "stream.state_updated", "stream.show_changed", "stream.interrupt_removed",
-          "stream.emote_increment", "stream.takeover_started", "stream.takeover_cleared",
-          "stream.goals_updated"
-        ] -> :stream
-      String.starts_with?(event_type, "stream.") -> :twitch
-      String.starts_with?(event_type, "channel.") -> :twitch
-      String.starts_with?(event_type, "obs.") -> :obs
-      String.starts_with?(event_type, "ironmon.") -> :ironmon
-      String.starts_with?(event_type, "rainwave.") -> :rainwave
-      String.starts_with?(event_type, "system.") -> :system
-      true -> :twitch  # default
+          event_type in [
+            "stream.state_updated",
+            "stream.show_changed",
+            "stream.interrupt_removed",
+            "stream.emote_increment",
+            "stream.takeover_started",
+            "stream.takeover_cleared",
+            "stream.goals_updated"
+          ] ->
+        :stream
+
+      String.starts_with?(event_type, "stream.") ->
+        :twitch
+
+      String.starts_with?(event_type, "channel.") ->
+        :twitch
+
+      String.starts_with?(event_type, "obs.") ->
+        :obs
+
+      String.starts_with?(event_type, "ironmon.") ->
+        :ironmon
+
+      String.starts_with?(event_type, "rainwave.") ->
+        :rainwave
+
+      String.starts_with?(event_type, "system.") ->
+        :system
+
+      # default
+      true ->
+        :twitch
     end
   end
 
   defp flat_event_format?(event) when is_map(event) do
     Enum.all?(event, fn {_key, value} ->
       case value do
-        %DateTime{} -> true  # DateTime structs are allowed
-        map when is_map(map) -> false  # No other nested maps allowed
+        # DateTime structs are allowed
+        %DateTime{} ->
+          true
+
+        # No other nested maps allowed
+        map when is_map(map) ->
+          false
+
         list when is_list(list) ->
           # Lists are allowed if they contain simple values or structured data
           # Note: fragments come with atom keys from BoundaryConverter
           Enum.all?(list, fn item ->
             not is_map(item) or (is_map(item) and is_flat_fragment?(item))
           end)
-        _ -> true  # All other types are fine
+
+        # All other types are fine
+        _ ->
+          true
       end
     end)
   end
@@ -435,7 +497,8 @@ defmodule Server.P0EventValidationTest do
   defp is_flat_fragment?(item) when is_map(item) do
     # Fragment maps can have atom or string keys and should be flat (no nested maps)
     Enum.all?(item, fn {_key, value} ->
-      not is_map(value) or value in [%{}]  # Allow empty maps but no nested structures
+      # Allow empty maps but no nested structures
+      not is_map(value) or value in [%{}]
     end)
   end
 

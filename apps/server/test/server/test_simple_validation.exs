@@ -15,12 +15,13 @@ defmodule Server.SimpleValidationTest do
       {:ok, _, socket} = subscribe_and_join(socket, ServerWeb.EventsChannel, "events:all")
 
       # Process a simple event
-      assert :ok = Events.process_event("channel.follow", %{
-        "user_id" => "123456",
-        "user_login" => "testuser",
-        "broadcaster_user_id" => "789012",
-        "broadcaster_user_login" => "teststreamer"
-      })
+      assert :ok =
+               Events.process_event("channel.follow", %{
+                 "user_id" => "123456",
+                 "user_login" => "testuser",
+                 "broadcaster_user_id" => "789012",
+                 "broadcaster_user_login" => "teststreamer"
+               })
 
       # Verify the event is received
       assert_receive %Phoenix.Socket.Message{

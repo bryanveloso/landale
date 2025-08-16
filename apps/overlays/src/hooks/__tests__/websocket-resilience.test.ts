@@ -1,39 +1,44 @@
 import { describe, test, expect, beforeEach, afterEach, mock, type Mock } from 'bun:test'
-import { createSignal, createRoot } from 'solid-js'
+import { createSignal } from 'solid-js'
 
 /**
  * Focused WebSocket resilience tests for critical streaming functionality.
- * 
+ *
  * These tests verify the core patterns needed for live streaming reliability:
  * - Connection state management
- * - Message handling during disconnections  
+ * - Message handling during disconnections
  * - State synchronization
  * - Error recovery
  */
 
 // Mock Phoenix types
 interface MockChannel {
-  join: Mock<any>
-  leave: Mock<any>
-  push: Mock<any>
-  on: Mock<any>
-  off: Mock<any>
+  join: Mock<() => { receive: Mock<(event: string, callback: (data: unknown) => void) => unknown> }>
+  leave: Mock<() => void>
+  push: Mock<
+    (
+      event: string,
+      payload: unknown
+    ) => { receive: Mock<(event: string, callback: (data: unknown) => void) => unknown> }
+  >
+  on: Mock<(event: string, callback: (data: unknown) => void) => void>
+  off: Mock<(event: string, callback?: (data: unknown) => void) => void>
 }
 
 interface MockSocket {
-  isConnected: Mock<any>
-  channel: Mock<any>
-  disconnect: Mock<any>
-  connect: Mock<any>
+  isConnected: Mock<() => boolean>
+  channel: Mock<(topic: string) => MockChannel>
+  disconnect: Mock<() => void>
+  connect: Mock<() => void>
 }
 
 // Simplified stream state type
 interface TestStreamState {
   current_show: 'ironmon' | 'variety' | 'coding'
-  active_content: any
+  active_content: unknown
   priority_level: 'alert' | 'sub_train' | 'ticker'
-  interrupt_stack: any[]
-  ticker_rotation: any[]
+  interrupt_stack: unknown[]
+  ticker_rotation: unknown[]
   metadata: {
     last_updated: string
     state_version: number
@@ -58,7 +63,7 @@ class TestStreamChannel {
   private mockSocket: MockSocket
   private mockChannel: MockChannel | null = null
   private connectionCheckInterval: number | null = null
-  private messageHandlers: Map<string, Function[]> = new Map()
+  private messageHandlers: Map<string, ((data: unknown) => void)[]> = new Map()
 
   constructor() {
     this.mockSocket = this.createMockSocket()
@@ -84,7 +89,7 @@ class TestStreamChannel {
   private createMockChannel(): MockChannel {
     const channel = {
       join: mock(() => ({
-        receive: mock((event: string, callback: Function) => {
+        receive: mock((event: string, callback: (data: unknown) => void) => {
           if (event === 'ok') {
             setTimeout(() => {
               callback({})
@@ -93,7 +98,7 @@ class TestStreamChannel {
             }, 0)
           }
           return {
-            receive: mock((nextEvent: string, nextCallback: Function) => ({
+            receive: mock((_nextEvent: string, nextCallback: (data: unknown) => void) => ({
               receive: mock(() => ({}))
             }))
           }
@@ -102,8 +107,8 @@ class TestStreamChannel {
       leave: mock(() => {
         // Clean up when leaving
       }),
-      push: mock((event: string, payload: any) => ({
-        receive: mock((responseEvent: string, callback: Function) => {
+      push: mock((_event: string, _payload: unknown) => ({
+        receive: mock((responseEvent: string, callback: (data: unknown) => void) => {
           if (responseEvent === 'ok') {
             setTimeout(() => callback({}), 0)
           }
@@ -114,7 +119,7 @@ class TestStreamChannel {
           }
         })
       })),
-      on: mock((event: string, handler: Function) => {
+      on: mock((event: string, handler: (data: unknown) => void) => {
         if (!this.messageHandlers.has(event)) {
           this.messageHandlers.set(event, [])
         }
@@ -139,19 +144,20 @@ class TestStreamChannel {
   private joinChannel() {
     const channel = this.mockSocket.channel('stream:overlays', {})
     channel.join()
-    
+
     // Setup message handlers
     channel.on('stream_state', (payload: TestStreamState) => {
       this.streamStateSignal[1](payload)
     })
 
-    channel.on('content_update', (payload: any) => {
+    channel.on('content_update', (payload: unknown) => {
       if (payload.type === 'goals_update') {
-        this.streamStateSignal[1](prev => ({
+        this.streamStateSignal[1]((prev) => ({
           ...prev,
-          active_content: prev.active_content?.type === 'stream_goals'
-            ? { ...prev.active_content, data: payload.data }
-            : prev.active_content
+          active_content:
+            prev.active_content?.type === 'stream_goals'
+              ? { ...prev.active_content, data: payload.data }
+              : prev.active_content
         }))
       }
     })
@@ -174,7 +180,7 @@ class TestStreamChannel {
     return this.streamStateSignal[0]
   }
 
-  sendMessage(event: string, payload: any) {
+  sendMessage(event: string, payload: unknown) {
     if (this.mockChannel && this.isConnected()) {
       this.mockChannel.push(event, payload)
       return true
@@ -195,12 +201,12 @@ class TestStreamChannel {
     const handlers = this.messageHandlers.get('stream_state') || []
     const currentState = this.streamStateSignal[0]()
     const updatedState = { ...currentState, ...newState }
-    handlers.forEach(handler => handler(updatedState))
+    handlers.forEach((handler) => handler(updatedState))
   }
 
-  simulateContentUpdate(payload: any) {
+  simulateContentUpdate(payload: unknown) {
     const handlers = this.messageHandlers.get('content_update') || []
-    handlers.forEach(handler => handler(payload))
+    handlers.forEach((handler) => handler(payload))
   }
 
   getMockSocket() {
@@ -229,9 +235,9 @@ describe('WebSocket Resilience - Core Patterns', () => {
     test('establishes connection and joins channel', async () => {
       // Initially connected
       streamChannel.simulateConnectionRestore()
-      
+
       // Wait for connection processing
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       expect(streamChannel.isConnected()).toBe(true)
       expect(streamChannel.getMockSocket().channel).toHaveBeenCalledWith('stream:overlays', {})
@@ -241,13 +247,13 @@ describe('WebSocket Resilience - Core Patterns', () => {
     test('handles connection loss gracefully', async () => {
       // Start connected
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
-      
+      await new Promise((resolve) => setTimeout(resolve, 150))
+
       expect(streamChannel.isConnected()).toBe(true)
 
       // Simulate connection loss
       streamChannel.simulateConnectionLoss()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       expect(streamChannel.isConnected()).toBe(false)
       // Channel leave should be called during connection loss
@@ -259,11 +265,11 @@ describe('WebSocket Resilience - Core Patterns', () => {
     test('automatically reconnects when connection restored', async () => {
       // Start disconnected
       streamChannel.simulateConnectionLoss()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Restore connection
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Should rejoin channel
       expect(streamChannel.isConnected()).toBe(true)
@@ -272,12 +278,12 @@ describe('WebSocket Resilience - Core Patterns', () => {
 
     test('prevents multiple channel joins for same connection', async () => {
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       const initialJoinCalls = streamChannel.getMockChannel()?.join.mock.calls.length || 0
 
       // Wait for another connection check cycle
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       const finalJoinCalls = streamChannel.getMockChannel()?.join.mock.calls.length || 0
       expect(finalJoinCalls).toBe(initialJoinCalls) // Should not increase
@@ -288,7 +294,7 @@ describe('WebSocket Resilience - Core Patterns', () => {
     test('queues messages when disconnected and does not send', async () => {
       // Start disconnected
       streamChannel.simulateConnectionLoss()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Attempt to send message
       const result = streamChannel.sendMessage('test_event', { data: 'test' })
@@ -300,7 +306,7 @@ describe('WebSocket Resilience - Core Patterns', () => {
     test('sends messages immediately when connected', async () => {
       // Start connected
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Send message
       const result = streamChannel.sendMessage('test_event', { data: 'test' })
@@ -313,7 +319,7 @@ describe('WebSocket Resilience - Core Patterns', () => {
   describe('State Synchronization', () => {
     test('maintains state consistency during reconnection', async () => {
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Initial state
       const initialState = streamChannel.streamState()
@@ -321,10 +327,10 @@ describe('WebSocket Resilience - Core Patterns', () => {
 
       // Simulate disconnection and reconnection
       streamChannel.simulateConnectionLoss()
-      await new Promise(resolve => setTimeout(resolve, 150))
-      
+      await new Promise((resolve) => setTimeout(resolve, 150))
+
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // State should remain consistent
       expect(streamChannel.streamState().current_show).toBe('variety')
@@ -332,20 +338,20 @@ describe('WebSocket Resilience - Core Patterns', () => {
 
     test('requests fresh state after reconnection', async () => {
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 200)) // Give more time for async operations
+      await new Promise((resolve) => setTimeout(resolve, 200)) // Give more time for async operations
 
       // Verify channel was joined and is ready for state requests
       const channel = streamChannel.getMockChannel()
       expect(channel).toBeTruthy()
       expect(channel?.join).toHaveBeenCalled()
-      
+
       // In real implementation, state request would be triggered automatically
       // This test verifies the connection infrastructure is working
     })
 
     test('handles stream state updates correctly', async () => {
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Simulate receiving stream state update
       const newState = {
@@ -357,7 +363,7 @@ describe('WebSocket Resilience - Core Patterns', () => {
       }
 
       streamChannel.simulateStreamStateUpdate(newState)
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
 
       expect(streamChannel.streamState().current_show).toBe('ironmon')
       expect(streamChannel.streamState().metadata.state_version).toBe(1)
@@ -365,7 +371,7 @@ describe('WebSocket Resilience - Core Patterns', () => {
 
     test('handles content updates correctly', async () => {
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Set initial stream goals content
       streamChannel.simulateStreamStateUpdate({
@@ -381,7 +387,7 @@ describe('WebSocket Resilience - Core Patterns', () => {
         data: { current: 150, target: 500 }
       })
 
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
 
       expect(streamChannel.streamState().active_content?.data.current).toBe(150)
     })
@@ -390,10 +396,10 @@ describe('WebSocket Resilience - Core Patterns', () => {
   describe('Performance Under Load', () => {
     test('handles high frequency state updates efficiently', async () => {
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       const startTime = performance.now()
-      
+
       // Send many rapid updates
       for (let i = 0; i < 100; i++) {
         streamChannel.simulateStreamStateUpdate({
@@ -405,21 +411,21 @@ describe('WebSocket Resilience - Core Patterns', () => {
       }
 
       const endTime = performance.now()
-      
+
       // Should process updates quickly
       expect(endTime - startTime).toBeLessThan(100)
-      
+
       // Final state should reflect the last update
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
       expect(streamChannel.streamState().metadata.state_version).toBe(99)
     })
 
     test('handles concurrent message sending efficiently', async () => {
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       const startTime = performance.now()
-      
+
       // Send multiple messages concurrently
       const results = []
       for (let i = 0; i < 50; i++) {
@@ -428,12 +434,12 @@ describe('WebSocket Resilience - Core Patterns', () => {
       }
 
       const endTime = performance.now()
-      
+
       // Should handle all messages quickly
       expect(endTime - startTime).toBeLessThan(50)
-      
+
       // All messages should be sent successfully
-      expect(results.every(r => r === true)).toBe(true)
+      expect(results.every((r) => r === true)).toBe(true)
       // Verify messages were sent (exact count may vary due to state request timing)
       const channel = streamChannel.getMockChannel()
       if (channel) {
@@ -447,10 +453,10 @@ describe('WebSocket Resilience - Core Patterns', () => {
       // Rapid state changes
       for (let i = 0; i < 10; i++) {
         streamChannel.simulateConnectionRestore()
-        await new Promise(resolve => setTimeout(resolve, 25))
-        
+        await new Promise((resolve) => setTimeout(resolve, 25))
+
         streamChannel.simulateConnectionLoss()
-        await new Promise(resolve => setTimeout(resolve, 25))
+        await new Promise((resolve) => setTimeout(resolve, 25))
       }
 
       // Should handle gracefully without crashes
@@ -461,17 +467,17 @@ describe('WebSocket Resilience - Core Patterns', () => {
     test('maintains functionality during connection instability', async () => {
       // Start connected
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       const initialState = streamChannel.streamState()
-      
+
       // Simulate unstable period
       for (let i = 0; i < 5; i++) {
         streamChannel.simulateConnectionLoss()
-        await new Promise(resolve => setTimeout(resolve, 50))
-        
+        await new Promise((resolve) => setTimeout(resolve, 50))
+
         streamChannel.simulateConnectionRestore()
-        await new Promise(resolve => setTimeout(resolve, 50))
+        await new Promise((resolve) => setTimeout(resolve, 50))
       }
 
       // State should remain consistent
@@ -482,7 +488,7 @@ describe('WebSocket Resilience - Core Patterns', () => {
   describe('Error Handling', () => {
     test('handles malformed message payloads gracefully', async () => {
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Send malformed state updates
       expect(() => {
@@ -498,12 +504,12 @@ describe('WebSocket Resilience - Core Patterns', () => {
 
     test('recovers from temporary message send failures', async () => {
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Send messages (some might fail in real scenarios)
       for (let i = 0; i < 10; i++) {
         streamChannel.sendMessage('recovery_test', { attempt: i })
-        await new Promise(resolve => setTimeout(resolve, 5))
+        await new Promise((resolve) => setTimeout(resolve, 5))
       }
 
       // Should remain functional
@@ -515,7 +521,7 @@ describe('WebSocket Resilience - Core Patterns', () => {
   describe('Cleanup and Resource Management', () => {
     test('properly cleans up resources', async () => {
       streamChannel.simulateConnectionRestore()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Cleanup should not throw
       expect(() => streamChannel.cleanup()).not.toThrow()
@@ -523,7 +529,7 @@ describe('WebSocket Resilience - Core Patterns', () => {
 
     test('handles cleanup when already disconnected', async () => {
       streamChannel.simulateConnectionLoss()
-      await new Promise(resolve => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 150))
 
       // Should handle cleanup gracefully
       expect(() => streamChannel.cleanup()).not.toThrow()
