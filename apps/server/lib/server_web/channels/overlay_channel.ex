@@ -511,7 +511,7 @@ defmodule ServerWeb.OverlayChannel do
     if Code.ensure_loaded?(service) do
       try do
         case service.get_status() do
-          {:ok, status} -> status
+          {:ok, status} -> %{connected: true, status: status}
           _ -> %{connected: false}
         end
       rescue
@@ -521,6 +521,22 @@ defmodule ServerWeb.OverlayChannel do
       end
     else
       %{connected: false}
+    end
+  end
+
+  defp get_service_status(:database) do
+    try do
+      case Server.Repo.query("SELECT 1", [], timeout: 5000) do
+        {:ok, _} -> %{connected: true, status: "healthy"}
+        {:error, reason} -> %{connected: false, error: to_string(reason)}
+      end
+    rescue
+      e in Postgrex.Error -> %{connected: false, error: "Database error: #{e.message}"}
+      e in DBConnection.ConnectionError -> %{connected: false, error: "Connection error: #{e.message}"}
+      e in DBConnection.OwnershipError -> %{connected: false, error: "Ownership error: #{e.message}"}
+      _other -> %{connected: false, error: "Database unavailable"}
+    catch
+      :exit, reason -> %{connected: false, error: "Process exit: #{inspect(reason)}"}
     end
   end
 
