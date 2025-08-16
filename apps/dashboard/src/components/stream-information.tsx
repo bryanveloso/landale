@@ -28,7 +28,7 @@ interface ChannelInfo {
   title: string
   delay: number
   tags: string[]
-  branded_content: boolean
+  branded_content?: boolean
 }
 
 interface GameCategory {
@@ -53,7 +53,7 @@ function isChannelInfo(data: unknown): data is ChannelInfo {
     typeof obj.title === 'string' &&
     typeof obj.delay === 'number' &&
     Array.isArray(obj.tags) &&
-    typeof obj.branded_content === 'boolean'
+    (obj.branded_content === undefined || typeof obj.branded_content === 'boolean')
   )
 }
 
