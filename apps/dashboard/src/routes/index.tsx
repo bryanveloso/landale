@@ -18,10 +18,10 @@ function Index() {
         <div></div>
 
         <div class="flex">
+          <ActivityLogPanel />
           <StreamInformation />
           <TakeoverPanel />
           <StreamQueue />
-          <ActivityLogPanel />
           <LayerStateMonitor />
         </div>
 

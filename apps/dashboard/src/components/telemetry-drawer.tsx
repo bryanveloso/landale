@@ -10,6 +10,7 @@ import { Portal } from 'solid-js/web'
 import { invoke } from '@tauri-apps/api/core'
 import { ConnectionTelemetry } from './connection-telemetry'
 import { ServiceControls } from './service-controls'
+import { TranscriptionAnalytics } from './transcription-analytics'
 import { ServiceStatusProvider, useServiceStatus } from '@/services/service-status-service'
 
 interface TelemetryDrawerProps {
@@ -177,6 +178,9 @@ function TelemetryDrawerContent(props: TelemetryDrawerProps) {
               <Show when={serviceMetrics()}>
                 <ServiceControls serviceMetrics={serviceMetrics} requestRefresh={requestRefresh} />
               </Show>
+
+              {/* Transcription Analytics */}
+              <TranscriptionAnalytics />
 
               {/* Overlay Health */}
               <Show when={overlayHealth() && overlayHealth()!.length > 0}>

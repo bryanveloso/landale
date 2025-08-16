@@ -34,11 +34,38 @@ interface OverlayHealth {
   error?: string
 }
 
+interface TranscriptionAnalytics {
+  timestamp: number
+  total_transcriptions_24h: number
+  confidence: {
+    average: number
+    min: number
+    max: number
+    distribution: {
+      high: number
+      medium: number
+      low: number
+    }
+  }
+  duration: {
+    total_seconds: number
+    average_duration: number
+    total_text_length: number
+  }
+  trends: {
+    confidence_trend: 'improving' | 'declining' | 'stable' | 'unknown'
+    hourly_volume: Array<{ hour: string; count: number }>
+    quality_trend: 'excellent' | 'good' | 'acceptable' | 'needs_attention' | 'unknown'
+  }
+  error?: string
+}
+
 interface ServiceStatusData {
   timestamp: number
   services: ServiceMetric[]
   system: SystemInfo
   overlays: OverlayHealth[]
+  transcription?: TranscriptionAnalytics
 }
 
 // Service interface
@@ -46,6 +73,7 @@ interface ServiceStatusContext {
   systemInfo: () => SystemInfo | null
   serviceMetrics: () => ServiceMetric[] | null
   overlayHealth: () => OverlayHealth[] | null
+  transcriptionAnalytics: () => TranscriptionAnalytics | null
   requestRefresh: () => void
   environmentFilter: () => string | null
   setEnvironmentFilter: (filter: string | null) => void
@@ -72,6 +100,7 @@ export const ServiceStatusProvider: Component<ServiceStatusProviderProps> = (pro
   const [systemInfo, setSystemInfo] = createSignal<SystemInfo | null>(null)
   const [serviceMetrics, setServiceMetrics] = createSignal<ServiceMetric[] | null>(null)
   const [overlayHealth, setOverlayHealth] = createSignal<OverlayHealth[] | null>(null)
+  const [transcriptionAnalytics, setTranscriptionAnalytics] = createSignal<TranscriptionAnalytics | null>(null)
   const [environmentFilter, setEnvironmentFilter] = createSignal<string | null>(null)
   const [isLoading, setIsLoading] = createSignal(false)
 
@@ -112,6 +141,10 @@ export const ServiceStatusProvider: Component<ServiceStatusProviderProps> = (pro
           ? data.overlays.filter((overlay) => overlay.environment === filter)
           : data.overlays
         setOverlayHealth(filteredOverlays)
+      }
+
+      if (data.transcription) {
+        setTranscriptionAnalytics(data.transcription)
       }
     })
 
@@ -156,6 +189,7 @@ export const ServiceStatusProvider: Component<ServiceStatusProviderProps> = (pro
     systemInfo,
     serviceMetrics,
     overlayHealth,
+    transcriptionAnalytics,
     requestRefresh,
     environmentFilter,
     setEnvironmentFilter,

@@ -28,7 +28,7 @@ export function ActivityLogPanel() {
     switch (event.event_type) {
       case EVENT_TYPES.CHAT_MESSAGE: {
         // In flat format, message is directly in the data object
-        const message = eventData.message || (eventData as ChatMessageData).message
+        const message = eventData.message || (eventData as unknown as ChatMessageData).message
         return `${event.user_name}: ${message}`
       }
 
@@ -40,7 +40,7 @@ export function ActivityLogPanel() {
 
       case EVENT_TYPES.CHEER: {
         // In flat format, bits is directly in the data object
-        const bits = eventData.bits || eventData.cheer_bits || (eventData as CheerData).bits
+        const bits = eventData.bits || eventData.cheer_bits || (eventData as unknown as CheerData).bits
         return `${event.user_name} cheered ${bits} bits`
       }
 
@@ -71,9 +71,9 @@ export function ActivityLogPanel() {
   return (
     <section>
       <header>
-        <h2>Activity Log</h2>
+        <h2 class="sr-only">Activity Log</h2>
 
-        <div>
+        <div class="flex justify-around">
           <Button onClick={clearFilters}>All Events</Button>
           <Button onClick={() => handleFilterChange(EVENT_TYPES.CHAT_MESSAGE)}>Chat</Button>
           <Button onClick={() => handleFilterChange(EVENT_TYPES.FOLLOW)}>Follows</Button>
