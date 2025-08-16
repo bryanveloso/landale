@@ -105,6 +105,10 @@ defmodule ServerWeb.EventsChannel do
     push(socket, "rainwave_event", event)
   end
 
+  defp forward_event(socket, :stream, event) do
+    push(socket, "stream_event", event)
+  end
+
   defp forward_event(socket, _, event) do
     push(socket, "unknown_event", event)
   end
@@ -134,6 +138,7 @@ defmodule ServerWeb.EventsChannel do
       {"system", :system} -> true
       {"rainwave", :rainwave} -> true
       {"music", :rainwave} -> true
+      {"stream", :stream} -> true
       # Topic-specific filtering for Twitch events (only when event_type is available)
       {"chat", :twitch} when not is_nil(event_type) -> chat_event?(event_type)
       {"goals", :twitch} when not is_nil(event_type) -> goal_event?(event_type)
