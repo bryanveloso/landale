@@ -44,6 +44,9 @@ config :server, Server.DataAccessGuard,
 
 # Note: Cloak vault configuration moved to runtime.exs for security
 
+# TimescaleDB feature configuration (default: false for basic PostgreSQL)
+config :server, :timescaledb_enabled, false
+
 # Game ID to show mapping configuration (migrated from root config)
 config :server, :game_show_mapping, %{
   # Pokemon FireRed/LeafGreen for IronMON

@@ -246,6 +246,9 @@ defmodule ServerWeb.ServicesChannel do
     # Get service metrics from SystemHealth
     services = Server.Health.SystemHealth.gather_service_metrics()
 
+    # Get transcription analytics
+    transcription_analytics = Server.Health.SystemHealth.gather_transcription_analytics()
+
     # Get system info
     system_info = %{
       uptime: System.monotonic_time(:second),
@@ -259,7 +262,8 @@ defmodule ServerWeb.ServicesChannel do
       timestamp: System.system_time(:millisecond),
       services: services,
       system: system_info,
-      overlays: []
+      overlays: [],
+      transcription: transcription_analytics
     }
   end
 end

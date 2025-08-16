@@ -3,6 +3,9 @@ import Config
 # Configure environment for runtime checks
 config :server, env: :prod
 
+# Enable TimescaleDB features in production
+config :server, :timescaledb_enabled, true
+
 # Production logging configuration
 config :logger, level: :info
 

@@ -170,7 +170,7 @@ defmodule Server.Transcription do
   """
   @spec search_transcriptions_full_text(String.t(), transcription_opts()) :: [Transcription.t()]
   def search_transcriptions_full_text(search_term, opts \\ []) when is_binary(search_term) do
-    if Mix.env() == :prod do
+    if Application.get_env(:server, :timescaledb_enabled, false) do
       search_with_similarity(search_term, opts)
     else
       # Fall back to basic search in test/dev environments

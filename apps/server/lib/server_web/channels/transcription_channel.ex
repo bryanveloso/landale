@@ -319,30 +319,6 @@ defmodule ServerWeb.TranscriptionChannel do
   end
 
   defp broadcast_transcription(transcription) do
-    transcription_event = %{
-      id: transcription.id,
-      timestamp: transcription.timestamp,
-      duration: transcription.duration,
-      text: transcription.text,
-      source_id: transcription.source_id,
-      stream_session_id: transcription.stream_session_id,
-      confidence: transcription.confidence
-    }
-
-    # Broadcast to live channel
-    Phoenix.PubSub.broadcast(
-      Server.PubSub,
-      "transcription:live",
-      {:new_transcription, transcription_event}
-    )
-
-    # Also broadcast to session-specific channel if session_id exists
-    if transcription.stream_session_id do
-      Phoenix.PubSub.broadcast(
-        Server.PubSub,
-        "transcription:session:#{transcription.stream_session_id}",
-        {:new_transcription, transcription_event}
-      )
-    end
+    Server.Transcription.Broadcaster.broadcast_transcription(transcription)
   end
 end

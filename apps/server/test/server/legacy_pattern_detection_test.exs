@@ -158,7 +158,7 @@ defmodule Server.LegacyPatternDetectionTest do
         assert normalized_event.type == event_type
 
         # Verify flat structure
-        assert is_flat_normalized_event?(normalized_event)
+        assert flat_normalized_event?(normalized_event)
       end
     end
 

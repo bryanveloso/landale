@@ -64,7 +64,7 @@ defmodule Server.OBSServiceComplianceTest do
       # These assertions SHOULD pass once OBS is properly integrated
       assert_push(
         "obs_event",
-        %{source: :obs, type: ^first_event_type, session_id: "test-session-123"},
+        %{source: :obs, type: first_event_type, session_id: "test-session-123"},
         100,
         events_socket
       )

@@ -69,6 +69,28 @@ defmodule Server.Health.SystemHealth do
   end
 
   @doc """
+  Gathers transcription analytics for telemetry.
+  """
+  @spec gather_transcription_analytics() :: map()
+  def gather_transcription_analytics do
+    try do
+      Server.Transcription.Analytics.gather_analytics()
+    rescue
+      error ->
+        Logger.warning("Failed to gather transcription analytics", error: inspect(error))
+
+        %{
+          timestamp: System.system_time(:millisecond),
+          total_transcriptions_24h: 0,
+          confidence: %{average: 0.0, min: 0.0, max: 0.0, distribution: %{high: 0, medium: 0, low: 0}},
+          duration: %{total_seconds: 0.0, average_duration: 0.0, total_text_length: 0},
+          trends: %{confidence_trend: "unknown", hourly_volume: [], quality_trend: "unknown"},
+          error: "Analytics unavailable"
+        }
+    end
+  end
+
+  @doc """
   Gathers metrics from all services for status reporting.
   """
   @spec gather_service_metrics() :: map()
