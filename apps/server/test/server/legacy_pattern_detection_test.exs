@@ -165,22 +165,9 @@ defmodule Server.LegacyPatternDetectionTest do
     test "detect services bypassing Server.Events" do
       # This test monitors for direct PubSub broadcasts that bypass Server.Events
 
-      # Track calls to Server.Events.process_event
-      test_pid = self()
-      original_process_event = &Events.process_event/3
-
       # Monitor Events.process_event calls
       events_calls = Agent.start_link(fn -> [] end)
       {:ok, events_agent} = events_calls
-
-      # Override process_event to track calls (simplified mock)
-      tracked_process_event = fn event_type, event_data, opts ->
-        Agent.update(events_agent, fn calls ->
-          [{event_type, event_data, opts} | calls]
-        end)
-
-        original_process_event.(event_type, event_data, opts)
-      end
 
       # Subscribe to unified topics to see what actually gets broadcasted
       Phoenix.PubSub.subscribe(Server.PubSub, "events")
@@ -304,7 +291,7 @@ defmodule Server.LegacyPatternDetectionTest do
         initial_topics = Phoenix.PubSub.topics(Server.PubSub)
 
         {:ok, socket} = connect(ServerWeb.UserSocket, %{})
-        {:ok, _, socket} = subscribe_and_join(socket, channel_module, topic)
+        {:ok, _, _socket} = subscribe_and_join(socket, channel_module, topic)
 
         # Allow subscriptions to register
         Process.sleep(10)
@@ -331,9 +318,6 @@ defmodule Server.LegacyPatternDetectionTest do
   describe "Service Integration Compliance" do
     test "all services should call Server.Events.process_event/2" do
       # This test validates that key services are properly integrated
-
-      # Track Server.Events.process_event calls
-      test_pid = self()
 
       # Test Twitch service (should be compliant)
       capture_log(fn ->

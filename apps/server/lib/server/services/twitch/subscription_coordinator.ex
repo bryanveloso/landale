@@ -913,7 +913,4 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
 
     "#{event_type}:#{JSON.encode!(sorted_condition)}"
   end
-
-  # Service configuration helpers
-  defp oauth_service, do: Application.get_env(:server, :services, [])[:oauth] || Server.OAuthService
 end

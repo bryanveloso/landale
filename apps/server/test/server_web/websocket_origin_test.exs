@@ -1,8 +1,5 @@
 defmodule ServerWeb.WebSocketOriginTest do
   use ExUnit.Case, async: true
-  import Phoenix.ChannelTest
-
-  alias ServerWeb.Endpoint
 
   describe "WebSocket origin validation" do
     test "accepts connections from overlays app on saya:8008" do

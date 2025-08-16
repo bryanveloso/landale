@@ -72,6 +72,17 @@ defmodule ServerWeb.EventsChannel do
     {:noreply, socket}
   end
 
+  # Catch-all handler to prevent crashes from unexpected messages
+  @impl true
+  def handle_info(unhandled_msg, socket) do
+    Logger.warning("Unhandled message in #{__MODULE__}",
+      message: inspect(unhandled_msg),
+      event_topic: socket.assigns[:event_topic]
+    )
+
+    {:noreply, socket}
+  end
+
   # Forward event to appropriate channel based on source
   defp forward_event(socket, :twitch, event) do
     event_name = get_twitch_event_name(event.type)
@@ -111,17 +122,6 @@ defmodule ServerWeb.EventsChannel do
       "channel.update" -> "channel_update"
       _ -> "twitch_event"
     end
-  end
-
-  # Catch-all handler to prevent crashes from unexpected messages
-  @impl true
-  def handle_info(unhandled_msg, socket) do
-    Logger.warning("Unhandled message in #{__MODULE__}",
-      message: inspect(unhandled_msg),
-      event_topic: socket.assigns[:event_topic]
-    )
-
-    {:noreply, socket}
   end
 
   # Enhanced event filtering that considers both topic and event type for specific subscriptions
