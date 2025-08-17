@@ -76,7 +76,7 @@ export const ConnectionMonitor: Component<ConnectionMonitorProps> = (props) => {
 
 const DefaultErrorFallback: Component<{ error: Error; retry: () => void }> = (props) => {
   return (
-    <div class="flex h-full flex-col items-center justify-center rounded border border-red-200 bg-red-50 p-6">
+    <div class="bg-ink flex h-full flex-col items-center justify-center rounded border border-red-200/10 p-6">
       <div class="text-center">
         <h2 class="mb-2 text-lg font-semibold text-red-800">Connection Lost</h2>
         <p class="mb-4 text-red-600">{props.error.message}</p>
