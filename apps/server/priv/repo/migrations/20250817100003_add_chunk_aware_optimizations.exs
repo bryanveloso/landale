@@ -6,62 +6,91 @@ defmodule Server.Repo.Migrations.AddChunkAwareOptimizations do
     if System.get_env("MIX_ENV") != "test" do
       # Set chunk time intervals for better performance
       # 1 day chunks for high-volume tables
-      execute """
-        SELECT set_chunk_time_interval('transcriptions', INTERVAL '1 day');
-      """
-    rescue
-      _ ->
-        :ok
+      try do
+        execute """
+          SELECT set_chunk_time_interval('transcriptions', INTERVAL '1 day');
+        """
+      rescue
+        _ ->
+          :ok
+      end
 
+      try do
         execute """
           SELECT set_chunk_time_interval('events', INTERVAL '1 day');
         """
-    rescue
-      _ ->
-        :ok
+      rescue
+        _ ->
+          :ok
+      end
 
-        # Create chunk-aware indexes for time range queries
-        # These indexes are optimized for TimescaleDB's chunk structure
+      # Create chunk-aware indexes for time range queries
+      # These indexes are optimized for TimescaleDB's chunk structure
 
-        # For transcriptions - optimized time range + filtering indexes
+      # For transcriptions - optimized time range + filtering indexes
+      try do
         execute """
           CREATE INDEX IF NOT EXISTS transcriptions_timestamp_confidence_idx
           ON transcriptions (timestamp DESC, confidence)
           WHERE confidence IS NOT NULL;
         """
+      rescue
+        _ -> :ok
+      end
 
+      try do
         execute """
           CREATE INDEX IF NOT EXISTS transcriptions_session_timestamp_idx
           ON transcriptions (stream_session_id, timestamp DESC)
           WHERE stream_session_id IS NOT NULL;
         """
+      rescue
+        _ -> :ok
+      end
 
-        # For events - optimized for time range queries with type filtering
+      # For events - optimized for time range queries with type filtering
+      try do
         execute """
           CREATE INDEX IF NOT EXISTS events_type_timestamp_idx
           ON events (event_type, timestamp DESC);
         """
+      rescue
+        _ -> :ok
+      end
 
+      try do
         execute """
           CREATE INDEX IF NOT EXISTS events_user_timestamp_idx
           ON events (user_id, timestamp DESC)
           WHERE user_id IS NOT NULL;
         """
+      rescue
+        _ -> :ok
+      end
 
-        # For correlations - even though not a hypertable, optimize for time queries
+      # For correlations - even though not a hypertable, optimize for time queries
+      try do
         execute """
           CREATE INDEX IF NOT EXISTS correlations_created_pattern_idx
           ON correlations (created_at DESC, pattern_type, confidence);
         """
+      rescue
+        _ -> :ok
+      end
 
+      try do
         execute """
           CREATE INDEX IF NOT EXISTS correlations_session_created_idx
           ON correlations (session_id, created_at DESC)
           WHERE session_id IS NOT NULL;
         """
+      rescue
+        _ -> :ok
+      end
 
-        # Create compression policies for older data (if using TimescaleDB 2.0+)
-        # Compress chunks older than 7 days
+      # Create compression policies for older data (if using TimescaleDB 2.0+)
+      # Compress chunks older than 7 days
+      try do
         execute """
           ALTER TABLE transcriptions SET (
             timescaledb.compress,
@@ -69,17 +98,19 @@ defmodule Server.Repo.Migrations.AddChunkAwareOptimizations do
             timescaledb.compress_orderby = 'timestamp DESC'
           );
         """
-    rescue
-      _ ->
-        :ok
+      rescue
+        _ -> :ok
+      end
 
+      try do
         execute """
           SELECT add_compression_policy('transcriptions', INTERVAL '7 days', if_not_exists => true);
         """
-    rescue
-      _ ->
-        :ok
+      rescue
+        _ -> :ok
+      end
 
+      try do
         execute """
           ALTER TABLE events SET (
             timescaledb.compress,
@@ -87,18 +118,20 @@ defmodule Server.Repo.Migrations.AddChunkAwareOptimizations do
             timescaledb.compress_orderby = 'timestamp DESC'
           );
         """
-    rescue
-      _ ->
-        :ok
+      rescue
+        _ -> :ok
+      end
 
+      try do
         execute """
           SELECT add_compression_policy('events', INTERVAL '7 days', if_not_exists => true);
         """
-    rescue
-      _ ->
-        :ok
+      rescue
+        _ -> :ok
+      end
 
-        # Create helper functions for chunk-aware queries
+      # Create helper functions for chunk-aware queries
+      try do
         execute """
           CREATE OR REPLACE FUNCTION get_recent_chunks(
             table_name text,
@@ -120,8 +153,12 @@ defmodule Server.Repo.Migrations.AddChunkAwareOptimizations do
           END;
           $$;
         """
+      rescue
+        _ -> :ok
+      end
 
-        # Create optimized query function for time-range aggregations
+      # Create optimized query function for time-range aggregations
+      try do
         execute """
           CREATE OR REPLACE FUNCTION get_transcription_stats(
             start_time timestamptz,
@@ -150,8 +187,12 @@ defmodule Server.Repo.Migrations.AddChunkAwareOptimizations do
           END;
           $$;
         """
+      rescue
+        _ -> :ok
+      end
 
-        # Create function for efficient chat message search
+      # Create function for efficient chat message search
+      try do
         execute """
           CREATE OR REPLACE FUNCTION search_chat_messages(
             search_term text,
@@ -186,70 +227,142 @@ defmodule Server.Repo.Migrations.AddChunkAwareOptimizations do
           END;
           $$;
         """
+      rescue
+        _ -> :ok
+      end
 
-        # Add data retention policies for automatic old data cleanup
-        # This keeps only 30 days of detailed data (configurable)
+      # Add data retention policies for automatic old data cleanup
+      # This keeps only 30 days of detailed data (configurable)
+      try do
         execute """
           SELECT add_retention_policy('transcriptions', INTERVAL '30 days', if_not_exists => true);
         """
-    rescue
-      _ ->
-        :ok
+      rescue
+        _ -> :ok
+      end
 
+      try do
         execute """
           SELECT add_retention_policy('events', INTERVAL '30 days', if_not_exists => true);
         """
-    rescue
-      _ ->
-        :ok
+      rescue
+        _ -> :ok
+      end
 
-        # Create statistics for query planner optimization
+      # Create statistics for query planner optimization
+      try do
         execute """
           ALTER TABLE transcriptions SET (autovacuum_analyze_scale_factor = 0.02);
         """
+      rescue
+        _ -> :ok
+      end
 
+      try do
         execute """
           ALTER TABLE events SET (autovacuum_analyze_scale_factor = 0.02);
         """
+      rescue
+        _ -> :ok
+      end
 
-        # Run ANALYZE to update statistics
+      # Run ANALYZE to update statistics
+      try do
         execute "ANALYZE transcriptions;"
+      rescue
+        _ -> :ok
+      end
+
+      try do
         execute "ANALYZE events;"
+      rescue
+        _ -> :ok
+      end
     end
   end
 
   def down do
     if System.get_env("MIX_ENV") != "test" do
       # Drop functions
-      execute "DROP FUNCTION IF EXISTS get_recent_chunks CASCADE;"
-      execute "DROP FUNCTION IF EXISTS get_transcription_stats CASCADE;"
-      execute "DROP FUNCTION IF EXISTS search_chat_messages CASCADE;"
+      try do
+        execute "DROP FUNCTION IF EXISTS get_recent_chunks CASCADE;"
+      rescue
+        _ -> :ok
+      end
+
+      try do
+        execute "DROP FUNCTION IF EXISTS get_transcription_stats CASCADE;"
+      rescue
+        _ -> :ok
+      end
+
+      try do
+        execute "DROP FUNCTION IF EXISTS search_chat_messages CASCADE;"
+      rescue
+        _ -> :ok
+      end
 
       # Remove policies
-      execute "SELECT remove_compression_policy('transcriptions', if_exists => true);"
-    rescue
-      _ ->
-        :ok
-        execute "SELECT remove_compression_policy('events', if_exists => true);"
-    rescue
-      _ ->
-        :ok
-        execute "SELECT remove_retention_policy('transcriptions', if_exists => true);"
-    rescue
-      _ ->
-        :ok
-        execute "SELECT remove_retention_policy('events', if_exists => true);"
-    rescue
-      _ ->
-        :ok
+      try do
+        execute "SELECT remove_compression_policy('transcriptions', if_exists => true);"
+      rescue
+        _ -> :ok
+      end
 
-        # Drop indexes
+      try do
+        execute "SELECT remove_compression_policy('events', if_exists => true);"
+      rescue
+        _ -> :ok
+      end
+
+      try do
+        execute "SELECT remove_retention_policy('transcriptions', if_exists => true);"
+      rescue
+        _ -> :ok
+      end
+
+      try do
+        execute "SELECT remove_retention_policy('events', if_exists => true);"
+      rescue
+        _ -> :ok
+      end
+
+      # Drop indexes
+      try do
         execute "DROP INDEX IF EXISTS transcriptions_timestamp_confidence_idx;"
+      rescue
+        _ -> :ok
+      end
+
+      try do
         execute "DROP INDEX IF EXISTS transcriptions_session_timestamp_idx;"
+      rescue
+        _ -> :ok
+      end
+
+      try do
         execute "DROP INDEX IF EXISTS events_type_timestamp_idx;"
+      rescue
+        _ -> :ok
+      end
+
+      try do
         execute "DROP INDEX IF EXISTS events_user_timestamp_idx;"
+      rescue
+        _ -> :ok
+      end
+
+      try do
         execute "DROP INDEX IF EXISTS correlations_created_pattern_idx;"
+      rescue
+        _ -> :ok
+      end
+
+      try do
         execute "DROP INDEX IF EXISTS correlations_session_created_idx;"
+      rescue
+        _ -> :ok
+      end
     end
   end
 end
