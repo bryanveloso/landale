@@ -58,12 +58,6 @@ defmodule Server.Application do
             # Stream coordination
             Server.ContentAggregator,
             Server.StreamProducer,
-            # Correlation engine for chat-transcription matching
-            # Circuit breaker for database operations
-            Server.Correlation.Repository,
-            # Monitoring for correlation metrics
-            Server.Correlation.Monitor,
-            Server.Correlation.Engine,
             # IronMON tracking
             Server.Ironmon.RunTracker,
             # Subscription monitoring
