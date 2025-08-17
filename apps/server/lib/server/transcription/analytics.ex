@@ -209,7 +209,7 @@ defmodule Server.Transcription.Analytics do
     end
   end
 
-  defp calculate_hourly_volume_db(now) do
+  def calculate_hourly_volume_db(now) do
     if Application.get_env(:server, :timescaledb_enabled, false) do
       calculate_hourly_volume_timescaledb(now)
     else
