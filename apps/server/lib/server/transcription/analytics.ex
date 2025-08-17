@@ -138,8 +138,15 @@ defmodule Server.Transcription.Analytics do
     )
     |> Repo.all()
     |> Enum.map(fn %{hour: hour, count: count} ->
+      # Convert NaiveDateTime from time_bucket to DateTime
+      datetime =
+        case hour do
+          %NaiveDateTime{} = naive -> DateTime.from_naive!(naive, "Etc/UTC")
+          %DateTime{} = dt -> dt
+        end
+
       %{
-        hour: DateTime.to_iso8601(hour),
+        hour: DateTime.to_iso8601(datetime),
         count: count
       }
     end)
