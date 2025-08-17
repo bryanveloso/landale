@@ -18,16 +18,32 @@ defmodule Server.Transcription.Analytics do
 
   @doc """
   Gathers transcription analytics data for telemetry using TimescaleDB optimizations.
+  Uses continuous aggregates when available for better performance.
   """
   @spec gather_analytics() :: map()
   def gather_analytics do
     now = DateTime.utc_now()
     twenty_four_hours_ago = DateTime.add(now, -24, :hour)
 
-    # Use database aggregations instead of loading all data into memory
-    confidence_metrics = calculate_confidence_metrics_db(twenty_four_hours_ago, now)
-    duration_metrics = calculate_duration_metrics_db(twenty_four_hours_ago, now)
-    hourly_volume = calculate_hourly_volume_db(now)
+    # Try to use optimized queries first, fallback to standard queries
+    {confidence_metrics, duration_metrics, hourly_volume} =
+      if use_optimized_analytics?() do
+        # Use continuous aggregates and optimized queries
+        alias Server.Transcription.OptimizedAnalytics
+
+        hourly_data = OptimizedAnalytics.get_hourly_metrics(twenty_four_hours_ago, now)
+        confidence = calculate_confidence_from_aggregates(hourly_data)
+        duration = calculate_duration_from_aggregates(hourly_data)
+
+        {confidence, duration, format_hourly_volume(hourly_data)}
+      else
+        # Fallback to standard database queries
+        confidence_metrics = calculate_confidence_metrics_db(twenty_four_hours_ago, now)
+        duration_metrics = calculate_duration_metrics_db(twenty_four_hours_ago, now)
+        hourly_volume = calculate_hourly_volume_db(now)
+
+        {confidence_metrics, duration_metrics, hourly_volume}
+      end
 
     %{
       timestamp: System.system_time(:millisecond),
@@ -40,6 +56,84 @@ defmodule Server.Transcription.Analytics do
         quality_trend: determine_quality_trend_db(twenty_four_hours_ago, now)
       }
     }
+  end
+
+  # Check if optimized analytics are available
+  defp use_optimized_analytics? do
+    Application.get_env(:server, :timescaledb_enabled, false) &&
+      Application.get_env(:server, :use_continuous_aggregates, true)
+  end
+
+  # Calculate confidence metrics from continuous aggregate data
+  defp calculate_confidence_from_aggregates(hourly_data) when hourly_data == [], do: default_confidence_metrics()
+
+  defp calculate_confidence_from_aggregates(hourly_data) do
+    total_count = Enum.reduce(hourly_data, 0, &(&1["count"] + &2))
+
+    {sum_confidence, high, medium, low} =
+      Enum.reduce(hourly_data, {0, 0, 0, 0}, fn data, {sum, h, m, l} ->
+        weighted_confidence = (data["avg_confidence"] || 0) * data["count"]
+
+        {
+          sum + weighted_confidence,
+          h + (data["high_confidence_count"] || 0),
+          m + (data["medium_confidence_count"] || 0),
+          l + (data["low_confidence_count"] || 0)
+        }
+      end)
+
+    avg_confidence = if total_count > 0, do: sum_confidence / total_count, else: 0.0
+
+    %{
+      total_count: total_count,
+      average: Float.round(avg_confidence, 3),
+      min:
+        Enum.min_by(hourly_data, & &1["min_confidence"], fn -> %{"min_confidence" => 0} end)["min_confidence"]
+        |> Float.round(3),
+      max:
+        Enum.max_by(hourly_data, & &1["max_confidence"], fn -> %{"max_confidence" => 0} end)["max_confidence"]
+        |> Float.round(3),
+      distribution: %{
+        high: high,
+        medium: medium,
+        low: low
+      }
+    }
+  end
+
+  defp default_confidence_metrics do
+    %{
+      total_count: 0,
+      average: 0.0,
+      min: 0.0,
+      max: 0.0,
+      distribution: %{high: 0, medium: 0, low: 0}
+    }
+  end
+
+  # Calculate duration metrics from continuous aggregate data
+  defp calculate_duration_from_aggregates([]), do: %{total_seconds: 0.0, average_duration: 0.0, total_text_length: 0}
+
+  defp calculate_duration_from_aggregates(hourly_data) do
+    total_duration = Enum.reduce(hourly_data, 0, &((&1["total_duration"] || 0) + &2))
+    total_count = Enum.reduce(hourly_data, 0, &(&1["count"] + &2))
+
+    %{
+      total_seconds: Float.round(total_duration, 1),
+      average_duration: Float.round(if(total_count > 0, do: total_duration / total_count, else: 0.0), 2),
+      # Not available in hourly aggregates, would need daily
+      total_text_length: 0
+    }
+  end
+
+  # Format hourly volume data from aggregates
+  defp format_hourly_volume(hourly_data) do
+    Enum.map(hourly_data, fn data ->
+      %{
+        hour: DateTime.to_iso8601(data["hour"]),
+        count: data["count"] || 0
+      }
+    end)
   end
 
   # Database-optimized analytics functions using TimescaleDB time_bucket
