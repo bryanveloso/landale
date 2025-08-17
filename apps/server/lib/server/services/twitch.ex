@@ -400,12 +400,26 @@ defmodule Server.Services.Twitch do
 
   # Subscription Creation
   def handle_info({:create_subscriptions_with_validated_token, session_id}, state) do
-    new_state = SubscriptionCoordinator.create_default_subscriptions(state, session_id)
+    {new_state, success_count, failed_count} = SubscriptionCoordinator.create_default_subscriptions(state, session_id)
+
+    Logger.info("Default subscriptions processed",
+      success: success_count,
+      failed: failed_count,
+      session_id: session_id
+    )
+
     {:noreply, new_state}
   end
 
   def handle_info({:retry_default_subscriptions, session_id}, state) do
-    new_state = SubscriptionCoordinator.create_default_subscriptions(state, session_id)
+    {new_state, success_count, failed_count} = SubscriptionCoordinator.create_default_subscriptions(state, session_id)
+
+    Logger.info("Default subscriptions retried",
+      success: success_count,
+      failed: failed_count,
+      session_id: session_id
+    )
+
     {:noreply, new_state}
   end
 
