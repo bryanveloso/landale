@@ -6,6 +6,7 @@ import { StreamInformation } from '@/components/stream-information'
 import { StatusBar } from '@/components/status-bar'
 import { ConnectionMonitor } from '@/components/error-boundary'
 import { ActivityLogPanel } from '@/components/activity-log-panel'
+import { CorrelationDashboard } from '@/components/correlation-dashboard'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -23,6 +24,7 @@ function Index() {
           <TakeoverPanel />
           <StreamQueue />
           <LayerStateMonitor />
+          <CorrelationDashboard />
         </div>
 
         <StatusBar />
