@@ -420,16 +420,11 @@ defmodule Server.Services.Twitch.SessionManager do
         }
 
         # Call SubscriptionCoordinator to create default subscriptions
-        updated_coordinator_state =
+        {updated_coordinator_state, success_count, failed_count} =
           SubscriptionCoordinator.create_default_subscriptions(
             coordinator_state,
             state.session_id
           )
-
-        # Count successful subscriptions
-        success_count = map_size(updated_coordinator_state.subscriptions)
-        # TODO: SubscriptionCoordinator doesn't return failed count
-        failed_count = 0
 
         Logger.info("Default subscriptions created",
           success: success_count,

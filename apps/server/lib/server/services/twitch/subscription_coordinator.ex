@@ -96,11 +96,13 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
   2. Skips subscriptions without proper authorization
   3. Creates subscriptions with proper condition mapping
   4. Tracks success/failure metrics
+
+  Returns a tuple {updated_state, success_count, failed_count}
   """
   def create_default_subscriptions(state, session_id) when not is_nil(session_id) do
     if state.default_subscriptions_created do
       Logger.debug("Default subscriptions already created for this session")
-      state
+      {state, 0, 0}
     else
       Logger.info("Creating default Twitch EventSub subscriptions",
         session_id: session_id,
@@ -110,7 +112,7 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
       case state.user_id do
         nil ->
           Logger.warning("Cannot create subscriptions: user_id not available yet")
-          schedule_retry(state, session_id)
+          {schedule_retry(state, session_id), 0, 0}
 
         user_id ->
           create_subscriptions_for_user(state, user_id, session_id)
@@ -120,7 +122,7 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
 
   def create_default_subscriptions(state, nil) do
     Logger.warning("Cannot create subscriptions without session_id")
-    state
+    {state, 0, 0}
   end
 
   @doc """
@@ -299,7 +301,8 @@ defmodule Server.Services.Twitch.SubscriptionCoordinator do
         add_subscription_to_state(subscription, nil, nil, acc)
       end)
 
-    %{new_state | default_subscriptions_created: true}
+    updated_state = %{new_state | default_subscriptions_created: true}
+    {updated_state, results.successful_count, results.failed_count}
   end
 
   defp prepare_default_subscriptions(user_id) do
