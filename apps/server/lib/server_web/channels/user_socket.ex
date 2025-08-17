@@ -12,6 +12,7 @@ defmodule ServerWeb.UserSocket do
   channel "overlay:*", ServerWeb.OverlayChannel
   channel "stream:*", ServerWeb.StreamChannel
   channel "transcription:*", ServerWeb.TranscriptionChannel
+  channel "correlation:*", ServerWeb.CorrelationChannel
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After
