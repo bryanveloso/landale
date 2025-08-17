@@ -9,7 +9,7 @@ defmodule Server.Transcription.Broadcaster do
   This module represents legitimate domain separation from the main event
   system due to transcription's specialized requirements:
   - Live caption streaming to OBS
-  - Session-aware correlation for replay/analysis
+  - Session-aware replay for analysis
   - High-frequency data optimized for TimescaleDB
   """
 

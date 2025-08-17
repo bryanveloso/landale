@@ -22,7 +22,7 @@ defmodule Server.Events do
   - `channel.subscription.gift` - Gift subscriptions
   - `channel.cheer` - Bits cheered
   - `channel.update` - Channel information updates
-  - `channel.chat.message` - Chat messages for correlation analysis
+  - `channel.chat.message` - Chat messages
   - `channel.chat.clear` - Chat clearing events
   - `channel.chat.message_delete` - Message deletion events
   - `channel.goal.begin` - Goal creation

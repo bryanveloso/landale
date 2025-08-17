@@ -248,53 +248,6 @@ defmodule Server.Transcription.OptimizedAnalytics do
     end
   end
 
-  @doc """
-  Get correlation patterns efficiently using optimized indexes.
-  """
-  @spec get_correlation_patterns(String.t(), keyword()) :: [map()]
-  def get_correlation_patterns(pattern_type, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 100)
-    min_confidence = Keyword.get(opts, :min_confidence, 0.7)
-    session_id = Keyword.get(opts, :session_id)
-
-    query = """
-    SELECT
-      pattern_type,
-      COUNT(*) as occurrence_count,
-      AVG(confidence) as avg_confidence,
-      array_agg(DISTINCT unnest(detected_keywords)) as all_keywords
-    FROM correlations
-    WHERE pattern_type = $1
-      AND confidence >= $2
-      #{if session_id, do: "AND session_id = $3", else: ""}
-    GROUP BY pattern_type
-    ORDER BY occurrence_count DESC
-    LIMIT $#{if session_id, do: 4, else: 3}
-    """
-
-    params =
-      if session_id do
-        [pattern_type, min_confidence, session_id, limit]
-      else
-        [pattern_type, min_confidence, limit]
-      end
-
-    case Repo.query(query, params) do
-      {:ok, %{rows: rows}} ->
-        Enum.map(rows, fn [pattern, count, avg_conf, keywords] ->
-          %{
-            pattern_type: pattern,
-            occurrence_count: count,
-            avg_confidence: Float.round(avg_conf || 0.0, 3),
-            keywords: keywords || []
-          }
-        end)
-
-      {:error, _} ->
-        []
-    end
-  end
-
   # Fallback functions for when continuous aggregates aren't available
 
   defp get_hourly_metrics_fallback(start_time, end_time, session_id) do
