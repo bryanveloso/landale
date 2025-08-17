@@ -92,8 +92,8 @@ defmodule Server.Correlation.TemporalEngine do
     Phoenix.PubSub.subscribe(Server.PubSub, "chat:message")
 
     # Initialize buffers
-    transcription_buffer = SlidingBuffer.new(@transcription_buffer_size)
-    chat_buffer = SlidingBuffer.new(@chat_buffer_size)
+    transcription_buffer = SlidingBuffer.new(max_size: @transcription_buffer_size)
+    chat_buffer = SlidingBuffer.new(max_size: @chat_buffer_size)
 
     state = %__MODULE__{
       transcription_buffer: transcription_buffer,
