@@ -116,12 +116,13 @@ type LayerState = 'hidden' | 'entering' | 'active' | 'interrupted' | 'exiting'
 
 ## Critical Rules
 
-1. **Commit Messages**: ALWAYS end with a period. Format: `<description>.`
-2. **Bun First**: Use Bun APIs, never Node.js equivalents
-3. **Personal Scale**: Single-user system - avoid enterprise patterns
-4. **Real-time Focus**: Optimize for low latency over throughput
-5. **Code First**: Show working code rather than explaining
-6. **Pattern Adherence**: Use established patterns from above
+1. **Research First**: ALWAYS research technical constraints before writing migrations, using unfamiliar technologies, or implementing domain-specific features. Use Context7, WebFetch, and documentation tools to understand requirements upfront instead of discovering constraints through production failures.
+2. **Commit Messages**: ALWAYS end with a period. Format: `<description>.`
+3. **Bun First**: Use Bun APIs, never Node.js equivalents
+4. **Personal Scale**: Single-user system - avoid enterprise patterns
+5. **Real-time Focus**: Optimize for low latency over throughput
+6. **Code First**: Show working code rather than explaining
+7. **Pattern Adherence**: Use established patterns from above
 
 ## Code Standards
 
@@ -258,7 +259,7 @@ bun test:coverage          # Coverage report
 # Docker
 docker compose up          # Run services
 
-# Nurvus Deployment
+# Building Nuruvs
 cd apps/nurvus
 mix increment_version      # ALWAYS run before release
 mix release --overwrite
@@ -303,39 +304,25 @@ curl http://localhost:8890/health
   - Implement `on_connected()`, `on_disconnected()`, `on_message()` handlers
   - Automatic reconnection built into base class
 
-## Known Limitations
+## PRODUCTION DEPLOYMENT PROCESS (CRITICAL)
 
-1. **TypeScript Test Coverage**: Only 2 test files exist (~1% coverage) - Critical gap
-   - Only 1 real test (layer orchestrator) and 1 placeholder
-   - Frontend essentially untested despite 143 test files claimed in old docs
-2. **Python Test Coverage**: 10 test files exist (~15% coverage, needs 50-65% target)
-   - phononmaser has 6 test files
-   - seed has 3 test files
-   - shared-python has 1 test file
-   - Need comprehensive test suite for WebSocket resilience patterns
-3. **Telemetry Dashboard**: Basic implementation exists but could be enhanced
-   - Metrics are collected in `apps/server/lib/server_web/channels/telemetry_channel.ex`
-   - Data is broadcast via `dashboard:telemetry` Phoenix channel every 2 seconds
-   - Basic dashboard available at `/telemetry` route in dashboard app (shows service status)
-   - Could be enhanced with more detailed metrics visualization
-4. **Documentation**: Some guides in `handbook/` are from July 2025 and may not reflect August improvements
-5. **Python Template**: Resilience patterns exist but no standardized template
+**NEVER ASK ABOUT DEPLOYMENT AGAIN. THIS IS THE PROCESS:**
+
+1. **COMMIT CODE** - Local changes committed to git
+2. **PUSH CODE** - Push to GitHub main branch
+3. **GITHUB CI/CD** - `.github/` workflows automatically run CI and deploy to OrbStack on Saya machine
+4. **DATABASE MIGRATION** - Run migrations in the release build using Server.Release.migrate() (MIX DOES NOT EXIST IN PRODUCTION)
+5. **DONE** - Production is updated automatically
+
+**Key Points:**
+
+- GitHub handles ALL deployment via CI/CD workflows
+- Saya machine runs OrbStack (not Docker Compose)
+- Production uses Elixir releases (no Mix commands available)
+- Database migrations use `Server.Release.migrate()` function
+- Nurvus on Saya manages the OrbStack processes but is NOT the deployment system
 
 ## Architecture Assessment Summary
-
-### Strengths
-
-- **Appropriate Scale**: Correctly sized for personal use without over-engineering
-- **Resilience Patterns**: Professional-grade WebSocket handling, circuit breakers, memory protection
-- **Clean Separation**: Clear service boundaries with defined responsibilities
-- **Developer Experience**: Comprehensive documentation, refactoring protocols, configuration management
-
-### Next Priorities
-
-1. **Build Telemetry Dashboard**: Visualize the metrics already being collected
-2. **Document Test Patterns**: Capture MockWebSocketConnection implementation
-3. **Create Python Service Template**: Standardize resilience patterns
-4. **Update Documentation**: Remove outdated references, document what's real
 
 ## Development Workflow
 
