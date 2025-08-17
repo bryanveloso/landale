@@ -64,9 +64,6 @@ defmodule Server.Application do
             # Monitoring for correlation metrics
             Server.Correlation.Monitor,
             Server.Correlation.Engine,
-            # Temporal analysis for stream delay-aware correlations
-            Server.Correlation.TemporalAnalyzer,
-            Server.Correlation.TemporalEngine,
             # IronMON tracking
             Server.Ironmon.RunTracker,
             # Subscription monitoring
