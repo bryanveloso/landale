@@ -18,7 +18,7 @@ defmodule Server.Repo.Migrations.AddTemporalCorrelationFields do
 
     # Create temporal delay estimation table for tracking delay history
     create table(:stream_delay_estimates, primary_key: false) do
-      add :id, :binary_id
+      add :id, :binary_id, primary_key: true
       add :session_id, :binary_id, null: true
       add :estimated_delay_ms, :integer, null: false
       add :confidence, :float, null: false
@@ -30,12 +30,9 @@ defmodule Server.Repo.Migrations.AddTemporalCorrelationFields do
       timestamps(type: :utc_datetime_usec)
     end
 
-    # Add composite primary key including partitioning column
-    execute "ALTER TABLE stream_delay_estimates ADD PRIMARY KEY (id, inserted_at);"
-
     # Create hypertable for delay estimates if TimescaleDB is available
     execute_if_timescale("""
-    PERFORM create_hypertable('stream_delay_estimates', 'inserted_at',
+    SELECT create_hypertable('stream_delay_estimates', 'inserted_at',
       chunk_time_interval => INTERVAL '1 day',
       if_not_exists => TRUE
     );
@@ -48,7 +45,7 @@ defmodule Server.Repo.Migrations.AddTemporalCorrelationFields do
 
     # Create temporal pattern statistics table
     create table(:temporal_pattern_stats, primary_key: false) do
-      add :id, :binary_id
+      add :id, :binary_id, primary_key: true
       add :session_id, :binary_id, null: true
       add :pattern_type, :string, null: false
       add :temporal_pattern_type, :string, null: false
@@ -61,24 +58,25 @@ defmodule Server.Repo.Migrations.AddTemporalCorrelationFields do
       timestamps(type: :utc_datetime_usec)
     end
 
-    # Add composite primary key including partitioning column
-    execute "ALTER TABLE temporal_pattern_stats ADD PRIMARY KEY (id, inserted_at);"
-
-    # Add indexes for pattern statistics (before hypertable creation)
-    create index(:temporal_pattern_stats, [:session_id, :pattern_type])
-    create index(:temporal_pattern_stats, [:temporal_pattern_type])
-    create index(:temporal_pattern_stats, [:inserted_at])
-
-    # Note: Unique index removed due to TimescaleDB partitioning constraints
-    # Use regular index instead for performance
-
     # Create hypertable for pattern stats if TimescaleDB is available
     execute_if_timescale("""
-    PERFORM create_hypertable('temporal_pattern_stats', 'inserted_at',
+    SELECT create_hypertable('temporal_pattern_stats', 'inserted_at',
       chunk_time_interval => INTERVAL '1 day',
       if_not_exists => TRUE
     );
     """)
+
+    # Add indexes for pattern statistics
+    create index(:temporal_pattern_stats, [:session_id, :pattern_type])
+    create index(:temporal_pattern_stats, [:temporal_pattern_type])
+    create index(:temporal_pattern_stats, [:inserted_at])
+
+    create unique_index(:temporal_pattern_stats, [
+             :session_id,
+             :pattern_type,
+             :temporal_pattern_type,
+             :inserted_at
+           ])
 
     # Create view for temporal analysis dashboard
     execute("""

@@ -119,8 +119,11 @@ defmodule Server.Repo.Migrations.AddTimescaledbContinuousAggregates do
       execute "CREATE INDEX ON events_hourly (hour DESC, event_type);"
       execute "CREATE INDEX ON events_daily (day DESC, event_type);"
 
-      # Note: Continuous aggregates will be refreshed automatically by the policies
-      # refresh_continuous_aggregate() cannot run inside a transaction block
+      # Perform initial refresh of the aggregates
+      execute "CALL refresh_continuous_aggregate('transcriptions_hourly', NULL, NULL);"
+      execute "CALL refresh_continuous_aggregate('transcriptions_daily', NULL, NULL);"
+      execute "CALL refresh_continuous_aggregate('events_hourly', NULL, NULL);"
+      execute "CALL refresh_continuous_aggregate('events_daily', NULL, NULL);"
     end
   end
 

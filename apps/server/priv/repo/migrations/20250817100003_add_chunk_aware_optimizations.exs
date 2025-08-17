@@ -202,7 +202,7 @@ defmodule Server.Repo.Migrations.AddChunkAwareOptimizations do
           )
           RETURNS TABLE(
             id uuid,
-            created_at timestamptz,
+            timestamp timestamptz,
             user_name text,
             message text,
             similarity float
@@ -213,7 +213,7 @@ defmodule Server.Repo.Migrations.AddChunkAwareOptimizations do
             RETURN QUERY
             SELECT
               e.id,
-              e.timestamp AS created_at,
+              e.timestamp,
               e.user_name,
               e.data->>'message' as message,
               similarity(e.data->>'message', search_term) as similarity

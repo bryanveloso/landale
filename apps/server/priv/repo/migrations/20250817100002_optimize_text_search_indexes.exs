@@ -84,13 +84,7 @@ defmodule Server.Repo.Migrations.OptimizeTextSearchIndexes do
       # Add text search configuration for better ranking
       # Create custom text search configuration for streaming content
       execute """
-        DO $$
-        BEGIN
-          IF NOT EXISTS (SELECT 1 FROM pg_ts_config WHERE cfgname = 'streaming_english') THEN
-            CREATE TEXT SEARCH CONFIGURATION streaming_english (COPY = english);
-          END IF;
-        END
-        $$;
+        CREATE TEXT SEARCH CONFIGURATION IF NOT EXISTS streaming_english (COPY = english);
       """
 
       # Add full text search columns with proper weighting
