@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ServiceStatusRouteImport } from './routes/service-status'
 import { Route as OauthRouteImport } from './routes/oauth'
+import { Route as CorrelationsRouteImport } from './routes/correlations'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ServiceStatusRoute = ServiceStatusRouteImport.update({
@@ -23,6 +24,11 @@ const OauthRoute = OauthRouteImport.update({
   path: '/oauth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CorrelationsRoute = CorrelationsRouteImport.update({
+  id: '/correlations',
+  path: '/correlations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,30 +37,34 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/correlations': typeof CorrelationsRoute
   '/oauth': typeof OauthRoute
   '/service-status': typeof ServiceStatusRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/correlations': typeof CorrelationsRoute
   '/oauth': typeof OauthRoute
   '/service-status': typeof ServiceStatusRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/correlations': typeof CorrelationsRoute
   '/oauth': typeof OauthRoute
   '/service-status': typeof ServiceStatusRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/oauth' | '/service-status'
+  fullPaths: '/' | '/correlations' | '/oauth' | '/service-status'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/oauth' | '/service-status'
-  id: '__root__' | '/' | '/oauth' | '/service-status'
+  to: '/' | '/correlations' | '/oauth' | '/service-status'
+  id: '__root__' | '/' | '/correlations' | '/oauth' | '/service-status'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CorrelationsRoute: typeof CorrelationsRoute
   OauthRoute: typeof OauthRoute
   ServiceStatusRoute: typeof ServiceStatusRoute
 }
@@ -75,6 +85,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof OauthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/correlations': {
+      id: '/correlations'
+      path: '/correlations'
+      fullPath: '/correlations'
+      preLoaderRoute: typeof CorrelationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,6 +104,7 @@ declare module '@tanstack/solid-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CorrelationsRoute: CorrelationsRoute,
   OauthRoute: OauthRoute,
   ServiceStatusRoute: ServiceStatusRoute,
 }

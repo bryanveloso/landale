@@ -20,6 +20,10 @@ export function StatusBar() {
           <Link href="/service-status" class="text-gray-400 transition-colors hover:text-white">
             Service Status
           </Link>
+          <span class="text-gray-600">|</span>
+          <Link href="/correlations" class="text-gray-400 transition-colors hover:text-white">
+            Correlations
+          </Link>
         </div>
       </div>
     </div>
