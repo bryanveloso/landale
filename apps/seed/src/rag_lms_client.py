@@ -68,40 +68,31 @@ class RAGLMSClient:
             logger.info(f"RAG LMS: Prompt length: {len(prompt)} chars")
             logger.debug(f"RAG LMS: Prompt preview: {prompt[:200]}...")
 
-            # Use the convenience API with configurable parameters and structured response
-            config = {"temperature": self.temperature, "maxTokens": self.max_tokens, "topP": self.top_p}
-
-            logger.debug(f"RAG LMS: Using config: {config}")
-            response = await asyncio.to_thread(self.llm_model.respond, prompt, config, schema=RAGResponse)
+            # Use the convenience API - parameters are configured at model level, not per request
+            logger.debug(
+                f"RAG LMS: Using configured params temp={self.temperature}, max_tokens={self.max_tokens}, top_p={self.top_p}"
+            )
+            response = await asyncio.to_thread(self.llm_model.respond, prompt)
 
             logger.info(f"RAG LMS: Received response object: {type(response)}")
 
-            if response and hasattr(response, "parsed"):
-                # Get the structured data from the parsed field
-                structured_data = response.parsed
-                logger.info(f"RAG LMS structured response generated: {structured_data.response_type}")
-                logger.debug(f"RAG LMS response preview: {structured_data.answer[:100]}...")
+            # Handle LM Studio SDK response format
+            if response and hasattr(response, "content"):
+                content = response.content.strip()
+                logger.info(f"RAG LMS response received, length: {len(content)} chars")
+                logger.debug(f"RAG LMS response preview: {content[:100]}...")
 
-                # Convert to dict for easier handling
+                # For now, use unstructured response format
+                # TODO: Implement JSON parsing or proper structured response when LM Studio SDK supports it
                 return {
-                    "answer": structured_data.answer,
-                    "confidence": structured_data.confidence,
-                    "reasoning": structured_data.reasoning,
-                    "response_type": structured_data.response_type,
-                    "suggestions": structured_data.suggestions,
+                    "answer": content,
+                    "confidence": 0.7,  # Higher confidence than fallback since we got a response
+                    "reasoning": "AI generated response using RAG context",
+                    "response_type": "creative",  # Most RAG responses will be interpretive
+                    "suggestions": None,
                 }
             else:
-                logger.warning(f"RAG LMS: No parsed field in response: {response}")
-                # Fallback to content if structured parsing fails
-                if hasattr(response, "content"):
-                    content = response.content.strip()
-                    return {
-                        "answer": content,
-                        "confidence": 0.5,
-                        "reasoning": "Unstructured fallback response",
-                        "response_type": "fallback",
-                        "suggestions": None,
-                    }
+                logger.warning(f"RAG LMS: No content in response: {response}")
                 return None
 
         except Exception as e:

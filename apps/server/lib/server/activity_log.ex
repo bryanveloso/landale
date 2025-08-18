@@ -50,29 +50,39 @@ defmodule Server.ActivityLog do
 
   ## Options
 
-    * `:limit` - Maximum number of results (default: 100, max: 1000)
+    * `:limit` - Maximum number of results (unbounded by default, max: 1000 when specified)
     * `:event_type` - Filter by specific event type
     * `:user_id` - Filter by specific user ID
 
   ## Examples
 
+      iex> list_recent_events()
+      [%Event{}, ...]  # All events (unbounded)
+
       iex> list_recent_events(limit: 50)
-      [%Event{}, ...]
+      [%Event{}, ...]  # Limited to 50
 
       iex> list_recent_events(event_type: "channel.chat.message", limit: 25)
       [%Event{}, ...]
   """
   @spec list_recent_events(event_opts()) :: [Event.t()]
   def list_recent_events(opts \\ []) do
-    limit = Keyword.get(opts, :limit, 100) |> min(1000)
+    # Only apply limit if explicitly provided, otherwise unbounded
+    limit =
+      case Keyword.get(opts, :limit) do
+        # Unbounded query
+        nil -> nil
+        # Respect max when explicit
+        val -> min(val, 1000)
+      end
+
     event_type = Keyword.get(opts, :event_type)
     user_id = Keyword.get(opts, :user_id)
 
-    query =
-      from(e in Event,
-        order_by: [desc: e.timestamp],
-        limit: ^limit
-      )
+    query = from(e in Event, order_by: [desc: e.timestamp])
+
+    # Only add limit clause if limit is not nil
+    query = if limit, do: from(q in query, limit: ^limit), else: query
 
     query =
       if event_type do
@@ -96,15 +106,25 @@ defmodule Server.ActivityLog do
   """
   @spec list_events_by_time_range(DateTime.t(), DateTime.t(), event_opts()) :: [Event.t()]
   def list_events_by_time_range(start_time, end_time, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 1000)
+    # Only apply limit if explicitly provided, otherwise unbounded (matching list_recent_events pattern)
+    limit =
+      case Keyword.get(opts, :limit) do
+        # Unbounded query
+        nil -> nil
+        # Respect max when explicit
+        val -> min(val, 1000)
+      end
+
     event_type = Keyword.get(opts, :event_type)
 
     query =
       from(e in Event,
         where: e.timestamp >= ^start_time and e.timestamp <= ^end_time,
-        order_by: [asc: e.timestamp],
-        limit: ^limit
+        order_by: [asc: e.timestamp]
       )
+
+    # Only add limit clause if limit is not nil
+    query = if limit, do: from(q in query, limit: ^limit), else: query
 
     query =
       if event_type do

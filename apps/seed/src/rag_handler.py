@@ -2,7 +2,8 @@
 
 import asyncio
 import json
-from datetime import UTC, datetime, timedelta
+import re
+from datetime import datetime
 from typing import Any
 
 import aiohttp
@@ -65,13 +66,16 @@ class RAGHandler:
         if self._vocab_client:
             await self._vocab_client.__aexit__(exc_type, exc_val, exc_tb)
 
-    async def query(self, question: str, time_window_hours: int = 24) -> dict[str, Any]:
+    async def query(self, question: str, time_window_hours: int | None = None) -> dict[str, Any]:
         """
         Process a natural language query about streaming data.
 
         Args:
             question: Natural language question from user
-            time_window_hours: Time window to search within (default 24 hours)
+            time_window_hours: Optional time window for AI context pattern retrieval only.
+                             Most data sources (chat, subscriptions, followers, raids, cheers)
+                             are now unbounded bulk queries that return all available data.
+                             Only AI context analysis respects this time window parameter.
 
         Returns:
             Dictionary containing the answer and supporting data
@@ -121,14 +125,18 @@ class RAGHandler:
                 "timestamp": datetime.utcnow().isoformat(),
             }
 
-    async def _retrieve_relevant_data(self, question: str, time_window_hours: int) -> dict[str, Any]:
+    async def _retrieve_relevant_data(self, question: str, time_window_hours: int | None) -> dict[str, Any]:
         """
         Retrieve relevant data based on the question.
 
         This function analyzes the question and retrieves appropriate data from:
-        - Context history (transcripts, chat, patterns)
-        - Activity events (follows, subs, raids, etc.)
-        - Stream statistics
+        - Context history (transcripts, chat, patterns) - context patterns use time_window_hours
+        - Activity events (follows, subs, raids, etc.) - unbounded bulk queries
+        - Stream statistics - unbounded queries
+
+        Note: time_window_hours only affects AI context pattern retrieval. All other data sources
+        (chat messages, subscriptions, followers, raids, cheers, etc.) return all available data
+        regardless of the time window parameter.
         """
         question_lower = question.lower()
         retrieved_data = {"sources": [], "raw_data": {}}
@@ -138,17 +146,17 @@ class RAGHandler:
 
         # Check for subscriber-related queries
         if any(word in question_lower for word in ["sub", "subscriber", "subscription", "resub", "gift"]):
-            queries_to_run.append(self._get_subscription_data(time_window_hours))
+            queries_to_run.append(self._get_subscription_data())
             retrieved_data["sources"].append("subscription_events")
 
         # Check for follower-related queries
         if any(word in question_lower for word in ["follow", "follower", "new viewer"]):
-            queries_to_run.append(self._get_follower_data(time_window_hours))
+            queries_to_run.append(self._get_follower_data())
             retrieved_data["sources"].append("follower_events")
 
         # Check for chat/message queries
         if any(word in question_lower for word in ["chat", "message", "said", "talking", "conversation"]):
-            queries_to_run.append(self._get_chat_data(time_window_hours))
+            queries_to_run.append(self._get_chat_data())
             retrieved_data["sources"].append("chat_messages")
 
         # Check for game/stream content queries
@@ -158,12 +166,12 @@ class RAGHandler:
 
         # Check for raid/host queries
         if any(word in question_lower for word in ["raid", "raided", "host"]):
-            queries_to_run.append(self._get_raid_data(time_window_hours))
+            queries_to_run.append(self._get_raid_data())
             retrieved_data["sources"].append("raid_events")
 
         # Check for bits/cheer queries
         if any(word in question_lower for word in ["bits", "cheer", "cheered"]):
-            queries_to_run.append(self._get_cheer_data(time_window_hours))
+            queries_to_run.append(self._get_cheer_data())
             retrieved_data["sources"].append("cheer_events")
 
         # Check for context/pattern queries
@@ -175,7 +183,7 @@ class RAGHandler:
             retrieved_data["sources"].append("ai_context_analysis")
 
         # Always get basic stats for context
-        queries_to_run.append(self._get_activity_stats(time_window_hours))
+        queries_to_run.append(self._get_activity_stats())
         retrieved_data["sources"].append("activity_stats")
 
         # If no specific data type detected, search contexts for relevant transcripts
@@ -229,8 +237,6 @@ class RAGHandler:
                                 message_text = str(data["message"])
 
                             # Extract potential vocabulary terms (3+ chars, not common words)
-                            import re
-
                             words = re.findall(r"\b\w{3,}\b", message_text.lower())
                             for word in words:
                                 if not self._is_common_word(word):
@@ -341,28 +347,6 @@ class RAGHandler:
             "best",
         }
         return word.lower() in common_words
-
-    def _filter_events_by_time(self, events: list, hours: int, event_type: str = "") -> list:
-        """Helper method to safely filter events by time window."""
-
-        cutoff = datetime.now(UTC) - timedelta(hours=hours)
-
-        logger.info(f"RAG Handler {event_type}: Found {len(events)} raw events, filtering by cutoff: {cutoff}")
-
-        filtered_events = []
-        for e in events:
-            try:
-                if isinstance(e, dict) and "timestamp" in e:
-                    event_time = datetime.fromisoformat(e["timestamp"].replace("Z", "+00:00"))
-                    if event_time > cutoff:
-                        filtered_events.append(e)
-                else:
-                    logger.warning(f"RAG Handler {event_type}: Event missing timestamp or wrong type: {type(e)}")
-            except Exception as ex:
-                logger.error(f"RAG Handler {event_type}: Error processing event timestamp: {ex}, event: {e}")
-
-        logger.info(f"RAG Handler {event_type}: Filtered to {len(filtered_events)} events within {hours}h window")
-        return filtered_events
 
     async def _generate_response(self, question: str, retrieved_data: dict[str, Any]) -> dict[str, Any]:
         """
@@ -562,61 +546,66 @@ Respond using the structured format."""
             "data_summary": f"Retrieved {len(raw_data)} data sources",
         }
 
-    async def _get_subscription_data(self, hours: int) -> list[dict]:
-        """Get subscription events from the last N hours."""
+    async def _get_subscription_data(self) -> list[dict]:
+        """Get all subscription events."""
         if not self.session:
             return []
 
         try:
-            url = f"{self.server_url}/api/activity/events"
-            params = {"event_type": "channel.subscribe", "limit": 100}
+            url = f"{self.server_url}/api/activity/events/bulk"
+            params = {"event_type": "channel.subscribe"}
+            logger.info(f"RAG Handler fetching subscription data from bulk API: {url} with params: {params}")
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
                     events = data.get("data", {}).get("events", [])
-                    return self._filter_events_by_time(events, hours, "subscription")
+                    logger.info(f"RAG Handler subscription: Got {len(events)} events from bulk API")
+                    return events
 
         except Exception as e:
             logger.error(f"Error fetching subscription data: {e}")
 
         return []
 
-    async def _get_follower_data(self, hours: int) -> list[dict]:
-        """Get follower events from the last N hours."""
+    async def _get_follower_data(self) -> list[dict]:
+        """Get all follower events."""
         if not self.session:
             return []
 
         try:
-            url = f"{self.server_url}/api/activity/events"
-            params = {"event_type": "channel.follow", "limit": 100}
+            url = f"{self.server_url}/api/activity/events/bulk"
+            params = {"event_type": "channel.follow"}
+            logger.info(f"RAG Handler fetching follower data from bulk API: {url} with params: {params}")
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
                     events = data.get("data", {}).get("events", [])
-                    return self._filter_events_by_time(events, hours, "follower")
+                    logger.info(f"RAG Handler follower: Got {len(events)} events from bulk API")
+                    return events
 
         except Exception as e:
             logger.error(f"Error fetching follower data: {e}")
 
         return []
 
-    async def _get_chat_data(self, hours: int) -> list[dict]:
-        """Get recent chat messages."""
+    async def _get_chat_data(self) -> list[dict]:
+        """Get all chat messages."""
         if not self.session:
             return []
 
         try:
-            url = f"{self.server_url}/api/activity/events"
-            params = {"event_type": "channel.chat.message", "limit": 50}
-            logger.info(f"RAG Handler fetching chat data from: {url} with params: {params}")
+            url = f"{self.server_url}/api/activity/events/bulk"
+            params = {"event_type": "channel.chat.message"}
+            logger.info(f"RAG Handler fetching chat data from bulk API: {url} with params: {params}")
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
                     events = data.get("data", {}).get("events", [])
-                    return self._filter_events_by_time(events, hours, "chat")
+                    logger.info(f"RAG Handler chat: Got {len(events)} events from bulk API")
+                    return events
 
         except Exception as e:
             logger.error(f"Error fetching chat data: {e}")
@@ -642,54 +631,58 @@ Respond using the structured format."""
 
         return {}
 
-    async def _get_raid_data(self, hours: int) -> list[dict]:
-        """Get raid events from the last N hours."""
+    async def _get_raid_data(self) -> list[dict]:
+        """Get all raid events."""
         if not self.session:
             return []
 
         try:
-            url = f"{self.server_url}/api/activity/events"
-            params = {"event_type": "channel.raid", "limit": 50}
+            url = f"{self.server_url}/api/activity/events/bulk"
+            params = {"event_type": "channel.raid"}
+            logger.info(f"RAG Handler fetching raid data from bulk API: {url} with params: {params}")
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
                     events = data.get("data", {}).get("events", [])
-                    return self._filter_events_by_time(events, hours, "raid")
+                    logger.info(f"RAG Handler raid: Got {len(events)} events from bulk API")
+                    return events
 
         except Exception as e:
             logger.error(f"Error fetching raid data: {e}")
 
         return []
 
-    async def _get_cheer_data(self, hours: int) -> list[dict]:
-        """Get cheer/bits events from the last N hours."""
+    async def _get_cheer_data(self) -> list[dict]:
+        """Get all cheer/bits events."""
         if not self.session:
             return []
 
         try:
-            url = f"{self.server_url}/api/activity/events"
-            params = {"event_type": "channel.cheer", "limit": 50}
+            url = f"{self.server_url}/api/activity/events/bulk"
+            params = {"event_type": "channel.cheer"}
+            logger.info(f"RAG Handler fetching cheer data from bulk API: {url} with params: {params}")
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
                     events = data.get("data", {}).get("events", [])
-                    return self._filter_events_by_time(events, hours, "cheer")
+                    logger.info(f"RAG Handler cheer: Got {len(events)} events from bulk API")
+                    return events
 
         except Exception as e:
             logger.error(f"Error fetching cheer data: {e}")
 
         return []
 
-    async def _get_activity_stats(self, hours: int) -> dict:
+    async def _get_activity_stats(self) -> dict:
         """Get activity statistics."""
         if not self.session:
             return {}
 
         try:
             url = f"{self.server_url}/api/activity/stats"
-            params = {"hours": hours}
+            params = {}
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
@@ -701,9 +694,19 @@ Respond using the structured format."""
 
         return {}
 
-    async def _get_context_patterns(self, hours: int) -> dict:
-        """Get AI-analyzed context patterns."""
-        stats = await self.context_client.get_context_stats(hours)
+    async def _get_context_patterns(self, hours: int | None) -> dict:
+        """
+        Get AI-analyzed context patterns.
+
+        Note: This is the ONLY data retrieval method that respects time filtering.
+        All other data sources (_get_subscription_data, _get_follower_data, etc.)
+        are unbounded and return all available data regardless of time windows.
+        """
+        if hours is not None:
+            stats = await self.context_client.get_context_stats(hours)
+        else:
+            # Get all-time stats when no time limit specified
+            stats = await self.context_client.get_context_stats(8760)  # 1 year
         contexts = await self.context_client.get_contexts(limit=10)
 
         return {"stats": stats, "recent_contexts": contexts}
@@ -902,8 +905,8 @@ async def create_rag_endpoints(app: web.Application, rag_handler: RAGHandler):
             if not question:
                 return web.json_response({"success": False, "error": "Question is required"}, status=400)
 
-            # Optional time window parameter
-            time_window = data.get("time_window_hours", 24)
+            # Optional time window parameter (only affects AI context pattern retrieval)
+            time_window = data.get("time_window_hours")
 
             # Process the query
             result = await rag_handler.query(question, time_window)
