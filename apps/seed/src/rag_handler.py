@@ -35,7 +35,12 @@ class RAGHandler:
         self.server_url = server_url
         self.session: aiohttp.ClientSession | None = None
         logger.info(f"RAG Handler initialized with server_url: {server_url}")
-        self._rag_lms_client = RAGLMSClient()
+        # Configure RAG LMS client for exobrain experimentation
+        # Default: Creative but controlled (good for personality understanding)
+        self._rag_lms_client = RAGLMSClient(
+            temperature=0.8,  # Creative enough for personality, not chaotic
+            top_p=0.9,  # Diverse but focused token selection
+        )
         self.rag_lms = None
         self._vocab_client = CommunityVocabularyClient(api_url=server_url)
         self.vocab_client = None
@@ -406,36 +411,48 @@ class RAGHandler:
 
         full_context = "\n".join(context_parts)
 
-        # Build prompt for LMS
-        prompt = f"""You are answering questions about a Twitch stream based on real data.
+        # Build prompt for LMS with structured response guidance
+        prompt = f"""You are answering questions about a Twitch stream based on real data. Provide a structured response with the following components:
 
 User Question: "{question}"
 
 Available Data:
 {full_context}
 
-Instructions:
-1. Answer the user's question directly and specifically using ONLY the provided data
-2. Be precise with numbers, usernames, and facts from the data
-3. Use the Community Vocabulary Context to understand stream lingo, emotes, and inside jokes
-4. Use the Stream Flow Context to understand whether events are from live streaming or offline periods
-5. Remember: "Stream offline" means the stream ended normally - this is NOT a problem or error
-6. If the data doesn't contain the answer, say so clearly
-7. Keep responses concise (2-3 sentences max) but informative
-8. When mentioning community terms or emotes, use their proper definitions if provided
+Instructions for your structured response:
+1. **answer**: Provide a direct, concise answer (2-3 sentences max) using ONLY the provided data
+2. **confidence**: Rate your confidence 0.0-1.0 based on data completeness and clarity
+3. **reasoning**: Brief explanation of how you derived the answer from the data
+4. **response_type**: Choose from:
+   - "factual": Answering with specific data/numbers
+   - "creative": Providing suggestions or personality-based insights
+   - "clarification": Need more information or data is ambiguous
+   - "insufficient_data": Not enough data to answer properly
+5. **suggestions**: (Optional) For creative responses, provide follow-up ideas or "what if" scenarios
 
-Please provide a direct, concise answer to the question based on the data provided."""
+Guidelines:
+- Be precise with numbers, usernames, and facts from the data
+- Use Community Vocabulary Context to understand stream lingo, emotes, and inside jokes
+- Use Stream Flow Context to understand whether events are from live streaming or offline periods
+- Remember: "Stream offline" means the stream ended normally - this is NOT a problem or error
+- When mentioning community terms or emotes, use their proper definitions if provided
+- For creative questions, think about stream personality and community dynamics
+
+Respond using the structured format."""
 
         try:
-            # Use RAG LMS client to generate response
+            # Use RAG LMS client to generate structured response
             if self.rag_lms:
                 response = await self.rag_lms.generate_response(prompt)
 
                 if response:
                     return {
-                        "answer": response.strip(),
-                        "confidence": 0.8,
+                        "answer": response["answer"],
+                        "confidence": response["confidence"],
                         "data_summary": f"AI analysis of {len(retrieved_data.get('sources', []))} data sources",
+                        "response_type": response["response_type"],
+                        "reasoning": response["reasoning"],
+                        "suggestions": response.get("suggestions"),
                     }
                 else:
                     logger.warning("RAG LMS client returned empty response")
