@@ -13,6 +13,8 @@ from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent,
 from .health import create_health_app
 from .lms_client import LMSClient
 from .logger import configure_json_logging, get_logger
+from .rag_handler import RAGHandler
+from .rag_websocket import setup_rag_websocket_handlers
 from .transcription_client import TranscriptionWebSocketClient
 from .websocket_client import ServerClient
 
@@ -51,6 +53,7 @@ class SeedService(SupervisedService):
             self.config.websocket.server_url.replace("ws://", "http://").replace("/events", "")
         )
         self.correlator: StreamCorrelator | None = None
+        self.rag_handler: RAGHandler | None = None
 
         # State
         self.running = False
@@ -77,6 +80,13 @@ class SeedService(SupervisedService):
             max_buffer_size=self.config.correlator.max_buffer_size,
         )
 
+        # Initialize RAG handler for query interface
+        self.rag_handler = RAGHandler(
+            context_client=self.context_client,
+            server_url=self.config.websocket.server_url.replace("ws://", "http://").replace("/events", ""),
+        )
+        await self.rag_handler.__aenter__()
+
         # Register event handlers
         self.transcription_client.on_transcription(self._handle_transcription)
         self.server_client.on_chat_message(self._handle_chat_message)
@@ -101,10 +111,15 @@ class SeedService(SupervisedService):
 
         self.running = True
 
-        # Start health check endpoint with service references
+        # Start health check endpoint with service references and RAG handler
         self.health_runner = await create_health_app(
-            port=self.config.health.port, service=self, correlator=self.correlator
+            port=self.config.health.port, service=self, correlator=self.correlator, rag_handler=self.rag_handler
         )
+
+        # Set up WebSocket handlers for RAG queries if server is connected
+        if self.rag_handler and (hasattr(self.server_client, "connected") and self.server_client.connected):
+            setup_rag_websocket_handlers(self.server_client, self.rag_handler)
+            logger.info("RAG WebSocket handlers registered")
 
         # Start listening tasks
         tracker = get_global_tracker()
@@ -134,6 +149,10 @@ class SeedService(SupervisedService):
         await self.server_client.disconnect()
         await self.lms_client.__aexit__(None, None, None)
         await self.context_client.__aexit__(None, None, None)
+
+        # Cleanup RAG handler
+        if self.rag_handler:
+            await self.rag_handler.__aexit__(None, None, None)
 
         # Cleanup health endpoint
         if self.health_runner:

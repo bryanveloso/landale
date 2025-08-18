@@ -14,7 +14,7 @@ class ContextClient:
     """HTTP client for posting context data to the Phoenix server."""
 
     def __init__(self, server_url: str | None = None):
-        self.server_url = server_url or "http://zelan:8080"
+        self.server_url = server_url or "http://zelan:7175"
         self.session: aiohttp.ClientSession | None = None
 
     async def __aenter__(self):

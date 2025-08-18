@@ -150,7 +150,9 @@ async def detailed_status(request):
     return web.json_response(status)
 
 
-async def create_health_app(port: int = 8891, service=None, correlator: "StreamCorrelator | None" = None):
+async def create_health_app(
+    port: int = 8891, service=None, correlator: "StreamCorrelator | None" = None, rag_handler=None
+):
     """Create health check web app."""
     app = web.Application()
     app["start_time"] = time.monotonic()
@@ -161,6 +163,12 @@ async def create_health_app(port: int = 8891, service=None, correlator: "StreamC
     # Add routes
     app.router.add_get("/health", health_check)
     app.router.add_get("/status", detailed_status)
+
+    # Add RAG endpoints if handler provided
+    if rag_handler:
+        from .rag_handler import create_rag_endpoints
+
+        await create_rag_endpoints(app, rag_handler)
 
     # Disable access logging to prevent broken pipe errors when managed by Nurvus
     runner = web.AppRunner(app, access_log=None)

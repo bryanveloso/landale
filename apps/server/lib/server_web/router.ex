@@ -126,5 +126,18 @@ defmodule ServerWeb.Router do
     get "/oauth/status", OAuthController, :status
     post "/oauth/refresh", OAuthController, :refresh
     post "/oauth/upload", OAuthController, :upload
+
+    # Community management
+    get "/community/members", CommunityController, :list_members
+    post "/community/members/activity", CommunityController, :update_member_activity
+    get "/community/stats", CommunityController, :get_community_stats
+
+    get "/community/pronunciation", CommunityController, :list_pronunciations
+    post "/community/pronunciation", CommunityController, :create_pronunciation
+    get "/community/pronunciation/:username", CommunityController, :get_pronunciation
+
+    get "/community/vocabulary", CommunityController, :list_vocabulary
+    post "/community/vocabulary", CommunityController, :create_vocabulary
+    get "/community/vocabulary/search", CommunityController, :search_vocabulary
   end
 end

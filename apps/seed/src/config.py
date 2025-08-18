@@ -10,7 +10,7 @@ class LMSConfig(BaseModel):
     """LM Studio configuration."""
 
     api_url: str = Field(default="http://zelan:1234/v1", description="LM Studio API endpoint URL")
-    model: str = Field(default="meta/llama-3.3-70b", description="LLM model to use for analysis")
+    model: str = Field(default="deepseek/deepseek-r1-0528-qwen3-8b", description="LLM model to use for analysis")
     rate_limit: int = Field(default=10, ge=1, le=100, description="Maximum API requests per time window")
     rate_window: int = Field(default=60, ge=10, le=300, description="Rate limit time window in seconds")
     timeout: float = Field(default=30.0, ge=5.0, le=120.0, description="API request timeout in seconds")

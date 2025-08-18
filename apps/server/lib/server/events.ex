@@ -532,6 +532,432 @@ defmodule Server.Events do
     }
   end
 
+  defp get_event_specific_data("channel.subscription.end", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      user_id: Map.get(data, :user_id),
+      user_login: Map.get(data, :user_login),
+      user_name: Map.get(data, :user_name),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      tier: Map.get(data, :tier),
+      is_gift: Map.get(data, :is_gift, false)
+    }
+  end
+
+  defp get_event_specific_data("channel.subscription.message", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      user_id: Map.get(data, :user_id),
+      user_login: Map.get(data, :user_login),
+      user_name: Map.get(data, :user_name),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      tier: Map.get(data, :tier),
+      message: Map.get(data, :message, %{}) |> Map.get(:text),
+      cumulative_months: Map.get(data, :cumulative_months),
+      streak_months: Map.get(data, :streak_months),
+      duration_months: Map.get(data, :duration_months)
+    }
+  end
+
+  defp get_event_specific_data("channel.raid", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      from_broadcaster_user_id: Map.get(data, :from_broadcaster_user_id),
+      from_broadcaster_user_login: Map.get(data, :from_broadcaster_user_login),
+      from_broadcaster_user_name: Map.get(data, :from_broadcaster_user_name),
+      to_broadcaster_user_id: Map.get(data, :to_broadcaster_user_id),
+      to_broadcaster_user_login: Map.get(data, :to_broadcaster_user_login),
+      to_broadcaster_user_name: Map.get(data, :to_broadcaster_user_name),
+      viewers: Map.get(data, :viewers)
+    }
+  end
+
+  defp get_event_specific_data("channel.chat.clear_user_messages", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      target_user_id: Map.get(data, :target_user_id),
+      target_user_login: Map.get(data, :target_user_login),
+      target_user_name: Map.get(data, :target_user_name)
+    }
+  end
+
+  defp get_event_specific_data("channel.chat.notification", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      chatter_user_id: Map.get(data, :chatter_user_id),
+      chatter_user_login: Map.get(data, :chatter_user_login),
+      chatter_user_name: Map.get(data, :chatter_user_name),
+      notification_type: Map.get(data, :notification_type),
+      message: Map.get(data, :message, %{}) |> Map.get(:text)
+    }
+  end
+
+  defp get_event_specific_data("channel.chat_settings.update", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      emote_mode: Map.get(data, :emote_mode),
+      follower_mode: Map.get(data, :follower_mode),
+      follower_mode_duration_minutes: Map.get(data, :follower_mode_duration_minutes),
+      slow_mode: Map.get(data, :slow_mode),
+      slow_mode_wait_time_seconds: Map.get(data, :slow_mode_wait_time_seconds),
+      subscriber_mode: Map.get(data, :subscriber_mode),
+      unique_chat_mode: Map.get(data, :unique_chat_mode)
+    }
+  end
+
+  # Channel Points events
+  defp get_event_specific_data("channel.channel_points_custom_reward.add", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      is_enabled: Map.get(data, :is_enabled),
+      is_paused: Map.get(data, :is_paused),
+      is_in_stock: Map.get(data, :is_in_stock),
+      title: Map.get(data, :title),
+      cost: Map.get(data, :cost),
+      prompt: Map.get(data, :prompt)
+    }
+  end
+
+  defp get_event_specific_data("channel.channel_points_custom_reward.update", event_data) do
+    get_event_specific_data("channel.channel_points_custom_reward.add", event_data)
+  end
+
+  defp get_event_specific_data("channel.channel_points_custom_reward.remove", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      title: Map.get(data, :title),
+      prompt: Map.get(data, :prompt)
+    }
+  end
+
+  defp get_event_specific_data("channel.channel_points_custom_reward_redemption.add", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      user_id: Map.get(data, :user_id),
+      user_login: Map.get(data, :user_login),
+      user_name: Map.get(data, :user_name),
+      user_input: Map.get(data, :user_input),
+      status: Map.get(data, :status),
+      reward: Map.get(data, :reward, %{}),
+      redeemed_at: parse_datetime(Map.get(data, :redeemed_at))
+    }
+  end
+
+  defp get_event_specific_data("channel.channel_points_custom_reward_redemption.update", event_data) do
+    get_event_specific_data("channel.channel_points_custom_reward_redemption.add", event_data)
+  end
+
+  # Poll events
+  defp get_event_specific_data("channel.poll.begin", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      title: Map.get(data, :title),
+      choices: Map.get(data, :choices, []),
+      bits_voting_enabled: Map.get(data, :bits_voting_enabled),
+      bits_per_vote: Map.get(data, :bits_per_vote),
+      channel_points_voting_enabled: Map.get(data, :channel_points_voting_enabled),
+      channel_points_per_vote: Map.get(data, :channel_points_per_vote),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      ends_at: parse_datetime(Map.get(data, :ends_at))
+    }
+  end
+
+  defp get_event_specific_data("channel.poll.progress", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      title: Map.get(data, :title),
+      choices: Map.get(data, :choices, []),
+      bits_voting_enabled: Map.get(data, :bits_voting_enabled),
+      bits_per_vote: Map.get(data, :bits_per_vote),
+      channel_points_voting_enabled: Map.get(data, :channel_points_voting_enabled),
+      channel_points_per_vote: Map.get(data, :channel_points_per_vote),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      ends_at: parse_datetime(Map.get(data, :ends_at))
+    }
+  end
+
+  defp get_event_specific_data("channel.poll.end", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      title: Map.get(data, :title),
+      choices: Map.get(data, :choices, []),
+      bits_voting_enabled: Map.get(data, :bits_voting_enabled),
+      bits_per_vote: Map.get(data, :bits_per_vote),
+      channel_points_voting_enabled: Map.get(data, :channel_points_voting_enabled),
+      channel_points_per_vote: Map.get(data, :channel_points_per_vote),
+      status: Map.get(data, :status),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      ended_at: parse_datetime(Map.get(data, :ended_at))
+    }
+  end
+
+  # Prediction events
+  defp get_event_specific_data("channel.prediction.begin", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      title: Map.get(data, :title),
+      outcomes: Map.get(data, :outcomes, []),
+      prediction_window: Map.get(data, :prediction_window),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      locks_at: parse_datetime(Map.get(data, :locks_at))
+    }
+  end
+
+  defp get_event_specific_data("channel.prediction.progress", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      title: Map.get(data, :title),
+      outcomes: Map.get(data, :outcomes, []),
+      prediction_window: Map.get(data, :prediction_window),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      locks_at: parse_datetime(Map.get(data, :locks_at))
+    }
+  end
+
+  defp get_event_specific_data("channel.prediction.lock", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      title: Map.get(data, :title),
+      outcomes: Map.get(data, :outcomes, []),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      locked_at: parse_datetime(Map.get(data, :locked_at))
+    }
+  end
+
+  defp get_event_specific_data("channel.prediction.end", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      title: Map.get(data, :title),
+      winning_outcome_id: Map.get(data, :winning_outcome_id),
+      outcomes: Map.get(data, :outcomes, []),
+      status: Map.get(data, :status),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      ended_at: parse_datetime(Map.get(data, :ended_at))
+    }
+  end
+
+  # Additional EventSub events
+  defp get_event_specific_data("channel.charity_campaign.donate", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      campaign_id: Map.get(data, :campaign_id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      user_id: Map.get(data, :user_id),
+      user_login: Map.get(data, :user_login),
+      user_name: Map.get(data, :user_name),
+      charity_name: Map.get(data, :charity_name),
+      amount: Map.get(data, :amount, %{}) |> Map.get(:value)
+    }
+  end
+
+  defp get_event_specific_data("channel.charity_campaign.progress", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      charity_name: Map.get(data, :charity_name),
+      current_amount: Map.get(data, :current_amount, %{}) |> Map.get(:value),
+      target_amount: Map.get(data, :target_amount, %{}) |> Map.get(:value)
+    }
+  end
+
+  defp get_event_specific_data("channel.hype_train.begin", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      total: Map.get(data, :total),
+      progress: Map.get(data, :progress),
+      goal: Map.get(data, :goal),
+      top_contributions: Map.get(data, :top_contributions, []),
+      last_contribution: Map.get(data, :last_contribution, %{}),
+      level: Map.get(data, :level),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      expires_at: parse_datetime(Map.get(data, :expires_at))
+    }
+  end
+
+  defp get_event_specific_data("channel.hype_train.progress", event_data) do
+    get_event_specific_data("channel.hype_train.begin", event_data)
+  end
+
+  defp get_event_specific_data("channel.hype_train.end", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      id: Map.get(data, :id),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      level: Map.get(data, :level),
+      total: Map.get(data, :total),
+      top_contributions: Map.get(data, :top_contributions, []),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      ended_at: parse_datetime(Map.get(data, :ended_at)),
+      cooldown_ends_at: parse_datetime(Map.get(data, :cooldown_ends_at))
+    }
+  end
+
+  defp get_event_specific_data("channel.shoutout.create", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      moderator_user_id: Map.get(data, :moderator_user_id),
+      moderator_user_login: Map.get(data, :moderator_user_login),
+      moderator_user_name: Map.get(data, :moderator_user_name),
+      to_broadcaster_user_id: Map.get(data, :to_broadcaster_user_id),
+      to_broadcaster_user_login: Map.get(data, :to_broadcaster_user_login),
+      to_broadcaster_user_name: Map.get(data, :to_broadcaster_user_name),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      viewer_count: Map.get(data, :viewer_count),
+      cooldown_ends_at: parse_datetime(Map.get(data, :cooldown_ends_at)),
+      target_cooldown_ends_at: parse_datetime(Map.get(data, :target_cooldown_ends_at))
+    }
+  end
+
+  defp get_event_specific_data("channel.shoutout.receive", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      from_broadcaster_user_id: Map.get(data, :from_broadcaster_user_id),
+      from_broadcaster_user_login: Map.get(data, :from_broadcaster_user_login),
+      from_broadcaster_user_name: Map.get(data, :from_broadcaster_user_name),
+      viewer_count: Map.get(data, :viewer_count),
+      started_at: parse_datetime(Map.get(data, :started_at))
+    }
+  end
+
+  defp get_event_specific_data("channel.vip.add", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      user_id: Map.get(data, :user_id),
+      user_login: Map.get(data, :user_login),
+      user_name: Map.get(data, :user_name),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name)
+    }
+  end
+
+  defp get_event_specific_data("channel.vip.remove", event_data) do
+    get_event_specific_data("channel.vip.add", event_data)
+  end
+
+  defp get_event_specific_data("channel.ad_break.begin", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      duration_seconds: Map.get(data, :duration_seconds),
+      started_at: parse_datetime(Map.get(data, :started_at)),
+      is_automatic: Map.get(data, :is_automatic),
+      broadcaster_user_id: Map.get(data, :broadcaster_user_id),
+      broadcaster_user_login: Map.get(data, :broadcaster_user_login),
+      broadcaster_user_name: Map.get(data, :broadcaster_user_name),
+      requester_user_id: Map.get(data, :requester_user_id),
+      requester_user_login: Map.get(data, :requester_user_login),
+      requester_user_name: Map.get(data, :requester_user_name)
+    }
+  end
+
+  defp get_event_specific_data("user.update", event_data) do
+    {:ok, data} = Server.BoundaryConverter.from_external(event_data)
+
+    %{
+      user_id: Map.get(data, :user_id),
+      user_login: Map.get(data, :user_login),
+      user_name: Map.get(data, :user_name),
+      email: Map.get(data, :email),
+      email_verified: Map.get(data, :email_verified),
+      description: Map.get(data, :description)
+    }
+  end
+
   defp get_event_specific_data("twitch.service_status", event_data) do
     {:ok, data} = Server.BoundaryConverter.from_external(event_data)
 
@@ -1082,21 +1508,84 @@ defmodule Server.Events do
   # Determine which events should be stored in the ActivityLog
   @doc "Determines if an event should be stored in ActivityLog (public for testing)"
   def should_store_event?(event_type) do
-    valuable_events = [
-      # Twitch events (valuable for activity tracking)
-      "channel.chat.message",
-      "channel.chat.clear",
-      "channel.chat.message_delete",
-      "channel.follow",
-      "channel.subscribe",
-      "channel.subscription.gift",
-      "channel.cheer",
-      "channel.update",
+    # Store ALL Twitch EventSub events for comprehensive data analysis
+    # This ensures Seed has complete context for community vocabulary tracking
+    all_eventsub_events = [
+      # Stream events
       "stream.online",
       "stream.offline",
+
+      # Channel information
+      "channel.update",
+
+      # Follow events
+      "channel.follow",
+
+      # Subscription events
+      "channel.subscribe",
+      "channel.subscription.end",
+      "channel.subscription.gift",
+      "channel.subscription.message",
+
+      # Bits/Cheer events
+      "channel.cheer",
+
+      # Raid events
+      "channel.raid",
+
+      # Chat events
+      "channel.chat.clear",
+      "channel.chat.clear_user_messages",
+      "channel.chat.message",
+      "channel.chat.message_delete",
+      "channel.chat.notification",
+      "channel.chat_settings.update",
+
+      # Channel Points events
+      "channel.channel_points_custom_reward.add",
+      "channel.channel_points_custom_reward.update",
+      "channel.channel_points_custom_reward.remove",
+      "channel.channel_points_custom_reward_redemption.add",
+      "channel.channel_points_custom_reward_redemption.update",
+
+      # Poll events
+      "channel.poll.begin",
+      "channel.poll.progress",
+      "channel.poll.end",
+
+      # Prediction events
+      "channel.prediction.begin",
+      "channel.prediction.progress",
+      "channel.prediction.lock",
+      "channel.prediction.end",
+
+      # Charity events
+      "channel.charity_campaign.donate",
+      "channel.charity_campaign.progress",
+
+      # Hype Train events
+      "channel.hype_train.begin",
+      "channel.hype_train.progress",
+      "channel.hype_train.end",
+
+      # Goal events
       "channel.goal.begin",
       "channel.goal.progress",
       "channel.goal.end",
+
+      # Shoutout events
+      "channel.shoutout.create",
+      "channel.shoutout.receive",
+
+      # VIP events
+      "channel.vip.add",
+      "channel.vip.remove",
+
+      # Ad break events
+      "channel.ad_break.begin",
+
+      # User events
+      "user.update",
 
       # OBS events (valuable for stream analysis)
       "obs.stream_started",
@@ -1126,7 +1615,7 @@ defmodule Server.Events do
       # as they're too frequent and better suited for dedicated monitoring systems
     ]
 
-    event_type in valuable_events
+    event_type in all_eventsub_events
   end
 
   # Async storage of event with user upsert - atomic transaction
