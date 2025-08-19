@@ -46,7 +46,7 @@ class Phononmaser(SupervisedService):
         self.server_websocket_url = os.getenv("SERVER_WS_URL", self.config.server_url)
 
         # PromptManager configuration (optional)
-        self.enable_prompt_manager = self.config.get_env_bool("ENABLE_PROMPT_MANAGER", False)
+        self.enable_prompt_manager = self.config.get_env_bool("ENABLE_PROMPT_MANAGER", True)
         self.phoenix_base_url = os.getenv(
             "PHOENIX_BASE_URL", f"http://{self.config.server_host}:{self.config.server_tcp_port}"
         )
