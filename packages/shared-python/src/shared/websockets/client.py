@@ -127,7 +127,7 @@ class BaseWebSocketClient(ABC):
                 try:
                     callback(event)
                 except Exception as e:
-                    logger.error(f"Error in connection callback: {e}")
+                    logger.error("Error in connection callback", extra={"error": str(e)})
 
     def _is_circuit_open(self) -> bool:
         """Check if circuit breaker is open."""
@@ -193,7 +193,7 @@ class BaseWebSocketClient(ABC):
                 else:
                     self._heartbeat_failures += 1
                     self.heartbeat_failures += 1
-                    logger.warning(f"Heartbeat failed ({self._heartbeat_failures} consecutive failures)")
+                    logger.warning("Heartbeat failed", extra={"consecutive_failures": self._heartbeat_failures})
 
                     # Force reconnection after multiple heartbeat failures
                     if self._heartbeat_failures >= 3:
@@ -203,7 +203,7 @@ class BaseWebSocketClient(ABC):
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in heartbeat loop: {e}")
+                logger.error("Error in heartbeat loop", extra={"error": str(e)})
                 break
 
     async def _send_heartbeat(self) -> bool:
@@ -221,7 +221,7 @@ class BaseWebSocketClient(ABC):
 
             # Check circuit breaker before attempting connection
             if self._is_circuit_open():
-                logger.warning(f"Circuit breaker open, not attempting connection to {self.url}")
+                logger.warning("Circuit breaker open, not attempting connection", extra={"url": self.url})
                 self._emit_connection_event(ConnectionState.FAILED)
                 return False
 
@@ -232,12 +232,16 @@ class BaseWebSocketClient(ABC):
             while self._reconnect_attempts < self.max_reconnect_attempts:
                 try:
                     logger.info(
-                        f"Attempting to connect to {self.url} "
-                        f"(attempt {self._reconnect_attempts + 1}/{self.max_reconnect_attempts})"
+                        "Attempting connection",
+                        extra={
+                            "url": self.url,
+                            "attempt": self._reconnect_attempts + 1,
+                            "max_attempts": self.max_reconnect_attempts,
+                        },
                     )
 
                     if await self._do_connect():
-                        logger.info(f"Successfully connected to {self.url}")
+                        logger.info("Connection established", extra={"url": self.url})
                         self._reconnect_attempts = 0
                         self._reconnect_delay = self.reconnect_delay_base
                         self.successful_connects += 1
@@ -256,13 +260,16 @@ class BaseWebSocketClient(ABC):
                     self._emit_connection_event(ConnectionState.FAILED)
                     raise
                 except Exception as e:
-                    logger.error(f"Connection attempt failed: {e}")
+                    logger.error("Connection attempt failed", extra={"error": str(e)})
                     self._record_failure()
 
                 self._reconnect_attempts += 1
 
                 if self._reconnect_attempts >= self.max_reconnect_attempts:
-                    logger.error(f"Failed to connect after {self.max_reconnect_attempts} attempts. Giving up.")
+                    logger.error(
+                        "Failed to connect after max attempts. Giving up.",
+                        extra={"max_attempts": self.max_reconnect_attempts},
+                    )
                     self.failed_reconnects += 1
                     self._emit_connection_event(ConnectionState.FAILED)
                     return False
@@ -288,7 +295,7 @@ class BaseWebSocketClient(ABC):
                 await self._do_listen()
 
             except websockets.exceptions.ConnectionClosed:
-                logger.info(f"Connection to {self.url} lost")
+                logger.info("Connection lost", extra={"url": self.url})
                 self.total_reconnects += 1
 
                 # Stop heartbeat monitoring
@@ -312,7 +319,7 @@ class BaseWebSocketClient(ABC):
                 self._emit_connection_event(ConnectionState.DISCONNECTED)
                 break
             except Exception as e:
-                logger.error(f"Unexpected error in listen loop: {e}")
+                logger.error("Unexpected error in listen loop", extra={"error": str(e)})
                 await self._stop_heartbeat()
                 self._emit_connection_event(ConnectionState.DISCONNECTED)
 
@@ -325,7 +332,7 @@ class BaseWebSocketClient(ABC):
     async def disconnect(self):
         """Disconnect and cleanup."""
         async with self._connection_lock:
-            logger.info(f"Disconnecting from {self.url}")
+            logger.info("Disconnecting", extra={"url": self.url})
             self._should_reconnect = False
 
             # Stop heartbeat monitoring
@@ -344,7 +351,7 @@ class BaseWebSocketClient(ABC):
             await self._do_disconnect()
 
             self._emit_connection_event(ConnectionState.DISCONNECTED)
-            logger.info(f"Disconnected from {self.url}")
+            logger.info("Disconnected", extra={"url": self.url})
 
     def create_task(self, coro) -> asyncio.Task:
         """Create and track a background task."""
@@ -368,13 +375,13 @@ class BaseWebSocketClient(ABC):
             if self._last_heartbeat > 0:
                 time_since_heartbeat = time.time() - self._last_heartbeat
                 if time_since_heartbeat > (self.heartbeat_interval * 2):
-                    logger.debug(f"Heartbeat is stale: {time_since_heartbeat:.1f}s since last heartbeat")
+                    logger.debug("Heartbeat is stale", extra={"time_since_heartbeat": time_since_heartbeat})
                     return False
 
             return True
 
         except Exception as e:
-            logger.error(f"Health check failed: {e}")
+            logger.error("Health check failed", extra={"error": str(e)})
             return False
 
     def get_status(self) -> dict:

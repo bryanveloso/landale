@@ -130,7 +130,10 @@ def error_boundary(
                             attempts += 1
                             # For sync functions, we can't use asyncio.sleep
                             # This is a limitation - sync functions with retries should be rare
-                            logger.warning(f"Retry logic for sync function {func.__name__} doesn't support delays")
+                            logger.warning(
+                                "Retry logic for sync function doesn't support delays",
+                                extra={"function": func.__name__},
+                            )
                             continue
 
                         # Max retries reached or no retries configured

@@ -22,7 +22,7 @@ class TaskTracker:
         self._completed_count = 0
         self._failed_count = 0
         self._cancelled_count = 0
-        logger.info(f"TaskTracker '{self.name}' initialized")
+        logger.info("TaskTracker initialized", extra={"tracker_name": self.name})
 
     def create_task(
         self, coro: Coroutine[Any, Any, T], *, name: str | None = None, log_errors: bool = True
@@ -48,26 +48,30 @@ class TaskTracker:
         task = asyncio.create_task(coro, name=name)
         self._active_tasks.add(task)
 
-        logger.debug(f"Task '{task.get_name()}' created. Active tasks: {len(self._active_tasks)}")
+        logger.debug("Task created", extra={"task_name": task.get_name(), "active_tasks": len(self._active_tasks)})
 
         # Add completion callback
         def _on_done(t: asyncio.Task):
             try:
                 if t.cancelled():
                     self._cancelled_count += 1
-                    logger.info(f"Task '{t.get_name()}' cancelled")
+                    logger.info("Task cancelled", extra={"task_name": t.get_name()})
                 elif t.exception():
                     self._failed_count += 1
                     if log_errors:
-                        logger.error(f"Task '{t.get_name()}' failed: {t.exception()}", exc_info=t.exception())
+                        logger.error(
+                            "Task failed",
+                            extra={"task_name": t.get_name(), "error": str(t.exception())},
+                            exc_info=t.exception(),
+                        )
                 else:
                     self._completed_count += 1
-                    logger.debug(f"Task '{t.get_name()}' completed successfully")
+                    logger.debug("Task completed successfully", extra={"task_name": t.get_name()})
             except Exception as e:
-                logger.warning(f"Error in task done callback: {e}")
+                logger.warning("Error in task done callback", extra={"error": str(e)})
             finally:
                 # WeakSet automatically removes the task, but log the count
-                logger.debug(f"Active tasks remaining: {len(self._active_tasks)}")
+                logger.debug("Active tasks remaining", extra={"active_tasks": len(self._active_tasks)})
 
         task.add_done_callback(_on_done)
         return task
@@ -111,7 +115,7 @@ class TaskTracker:
                 # Task was garbage collected
                 logger.debug("Skipped GC'd task in status collection")
             except Exception as e:
-                logger.warning(f"Error getting task info: {e}")
+                logger.warning("Error getting task info", extra={"error": str(e)})
 
         return {
             "tracker_name": self.name,
@@ -131,11 +135,13 @@ class TaskTracker:
             timeout: Maximum time to wait for tasks to complete
         """
         if not self._active_tasks:
-            logger.info(f"TaskTracker '{self.name}' shutdown: no active tasks")
+            logger.info("TaskTracker shutdown: no active tasks", extra={"tracker_name": self.name})
             return
 
         tasks = list(self._active_tasks)
-        logger.info(f"TaskTracker '{self.name}' shutdown: cancelling {len(tasks)} tasks")
+        logger.info(
+            "TaskTracker shutdown: cancelling tasks", extra={"tracker_name": self.name, "task_count": len(tasks)}
+        )
 
         # Cancel all tasks
         for task in tasks:
@@ -145,7 +151,7 @@ class TaskTracker:
         # Wait for cancellation with timeout
         try:
             await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=timeout)
-            logger.info(f"TaskTracker '{self.name}' shutdown complete")
+            logger.info("TaskTracker shutdown complete", extra={"tracker_name": self.name})
         except TimeoutError:
             logger.warning(
                 f"TaskTracker '{self.name}' shutdown: "

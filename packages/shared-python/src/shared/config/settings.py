@@ -40,7 +40,10 @@ class CommonConfig:
             parsed = int(value)
             # Validate reasonable ranges for common config values
             if parsed < 0:
-                logger.warning(f"Negative value for {key}: {parsed}, using default: {default}")
+                logger.warning(
+                    "Negative value for config key, using default",
+                    extra={"key": key, "value": parsed, "default": default},
+                )
                 return default
             return parsed
         except ValueError:
@@ -106,7 +109,7 @@ class PhononmaserConfig(CommonConfig):
 
         # Audio settings validation
         if self.sample_rate not in [8000, 16000, 22050, 44100, 48000]:
-            logger.warning(f"Non-standard sample rate: {self.sample_rate}Hz")
+            logger.warning("Non-standard sample rate detected", extra={"sample_rate": self.sample_rate})
         if self.channels not in [1, 2]:
             errors.append(f"Invalid channel count: {self.channels} (must be 1 or 2)")
         if not (1 <= self.buffer_size_mb <= 1000):
