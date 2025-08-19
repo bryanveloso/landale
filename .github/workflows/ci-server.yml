@@ -23,7 +23,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        image: timescale/timescaledb:latest-pg16
         env:
           POSTGRES_DB: server_test
           POSTGRES_PASSWORD: postgres
@@ -52,7 +52,7 @@ jobs:
           path: |
             apps/server/deps
             apps/server/_build
-          key: ${{ runner.os }}-mix-${{ github.sha }}-${{ hashFiles('apps/server/mix.lock') }}
+          key: ${{ runner.os }}-mix-${{ hashFiles('apps/server/mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-mix-
 
@@ -91,6 +91,16 @@ jobs:
           mix test --cover --export-coverage default
           mix test.coverage || true
 
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-test-artifacts
+          path: |
+            apps/server/test_results.txt
+            apps/server/_build/test/logs/
+          retention-days: 7
+
       - name: Generate test summary
         if: always()
         working-directory: apps/server
@@ -107,6 +117,8 @@ jobs:
               echo "❌ **Some tests failed**" >> $GITHUB_STEP_SUMMARY
               grep -E "[0-9]+ tests, [0-9]+ failures" test_results.txt >> $GITHUB_STEP_SUMMARY
             fi
+          else
+            echo "⚠️ **No test results found**" >> $GITHUB_STEP_SUMMARY
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY

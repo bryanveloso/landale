@@ -32,10 +32,25 @@ jobs:
       - name: Set up Python
         run: uv python install ${{ matrix.app == 'seed' && '3.13' || '3.11' }}
 
+      - name: Cache Python dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            ./.venv
+          key: ${{ runner.os }}-uv-${{ matrix.app }}-${{ hashFiles('**/uv.lock', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-${{ matrix.app }}-
+
       - name: Install dependencies
         working-directory: apps/${{ matrix.app }}
         run: |
-          uv sync --dev
+          # Install CPU-only PyTorch for CI to reduce download size
+          if [ "${{ matrix.app }}" = "phononmaser" ]; then
+            echo "🔧 Installing CPU-only PyTorch for CI performance"
+            uv add torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu --no-sync
+          fi
+          uv sync --dev --no-progress
 
       - name: Run Ruff linting
         working-directory: apps/${{ matrix.app }}
@@ -47,4 +62,19 @@ jobs:
 
       - name: Run tests
         working-directory: apps/${{ matrix.app }}
-        run: uv run pytest --tb=short || [ $? -eq 5 ]
+        run: |
+          echo "🧪 Running tests for ${{ matrix.app }}..."
+          # Run tests with proper exit code handling and coverage
+          uv run pytest --tb=short -v --cov=src --cov-report=term-missing || {
+            exit_code=$?
+            if [ $exit_code -eq 5 ]; then
+              echo "⚠️  No tests found for ${{ matrix.app }} - this is acceptable"
+              echo "📁 Test directories searched:"
+              find . -name "*test*.py" -o -name "test_*" -type d | head -10
+              exit 0
+            else
+              echo "❌ Tests failed for ${{ matrix.app }} with exit code $exit_code"
+              exit $exit_code
+            fi
+          }
+          echo "✅ Tests completed successfully for ${{ matrix.app }}"

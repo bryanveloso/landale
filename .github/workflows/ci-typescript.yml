@@ -56,4 +56,13 @@ jobs:
         run: bunx turbo run lint --filter="!@landale/phononmaser" --filter="!@landale/seed"
 
       - name: Run tests
-        run: bunx turbo run test --filter="!@landale/phononmaser" --filter="!@landale/seed"
+        run: |
+          echo "🧪 Running TypeScript tests..."
+          bunx turbo run test --filter="!@landale/phononmaser" --filter="!@landale/seed" --continue || {
+            echo "⚠️  Some TypeScript tests failed, but continuing..."
+            echo "📊 Test files found:"
+            find apps packages -name "*.test.ts" -o -name "*.test.tsx" | wc -l
+            echo "files"
+            exit 1
+          }
+          echo "✅ TypeScript tests completed"
