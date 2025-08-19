@@ -12,8 +12,28 @@ export function useActivityLog() {
   const [filters, setFilters] = createSignal<ActivityLogFilters>({ limit: 50 })
   const [eventsChannel, setEventsChannel] = createSignal<Channel | null>(null)
 
-  const addEvent = (event: ActivityEvent) => {
-    setEvents((prev) => [event, ...prev].slice(0, 1000))
+  // Client-side reconciliation: prevent duplicates using event IDs
+  const addOrUpdateEvent = (event: ActivityEvent) => {
+    setEvents((prev) => {
+      const eventMap = new Map(prev.map((e) => [e.id, e]))
+
+      // Check if this is a duplicate or update
+      const isUpdate = eventMap.has(event.id)
+      if (isUpdate) {
+        console.debug('🔄 Updated existing event:', { id: event.id, type: event.event_type })
+      } else {
+        console.debug('✅ Added new event:', { id: event.id, type: event.event_type })
+      }
+
+      // If event already exists, update it (for mutable events like stream status)
+      // Otherwise add new event
+      eventMap.set(event.id, event)
+
+      // Convert back to array, sort by timestamp (newest first), limit to 1000
+      return Array.from(eventMap.values())
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 1000)
+    })
   }
 
   // Transform flat Twitch events to ActivityEvent format
@@ -45,6 +65,7 @@ export function useActivityLog() {
 
       const data = await response.json()
       if (data.success && data.data?.events) {
+        console.debug('📊 Loaded initial events:', data.data.events.length)
         setEvents(data.data.events)
       }
     } catch (err) {
@@ -65,7 +86,10 @@ export function useActivityLog() {
       // Listen for flat Twitch events
       channel.on('twitch_event', (event: Record<string, unknown>) => {
         const activityEvent = transformTwitchEvent(event)
-        if (activityEvent) addEvent(activityEvent)
+        if (activityEvent) {
+          console.debug('📥 Received real-time event:', { id: activityEvent.id, type: activityEvent.event_type })
+          addOrUpdateEvent(activityEvent)
+        }
       })
 
       channel
