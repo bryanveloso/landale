@@ -290,6 +290,68 @@ defmodule Server.Services.TwitchTest do
       assert is_map(Twitch.get_state())
       assert {:ok, _} = Twitch.get_status()
     end
+
+    test "handles keepalive timeout correctly" do
+      # Get the already-started service pid
+      pid = Process.whereis(Twitch)
+      assert is_pid(pid)
+
+      # Set up initial connected state
+      initial_state = :sys.get_state(pid)
+
+      connected_state = %{
+        initial_state
+        | connected: true,
+          connection_state: "ready",
+          session_id: "test_session_123",
+          default_subscriptions_created: true
+      }
+
+      :sys.replace_state(pid, fn _ -> connected_state end)
+
+      # Send keepalive timeout message
+      send(pid, :keepalive_timeout)
+
+      # Allow message to be processed
+      :timer.sleep(50)
+
+      # Verify state was properly reset
+      final_state = :sys.get_state(pid)
+      assert final_state.connected == false
+      assert final_state.connection_state == "keepalive_timeout"
+      assert final_state.session_id == nil
+      assert final_state.default_subscriptions_created == false
+      assert final_state.last_error == "Keepalive timeout - forced reconnection"
+      assert is_reference(final_state.reconnect_timer)
+    end
+
+    test "ignores redundant keepalive timeout messages" do
+      # Get the already-started service pid
+      pid = Process.whereis(Twitch)
+      assert is_pid(pid)
+
+      # Set initial state to already processing timeout
+      initial_state = :sys.get_state(pid)
+
+      timeout_state = %{
+        initial_state
+        | connection_state: "keepalive_timeout",
+          session_id: nil
+      }
+
+      :sys.replace_state(pid, fn _ -> timeout_state end)
+
+      # Send another keepalive timeout message
+      send(pid, :keepalive_timeout)
+
+      # Allow message to be processed
+      :timer.sleep(50)
+
+      # Verify state unchanged (redundant message ignored)
+      final_state = :sys.get_state(pid)
+      assert final_state.connection_state == "keepalive_timeout"
+      assert final_state.session_id == nil
+    end
   end
 
   describe "cache behavior" do

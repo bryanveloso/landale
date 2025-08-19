@@ -65,12 +65,11 @@ defmodule Server.OBSServiceComplianceTest do
       assert_push(
         "obs_event",
         %{source: :obs, type: first_event_type, session_id: "test-session-123"},
-        100,
-        events_socket
+        100
       )
 
       # Dashboard should also receive OBS events
-      assert_push("obs_event", %{source: :obs}, 100, dashboard_socket)
+      assert_push("obs_event", %{source: :obs}, 100)
     end
 
     @tag :legacy_detection

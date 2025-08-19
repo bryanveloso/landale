@@ -449,6 +449,50 @@ defmodule Server.Services.Twitch do
     end
   end
 
+  # Guard against redundant keepalive timeout processing
+  def handle_info(:keepalive_timeout, %{connection_state: "keepalive_timeout"} = state) do
+    Logger.debug("Ignoring redundant keepalive_timeout message",
+      session_id: state.session_id
+    )
+
+    {:noreply, state}
+  end
+
+  # Keepalive timeout - force reconnection to prevent phantom connections
+  def handle_info(:keepalive_timeout, state) do
+    Logger.warning("Keepalive timeout exceeded, forcing reconnection to prevent phantom connection",
+      session_id: state.session_id,
+      connected: state.connected,
+      last_keepalive: state.last_keepalive
+    )
+
+    # Cancel existing keepalive timer
+    if state.keepalive_timer do
+      Process.cancel_timer(state.keepalive_timer)
+    end
+
+    # Force disconnect and reconnect to establish fresh connection
+    cleanup_websocket(state.ws_client)
+
+    new_state = %{
+      state
+      | ws_client: nil,
+        connected: false,
+        connection_state: "keepalive_timeout",
+        session_id: nil,
+        keepalive_timer: nil,
+        last_keepalive: nil,
+        default_subscriptions_created: false,
+        last_error: "Keepalive timeout - forced reconnection"
+    }
+
+    # Schedule immediate reconnection
+    timer_ref = Process.send_after(self(), :connect, 1000)
+
+    broadcast_status_change(new_state)
+    {:noreply, %{new_state | reconnect_timer: timer_ref}}
+  end
+
   # Catch-all
   def handle_info(message, state) do
     Logger.debug("Unhandled message in Twitch service: #{inspect(message)}")
@@ -511,8 +555,6 @@ defmodule Server.Services.Twitch do
 
     Logger.info("Session welcome received", session_id: session_id)
 
-    new_state = %{state | session_id: session_id, connection_state: "ready"}
-
     # Create subscriptions after token validation
     if state.user_id do
       Process.send_after(self(), {:create_subscriptions_with_validated_token, session_id}, 100)
@@ -520,7 +562,9 @@ defmodule Server.Services.Twitch do
 
     # Set up keepalive monitoring
     keepalive_timeout = session["keepalive_timeout_seconds"] || 10
-    schedule_keepalive_timeout(keepalive_timeout * 2)
+    timer_ref = schedule_keepalive_timeout(keepalive_timeout * 2)
+
+    new_state = %{state | session_id: session_id, connection_state: "ready", keepalive_timer: timer_ref}
 
     broadcast_status_change(new_state)
     new_state
@@ -532,8 +576,8 @@ defmodule Server.Services.Twitch do
       Process.cancel_timer(state.keepalive_timer)
     end
 
-    schedule_keepalive_timeout(20)
-    %{state | last_keepalive: DateTime.utc_now()}
+    timer_ref = schedule_keepalive_timeout(20)
+    %{state | last_keepalive: DateTime.utc_now(), keepalive_timer: timer_ref}
   end
 
   defp handle_notification(state, message) do
