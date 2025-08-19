@@ -40,10 +40,15 @@ class CircuitBreaker:
         expected_exception: type[Exception] | tuple[type[Exception], ...] = Exception,
         success_threshold: int = 2,
         logger=None,
+        max_recovery_timeout: float = 300.0,  # Maximum 5 minutes
+        backoff_multiplier: float = 2.0,  # Exponential backoff multiplier
     ):
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
+        self.initial_recovery_timeout = recovery_timeout  # Store initial value for reset
+        self.max_recovery_timeout = max_recovery_timeout
+        self.backoff_multiplier = backoff_multiplier
         self.expected_exception = expected_exception
         self.success_threshold = success_threshold
         self.logger = logger
@@ -51,6 +56,7 @@ class CircuitBreaker:
         self.state = CircuitState.CLOSED
         self.failure_count = 0
         self.success_count = 0
+        self.consecutive_open_count = 0  # Track consecutive transitions to OPEN
         self.last_failure_time = 0.0
         self.last_state_change = time.time()
 
@@ -122,15 +128,22 @@ class CircuitBreaker:
             self._transition_to_open()
 
     def _transition_to_open(self):
-        """Transition to OPEN state."""
+        """Transition to OPEN state with exponential backoff."""
         self.state = CircuitState.OPEN
         self.last_state_change = time.time()
         self.success_count = 0
+        self.consecutive_open_count += 1
+
+        # Apply exponential backoff for recovery timeout
+        if self.consecutive_open_count > 1:
+            # Calculate new timeout with exponential backoff
+            new_timeout = self.recovery_timeout * (self.backoff_multiplier ** (self.consecutive_open_count - 1))
+            self.recovery_timeout = min(new_timeout, self.max_recovery_timeout)
 
         if self.logger:
             self.logger.error(
                 f"Circuit breaker '{self.name}' opened after {self.failure_count} failures. "
-                f"Will retry in {self.recovery_timeout}s."
+                f"Will retry in {self.recovery_timeout:.1f}s (attempt #{self.consecutive_open_count})."
             )
 
     def _transition_to_half_open(self):
@@ -144,14 +157,19 @@ class CircuitBreaker:
             self.logger.info(f"Circuit breaker '{self.name}' entering HALF_OPEN state for testing.")
 
     def _transition_to_closed(self):
-        """Transition to CLOSED state."""
+        """Transition to CLOSED state and reset backoff."""
         self.state = CircuitState.CLOSED
         self.last_state_change = time.time()
         self.failure_count = 0
         self.success_count = 0
+        self.consecutive_open_count = 0  # Reset consecutive open count
+        self.recovery_timeout = self.initial_recovery_timeout  # Reset to initial timeout
 
         if self.logger:
-            self.logger.info(f"Circuit breaker '{self.name}' closed. Service recovered.")
+            self.logger.info(
+                f"Circuit breaker '{self.name}' closed. Service recovered. "
+                f"Recovery timeout reset to {self.initial_recovery_timeout}s."
+            )
 
     def get_stats(self) -> dict[str, Any]:
         """Get circuit breaker statistics."""
@@ -162,6 +180,9 @@ class CircuitBreaker:
             "state": self.state.value,
             "failure_count": self.failure_count,
             "success_count": self.success_count,
+            "consecutive_open_count": self.consecutive_open_count,
+            "current_recovery_timeout": self.recovery_timeout,
+            "initial_recovery_timeout": self.initial_recovery_timeout,
             "total_calls": self.total_calls,
             "total_failures": self.total_failures,
             "total_successes": self.total_successes,
@@ -173,14 +194,18 @@ class CircuitBreaker:
         }
 
     def reset(self):
-        """Manually reset the circuit breaker to CLOSED state."""
+        """Manually reset the circuit breaker to CLOSED state and reset backoff."""
         self.state = CircuitState.CLOSED
         self.failure_count = 0
         self.success_count = 0
+        self.consecutive_open_count = 0
+        self.recovery_timeout = self.initial_recovery_timeout
         self.last_state_change = time.time()
 
         if self.logger:
-            self.logger.info(f"Circuit breaker '{self.name}' manually reset to CLOSED.")
+            self.logger.info(
+                f"Circuit breaker '{self.name}' manually reset to CLOSED with timeout {self.initial_recovery_timeout}s."
+            )
 
 
 class CircuitOpenError(Exception):
@@ -197,12 +222,14 @@ def circuit_breaker(
     expected_exception: type[Exception] | tuple[type[Exception], ...] = Exception,
     success_threshold: int = 2,
     logger=None,
+    max_recovery_timeout: float = 300.0,
+    backoff_multiplier: float = 2.0,
 ):
     """
-    Decorator to apply circuit breaker pattern to async functions.
+    Decorator to apply circuit breaker pattern to async functions with exponential backoff.
 
     Example:
-        @circuit_breaker(name="external_api", failure_threshold=3)
+        @circuit_breaker(name="external_api", failure_threshold=3, backoff_multiplier=1.5)
         async def call_external_api():
             ...
     """
@@ -216,6 +243,8 @@ def circuit_breaker(
             expected_exception=expected_exception,
             success_threshold=success_threshold,
             logger=logger,
+            max_recovery_timeout=max_recovery_timeout,
+            backoff_multiplier=backoff_multiplier,
         )
 
         async def wrapper(*args, **kwargs):

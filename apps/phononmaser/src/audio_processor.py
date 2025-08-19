@@ -9,12 +9,16 @@ import time
 import wave
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 from shared import get_global_tracker
 
 from .events import TranscriptionEvent
 from .logger import get_logger
+
+if TYPE_CHECKING:
+    from .prompt_manager import PromptManager
 
 logger = get_logger(__name__)
 
@@ -59,10 +63,12 @@ class AudioProcessor:
         buffer_duration_ms: int = 1500,
         max_buffer_size: int = 10 * 1024 * 1024,  # 10MB
         memory_optimization: bool = False,
+        prompt_manager: "PromptManager | None" = None,
     ):
         self.buffer_duration_ms = buffer_duration_ms
         self.max_buffer_size = max_buffer_size
         self.memory_optimization = memory_optimization
+        self.prompt_manager = prompt_manager
 
         # Initialize buffer
         self.buffer = AudioBuffer(chunks=[], start_timestamp=0, end_timestamp=0, total_size=0)
@@ -88,6 +94,11 @@ class AudioProcessor:
         # Transcription callback
         self.transcription_callback: Callable[[TranscriptionEvent], Awaitable[None]] | None = None
 
+        # Prompt caching for optimization
+        self._prompt_cache: str = ""
+        self._prompt_cache_time: float = 0.0
+        self._prompt_cache_ttl: float = 5.0  # 5 second TTL
+
         # Store Whisper configuration
         self.whisper_exe = os.getenv("WHISPER_EXECUTABLE", "/usr/local/bin/whisper")
         self.whisper_model_path = whisper_model_path
@@ -109,6 +120,8 @@ class AudioProcessor:
 
         logger.info(f"Using whisper-cli at: {self.whisper_exe}")
         logger.info(f"Using model: {self.whisper_model_path}")
+        if self.prompt_manager:
+            logger.info("PromptManager integration enabled")
 
     async def start(self) -> None:
         """Start the audio processor."""
@@ -188,6 +201,50 @@ class AudioProcessor:
         if not self.buffer.chunks:
             return 0.0
         return (self.buffer.end_timestamp - self.buffer.start_timestamp) / 1_000_000
+
+    def _get_current_prompt(self) -> str:
+        """
+        Safely get current prompt from PromptManager with caching.
+
+        Implements a 5-second cache to reduce PromptManager calls.
+        Returns stale cache on error to maintain stability.
+
+        Returns:
+            str: Current prompt or empty string if unavailable
+        """
+        if not self.prompt_manager:
+            return ""
+
+        current_time = time.time()
+        cache_age = current_time - self._prompt_cache_time
+
+        # Return cached prompt if still valid
+        if cache_age < self._prompt_cache_ttl and self._prompt_cache:
+            logger.debug(f"Using cached prompt (age: {cache_age:.1f}s): {self._prompt_cache[:50]}...")
+            return self._prompt_cache
+
+        # Try to fetch fresh prompt
+        try:
+            prompt = self.prompt_manager.get_current_prompt()
+            if prompt:
+                # Update cache with fresh prompt
+                self._prompt_cache = prompt
+                self._prompt_cache_time = current_time
+                logger.debug(f"Fetched and cached fresh prompt: {prompt[:50]}...")
+                return prompt
+            else:
+                # No prompt available, clear cache
+                self._prompt_cache = ""
+                self._prompt_cache_time = current_time
+                logger.debug("No current prompt available")
+                return ""
+        except Exception as e:
+            logger.warning(f"Failed to get prompt from PromptManager: {e}")
+            # Return stale cache if available on error
+            if self._prompt_cache:
+                logger.info(f"Using stale cached prompt after error (age: {cache_age:.1f}s)")
+                return self._prompt_cache
+            return ""
 
     async def _processing_loop(self) -> None:
         """Main processing loop with robust error handling."""
@@ -283,6 +340,7 @@ class AudioProcessor:
                 start_time = time.time()
                 logger.info(f"Starting transcription of {len(audio_float) / 16000:.1f}s audio")
 
+                # Build base command
                 cmd = [
                     self.whisper_exe,
                     "-m",
@@ -298,6 +356,14 @@ class AudioProcessor:
                     "--vad-model",
                     self.vad_model_path,
                 ]
+
+                # Add prompt if available
+                current_prompt = self._get_current_prompt()
+                if current_prompt:
+                    cmd.extend(["--prompt", current_prompt])
+                    logger.info(f"Added prompt to transcription: {current_prompt[:100]}...")
+                else:
+                    logger.debug("No prompt available for transcription")
 
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
@@ -366,6 +432,77 @@ class AudioProcessor:
 
         return audio_float
 
+    async def _process_with_temp_file(
+        self, audio_float: np.ndarray, processing_buffer: AudioBuffer
+    ) -> TranscriptionEvent | None:
+        """Process audio using temporary file (fallback method)."""
+        import tempfile
+
+        try:
+            # Write audio to temporary WAV file
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                temp_wav = tmp.name
+
+            try:
+                start_time = time.time()
+                duration_seconds = (processing_buffer.end_timestamp - processing_buffer.start_timestamp) / 1_000_000
+
+                # Convert float32 to int16 for WAV
+                audio_int16 = (audio_float * 32767).astype(np.int16)
+
+                # Write WAV file
+                with wave.open(temp_wav, "wb") as wav:
+                    wav.setnchannels(1)
+                    wav.setsampwidth(2)
+                    wav.setframerate(16000)
+                    wav.writeframes(audio_int16.tobytes())
+
+                logger.info(f"Processing audio via temp file: {temp_wav}")
+
+                # Build command
+                cmd = [
+                    self.whisper_exe,
+                    "-m",
+                    self.whisper_model_path,
+                    "-f",
+                    temp_wav,
+                    "-l",
+                    self.whisper_language,
+                    "-t",
+                    str(self.whisper_threads),
+                    "-np",
+                ]
+
+                # Add VAD if available
+                if self.vad_model_path and os.path.exists(self.vad_model_path):
+                    cmd.extend(["--vad", "--vad-model", self.vad_model_path])
+
+                # Add prompt if available
+                current_prompt = self._get_current_prompt()
+                if current_prompt:
+                    cmd.extend(["--prompt", current_prompt])
+
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                transcription_time = time.time() - start_time
+
+                if result.returncode != 0:
+                    logger.error(f"Whisper (temp file) failed with code {result.returncode}: {result.stderr}")
+                    return None
+
+                # Parse text output
+                return self._parse_whisper_output(
+                    result.stdout, transcription_time, processing_buffer.start_timestamp, duration_seconds
+                )
+
+            finally:
+                # Clean up temp file
+                if os.path.exists(temp_wav):
+                    os.unlink(temp_wav)
+
+        except Exception as e:
+            logger.error(f"Error in file-based audio processing: {e}")
+            return None
+
     async def _process_in_memory(
         self, audio_float: np.ndarray, processing_buffer: AudioBuffer
     ) -> TranscriptionEvent | None:
@@ -383,7 +520,7 @@ class AudioProcessor:
             # Convert float32 to int16 for processing
             audio_int16 = (audio_float * 32767).astype(np.int16)
 
-            # Use subprocess with stdin instead of temp files
+            # Build base command for stdin processing
             cmd = [
                 self.whisper_exe,
                 "-m",
@@ -400,6 +537,12 @@ class AudioProcessor:
                 self.vad_model_path,
             ]
 
+            # Add prompt if available
+            current_prompt = self._get_current_prompt()
+            if current_prompt:
+                cmd.extend(["--prompt", current_prompt])
+                logger.debug(f"Added prompt to in-memory transcription: {current_prompt[:50]}...")
+
             # Create WAV data in memory
             import io
 
@@ -415,16 +558,21 @@ class AudioProcessor:
             # Process via stdin (if Whisper supports it, otherwise fallback to temp file)
             try:
                 result = subprocess.run(cmd, input=wav_data, capture_output=True, timeout=30)
-            except (subprocess.SubprocessError, FileNotFoundError):
+            except (subprocess.SubprocessError, FileNotFoundError) as e:
                 # Fallback to temp file if stdin processing fails
-                logger.warning("In-memory processing failed, falling back to temp file")
-                return None
+                logger.warning(f"In-memory processing failed ({e}), falling back to file-based processing")
+                # Return the audio data to trigger file-based fallback
+                return await self._process_with_temp_file(audio_float, processing_buffer)
 
             transcription_time = time.time() - start_time
 
             if result.returncode != 0:
-                logger.error(f"In-memory Whisper failed with code {result.returncode}: {result.stderr}")
-                return None
+                logger.warning(
+                    f"In-memory Whisper failed with code {result.returncode}: {result.stderr}, "
+                    "falling back to file-based processing"
+                )
+                # Fallback to file-based processing on non-zero return
+                return await self._process_with_temp_file(audio_float, processing_buffer)
 
             # Parse text output using common parser
             return self._parse_whisper_output(

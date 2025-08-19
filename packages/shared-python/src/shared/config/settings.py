@@ -33,21 +33,36 @@ class CommonConfig:
         return os.getenv(key, default)
 
     def get_env_int(self, key: str, default: int = 0) -> int:
-        """Get an environment variable as integer."""
+        """Get an environment variable as integer with validation."""
         value = os.getenv(key, str(default))
         try:
-            return int(value)
+            parsed = int(value)
+            # Validate reasonable ranges for common config values
+            if parsed < 0:
+                logger.warning(f"Negative value for {key}: {parsed}, using default: {default}")
+                return default
+            return parsed
         except ValueError:
-            logger.error(f"Invalid integer value for {key}: {value}")
+            logger.error(
+                f"Invalid integer value for environment variable '{key}': '{value}'. "
+                f"Expected a valid integer, using default: {default}"
+            )
             return default
 
     def get_env_bool(self, key: str, default: bool = False) -> bool:
-        """Get an environment variable as boolean."""
-        value = os.getenv(key, "").lower()
-        if value in ("true", "1", "yes", "on"):
+        """Get an environment variable as boolean with clear parsing."""
+        value = os.getenv(key, "").lower().strip()
+        if not value:
+            return default
+        if value in ("true", "1", "yes", "on", "enabled"):
             return True
-        elif value in ("false", "0", "no", "off"):
+        elif value in ("false", "0", "no", "off", "disabled"):
             return False
+        logger.warning(
+            f"Ambiguous boolean value for environment variable '{key}': '{value}'. "
+            f"Expected true/false, yes/no, 1/0, on/off, or enabled/disabled. "
+            f"Using default: {default}"
+        )
         return default
 
 
@@ -71,6 +86,33 @@ class PhononmaserConfig(CommonConfig):
         self.transcription_enabled: bool = True
         self.transcription_model: str = "base"
 
+    def validate(self) -> list[str]:
+        """
+        Validate configuration and return list of errors.
+
+        Returns:
+            list[str]: List of validation error messages, empty if valid
+        """
+        errors = []
+
+        # Port validation
+        if not (1024 <= self.port <= 65535):
+            errors.append(f"Phononmaser port {self.port} is out of valid range (1024-65535)")
+        if not (1024 <= self.health_port <= 65535):
+            errors.append(f"Health check port {self.health_port} is out of valid range (1024-65535)")
+        if self.port == self.health_port:
+            errors.append(f"Phononmaser port and health port cannot be the same ({self.port})")
+
+        # Audio settings validation
+        if self.sample_rate not in [8000, 16000, 22050, 44100, 48000]:
+            logger.warning(f"Non-standard sample rate: {self.sample_rate}Hz")
+        if self.channels not in [1, 2]:
+            errors.append(f"Invalid channel count: {self.channels} (must be 1 or 2)")
+        if not (1 <= self.buffer_size_mb <= 1000):
+            errors.append(f"Buffer size {self.buffer_size_mb}MB out of reasonable range (1-1000MB)")
+
+        return errors
+
 
 class SeedConfig(CommonConfig):
     """Configuration specific to Seed service."""
@@ -90,6 +132,35 @@ class SeedConfig(CommonConfig):
         # Phononmaser connection
         self.phononmaser_host: str = "localhost"
         self.phononmaser_port: int = 8889
+
+    def validate(self) -> list[str]:
+        """
+        Validate configuration and return list of errors.
+
+        Returns:
+            list[str]: List of validation error messages, empty if valid
+        """
+        errors = []
+
+        # Port validation
+        if not (1024 <= self.port <= 65535):
+            errors.append(f"Seed port {self.port} is out of valid range (1024-65535)")
+        if not (1024 <= self.health_port <= 65535):
+            errors.append(f"Health check port {self.health_port} is out of valid range (1024-65535)")
+        if self.port == self.health_port:
+            errors.append(f"Seed port and health port cannot be the same ({self.port})")
+
+        # LMS settings validation
+        if not (1 <= self.lms_port <= 65535):
+            errors.append(f"LM Studio port {self.lms_port} is out of valid range (1-65535)")
+        if not self.lms_model:
+            errors.append("LMS_MODEL environment variable cannot be empty")
+
+        # Phononmaser connection validation
+        if not (1024 <= self.phononmaser_port <= 65535):
+            errors.append(f"Phononmaser port {self.phononmaser_port} is out of valid range (1024-65535)")
+
+        return errors
 
     @property
     def lms_api_url(self) -> str:
