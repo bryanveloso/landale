@@ -11,7 +11,7 @@ class CommonConfig:
 
     def __init__(self):
         # Core server configuration - only what needs to be configurable
-        self.server_host: str = os.getenv("SERVER_HOST", "localhost")
+        self.server_host: str = os.getenv("SERVER_HOST", "saya")
         self.server_ws_port: int = 7175
         self.server_tcp_port: int = 8080
 
