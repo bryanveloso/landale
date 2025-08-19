@@ -7,11 +7,11 @@ import sys
 
 from dotenv import load_dotenv
 from shared.config import PhononmaserConfig
+from shared.logger import configure_json_logging, get_logger
 from shared.supervisor import RestartStrategy, ServiceConfig, SupervisedService, run_with_supervisor
 
 from .audio_processor import AudioProcessor
 from .health import create_health_app
-from .logger import configure_json_logging, get_logger
 from .prompt_manager import PromptManager
 from .websocket_client import ServerWebSocketClient
 from .websocket_server import PhononmaserServer
@@ -20,7 +20,12 @@ from .websocket_server import PhononmaserServer
 load_dotenv()
 
 # Configure structured JSON logging
-configure_json_logging()
+configure_json_logging(
+    service_name="phononmaser",
+    level="INFO",  # Can be made configurable later
+    json_output=True,
+    component="audio_processing",
+)
 logger = get_logger(__name__)
 
 

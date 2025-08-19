@@ -6,11 +6,11 @@ from datetime import datetime
 
 import websockets
 from shared import safe_handler
+from shared.logger import bind_correlation_context, clear_context, get_logger
 from shared.websockets import BaseWebSocketClient, ConnectionEvent, ConnectionState
 from websockets.client import WebSocketClientProtocol
 
 from .events import ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
-from .logger import bind_correlation_context, clear_context, get_logger
 
 logger = get_logger(__name__)
 

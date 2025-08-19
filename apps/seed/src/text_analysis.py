@@ -6,8 +6,9 @@ input schema and vocabulary extraction algorithms.
 
 from datetime import datetime
 
+from shared.logger import get_logger
+
 from .community_api import contribute_analysis_to_community, enhance_analysis_with_community_context
-from .logger import get_logger
 from .text_analysis_exceptions import CommunityAPIError, ProcessingError
 from .text_analysis_schema import (
     TextAnalysisInput,

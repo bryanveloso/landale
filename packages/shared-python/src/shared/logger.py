@@ -1,4 +1,4 @@
-"""Structured JSON logging configuration for SEED intelligence service."""
+"""Shared structured JSON logging configuration for Landale Python services."""
 
 import logging
 import os
@@ -10,12 +10,21 @@ from typing import Any
 import structlog
 
 
-def configure_json_logging(level: str = "INFO", json_output: bool = True) -> None:
-    """Configure structured JSON logging for SEED service.
+def configure_json_logging(
+    service_name: str,
+    level: str = "INFO",
+    json_output: bool = True,
+    component: str | None = None,
+    version: str = "1.0.0",
+) -> None:
+    """Configure structured JSON logging for Landale services.
 
     Args:
+        service_name: Name of the service (e.g., 'seed', 'phononmaser', 'supervisor')
         level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         json_output: Whether to output JSON format (True) or human-readable (False)
+        component: Component name within the service (optional)
+        version: Service version for logging metadata
     """
     # Convert string level to logging constant
     log_level = getattr(logging, level.upper(), logging.INFO)
@@ -33,7 +42,7 @@ def configure_json_logging(level: str = "INFO", json_output: bool = True) -> Non
 
         log_dir = Path(log_dir).resolve()
         log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / "seed.log"
+        log_file = log_dir / f"{service_name}.log"
 
         # Use rotating file handler to manage log size
         handler = RotatingFileHandler(
@@ -62,7 +71,7 @@ def configure_json_logging(level: str = "INFO", json_output: bool = True) -> Non
         # Add timestamp in ISO 8601 format
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         # Add service metadata
-        add_service_metadata,
+        _create_service_metadata_processor(service_name, component, version),
         # Handle exceptions with structured tracebacks
         structlog.processors.format_exc_info,
     ]
@@ -82,16 +91,22 @@ def configure_json_logging(level: str = "INFO", json_output: bool = True) -> Non
     )
 
 
-def add_service_metadata(_logger: Any, _method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
-    """Add SEED service metadata to log entries."""
-    event_dict.update(
-        {
-            "service": "seed",
-            "component": "intelligence",
-            "version": "1.0.0",
+def _create_service_metadata_processor(service_name: str, component: str | None, version: str) -> Any:
+    """Create a processor that adds service metadata to log entries."""
+
+    def add_service_metadata(_logger: Any, _method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+        """Add service metadata to log entries."""
+        metadata = {
+            "service": service_name,
+            "version": version,
         }
-    )
-    return event_dict
+        if component:
+            metadata["component"] = component
+
+        event_dict.update(metadata)
+        return event_dict
+
+    return add_service_metadata
 
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
@@ -126,3 +141,19 @@ def bind_correlation_context(correlation_id: str | None = None, session_id: str 
 def clear_context() -> None:
     """Clear all context variables."""
     structlog.contextvars.clear_contextvars()
+
+
+def configure_logging_from_env(service_name: str, component: str | None = None) -> None:
+    """Configure logging using environment variables for level and format.
+
+    This is a convenience function that reads LOG_LEVEL and JSON_LOGS
+    environment variables to configure logging.
+
+    Args:
+        service_name: Name of the service (e.g., 'seed', 'phononmaser', 'supervisor')
+        component: Component name within the service (optional)
+    """
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    json_output = os.getenv("JSON_LOGS", "true").lower() in ("true", "1", "yes", "on")
+
+    configure_json_logging(service_name=service_name, level=log_level, json_output=json_output, component=component)

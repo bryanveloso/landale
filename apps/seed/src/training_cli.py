@@ -5,13 +5,14 @@ import asyncio
 import sys
 from pathlib import Path
 
+from shared.logger import configure_json_logging, get_logger
+
 from .context_client import ContextClient
 from .dataset_exporter import DatasetExporter
-from .logger import configure_json_logging, get_logger
 from .training_pipeline import TrainingDataPipeline
 
 # Configure structured logging
-configure_json_logging()
+configure_json_logging(service_name="seed", component="training_cli")
 logger = get_logger(__name__)
 
 

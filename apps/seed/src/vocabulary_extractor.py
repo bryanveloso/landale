@@ -8,7 +8,8 @@ import re
 from collections import Counter
 from datetime import datetime
 
-from .logger import get_logger
+from shared.logger import get_logger
+
 from .text_analysis_schema import TextAnalysisInput, TextAnalysisOutput
 
 logger = get_logger(__name__)

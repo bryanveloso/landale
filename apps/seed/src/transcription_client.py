@@ -7,10 +7,10 @@ from collections.abc import Callable
 from datetime import datetime
 
 import websockets
+from shared.logger import get_logger
 from shared.websockets import BaseWebSocketClient, ConnectionEvent, ConnectionState
 
 from .events import TranscriptionEvent
-from .logger import get_logger
 
 logger = get_logger(__name__)
 

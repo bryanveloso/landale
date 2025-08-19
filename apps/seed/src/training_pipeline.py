@@ -5,8 +5,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from shared.logger import get_logger
+
 from .context_client import ContextClient
-from .logger import get_logger
 
 logger = get_logger(__name__)
 

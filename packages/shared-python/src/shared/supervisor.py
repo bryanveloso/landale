@@ -1,7 +1,6 @@
 """Supervisor patterns for Python service crash resilience."""
 
 import asyncio
-import logging
 import signal
 import time
 import weakref
@@ -10,7 +9,9 @@ from collections.abc import Callable
 from enum import Enum
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from .logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class RestartStrategy(Enum):
@@ -114,14 +115,16 @@ class ServiceSupervisor:
 
             logger.info(
                 "Service state changed",
-                extra={"service": self.config.name, "old_state": old_state.value, "new_state": new_state.value},
+                service=self.config.name,
+                old_state=old_state.value,
+                new_state=new_state.value,
             )
 
             for callback in self.state_callbacks:
                 try:
                     callback(old_state, new_state)
                 except Exception as e:
-                    logger.error("Error in state change callback", extra={"error": str(e)})
+                    logger.error("Error in state change callback", error=str(e))
 
     def _emit_failure(self, error: Exception) -> None:
         """Emit failure event."""
@@ -129,12 +132,12 @@ class ServiceSupervisor:
             try:
                 callback(error)
             except Exception as e:
-                logger.error("Error in failure callback", extra={"error": str(e)})
+                logger.error("Error in failure callback", error=str(e))
 
     async def start_supervised(self) -> None:
         """Start supervising the service."""
         if self.supervisor_task and not self.supervisor_task.done():
-            logger.warning("Service already being supervised", extra={"service": self.config.name})
+            logger.warning("Service already being supervised", service=self.config.name)
             return
 
         self.supervisor_task = asyncio.create_task(self._supervision_loop())
@@ -159,17 +162,17 @@ class ServiceSupervisor:
                     await self._monitor_service()
 
                 except asyncio.CancelledError:
-                    logger.info("Supervision cancelled", extra={"service": self.config.name})
+                    logger.info("Supervision cancelled", service=self.config.name)
                     break
 
                 except Exception as e:
-                    logger.error("Service failed", extra={"service": self.config.name, "error": str(e)})
+                    logger.error("Service failed", service=self.config.name, error=str(e))
                     self.last_failure_time = time.time()
                     self._emit_failure(e)
 
                     # Check restart strategy
                     if not self._should_restart():
-                        logger.info("Not restarting service due to restart policy", extra={"service": self.config.name})
+                        logger.info("Not restarting service due to restart policy", service=self.config.name)
                         break
 
                     # Calculate restart delay
@@ -177,7 +180,8 @@ class ServiceSupervisor:
                     if delay > 0:
                         logger.info(
                             "Waiting before restarting service",
-                            extra={"service": self.config.name, "delay_seconds": delay},
+                            service=self.config.name,
+                            delay_seconds=delay,
                         )
                         self._emit_state_change(ServiceState.RESTARTING)
                         await asyncio.sleep(delay)
@@ -187,7 +191,7 @@ class ServiceSupervisor:
 
     async def _start_service(self) -> None:
         """Start the service."""
-        logger.info("Starting service", extra={"service": self.config.name})
+        logger.info("Starting service", service=self.config.name)
         self._emit_state_change(ServiceState.STARTING)
 
         self.last_start_time = time.time()
@@ -200,7 +204,7 @@ class ServiceSupervisor:
             self.health_task = asyncio.create_task(self._health_monitor_loop())
 
             self._emit_state_change(ServiceState.RUNNING)
-            logger.info("Service started successfully", extra={"service": self.config.name})
+            logger.info("Service started successfully", service=self.config.name)
 
         except Exception:
             self._emit_state_change(ServiceState.FAILED)
@@ -211,7 +215,7 @@ class ServiceSupervisor:
         if self.state in (ServiceState.STOPPED, ServiceState.STOPPING):
             return
 
-        logger.info("Stopping service", extra={"service": self.config.name})
+        logger.info("Stopping service", service=self.config.name)
         self._emit_state_change(ServiceState.STOPPING)
 
         # Cancel health monitoring
@@ -226,9 +230,9 @@ class ServiceSupervisor:
         try:
             await asyncio.wait_for(self.service.stop(), timeout=self.config.shutdown_timeout)
         except TimeoutError:
-            logger.warning("Service did not stop gracefully within timeout", extra={"service": self.config.name})
+            logger.warning("Service did not stop gracefully within timeout", service=self.config.name)
         except Exception as e:
-            logger.error("Error stopping service", extra={"service": self.config.name, "error": str(e)})
+            logger.error("Error stopping service", service=self.config.name, error=str(e))
 
         self._emit_state_change(ServiceState.STOPPED)
 
@@ -259,8 +263,10 @@ class ServiceSupervisor:
                 else:
                     consecutive_failures += 1
                     logger.warning(
-                        f"Health check failed for {self.config.name} "
-                        f"({consecutive_failures}/{max_consecutive_failures})"
+                        "Health check failed for service",
+                        service=self.config.name,
+                        consecutive_failures=consecutive_failures,
+                        max_consecutive_failures=max_consecutive_failures,
                     )
 
                     if consecutive_failures >= max_consecutive_failures:
@@ -269,7 +275,7 @@ class ServiceSupervisor:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error("Health check error", extra={"service": self.config.name, "error": str(e)})
+                logger.error("Health check error", service=self.config.name, error=str(e))
                 raise
 
     def _should_restart(self) -> bool:
@@ -294,8 +300,10 @@ class ServiceSupervisor:
 
         if len(self.restart_history) >= self.config.max_restarts:
             logger.error(
-                f"Service {self.config.name} reached max restarts "
-                f"({self.config.max_restarts}) in {self.config.restart_window_seconds}s"
+                "Service reached max restarts",
+                service=self.config.name,
+                max_restarts=self.config.max_restarts,
+                restart_window_seconds=self.config.restart_window_seconds,
             )
             return False
 
@@ -347,14 +355,14 @@ class ProcessSupervisor:
         supervisor.on_state_change(
             lambda old, new: logger.info(
                 "Service state transition",
-                extra={"service": config.name, "old_state": old.value, "new_state": new.value},
+                service=config.name,
+                old_state=old.value,
+                new_state=new.value,
             )
         )
 
         # Log failures
-        supervisor.on_failure(
-            lambda error: logger.error("Service failure", extra={"service": config.name, "error": str(error)})
-        )
+        supervisor.on_failure(lambda error: logger.error("Service failure", service=config.name, error=str(error)))
 
         self.service_supervisors[config.name] = supervisor
         return supervisor
@@ -379,7 +387,7 @@ class ProcessSupervisor:
 
     async def start_all(self) -> None:
         """Start all supervised services."""
-        logger.info("Starting services", extra={"service_count": len(self.service_supervisors)})
+        logger.info("Starting services", service_count=len(self.service_supervisors))
 
         tasks = []
         for supervisor in self.service_supervisors.values():
@@ -392,7 +400,7 @@ class ProcessSupervisor:
 
     async def stop_all(self) -> None:
         """Stop all supervised services."""
-        logger.info("Stopping services", extra={"service_count": len(self.service_supervisors)})
+        logger.info("Stopping services", service_count=len(self.service_supervisors))
 
         tasks = []
         for supervisor in self.service_supervisors.values():

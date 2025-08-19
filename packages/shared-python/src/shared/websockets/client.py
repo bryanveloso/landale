@@ -1,7 +1,6 @@
 """Base WebSocket client with automatic reconnection logic."""
 
 import asyncio
-import logging
 import random
 import time
 import weakref
@@ -11,7 +10,9 @@ from enum import Enum
 
 import websockets
 
-logger = logging.getLogger(__name__)
+from ..logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConnectionState(Enum):

@@ -12,9 +12,9 @@ from datetime import datetime
 from urllib.parse import urljoin
 
 import aiohttp
+from shared.logger import get_logger
 
 from .config import get_config
-from .logger import get_logger
 from .text_analysis_schema import TextAnalysisOutput
 
 logger = get_logger(__name__)

@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from shared import get_global_tracker
+from shared.logger import get_logger
 
 from .events import TranscriptionEvent
-from .logger import get_logger
 
 if TYPE_CHECKING:
     from .prompt_manager import PromptManager

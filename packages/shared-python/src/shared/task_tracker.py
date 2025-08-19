@@ -1,13 +1,14 @@
 """Task tracking utilities for debugging async operations."""
 
 import asyncio
-import logging
 import weakref
 from collections.abc import Coroutine
 from typing import Any, TypeVar
 
-# Use a specific logger for task tracking
-logger = logging.getLogger("landale.task_tracker")
+from .logger import get_logger
+
+# Use the shared structured logger
+logger = get_logger(__name__)
 
 T = TypeVar("T")
 

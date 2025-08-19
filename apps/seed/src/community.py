@@ -9,8 +9,7 @@ from datetime import datetime, timedelta
 
 import aiohttp
 from shared.config import get_config
-
-from .logger import get_logger
+from shared.logger import get_logger
 
 logger = get_logger(__name__)
 

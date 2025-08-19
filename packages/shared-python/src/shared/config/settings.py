@@ -1,9 +1,10 @@
 """Environment-based configuration for all Python services."""
 
-import logging
 import os
 
-logger = logging.getLogger(__name__)
+from ..logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class CommonConfig:

@@ -7,7 +7,8 @@ through the text analysis pipeline to extract vocabulary and insights.
 import asyncio
 from datetime import datetime
 
-from .logger import get_logger
+from shared.logger import get_logger
+
 from .quotes_api import ElsydeonQuotesClient, QuotesDataProcessor, bulk_import_all_quotes, import_recent_quotes
 from .text_analysis import TextAnalysisService, get_text_analysis_service
 from .text_analysis_schema import TextAnalysisOutput

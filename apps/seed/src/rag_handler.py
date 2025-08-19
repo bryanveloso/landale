@@ -8,10 +8,10 @@ from typing import Any
 
 import aiohttp
 from aiohttp import web
+from shared.logger import get_logger
 
 from .community_api import CommunityVocabularyClient
 from .context_client import ContextClient
-from .logger import get_logger
 from .rag_lms_client import RAGLMSClient
 
 logger = get_logger(__name__)

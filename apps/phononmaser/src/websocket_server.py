@@ -9,11 +9,11 @@ import weakref
 
 import websockets
 from shared import error_boundary, get_global_tracker, safe_handler
+from shared.logger import get_logger
 from websockets.server import WebSocketServerProtocol
 
 from .audio_processor import AudioChunk, AudioFormat, AudioProcessor
 from .events import TranscriptionEvent
-from .logger import get_logger
 from .service_config import _config as phononmaser_config
 
 logger = get_logger(__name__)

@@ -8,11 +8,11 @@ from zoneinfo import ZoneInfo
 
 import websockets
 from shared import safe_handler
+from shared.logger import get_logger
 from shared.websockets import BaseWebSocketClient, ConnectionEvent, ConnectionState
 from websockets.client import WebSocketClientProtocol
 
 from .events import TranscriptionEvent
-from .logger import get_logger
 from .timestamp_utils import convert_timestamp_to_iso
 
 logger = get_logger(__name__)

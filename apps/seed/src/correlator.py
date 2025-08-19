@@ -6,10 +6,11 @@ from collections import Counter, deque
 from datetime import datetime, timedelta
 from typing import Any
 
+from shared.logger import bind_correlation_context, clear_context, get_logger
+
 from .context_client import ContextClient
 from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from .lms_client import LMSClient
-from .logger import bind_correlation_context, clear_context, get_logger
 
 logger = get_logger(__name__)
 

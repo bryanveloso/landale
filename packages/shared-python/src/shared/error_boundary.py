@@ -11,8 +11,10 @@ import logging
 from collections.abc import Callable
 from typing import Any, TypeVar
 
+from .logger import get_logger
+
 T = TypeVar("T")
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def error_boundary(

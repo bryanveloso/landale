@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 from urllib.parse import urljoin
 
 import aiohttp
+from shared.logger import get_logger
 
-from .logger import get_logger
 from .text_analysis_schema import TextAnalysisInput, create_quote_input
 
 logger = get_logger(__name__)

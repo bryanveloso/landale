@@ -4,6 +4,7 @@ import asyncio
 
 from dotenv import load_dotenv
 from shared import get_global_tracker
+from shared.logger import configure_json_logging, get_logger
 from shared.supervisor import RestartStrategy, ServiceConfig, SupervisedService, run_with_supervisor
 
 from .config import get_config
@@ -12,7 +13,6 @@ from .correlator import StreamCorrelator
 from .events import AnalysisResult, ChatMessage, EmoteEvent, TranscriptionEvent, ViewerInteractionEvent
 from .health import create_health_app
 from .lms_client import LMSClient
-from .logger import configure_json_logging, get_logger
 from .rag_handler import RAGHandler
 from .rag_websocket import setup_rag_websocket_handlers
 from .transcription_client import TranscriptionWebSocketClient
@@ -24,8 +24,10 @@ load_dotenv()
 # Get configuration
 config = get_config()
 
-# Configure structured JSON logging based on config
-configure_json_logging(level=config.log_level, json_output=config.json_logs)
+# Configure structured JSON logging
+configure_json_logging(
+    service_name="seed", level=config.log_level, json_output=config.json_logs, component="intelligence"
+)
 logger = get_logger(__name__)
 
 

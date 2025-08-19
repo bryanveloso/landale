@@ -8,7 +8,8 @@ import re
 import unicodedata
 from abc import ABC, abstractmethod
 
-from .logger import get_logger
+from shared.logger import get_logger
+
 from .text_analysis_schema import TextAnalysisInput, TextSource
 
 logger = get_logger(__name__)

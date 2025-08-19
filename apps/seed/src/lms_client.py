@@ -7,9 +7,9 @@ import time
 from collections import deque
 
 import aiohttp
+from shared.logger import get_logger
 
 from .events import AnalysisResult, FlexiblePatterns, StreamDynamics
-from .logger import get_logger
 
 logger = get_logger(__name__)
 
