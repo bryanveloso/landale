@@ -13,7 +13,8 @@ class CommonConfig:
         # Core server configuration - only what needs to be configurable
         self.server_host: str = os.getenv("SERVER_HOST", "saya")
         self.server_ws_port: int = 7175
-        self.server_tcp_port: int = 8080
+        self.server_http_port: int = 7175  # Phoenix HTTP and WebSocket on same port
+        self.server_tcp_port: int = 8080  # IronMon TCP only
 
         # Logging configuration
         self.log_level: str = os.getenv("LOG_LEVEL", "INFO")

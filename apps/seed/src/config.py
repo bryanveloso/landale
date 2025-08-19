@@ -92,8 +92,8 @@ class SeedConfig(BaseSettings):
 
     def get_phononmaser_url(self) -> str:
         """Get phononmaser WebSocket URL."""
-        # Default to localhost if not specified
-        return os.getenv("PHONONMASER_URL", "ws://localhost:8889")
+        # Default to zelan where Phononmaser runs
+        return os.getenv("PHONONMASER_URL", "ws://zelan:8889")
 
     def get_server_events_url(self) -> str:
         """Get server events WebSocket URL."""

@@ -22,6 +22,7 @@ class ServiceConfig:
                 "host": _config.server_host,
                 "ports": {
                     "ws": _config.server_ws_port,
+                    "http": _config.server_http_port,
                     "tcp": _config.server_tcp_port,
                 },
             },

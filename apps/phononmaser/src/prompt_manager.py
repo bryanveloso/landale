@@ -9,7 +9,6 @@ from typing import Any
 
 import aiohttp
 from shared import safe_handler
-from shared.circuit_breaker import CircuitBreaker, CircuitOpenError
 
 from .logger import get_logger
 
@@ -36,8 +35,6 @@ class PromptManager:
         prompt_max_chars: int = 200,
         lookback_minutes: int = 10,
         prompt_expiry_minutes: int = 5,
-        circuit_breaker_failures: int = 3,
-        circuit_breaker_recovery_seconds: float = 60.0,
     ):
         """
         Initialize PromptManager.
@@ -48,8 +45,6 @@ class PromptManager:
             prompt_max_chars: Maximum characters in generated prompt (safety limit)
             lookback_minutes: How far back to look for chat messages
             prompt_expiry_minutes: How long to use cached prompts
-            circuit_breaker_failures: Failures before circuit opens
-            circuit_breaker_recovery_seconds: Time to wait before retry
         """
         self.phoenix_base_url = phoenix_base_url.rstrip("/")
         self.poll_interval = max(30.0, poll_interval_seconds)  # Enforce 30s minimum
@@ -59,17 +54,6 @@ class PromptManager:
 
         # API endpoint for bulk chat events
         self.bulk_api_url = f"{self.phoenix_base_url}/api/activity/events/bulk"
-
-        # Circuit breaker for API resilience with exponential backoff
-        self.circuit_breaker = CircuitBreaker(
-            name="chat_api",
-            failure_threshold=circuit_breaker_failures,
-            recovery_timeout=circuit_breaker_recovery_seconds,
-            expected_exception=(aiohttp.ClientError, asyncio.TimeoutError, json.JSONDecodeError),
-            logger=logger,
-            max_recovery_timeout=300.0,  # Max 5 minutes
-            backoff_multiplier=1.5,  # Gentler backoff (1.5x instead of 2x)
-        )
 
         # HTTP session for connection reuse
         self.session: aiohttp.ClientSession | None = None
@@ -87,7 +71,6 @@ class PromptManager:
             "successful_polls": 0,
             "failed_polls": 0,
             "prompts_generated": 0,
-            "circuit_breaker_opens": 0,
             "last_success_time": 0.0,
             "last_error": None,
         }
@@ -153,14 +136,11 @@ class PromptManager:
 
     def get_stats(self) -> dict[str, Any]:
         """Get PromptManager statistics for monitoring."""
-        circuit_stats = self.circuit_breaker.get_stats()
-
         return {
             **self.stats,
             "current_prompt_length": len(self.current_prompt),
             "prompt_age_seconds": time.time() - self.last_prompt_update if self.last_prompt_update > 0 else 0,
             "time_since_last_poll": time.time() - self.last_poll_time if self.last_poll_time > 0 else 0,
-            "circuit_breaker": circuit_stats,
             "running": self.running,
         }
 
@@ -207,8 +187,8 @@ class PromptManager:
                 "hours": hours,  # Use hours parameter as expected by the API
             }
 
-            # Make API call through circuit breaker
-            events = await self.circuit_breaker.call(self._fetch_chat_events, params)
+            # Make API call directly
+            events = await self._fetch_chat_events(params)
 
             # Process events to extract usernames
             usernames = self._extract_usernames(events)
@@ -235,10 +215,16 @@ class PromptManager:
             self.stats["last_success_time"] = time.time()
             self.stats["last_error"] = None
 
-        except CircuitOpenError as e:
-            # Circuit breaker is open - this is expected behavior
-            logger.debug("Chat API circuit breaker open", message=str(e))
+        except asyncio.CancelledError:
+            # Task cancelled during shutdown - this is expected
+            logger.debug("Chat events polling cancelled during shutdown")
+            raise  # Re-raise to properly handle cancellation
+
+        except (TimeoutError, aiohttp.ClientError) as e:
+            # Network/timeout errors - log as warning and continue
+            logger.warning("Chat API request failed", error=str(e))
             self.stats["failed_polls"] += 1
+            self.stats["last_error"] = str(e)
 
         except Exception as e:
             # Unexpected error - log and continue

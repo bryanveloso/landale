@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import signal
 import sys
 
 from dotenv import load_dotenv
@@ -48,7 +49,7 @@ class Phononmaser(SupervisedService):
         # PromptManager configuration (optional)
         self.enable_prompt_manager = self.config.get_env_bool("ENABLE_PROMPT_MANAGER", True)
         self.phoenix_base_url = os.getenv(
-            "PHOENIX_BASE_URL", f"http://{self.config.server_host}:{self.config.server_tcp_port}"
+            "PHOENIX_BASE_URL", f"http://{self.config.server_host}:{self.config.server_http_port}"
         )
 
         # Validate required configuration
@@ -186,26 +187,53 @@ class Phononmaser(SupervisedService):
 
 
 async def main():
-    """Main entry point with supervisor pattern."""
-    logger.info("Starting Phononmaser with supervisor...")
+    """Main entry point."""
+    # Check if we should use supervisor (production mode)
+    use_supervisor = os.getenv("USE_SUPERVISOR", "false").lower() in ("true", "1", "yes")
 
-    # Create service instance
-    service = Phononmaser()
+    if use_supervisor:
+        logger.info("Starting Phononmaser with supervisor...")
+        # Create service instance
+        service = Phononmaser()
 
-    # Create service configuration with restart policy
-    config = ServiceConfig(
-        name="phononmaser",
-        restart_strategy=RestartStrategy.ON_FAILURE,
-        max_restarts=5,
-        restart_window_seconds=300,  # 5 minutes
-        restart_delay_seconds=2.0,
-        restart_delay_max=30.0,
-        health_check_interval=30.0,
-        shutdown_timeout=15.0,
-    )
+        # Create service configuration with restart policy
+        config = ServiceConfig(
+            name="phononmaser",
+            restart_strategy=RestartStrategy.ON_FAILURE,
+            max_restarts=5,
+            restart_window_seconds=300,  # 5 minutes
+            restart_delay_seconds=2.0,
+            restart_delay_max=30.0,
+            health_check_interval=30.0,
+            shutdown_timeout=15.0,
+        )
 
-    # Run with supervisor
-    await run_with_supervisor([(service, config)])
+        # Run with supervisor
+        await run_with_supervisor([(service, config)])
+    else:
+        logger.info("Starting Phononmaser in development mode...")
+        # Run directly without supervisor for development
+        service = Phononmaser()
+
+        # Set up signal handlers for graceful shutdown
+        shutdown_event = asyncio.Event()
+
+        def handle_shutdown():
+            logger.info("Received shutdown signal")
+            shutdown_event.set()
+
+        try:
+            loop = asyncio.get_event_loop()
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                loop.add_signal_handler(sig, handle_shutdown)
+        except NotImplementedError:
+            logger.warning("Signal handlers not supported on this platform")
+
+        try:
+            await service.start()
+            await shutdown_event.wait()
+        finally:
+            await service.stop()
 
 
 if __name__ == "__main__":
