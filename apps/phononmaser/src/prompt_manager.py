@@ -280,10 +280,19 @@ class PromptManager:
                 )
                 raise
 
-            # Extract events array from response
-            if isinstance(data, dict) and "events" in data:
-                events = data["events"]
+            # Extract events array from Phoenix API response format
+            if isinstance(data, dict):
+                if "data" in data and isinstance(data["data"], dict) and "events" in data["data"]:
+                    # Phoenix API format: {"data": {"events": [...], ...}, "success": true, ...}
+                    events = data["data"]["events"]
+                elif "events" in data:
+                    # Direct events format: {"events": [...]}
+                    events = data["events"]
+                else:
+                    logger.warning("Unexpected API response format", response_keys=list(data.keys()))
+                    events = []
             elif isinstance(data, list):
+                # Direct list format: [...]
                 events = data
             else:
                 logger.warning("Unexpected API response format", data_type=type(data).__name__)

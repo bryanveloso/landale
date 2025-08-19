@@ -41,7 +41,7 @@ class SeedService(SupervisedService):
         logger.info(self.config.to_dict())
 
         # Components initialized from config
-        self.transcription_client = TranscriptionWebSocketClient(self.config.get_phononmaser_url())
+        self.transcription_client = TranscriptionWebSocketClient(self.config.websocket.server_ws_url)
         self.server_client = ServerClient(self.config.get_server_events_url())
         self.lms_client = LMSClient(
             api_url=self.config.lms.api_url,

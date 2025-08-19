@@ -63,8 +63,7 @@ class LMSClient:
         """Analyze with exponential backoff on failure."""
         for attempt in range(max_retries):
             try:
-                # Use circuit breaker to protect external API calls
-                return await self.circuit_breaker.call(self._do_analyze, transcription_context, chat_context)
+                return await self._do_analyze(transcription_context, chat_context)
             except Exception as e:
                 if attempt == max_retries - 1:
                     logger.error(f"All {max_retries} attempts failed for LMS analysis")
@@ -280,4 +279,4 @@ Respond with JSON in this exact format:
 
     def get_circuit_stats(self) -> dict:
         """Get circuit breaker statistics."""
-        return self.circuit_breaker.get_stats()
+        return {"message": "Circuit breakers removed"}
