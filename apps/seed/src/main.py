@@ -1,6 +1,8 @@
 """Main entry point for the SEED intelligence service."""
 
 import asyncio
+import os
+import signal
 
 from dotenv import load_dotenv
 from shared import get_global_tracker
@@ -86,6 +88,7 @@ class SeedService(SupervisedService):
         self.rag_handler = RAGHandler(
             context_client=self.context_client,
             server_url=self.config.websocket.server_url.replace("ws://", "http://").replace("/events", ""),
+            streamer_identity="Avalonstar",
         )
         await self.rag_handler.__aenter__()
 
@@ -158,10 +161,7 @@ class SeedService(SupervisedService):
 
         # Cleanup health endpoint
         if self.health_runner:
-            try:
-                await self.health_runner.cleanup()
-            except Exception as e:
-                logger.warning(f"Health runner cleanup error (non-critical): {e}")
+            await self.health_runner.cleanup()
 
         logger.info("SEED intelligence service stopped")
 
@@ -320,26 +320,53 @@ class SeedService(SupervisedService):
 
 
 async def main():
-    """Main entry point with supervisor pattern."""
-    logger.info("Starting SEED service with supervisor...")
+    """Main entry point."""
+    # Check if we should use supervisor (production mode)
+    use_supervisor = os.getenv("USE_SUPERVISOR", "false").lower() in ("true", "1", "yes")
 
-    # Create service instance
-    service = SeedService()
+    if use_supervisor:
+        logger.info("Starting SEED service with supervisor...")
+        # Create service instance
+        service = SeedService()
 
-    # Create service configuration with restart policy
-    config = ServiceConfig(
-        name="seed",
-        restart_strategy=RestartStrategy.ON_FAILURE,
-        max_restarts=5,
-        restart_window_seconds=300,  # 5 minutes
-        restart_delay_seconds=5.0,  # Longer delay for AI service
-        restart_delay_max=60.0,
-        health_check_interval=45.0,  # Less frequent for AI service
-        shutdown_timeout=30.0,  # More time for AI cleanup
-    )
+        # Create service configuration with restart policy
+        config = ServiceConfig(
+            name="seed",
+            restart_strategy=RestartStrategy.ON_FAILURE,
+            max_restarts=5,
+            restart_window_seconds=300,  # 5 minutes
+            restart_delay_seconds=5.0,  # Longer delay for AI service
+            restart_delay_max=60.0,
+            health_check_interval=45.0,  # Less frequent for AI service
+            shutdown_timeout=30.0,  # More time for AI cleanup
+        )
 
-    # Run with supervisor
-    await run_with_supervisor([(service, config)])
+        # Run with supervisor
+        await run_with_supervisor([(service, config)])
+    else:
+        logger.info("Starting SEED service in development mode...")
+        # Run directly without supervisor for development
+        service = SeedService()
+
+        # Set up signal handlers for graceful shutdown
+        shutdown_event = asyncio.Event()
+
+        def handle_shutdown():
+            logger.info("Received shutdown signal")
+            shutdown_event.set()
+
+        try:
+            loop = asyncio.get_event_loop()
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                loop.add_signal_handler(sig, handle_shutdown)
+        except NotImplementedError:
+            logger.warning("Signal handlers not supported on this platform")
+
+        try:
+            await service.start()
+            await shutdown_event.wait()
+        finally:
+            await service.stop()
 
 
 if __name__ == "__main__":

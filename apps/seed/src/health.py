@@ -5,51 +5,13 @@ import time
 from typing import TYPE_CHECKING
 
 from aiohttp import web
+from shared.health import HealthRunner
 from shared.logger import get_logger
 
 if TYPE_CHECKING:
     from .correlator import StreamCorrelator
 
 logger = get_logger(__name__)
-
-
-async def health_check(request):
-    """Health check endpoint."""
-    app = request.app
-
-    # Basic health info
-    health_data = {
-        "status": "healthy",
-        "service": "landale-seed",
-        "uptime_seconds": int(time.monotonic() - app["start_time"]),
-        "timestamp": int(time.time()),
-    }
-
-    # Add buffer stats if correlator is available
-    if "correlator" in app and app["correlator"]:
-        try:
-            buffer_stats = app["correlator"].get_buffer_stats()
-            health_data["buffers"] = buffer_stats
-
-            # Check if buffers are near capacity
-            buffer_warnings = []
-            for buffer_type, size in buffer_stats["buffer_sizes"].items():
-                limit = buffer_stats["buffer_limits"][buffer_type]
-                if size >= limit * 0.8:  # 80% full
-                    buffer_warnings.append(f"{buffer_type} buffer at {size}/{limit}")
-
-            if buffer_warnings:
-                health_data["warnings"] = buffer_warnings
-                health_data["status"] = "warning"
-        except Exception as e:
-            logger.error(f"Failed to get buffer stats: {e}")
-            health_data["buffer_error"] = str(e)
-
-    # Add connection status if available
-    if "connections" in app:
-        health_data["connections"] = app["connections"]
-
-    return web.json_response(health_data)
 
 
 async def detailed_status(request):
@@ -153,6 +115,45 @@ async def create_health_app(
     port: int = 8891, service=None, correlator: "StreamCorrelator | None" = None, rag_handler=None
 ):
     """Create health check web app."""
+
+    async def health_check(request):
+        """Health check endpoint."""
+        app = request.app
+
+        # Basic health info
+        health_data = {
+            "status": "healthy",
+            "service": "landale-seed",
+            "uptime_seconds": int(time.monotonic() - app["start_time"]),
+            "timestamp": int(time.time()),
+        }
+
+        # Add buffer stats if correlator is available
+        if "correlator" in app and app["correlator"]:
+            try:
+                buffer_stats = app["correlator"].get_buffer_stats()
+                health_data["buffers"] = buffer_stats
+
+                # Check if buffers are near capacity
+                buffer_warnings = []
+                for buffer_type, size in buffer_stats["buffer_sizes"].items():
+                    limit = buffer_stats["buffer_limits"][buffer_type]
+                    if size >= limit * 0.8:  # 80% full
+                        buffer_warnings.append(f"{buffer_type} buffer at {size}/{limit}")
+
+                if buffer_warnings:
+                    health_data["warnings"] = buffer_warnings
+                    health_data["status"] = "warning"
+            except Exception as e:
+                logger.error(f"Failed to get buffer stats: {e}")
+                health_data["buffer_error"] = str(e)
+
+        # Add connection status if available
+        if "connections" in app:
+            health_data["connections"] = app["connections"]
+
+        return web.json_response(health_data)
+
     app = web.Application()
     app["start_time"] = time.monotonic()
     app["service"] = service
@@ -177,4 +178,4 @@ async def create_health_app(
     await site.start()
 
     logger.info(f"Health check endpoints available at http://{host}:{port}/health and /status")
-    return runner
+    return HealthRunner(runner, site)

@@ -23,7 +23,7 @@ class TaskTracker:
         self._completed_count = 0
         self._failed_count = 0
         self._cancelled_count = 0
-        logger.info("TaskTracker initialized", extra={"tracker_name": self.name})
+        logger.info("TaskTracker initialized", tracker_name=self.name)
 
     def create_task(
         self, coro: Coroutine[Any, Any, T], *, name: str | None = None, log_errors: bool = True
