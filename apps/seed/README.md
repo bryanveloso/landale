@@ -93,7 +93,7 @@ from src.training_pipeline import TrainingDataPipeline
 from src.dataset_exporter import DatasetExporter
 from src.context_client import ContextClient
 
-async with ContextClient("http://localhost:8080") as client:
+async with ContextClient("http://localhost:7175") as client:
     pipeline = TrainingDataPipeline(client)
     exporter = DatasetExporter(client)
 
@@ -131,7 +131,7 @@ async with ContextClient("http://localhost:8080") as client:
 
 ```bash
 # Phoenix server endpoints
-SERVER_URL=http://localhost:8080
+SERVER_URL=http://localhost:7175
 SERVER_WS_URL=ws://localhost:7175
 
 # LM Studio configuration

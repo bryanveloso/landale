@@ -130,16 +130,139 @@ class RAGHandler:
 
     async def _retrieve_relevant_data(self, question: str, time_window_hours: int | None) -> dict[str, Any]:
         """
-        Retrieve relevant data based on the question.
+        Retrieve relevant data based on the question using stream sessions instead of time windows.
 
-        This function analyzes the question and retrieves appropriate data from:
-        - Context history (transcripts, chat, patterns) - context patterns use time_window_hours
-        - Activity events (follows, subs, raids, etc.) - unbounded bulk queries
-        - Stream statistics - unbounded queries
+        This function analyzes the question to determine which stream session(s) the user is asking about,
+        then retrieves all data for those specific sessions:
+        - Detects session intent ("current stream", "last stream", "that stream where...")
+        - Gets appropriate session data (chat, follows, subs, game changes)
+        - Returns session-contextualized data instead of arbitrary time windows
 
-        Note: time_window_hours only affects AI context pattern retrieval. All other data sources
-        (chat messages, subscriptions, followers, raids, cheers, etc.) return all available data
-        regardless of the time window parameter.
+        The time_window_hours parameter is now ignored - sessions provide natural boundaries.
+        """
+        retrieved_data = {"sources": [], "raw_data": {}}
+
+        try:
+            # Step 1: Detect which session(s) the user is asking about
+            session_intent = await self._detect_session_from_query(question)
+            logger.info(f"RAG detected session intent: {session_intent}")
+
+            # Step 2: Get available stream sessions
+            all_sessions = await self._get_stream_sessions()
+            if not all_sessions:
+                logger.warning("No stream sessions found")
+                # Fallback to legacy time-based approach for this query
+                return await self._retrieve_legacy_data(question, time_window_hours)
+
+            # Step 3: Select appropriate session(s) based on intent
+            target_sessions = []
+
+            if session_intent == "current":
+                # Find ongoing session or most recent completed session
+                live_sessions = [s for s in all_sessions if s["status"] == "live"]
+                if live_sessions:
+                    target_sessions = [live_sessions[0]]  # Should only be one live session
+                elif all_sessions:
+                    target_sessions = [all_sessions[0]]  # Most recent completed session
+
+            elif session_intent == "last":
+                # Find most recent completed session (skip live session if exists)
+                completed_sessions = [s for s in all_sessions if s["status"] == "completed"]
+                if completed_sessions:
+                    target_sessions = [completed_sessions[0]]  # Most recent completed
+
+            elif session_intent == "specific":
+                # For specific queries like "when I was playing X", we may need multiple sessions
+                # For now, use current approach but this could be enhanced to search by game
+                if all_sessions:
+                    target_sessions = all_sessions[:2]  # Last 2 sessions as context
+
+            if not target_sessions:
+                logger.warning(f"No sessions found for intent: {session_intent}")
+                return await self._retrieve_legacy_data(question, time_window_hours)
+
+            # Step 4: Get comprehensive data for selected session(s)
+            session_data_tasks = []
+            for session in target_sessions:
+                session_data_tasks.append(self._get_session_data(session))
+
+            session_results = await asyncio.gather(*session_data_tasks, return_exceptions=True)
+
+            # Step 5: Combine session data into standardized format
+            combined_chat_messages = []
+            combined_follows = []
+            combined_subs = []
+            combined_game_changes = []
+            session_summaries = []
+
+            for i, result in enumerate(session_results):
+                if isinstance(result, Exception):
+                    logger.error(f"Session data retrieval failed for session {i}: {result}")
+                    continue
+
+                combined_chat_messages.extend(result.get("chat_messages", []))
+                combined_follows.extend(result.get("follows", []))
+                combined_subs.extend(result.get("subscriptions", []))
+                combined_game_changes.extend(result.get("game_changes", []))
+
+                session_info = result.get("session_info", {})
+                summary = {
+                    "session_id": session_info.get("session_id"),
+                    "status": session_info.get("status"),
+                    "start_time": session_info.get("start_time").isoformat()
+                    if session_info.get("start_time")
+                    else None,
+                    "end_time": session_info.get("end_time").isoformat() if session_info.get("end_time") else None,
+                    "message_count": result.get("message_count", 0),
+                    "unique_chatters": result.get("unique_chatters", 0),
+                    "game_changes": len(result.get("game_changes", [])),
+                }
+                session_summaries.append(summary)
+
+            # Sort by timestamp (most recent first)
+            combined_chat_messages.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+            combined_follows.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+            combined_subs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+
+            # Store in standardized format for compatibility with response generation
+            retrieved_data["raw_data"]["chat_messages"] = combined_chat_messages
+            retrieved_data["raw_data"]["follower_events"] = combined_follows
+            retrieved_data["raw_data"]["subscription_events"] = combined_subs
+            retrieved_data["raw_data"]["stream_sessions"] = session_summaries
+            retrieved_data["raw_data"]["game_changes"] = combined_game_changes
+
+            retrieved_data["sources"] = [
+                "stream_sessions",
+                "chat_messages",
+                "follower_events",
+                "subscription_events",
+                "game_changes",
+            ]
+
+            # Always add basic stats for context
+            try:
+                stats = await self._get_activity_stats()
+                retrieved_data["raw_data"]["activity_stats"] = stats
+                retrieved_data["sources"].append("activity_stats")
+            except Exception as e:
+                logger.error(f"Error getting activity stats: {e}")
+
+            logger.info(
+                f"RAG session-based retrieval: {len(combined_chat_messages)} messages, "
+                f"{len(combined_follows)} follows, {len(combined_subs)} subs across {len(target_sessions)} sessions"
+            )
+
+            return retrieved_data
+
+        except Exception as e:
+            logger.error(f"Error in session-based data retrieval: {e}")
+            # Fallback to legacy approach
+            return await self._retrieve_legacy_data(question, time_window_hours)
+
+    async def _retrieve_legacy_data(self, question: str, time_window_hours: int | None = None) -> dict[str, Any]:  # noqa: ARG002
+        """
+        Legacy time-window based data retrieval for fallback cases.
+        This preserves the old logic when session-based retrieval fails.
         """
         question_lower = question.lower()
         retrieved_data = {"sources": [], "raw_data": {}}
@@ -167,35 +290,9 @@ class RAGHandler:
             queries_to_run.append(self._get_stream_info())
             retrieved_data["sources"].append("stream_info")
 
-        # Check for raid/host queries
-        if any(word in question_lower for word in ["raid", "raided", "host"]):
-            queries_to_run.append(self._get_raid_data())
-            retrieved_data["sources"].append("raid_events")
-
-        # Check for bits/cheer queries
-        if any(word in question_lower for word in ["bits", "cheer", "cheered"]):
-            queries_to_run.append(self._get_cheer_data())
-            retrieved_data["sources"].append("cheer_events")
-
-        # Check for context/pattern queries
-        if any(
-            word in question_lower
-            for word in ["mood", "sentiment", "energy", "vibe", "feeling", "pattern", "trend", "topic"]
-        ):
-            queries_to_run.append(self._get_context_patterns(time_window_hours))
-            retrieved_data["sources"].append("ai_context_analysis")
-
         # Always get basic stats for context
         queries_to_run.append(self._get_activity_stats())
         retrieved_data["sources"].append("activity_stats")
-
-        # If no specific data type detected, search contexts for relevant transcripts
-        if len(queries_to_run) == 1:  # Only stats was added
-            # Extract potential search terms from question
-            search_terms = self._extract_search_terms(question)
-            if search_terms:
-                queries_to_run.append(self._search_contexts(search_terms))
-                retrieved_data["sources"].append("context_search")
 
         # Run all queries in parallel
         results = await asyncio.gather(*queries_to_run, return_exceptions=True)
@@ -398,8 +495,15 @@ class RAGHandler:
         if vocab_context:
             context_parts.append(vocab_context)
 
-        # Add activity stats if available
-        if "activity_stats" in retrieved_data.get("raw_data", {}):
+        # Add session context if available (new session-based approach)
+        if "stream_sessions" in retrieved_data.get("raw_data", {}):
+            sessions = retrieved_data["raw_data"]["stream_sessions"]
+            if sessions:
+                session_context = self._build_session_context(sessions)
+                context_parts.append(session_context)
+
+        # Add activity stats if available (fallback/legacy approach)
+        elif "activity_stats" in retrieved_data.get("raw_data", {}):
             stats = retrieved_data["raw_data"]["activity_stats"]
             context_parts.append(
                 f"Stream Activity Summary:\n"
@@ -410,6 +514,11 @@ class RAGHandler:
                 f"- Subscriptions: {stats.get('subscriptions', 0)}\n"
                 f"- Cheers: {stats.get('cheers', 0)}"
             )
+
+        # Add game context if we have chat messages
+        game_context = await self._build_game_context(retrieved_data)
+        if game_context:
+            context_parts.append(game_context)
 
         # Add specific data based on what was retrieved
         for source, data in retrieved_data.get("raw_data", {}).items():
@@ -584,6 +693,278 @@ Respond using the structured format."""
             "data_summary": f"Retrieved {len(raw_data)} data sources",
         }
 
+    async def _get_stream_sessions(self) -> list[dict]:
+        """Get stream sessions (pairs of stream.online/stream.offline events)."""
+        if not self.session:
+            return []
+
+        try:
+            # Get stream online events
+            online_url = f"{self.server_url}/api/activity/events"
+            online_params = {"event_type": "stream.online"}
+
+            # Get stream offline events
+            offline_url = f"{self.server_url}/api/activity/events"
+            offline_params = {"event_type": "stream.offline"}
+
+            online_events = []
+            offline_events = []
+
+            async with self.session.get(online_url, params=online_params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    online_events = data.get("data", {}).get("events", [])
+
+            async with self.session.get(offline_url, params=offline_params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    offline_events = data.get("data", {}).get("events", [])
+
+            # Parse and sort events by timestamp
+            online_parsed = []
+            for event in online_events:
+                try:
+                    event_time = datetime.fromisoformat(event["timestamp"])
+                    online_parsed.append((event_time, event))
+                except ValueError:
+                    continue
+
+            offline_parsed = []
+            for event in offline_events:
+                try:
+                    event_time = datetime.fromisoformat(event["timestamp"])
+                    offline_parsed.append((event_time, event))
+                except ValueError:
+                    continue
+
+            # Sort by timestamp (most recent first)
+            online_parsed.sort(key=lambda x: x[0], reverse=True)
+            offline_parsed.sort(key=lambda x: x[0], reverse=True)
+
+            # Create sessions by pairing online/offline events
+            sessions = []
+
+            # If we have an ongoing stream (latest online > latest offline), create current session
+            if online_parsed and (not offline_parsed or online_parsed[0][0] > offline_parsed[0][0]):
+                current_session = {
+                    "session_id": f"session_{int(online_parsed[0][0].timestamp())}",
+                    "start_time": online_parsed[0][0],
+                    "end_time": None,  # Ongoing
+                    "start_event": online_parsed[0][1],
+                    "end_event": None,
+                    "status": "live",
+                }
+                sessions.append(current_session)
+
+            # Match offline events to preceding online events for completed sessions
+            used_online_indices = set()
+            if online_parsed and offline_parsed and online_parsed[0][0] > offline_parsed[0][0]:
+                # Skip the first online event (current session)
+                used_online_indices.add(0)
+
+            for offline_time, offline_event in offline_parsed:
+                # Find the most recent online event before this offline event
+                for i, (online_time, online_event) in enumerate(online_parsed):
+                    if i in used_online_indices:
+                        continue
+                    if online_time < offline_time:
+                        session = {
+                            "session_id": f"session_{int(online_time.timestamp())}",
+                            "start_time": online_time,
+                            "end_time": offline_time,
+                            "start_event": online_event,
+                            "end_event": offline_event,
+                            "status": "completed",
+                        }
+                        sessions.append(session)
+                        used_online_indices.add(i)
+                        break
+
+            logger.info(f"RAG Handler: Found {len(sessions)} stream sessions")
+            return sessions
+
+        except Exception as e:
+            logger.error(f"Error fetching stream sessions: {e}")
+            return []
+
+    async def _get_session_data(self, session: dict) -> dict:
+        """Get all data for a specific stream session."""
+        if not self.session:
+            return {}
+
+        start_time = session["start_time"]
+        end_time = session.get("end_time")  # None for ongoing sessions
+
+        try:
+            # Get chat messages for this session
+            chat_messages = await self._get_chat_data_for_session(start_time, end_time)
+
+            # Get game changes during this session
+            game_changes = await self._get_game_changes_for_session(start_time, end_time)
+
+            # Get follows/subs during this session
+            follows = await self._get_follows_for_session(start_time, end_time)
+            subs = await self._get_subs_for_session(start_time, end_time)
+
+            return {
+                "session_info": session,
+                "chat_messages": chat_messages,
+                "game_changes": game_changes,
+                "follows": follows,
+                "subscriptions": subs,
+                "message_count": len(chat_messages),
+                "unique_chatters": len({msg.get("user_login", "") for msg in chat_messages if msg.get("user_login")}),
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting session data: {e}")
+            return {"session_info": session}
+
+    async def _get_chat_data_for_session(self, start_time: datetime, end_time: datetime | None) -> list[dict]:
+        """Get chat messages within session timeframe."""
+        try:
+            url = f"{self.server_url}/api/activity/events"
+            params = {"event_type": "channel.chat.message"}
+
+            async with self.session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    all_messages = data.get("data", {}).get("events", [])
+
+                    # Filter messages within session timeframe
+                    session_messages = []
+                    for msg in all_messages:
+                        try:
+                            msg_time = datetime.fromisoformat(msg["timestamp"])
+                            if msg_time >= start_time and (end_time is None or msg_time <= end_time):
+                                session_messages.append(msg)
+                        except ValueError:
+                            continue
+
+                    return session_messages
+        except Exception as e:
+            logger.error(f"Error getting chat data for session: {e}")
+
+        return []
+
+    async def _get_game_changes_for_session(self, start_time: datetime, end_time: datetime | None) -> list[dict]:
+        """Get game/category changes within session timeframe."""
+        try:
+            raw_events = await self._get_channel_update_data()
+
+            session_changes = []
+            for event in raw_events:
+                try:
+                    event_time = datetime.fromisoformat(event["timestamp"])
+                    if event_time >= start_time and (end_time is None or event_time <= end_time):
+                        session_changes.append(event)
+                except ValueError:
+                    continue
+
+            return session_changes
+        except Exception as e:
+            logger.error(f"Error getting game changes for session: {e}")
+
+        return []
+
+    async def _get_follows_for_session(self, start_time: datetime, end_time: datetime | None) -> list[dict]:
+        """Get follows within session timeframe."""
+        try:
+            url = f"{self.server_url}/api/activity/events"
+            params = {"event_type": "channel.follow"}
+
+            async with self.session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    all_follows = data.get("data", {}).get("events", [])
+
+                    session_follows = []
+                    for follow in all_follows:
+                        try:
+                            follow_time = datetime.fromisoformat(follow["timestamp"])
+                            if follow_time >= start_time and (end_time is None or follow_time <= end_time):
+                                session_follows.append(follow)
+                        except ValueError:
+                            continue
+
+                    return session_follows
+        except Exception as e:
+            logger.error(f"Error getting follows for session: {e}")
+
+        return []
+
+    async def _get_subs_for_session(self, start_time: datetime, end_time: datetime | None) -> list[dict]:
+        """Get subscriptions within session timeframe."""
+        try:
+            url = f"{self.server_url}/api/activity/events"
+            params = {"event_type": "channel.subscribe"}
+
+            async with self.session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    all_subs = data.get("data", {}).get("events", [])
+
+                    session_subs = []
+                    for sub in all_subs:
+                        try:
+                            sub_time = datetime.fromisoformat(sub["timestamp"])
+                            if sub_time >= start_time and (end_time is None or sub_time <= end_time):
+                                session_subs.append(sub)
+                        except ValueError:
+                            continue
+
+                    return session_subs
+        except Exception as e:
+            logger.error(f"Error getting subs for session: {e}")
+
+        return []
+
+    async def _detect_session_from_query(self, question: str) -> str:
+        """Detect which session the user is asking about."""
+        question_lower = question.lower()
+
+        # Current/ongoing session indicators
+        current_indicators = [
+            "this stream",
+            "today's stream",
+            "current stream",
+            "now",
+            "today",
+            "this session",
+            "currently",
+            "right now",
+            "what's happening",
+        ]
+
+        # Last/previous session indicators
+        previous_indicators = [
+            "last stream",
+            "previous stream",
+            "my last stream",
+            "yesterday",
+            "before",
+            "earlier",
+            "the stream before",
+        ]
+
+        # Specific session indicators
+        specific_indicators = ["when I was playing", "during my", "while I was", "that stream where"]
+
+        for indicator in current_indicators:
+            if indicator in question_lower:
+                return "current"
+
+        for indicator in previous_indicators:
+            if indicator in question_lower:
+                return "last"
+
+        for indicator in specific_indicators:
+            if indicator in question_lower:
+                return "specific"
+
+        # Default to current session if unclear
+        return "current"
+
     async def _get_subscription_data(self) -> list[dict]:
         """Get all subscription events."""
         if not self.session:
@@ -690,6 +1071,130 @@ Respond using the structured format."""
             logger.error(f"Error fetching raid data: {e}")
 
         return []
+
+    async def _get_channel_update_data(self) -> list[dict]:
+        """Get all channel update events (game/category changes)."""
+        if not self.session:
+            return []
+
+        try:
+            url = f"{self.server_url}/api/activity/events"
+            params = {"event_type": "channel.update"}
+            logger.info(f"RAG Handler fetching channel update data from firehose API: {url} with params: {params}")
+
+            async with self.session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    events = data.get("data", {}).get("events", [])
+                    logger.info(f"RAG Handler channel updates: Got {len(events)} events from firehose API")
+                    return events
+
+        except Exception as e:
+            logger.error(f"Error fetching channel update data: {e}")
+
+        return []
+
+    async def _get_game_context_for_timestamp(self, target_timestamp_str: str) -> dict | None:
+        """Find the most recent channel.update before the given timestamp."""
+        if not hasattr(self, "_cached_channel_updates") or not self._cached_channel_updates:
+            raw_events = await self._get_channel_update_data()  # This fetches from the API
+            parsed_events = []
+            for event in raw_events:
+                try:
+                    # Parse timestamp to datetime object once for caching
+                    event_time = datetime.fromisoformat(event["timestamp"])
+                    parsed_events.append((event_time, event))
+                except ValueError:
+                    # Log cases where timestamp might be malformed or missing
+                    logger.warning(f"Could not parse timestamp for event: {event.get('timestamp')}")
+                    continue
+            # Sort by datetime object descending for easy linear lookup
+            self._cached_channel_updates = sorted(parsed_events, key=lambda x: x[0], reverse=True)
+
+        try:
+            # Parse target timestamp to datetime object once
+            target_dt = datetime.fromisoformat(target_timestamp_str)
+        except ValueError:
+            # Handle invalid target_timestamp format
+            logger.warning(f"Invalid target_timestamp format: {target_timestamp_str}")
+            return None
+
+        # Find most recent update before target_timestamp
+        for event_dt, event_data in self._cached_channel_updates:
+            if event_dt <= target_dt:
+                return event_data.get("data", {})
+
+        return None
+
+    async def _build_game_context(self, retrieved_data: dict[str, Any]) -> str | None:
+        """Build game/category context from chat messages and channel updates."""
+        chat_messages = retrieved_data.get("raw_data", {}).get("chat_messages", [])
+        if not chat_messages:
+            return None
+
+        # Get unique game contexts for all chat messages
+        game_contexts = set()
+        for message in chat_messages:
+            # Extract timestamp from message data
+            timestamp = message.get("timestamp") or message.get("data", {}).get("timestamp")
+            if timestamp:
+                game_data = await self._get_game_context_for_timestamp(timestamp)
+                if game_data:
+                    category_name = game_data.get("category_name")
+                    title = game_data.get("title")
+                    if category_name:
+                        context_entry = f"Game: {category_name}"
+                        if title:
+                            context_entry += f" (Stream Title: '{title}')"
+                        game_contexts.add(context_entry)
+
+        if game_contexts:
+            contexts_text = "\n- ".join(sorted(game_contexts))
+            return f"\nStream Game Context:\n- {contexts_text}"
+
+        return None
+
+    def _build_session_context(self, sessions: list[dict]) -> str:
+        """Build context describing stream sessions."""
+        if not sessions:
+            return ""
+
+        context_parts = []
+
+        for session in sessions:
+            status = session.get("status", "unknown")
+            start_time = session.get("start_time")
+            end_time = session.get("end_time")
+            message_count = session.get("message_count", 0)
+            unique_chatters = session.get("unique_chatters", 0)
+            game_changes = session.get("game_changes", 0)
+
+            if status == "live":
+                session_desc = "📺 Current Stream Session (LIVE)"
+                if start_time:
+                    session_desc += f"\n  Started: {start_time}"
+                session_desc += "\n  Status: Currently streaming"
+            else:
+                session_desc = "📺 Previous Stream Session"
+                if start_time and end_time:
+                    session_desc += f"\n  Duration: {start_time} to {end_time}"
+                elif start_time:
+                    session_desc += f"\n  Started: {start_time}"
+                session_desc += "\n  Status: Completed"
+
+            session_desc += f"\n  Chat Activity: {message_count} messages from {unique_chatters} unique viewers"
+
+            if game_changes > 0:
+                session_desc += f"\n  Game Changes: {game_changes} category/title updates during session"
+
+            context_parts.append(session_desc)
+
+        if len(sessions) == 1:
+            header = "Stream Session Context:"
+        else:
+            header = f"Stream Sessions Context ({len(sessions)} sessions):"
+
+        return f"\n{header}\n" + "\n\n".join(context_parts)
 
     async def _get_cheer_data(self) -> list[dict]:
         """Get all cheer/bits events."""
