@@ -12,34 +12,31 @@ defmodule Server.Repo.Migrations.OptimizeTextSearchIndexes do
       execute "DROP INDEX IF EXISTS transcriptions_text_gin_idx;"
 
       # Create optimized GIN index for transcriptions text search
-      # Using gin_trgm_ops for similarity searches and partial matching
       execute """
-        CREATE INDEX transcriptions_text_trgm_gin_idx
+        CREATE INDEX IF NOT EXISTS transcriptions_text_trgm_gin_idx
         ON transcriptions
         USING gin (text gin_trgm_ops)
         WHERE text IS NOT NULL;
       """
 
       # Create combined index for timestamp + text search
-      # This is efficient for time-bounded text searches
       execute """
-        CREATE INDEX transcriptions_timestamp_text_idx
+        CREATE INDEX IF NOT EXISTS transcriptions_timestamp_text_idx
         ON transcriptions
         USING gin (timestamp, text gin_trgm_ops);
       """
 
-      # Create index for source_id + text search (common query pattern)
+      # Create index for source_id + text search
       execute """
-        CREATE INDEX transcriptions_source_text_idx
+        CREATE INDEX IF NOT EXISTS transcriptions_source_text_idx
         ON transcriptions
         USING gin (source_id, text gin_trgm_ops)
         WHERE source_id IS NOT NULL;
       """
 
       # For events table - optimize chat message searches
-      # Create partial index only for chat messages
       execute """
-        CREATE INDEX events_chat_message_text_idx
+        CREATE INDEX IF NOT EXISTS events_chat_message_text_idx
         ON events
         USING gin ((data->>'message') gin_trgm_ops)
         WHERE event_type = 'channel.chat.message'
@@ -48,90 +45,32 @@ defmodule Server.Repo.Migrations.OptimizeTextSearchIndexes do
 
       # Create index for user + chat message searches
       execute """
-        CREATE INDEX events_user_chat_idx
+        CREATE INDEX IF NOT EXISTS events_user_chat_idx
         ON events
         USING gin (user_id, (data->>'message') gin_trgm_ops)
         WHERE event_type = 'channel.chat.message';
       """
 
-      # For correlations table - optimize keyword and text searches
-      execute """
-        CREATE INDEX correlations_transcription_text_idx
-        ON correlations
-        USING gin (transcription_text gin_trgm_ops);
-      """
+      # Add regular tsvector column (not generated) for transcriptions
+      execute "ALTER TABLE transcriptions ADD COLUMN IF NOT EXISTS text_search_vector tsvector;"
 
+      # Create index for text search vector
       execute """
-        CREATE INDEX correlations_chat_text_idx
-        ON correlations
-        USING gin (chat_text gin_trgm_ops);
-      """
-
-      # Create index for detected keywords array
-      execute """
-        CREATE INDEX correlations_keywords_idx
-        ON correlations
-        USING gin (detected_keywords);
-      """
-
-      # Create combined index for pattern type + text search
-      execute """
-        CREATE INDEX correlations_pattern_text_idx
-        ON correlations
-        USING gin (pattern_type, transcription_text gin_trgm_ops, chat_text gin_trgm_ops);
-      """
-
-      # Add text search configuration for better ranking
-      # Create custom text search configuration for streaming content
-      execute """
-        CREATE TEXT SEARCH CONFIGURATION IF NOT EXISTS streaming_english (COPY = english);
-      """
-
-      # Add full text search columns with proper weighting
-      execute """
-        ALTER TABLE transcriptions
-        ADD COLUMN IF NOT EXISTS text_search_vector tsvector
-        GENERATED ALWAYS AS (to_tsvector('english', coalesce(text, ''))) STORED;
-      """
-
-      execute """
-        CREATE INDEX transcriptions_text_search_vector_idx
+        CREATE INDEX IF NOT EXISTS transcriptions_text_search_vector_idx
         ON transcriptions
         USING gin (text_search_vector);
-      """
-
-      # For events table - add text search vector for chat messages
-      execute """
-        ALTER TABLE events
-        ADD COLUMN IF NOT EXISTS message_search_vector tsvector
-        GENERATED ALWAYS AS (
-          CASE
-            WHEN event_type = 'channel.chat.message'
-            THEN to_tsvector('english', coalesce(data->>'message', ''))
-            ELSE NULL
-          END
-        ) STORED;
-      """
-
-      execute """
-        CREATE INDEX events_message_search_vector_idx
-        ON events
-        USING gin (message_search_vector)
-        WHERE message_search_vector IS NOT NULL;
       """
 
       # Update table statistics for query planner
       execute "ANALYZE transcriptions;"
       execute "ANALYZE events;"
-      execute "ANALYZE correlations;"
     end
   end
 
   def down do
     if System.get_env("MIX_ENV") != "test" do
-      # Drop text search columns
+      # Drop text search column
       execute "ALTER TABLE transcriptions DROP COLUMN IF EXISTS text_search_vector;"
-      execute "ALTER TABLE events DROP COLUMN IF EXISTS message_search_vector;"
 
       # Drop all created indexes
       execute "DROP INDEX IF EXISTS transcriptions_text_trgm_gin_idx;"
@@ -140,14 +79,6 @@ defmodule Server.Repo.Migrations.OptimizeTextSearchIndexes do
       execute "DROP INDEX IF EXISTS transcriptions_text_search_vector_idx;"
       execute "DROP INDEX IF EXISTS events_chat_message_text_idx;"
       execute "DROP INDEX IF EXISTS events_user_chat_idx;"
-      execute "DROP INDEX IF EXISTS events_message_search_vector_idx;"
-      execute "DROP INDEX IF EXISTS correlations_transcription_text_idx;"
-      execute "DROP INDEX IF EXISTS correlations_chat_text_idx;"
-      execute "DROP INDEX IF EXISTS correlations_keywords_idx;"
-      execute "DROP INDEX IF EXISTS correlations_pattern_text_idx;"
-
-      # Drop custom text search configuration
-      execute "DROP TEXT SEARCH CONFIGURATION IF EXISTS streaming_english CASCADE;"
     end
   end
 end

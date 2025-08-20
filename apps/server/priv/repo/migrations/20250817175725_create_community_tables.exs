@@ -54,11 +54,6 @@ defmodule Server.Repo.Migrations.CreateCommunityTables do
     create unique_index(:pronunciation_overrides, [:username])
     create index(:pronunciation_overrides, [:active])
 
-    create unique_index(:username_aliases, [:canonical_username, :alias])
-    create index(:username_aliases, [:canonical_username])
-    create index(:username_aliases, [:alias])
-    create index(:username_aliases, [:active])
-
     create unique_index(:community_vocabulary, [:phrase])
     create index(:community_vocabulary, [:category])
     create index(:community_vocabulary, [:active])

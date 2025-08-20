@@ -172,7 +172,7 @@ defmodule Server.Repo.Migrations.AddChunkAwareOptimizations do
           )
           RETURNS TABLE(
             id uuid,
-            timestamp timestamptz,
+            created_at timestamptz,
             user_name text,
             message text,
             similarity float
