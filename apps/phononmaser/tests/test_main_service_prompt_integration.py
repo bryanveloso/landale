@@ -62,14 +62,14 @@ class TestMainServiceConfiguration:
         env_vars = {
             "WHISPER_MODEL_PATH": "/path/to/model",
             "ENABLE_PROMPT_MANAGER": "true",
-            "PHOENIX_BASE_URL": "http://custom:8080",
+            "PHOENIX_BASE_URL": "http://custom:7175",
         }
 
         with patch.dict(os.environ, env_vars):
             service = Phononmaser()
 
             assert service.enable_prompt_manager is True
-            assert service.phoenix_base_url == "http://custom:8080"
+            assert service.phoenix_base_url == "http://custom:7175"
 
     def test_environment_variable_parsing_disabled(self):
         """Test parsing environment variables with PromptManager disabled."""

@@ -59,7 +59,7 @@ class TestPromptManagerInitialization:
     def test_initialization_custom_config(self):
         """Test PromptManager initialization with custom configuration."""
         manager = PromptManager(
-            phoenix_base_url="http://custom:8080",
+            phoenix_base_url="http://custom:7175",
             poll_interval_seconds=60.0,
             prompt_max_chars=150,
             lookback_minutes=15,
@@ -68,12 +68,12 @@ class TestPromptManagerInitialization:
             circuit_breaker_recovery_seconds=45.0,
         )
 
-        assert manager.phoenix_base_url == "http://custom:8080"
+        assert manager.phoenix_base_url == "http://custom:7175"
         assert manager.poll_interval == 60.0
         assert manager.prompt_max_chars == 150
         assert manager.lookback_minutes == 15
         assert manager.prompt_expiry_minutes == 3
-        assert manager.bulk_api_url == "http://custom:8080/api/activity/events/bulk"
+        assert manager.bulk_api_url == "http://custom:7175/api/activity/events/bulk"
 
     def test_minimum_poll_interval_enforced(self):
         """Test that poll interval is enforced to minimum 30 seconds."""
@@ -766,10 +766,10 @@ class TestPromptManagerConfiguration:
 
     def test_api_url_construction(self):
         """Test API URL is constructed correctly."""
-        manager = PromptManager(phoenix_base_url="http://custom:8080/")
+        manager = PromptManager(phoenix_base_url="http://custom:7175/")
 
         # Should strip trailing slash and add correct path
-        assert manager.bulk_api_url == "http://custom:8080/api/activity/events/bulk"
+        assert manager.bulk_api_url == "http://custom:7175/api/activity/events/bulk"
 
     def test_time_range_calculation(self, prompt_manager):
         """Test time range calculation for API calls."""

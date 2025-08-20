@@ -281,10 +281,10 @@ class TestPromptManagerSafetyFeatures:
 
     def test_api_url_construction(self):
         """Test API URL is constructed correctly."""
-        manager = PromptManager(phoenix_base_url="http://test:8080/")
+        manager = PromptManager(phoenix_base_url="http://test:7175/")
 
         # Should strip trailing slash and construct correct endpoint
-        assert manager.bulk_api_url == "http://test:8080/api/activity/events/bulk"
+        assert manager.bulk_api_url == "http://test:7175/api/activity/events/bulk"
 
     def test_error_isolation(self):
         """Test errors in one component don't affect others."""

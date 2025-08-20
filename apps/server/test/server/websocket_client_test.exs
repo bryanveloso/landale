@@ -46,9 +46,9 @@ defmodule Server.WebSocketClientTest do
     end
 
     test "parses URL correctly for different schemes" do
-      ws_client = WebSocketClient.new("ws://localhost:8080", self())
+      ws_client = WebSocketClient.new("ws://localhost:7175", self())
       assert ws_client.uri.scheme == "ws"
-      assert ws_client.uri.port == 8080
+      assert ws_client.uri.port == 7175
 
       wss_client = WebSocketClient.new("wss://secure.example.com/path", self())
       assert wss_client.uri.scheme == "wss"

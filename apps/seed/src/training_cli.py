@@ -38,7 +38,7 @@ Examples:
     )
 
     parser.add_argument(
-        "--server-url", default="http://localhost:8080", help="Phoenix server URL (default: http://localhost:8080)"
+        "--server-url", default="http://localhost:7175", help="Phoenix server URL (default: http://localhost:7175)"
     )
 
     parser.add_argument(
