@@ -4,13 +4,40 @@ import { useActivityLog } from '@/hooks/use-activity-log'
 import type { EventType } from '@/types/activity-log'
 import { EVENT_TYPES, EVENT_TYPE_LABELS } from '@/types/activity-log'
 
+// Emote renderer component
+function EmoteRenderer({ fragments }: { fragments: Array<{ type: 'text' | 'emote'; text: string; emote?: any }> }) {
+  return (
+    <span style="display: inline;">
+      {fragments.map((fragment, index) =>
+        fragment.type === 'emote' ? (
+          <img
+            key={index}
+            src={
+              fragment.emote?.url || `https://static-cdn.jtvnw.net/emoticons/v2/${fragment.emote?.id}/default/dark/1.0`
+            }
+            alt={fragment.text}
+            title={fragment.text}
+            style="height: 18px; vertical-align: middle; margin: 0 2px;"
+          />
+        ) : (
+          <span key={index}>{fragment.text}</span>
+        )
+      )}
+    </span>
+  )
+}
+
 // Event-specific components
 function ChatMessageEvent({ jsonData }: { jsonData: string }) {
   const event = JSON.parse(jsonData)
+  const fragments = event.data?.fragments || [{ type: 'text', text: event.data?.message || '' }]
+
   return (
     <div style="color: #333;">
       <span style="font-weight: bold; color: #0066cc;">{event.user_name}:</span>
-      <span style="color: #333; margin-left: 8px;">{event.data?.message || ''}</span>
+      <span style="color: #333; margin-left: 8px;">
+        <EmoteRenderer fragments={fragments} />
+      </span>
     </div>
   )
 }
