@@ -24,6 +24,7 @@ class RAGHandler:
         self,
         context_client: ContextClient,
         server_url: str = "http://saya:7175",
+        streamer_identity: str = "Avalonstar",
     ):
         """
         Initialize RAG handler with necessary clients.
@@ -31,11 +32,13 @@ class RAGHandler:
         Args:
             context_client: Client for retrieving context data
             server_url: Phoenix server URL for additional data queries
+            streamer_identity: The streamer's username/identity for context
         """
         self.context_client = context_client
         self.server_url = server_url
+        self.streamer_identity = streamer_identity
         self.session: aiohttp.ClientSession | None = None
-        logger.info(f"RAG Handler initialized with server_url: {server_url}")
+        logger.info(f"RAG Handler initialized with server_url: {server_url}, streamer: {streamer_identity}")
         # Configure RAG LMS client for exobrain experimentation
         # Default: Creative but controlled (good for personality understanding)
         self._rag_lms_client = RAGLMSClient(
@@ -396,12 +399,14 @@ class RAGHandler:
         full_context = "\n".join(context_parts)
 
         # Build prompt for LMS with structured response guidance
-        prompt = f"""You are answering questions about a Twitch stream based on real data. Provide a structured response with the following components:
+        prompt = f"""You are answering questions about {self.streamer_identity}'s Twitch stream based on real data.
 
-User Question: "{question}"
+Question: "{question}"
 
 Available Data:
 {full_context}
+
+CRITICAL IDENTITY CONTEXT: The person asking this question IS {self.streamer_identity}, the streamer themselves. They are asking about THEIR OWN stream. When they say "my chat" they mean their channel's chat. When you see "{self.streamer_identity}" in the data, that refers to the person asking the question, not a separate user.
 
 Instructions for your structured response:
 1. **answer**: Provide a direct, concise answer (2-3 sentences max) using ONLY the provided data
@@ -415,6 +420,7 @@ Instructions for your structured response:
 5. **suggestions**: (Optional) For creative responses, provide follow-up ideas or "what if" scenarios
 
 Guidelines:
+- The person asking IS {self.streamer_identity}, so respond accordingly (use "your chat", "your stream", etc.)
 - Be precise with numbers, usernames, and facts from the data
 - Use Community Vocabulary Context to understand stream lingo, emotes, and inside jokes
 - Use Stream Flow Context to understand whether events are from live streaming or offline periods
@@ -934,10 +940,10 @@ async def create_rag_endpoints(app: web.Application, rag_handler: RAGHandler):
                 "What's my follower count this stream?",
             ],
             "chat_queries": [
-                "What is chat talking about?",
-                "Who's been most active in chat?",
+                "What happened in my chat?",
+                "Who's been most active in my chat?",
                 "What was the last thing someone said about the game?",
-                "How active has chat been?",
+                "How active has my chat been?",
             ],
             "stream_queries": [
                 "What game am I playing?",
@@ -946,16 +952,16 @@ async def create_rag_endpoints(app: web.Application, rag_handler: RAGHandler):
                 "How many viewers do I have?",
             ],
             "pattern_queries": [
-                "What's the mood of the stream?",
-                "How's the energy level?",
-                "What topics have come up?",
+                "What's the mood of my stream?",
+                "How's the energy level in my chat?",
+                "What topics have come up today?",
                 "What's the sentiment been like?",
             ],
             "specific_queries": [
-                "When did user123 last chat?",
+                "When did user123 last chat in my stream?",
                 "Did anyone raid me today?",
-                "How many bits were cheered?",
-                "What happened in the last hour?",
+                "How many bits were cheered in my stream?",
+                "What happened in my stream in the last hour?",
             ],
         }
 
