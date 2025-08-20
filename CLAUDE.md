@@ -735,4 +735,8 @@ continuation_id: "your-previous-id"
 /zen:planner Break down [complex feature] into manageable steps
 ```
 
+### TO MIGRATE PRODUCTION
+
+`docker exec landale-server-1 /app/bin/server eval "Server.Release.migrate()"`
+
 Remember: Zen MCP enhances Landale development by providing structured, multi-model analysis while maintaining our personal-scale, pragmatic approach.
