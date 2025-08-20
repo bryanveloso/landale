@@ -558,15 +558,15 @@ Respond using the structured format."""
             return []
 
         try:
-            url = f"{self.server_url}/api/activity/events/bulk"
+            url = f"{self.server_url}/api/activity/events"
             params = {"event_type": "channel.subscribe"}
-            logger.info(f"RAG Handler fetching subscription data from bulk API: {url} with params: {params}")
+            logger.info(f"RAG Handler fetching subscription data from firehose API: {url} with params: {params}")
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
                     events = data.get("data", {}).get("events", [])
-                    logger.info(f"RAG Handler subscription: Got {len(events)} events from bulk API")
+                    logger.info(f"RAG Handler subscription: Got {len(events)} events from firehose API")
                     return events
 
         except Exception as e:
@@ -580,15 +580,15 @@ Respond using the structured format."""
             return []
 
         try:
-            url = f"{self.server_url}/api/activity/events/bulk"
+            url = f"{self.server_url}/api/activity/events"
             params = {"event_type": "channel.follow"}
-            logger.info(f"RAG Handler fetching follower data from bulk API: {url} with params: {params}")
+            logger.info(f"RAG Handler fetching follower data from firehose API: {url} with params: {params}")
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
                     events = data.get("data", {}).get("events", [])
-                    logger.info(f"RAG Handler follower: Got {len(events)} events from bulk API")
+                    logger.info(f"RAG Handler follower: Got {len(events)} events from firehose API")
                     return events
 
         except Exception as e:
@@ -602,15 +602,15 @@ Respond using the structured format."""
             return []
 
         try:
-            url = f"{self.server_url}/api/activity/events/bulk"
+            url = f"{self.server_url}/api/activity/events"
             params = {"event_type": "channel.chat.message"}
-            logger.info(f"RAG Handler fetching chat data from bulk API: {url} with params: {params}")
+            logger.info(f"RAG Handler fetching chat data from firehose API: {url} with params: {params}")
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
                     events = data.get("data", {}).get("events", [])
-                    logger.info(f"RAG Handler chat: Got {len(events)} events from bulk API")
+                    logger.info(f"RAG Handler chat: Got {len(events)} events from firehose API")
                     return events
 
         except Exception as e:
@@ -643,15 +643,15 @@ Respond using the structured format."""
             return []
 
         try:
-            url = f"{self.server_url}/api/activity/events/bulk"
+            url = f"{self.server_url}/api/activity/events"
             params = {"event_type": "channel.raid"}
-            logger.info(f"RAG Handler fetching raid data from bulk API: {url} with params: {params}")
+            logger.info(f"RAG Handler fetching raid data from firehose API: {url} with params: {params}")
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
                     events = data.get("data", {}).get("events", [])
-                    logger.info(f"RAG Handler raid: Got {len(events)} events from bulk API")
+                    logger.info(f"RAG Handler raid: Got {len(events)} events from firehose API")
                     return events
 
         except Exception as e:
@@ -665,15 +665,15 @@ Respond using the structured format."""
             return []
 
         try:
-            url = f"{self.server_url}/api/activity/events/bulk"
+            url = f"{self.server_url}/api/activity/events"
             params = {"event_type": "channel.cheer"}
-            logger.info(f"RAG Handler fetching cheer data from bulk API: {url} with params: {params}")
+            logger.info(f"RAG Handler fetching cheer data from firehose API: {url} with params: {params}")
 
             async with self.session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
                     events = data.get("data", {}).get("events", [])
-                    logger.info(f"RAG Handler cheer: Got {len(events)} events from bulk API")
+                    logger.info(f"RAG Handler cheer: Got {len(events)} events from firehose API")
                     return events
 
         except Exception as e:
@@ -823,11 +823,9 @@ Respond using the structured format."""
             data = msg.get("data", {})
             # Handle case where data might be a string instead of dict
             if isinstance(data, dict):
-                text = (
-                    data.get("message", {}).get("text", "")
-                    if isinstance(data.get("message"), dict)
-                    else str(data.get("message", ""))
-                )
+                # Message can be either a string directly or nested in a text field
+                message = data.get("message", "")
+                text = message.get("text", "") if isinstance(message, dict) else str(message) if message else ""
             else:
                 text = str(data) if data else ""
             if text:
