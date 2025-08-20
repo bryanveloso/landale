@@ -229,7 +229,7 @@ class RAGHandler:
             # Extract terms from chat messages
             if "chat_messages" in retrieved_data.get("raw_data", {}):
                 chat_data = retrieved_data["raw_data"]["chat_messages"]
-                for msg in chat_data[:20]:  # Limit to recent messages
+                for msg in chat_data:  # Process ALL messages for full context
                     if isinstance(msg, dict) and "data" in msg:
                         data = msg["data"]
                         if isinstance(data, dict) and "message" in data:
@@ -245,9 +245,14 @@ class RAGHandler:
                                 if not self._is_common_word(word):
                                     terms_to_lookup.add(word)
 
+                            # Extract channel emotes (prefixSUFFIX/prefixSuffix pattern)
+                            emotes = self._extract_emotes_from_text(message_text)
+                            for emote in emotes:
+                                terms_to_lookup.add(emote)
+
             # Look up vocabulary definitions
             vocab_definitions = {}
-            for term in list(terms_to_lookup)[:15]:  # Limit API calls
+            for term in list(terms_to_lookup):  # Process ALL terms for full context
                 results = await self.vocab_client.search_vocabulary(term, limit=1)
                 if results:
                     vocab_entry = results[0]
@@ -276,6 +281,31 @@ class RAGHandler:
             logger.error(f"Error enhancing data with vocabulary context: {e}")
 
         return retrieved_data
+
+    def _extract_emotes_from_text(self, text: str) -> list[str]:
+        """Extract channel emotes from text using prefix pattern matching."""
+        if not text:
+            return []
+
+        # Pattern for channel emotes: prefixSUFFIX or prefixSuffix
+        # Common prefixes include: avalon, bard, pog, kappa, etc.
+        # Must be at least 5 chars total (3 char prefix + 2 char suffix minimum)
+        emote_pattern = r"\b([a-zA-Z]{3,})([A-Z][A-Z0-9]*|[A-Z][a-z][a-zA-Z0-9]*)\b"
+
+        emotes = []
+        matches = re.findall(emote_pattern, text)
+
+        for prefix, suffix in matches:
+            emote_name = prefix + suffix
+            # Filter out obvious non-emotes (common words, URLs, etc.)
+            if (
+                len(emote_name) >= 5
+                and not self._is_common_word(emote_name.lower())
+                and not emote_name.lower().startswith(("http", "www", "com"))
+            ):
+                emotes.append(emote_name)
+
+        return emotes
 
     def _is_common_word(self, word: str) -> bool:
         """Check if word is too common to look up in vocabulary."""
@@ -421,9 +451,11 @@ Instructions for your structured response:
 
 Guidelines:
 - The person asking IS {self.streamer_identity}, so respond accordingly (use "your chat", "your stream", etc.)
+- When asked "What happened in my chat?", focus on CONTENT and TOPICS, not just message counts - what were people talking about, what emotes were used, what was the mood?
 - Be precise with numbers, usernames, and facts from the data
 - Use Community Vocabulary Context to understand stream lingo, emotes, and inside jokes
 - Use Stream Flow Context to understand whether events are from live streaming or offline periods
+- Channel emotes follow the pattern prefixSUFFIX/prefixSuffix (e.g., avalonSTARWHEE, bardLove) - recognize these as expressions of emotion/reaction, not regular words
 - Remember: "Stream offline" means the stream ended normally - this is NOT a problem or error
 - When mentioning community terms or emotes, use their proper definitions if provided
 - For creative questions, think about stream personality and community dynamics
@@ -801,20 +833,37 @@ Respond using the structured format."""
 
         lines = [f"Total messages: {len(messages)}"]
 
-        # Get unique chatters
+        # Get unique chatters and collect emotes
         chatters = set()
+        all_emotes = set()
+
         for msg in messages:
             # Handle case where msg might be a string instead of dict
             if isinstance(msg, dict):
                 if user := msg.get("user_name"):
                     chatters.add(user)
+
+                # Extract emotes from this message
+                data = msg.get("data", {})
+                if isinstance(data, dict):
+                    message = data.get("message", "")
+                    text = message.get("text", "") if isinstance(message, dict) else str(message) if message else ""
+                    if text:
+                        emotes = self._extract_emotes_from_text(text)
+                        all_emotes.update(emotes)
             else:
                 logger.warning(f"Expected dict for chat message, got {type(msg)}: {msg}")
 
         lines.append(f"Active chatters: {len(chatters)}")
 
-        # Show sample messages
-        for msg in messages[:5]:
+        # Add emotes section
+        if all_emotes:
+            lines.append(f"Channel emotes used: {', '.join(sorted(all_emotes))}")
+
+        # Show ALL chat messages for full context
+        lines.append(f"\nALL chat messages ({len(messages)} total):")
+        message_count = 0
+        for msg in messages:  # ALL messages, no sampling
             # Handle case where msg might be a string instead of dict
             if not isinstance(msg, dict):
                 logger.warning(f"Skipping non-dict message: {type(msg)} - {msg}")
@@ -828,8 +877,15 @@ Respond using the structured format."""
                 text = message.get("text", "") if isinstance(message, dict) else str(message) if message else ""
             else:
                 text = str(data) if data else ""
+
             if text:
-                lines.append(f"- {msg.get('user_name', 'Unknown')}: {text[:50]}...")
+                # Show full message text, not truncated
+                username = msg.get("user_name", "Unknown")
+                lines.append(f"- {username}: {text}")
+                message_count += 1
+
+        if message_count == 0:
+            lines.append("- No recent messages with text content")
 
         return "\n".join(lines)
 
