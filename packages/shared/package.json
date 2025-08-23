@@ -16,10 +16,10 @@
     "test": "bun test"
   },
   "dependencies": {
-    "phoenix": "^1.7.21"
+    "phoenix": "^1.8.0"
   },
   "devDependencies": {
-    "@types/node": "^24.2.0",
+    "@types/node": "^24.3.0",
     "typescript": "^5.9.2"
   }
 }

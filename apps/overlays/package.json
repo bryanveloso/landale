@@ -12,21 +12,21 @@
   },
   "dependencies": {
     "@landale/logger": "workspace:*",
-    "@tailwindcss/vite": "^4.1.11",
-    "@tanstack/solid-router": "^1.130.12",
-    "@tanstack/solid-router-devtools": "^1.130.13",
+    "@tailwindcss/vite": "^4.1.12",
+    "@tanstack/solid-router": "^1.131.27",
+    "@tanstack/solid-router-devtools": "^1.131.27",
     "gsap": "^3.13.0",
-    "phoenix": "^1.7.21",
-    "solid-js": "^1.9.7",
-    "tailwindcss": "^4.1.11"
+    "phoenix": "^1.8.0",
+    "solid-js": "^1.9.9",
+    "tailwindcss": "^4.1.12"
   },
   "devDependencies": {
-    "@tanstack/router-plugin": "^1.130.15",
+    "@tanstack/router-plugin": "^1.131.27",
     "@types/bun": "latest",
     "@types/phoenix": "^1.6.6",
     "happy-dom": "^18.0.1",
     "typescript": "~5.9.2",
-    "vite": "^7.0.6",
+    "vite": "^7.1.3",
     "vite-plugin-solid": "^2.11.8",
     "vite-tsconfig-paths": "^5.1.4"
   }
