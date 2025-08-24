@@ -34,6 +34,7 @@ defmodule ServerWeb.Endpoint do
         # Overlays app (port 8008)
         "http://localhost:8008",
         "http://saya:8008",
+        "http://zelan:8008",
         # Tailscale network machines (correct domain format)
         "https://saya.tailnet-dffc.ts.net:5173",
         "https://zelan.tailnet-dffc.ts.net:5173",
@@ -89,6 +90,7 @@ defmodule ServerWeb.Endpoint do
       "http://localhost:3000",
       "http://localhost:8008",
       "http://saya:8008",
+      "http://zelan:8008",
       "http://zelan:3000",
       "http://zelan:5173",
       "http://zelan:5174",
