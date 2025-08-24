@@ -1,5 +1,6 @@
 import { Show, For, createMemo } from 'solid-js'
-import { Button } from './ui/button'
+
+import { Button } from '@/components/ui/button'
 import { useActivityLog } from '@/hooks/use-activity-log'
 import type { EventType } from '@/types/activity-log'
 import { EVENT_TYPES, EVENT_TYPE_LABELS } from '@/types/activity-log'
@@ -7,20 +8,19 @@ import { EVENT_TYPES, EVENT_TYPE_LABELS } from '@/types/activity-log'
 // Emote renderer component
 function EmoteRenderer({ fragments }: { fragments: Array<{ type: 'text' | 'emote'; text: string; emote?: any }> }) {
   return (
-    <span style="display: inline;">
-      {fragments.map((fragment, index) =>
+    <span class="inline-block">
+      {fragments.map((fragment, _index) =>
         fragment.type === 'emote' ? (
           <img
-            key={index}
             src={
               fragment.emote?.url || `https://static-cdn.jtvnw.net/emoticons/v2/${fragment.emote?.id}/default/dark/1.0`
             }
             alt={fragment.text}
             title={fragment.text}
-            style="height: 18px; vertical-align: middle; margin: 0 2px;"
+            style="vertical-align: middle;"
           />
         ) : (
-          <span key={index}>{fragment.text}</span>
+          <span>{fragment.text}</span>
         )
       )}
     </span>
@@ -33,9 +33,11 @@ function ChatMessageEvent({ jsonData }: { jsonData: string }) {
   const fragments = event.data?.fragments || [{ type: 'text', text: event.data?.message || '' }]
 
   return (
-    <div style="color: #333;">
-      <span style="font-weight: bold; color: #0066cc;">{event.user_name}:</span>
-      <span style="color: #333; margin-left: 8px;">
+    <div>
+      <span class="font-bold" style={`color: ${event.data.color};`}>
+        {event.user_name}:
+      </span>
+      <span class="ml-2 text-gray-800">
         <EmoteRenderer fragments={fragments} />
       </span>
     </div>
@@ -44,12 +46,12 @@ function ChatMessageEvent({ jsonData }: { jsonData: string }) {
 
 function FollowEvent({ jsonData }: { jsonData: string }) {
   const event = JSON.parse(jsonData)
-  return <div style="color: #28a745; font-weight: bold;">{event.user_name} followed</div>
+  return <div class="font-bold text-green-500">{event.user_name} followed</div>
 }
 
 function SubscribeEvent({ jsonData }: { jsonData: string }) {
   const event = JSON.parse(jsonData)
-  return <div style="color: #6f42c1; font-weight: bold;">{event.user_name} subscribed</div>
+  return <div class="font-bold text-purple-600">{event.user_name} subscribed</div>
 }
 
 function CheerEvent({ jsonData }: { jsonData: string }) {
@@ -63,16 +65,16 @@ function CheerEvent({ jsonData }: { jsonData: string }) {
 }
 
 function StreamOnlineEvent({ jsonData }: { jsonData: string }) {
-  return <div style="color: #28a745; font-weight: bold;">Stream went online</div>
+  return <div class="font-bold text-green-500">Stream went online</div>
 }
 
 function StreamOfflineEvent({ jsonData }: { jsonData: string }) {
-  return <div style="color: #dc3545; font-weight: bold;">Stream went offline</div>
+  return <div class="font-bold text-red-500">Stream went offline</div>
 }
 
 function DefaultEvent({ jsonData }: { jsonData: string }) {
   const event = JSON.parse(jsonData)
-  return <div style="color: #333;">{event.event_type} event</div>
+  return <div class="text-gray-800">{event.event_type} event</div>
 }
 
 // Component map for each event type
@@ -116,17 +118,9 @@ export function ActivityLogPanel() {
   })
 
   return (
-    <section>
+    <section class="h-full">
       <header>
-        <h2 class="sr-only">Activity Log</h2>
-
-        <div class="flex justify-around">
-          <Button onClick={clearFilters}>All Events</Button>
-          <Button onClick={() => handleFilterChange(EVENT_TYPES.CHAT_MESSAGE)}>Chat</Button>
-          <Button onClick={() => handleFilterChange(EVENT_TYPES.FOLLOW)}>Follows</Button>
-          <Button onClick={() => handleFilterChange(EVENT_TYPES.SUBSCRIBE)}>Subscriptions</Button>
-          <Button onClick={() => handleFilterChange(EVENT_TYPES.CHEER)}>Cheers</Button>
-        </div>
+        <h2>Activity Log</h2>
       </header>
 
       <Show when={error()}>
@@ -143,17 +137,14 @@ export function ActivityLogPanel() {
             {(event) => {
               const EventComponent = EVENT_COMPONENTS[event.event_type as keyof typeof EVENT_COMPONENTS] || DefaultEvent
               return (
-                <li style="margin-bottom: 12px; padding: 8px; border-left: 3px solid #333; background: #f9f9f9; color: #333;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <time style="color: #666; font-size: 12px;">{formatEventTime(event.timestamp)}</time>
-                    <small style="color: #888; font-size: 11px;">
-                      {EVENT_TYPE_LABELS[event.event_type as EventType] || event.event_type}
-                    </small>
-                  </div>
+                <li>
                   <EventComponent jsonData={JSON.stringify(event)} />
-                  <details style="margin-top: 8px;">
-                    <summary style="cursor: pointer; color: #666; font-size: 11px;">JSON Data</summary>
-                    <pre style="font-size: 10px; background: #fff; padding: 8px; margin: 4px 0; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; border: 1px solid #ddd;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <time class="font-mono text-xs">{formatEventTime(event.timestamp)}</time>
+                  </div>
+                  <details class="mt-2">
+                    <summary class="cursor-pointer text-sm text-gray-600">JSON Data</summary>
+                    <pre class="my-1 overflow-x-auto rounded border border-gray-300 bg-white p-2 text-xs whitespace-pre-wrap">
                       {JSON.stringify(event, null, 2)}
                     </pre>
                   </details>
@@ -176,15 +167,6 @@ export function ActivityLogPanel() {
       <Show when={hasMore() && !loading()}>
         <Button onClick={loadMore}>Load More</Button>
       </Show>
-
-      {/* Debug info for development */}
-      {import.meta.env.DEV && (
-        <div>
-          <div>Total Events: {events().length}</div>
-          <div>Filtered Events: {filteredEvents().length}</div>
-          <div>Active Filter: {filters().event_type || 'None'}</div>
-        </div>
-      )}
     </section>
   )
 }
