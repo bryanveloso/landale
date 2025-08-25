@@ -586,12 +586,13 @@ defmodule Server.StreamProducer do
         not Enum.empty?(state.ticker) ->
           ticker_content = Enum.at(state.ticker, state.ticker_idx)
 
-          %{
+          content_data = get_content_data(ticker_content)
+
+          Map.merge(content_data, %{
             type: ticker_content,
             priority: @priority_ticker,
-            data: get_content_data(ticker_content),
             started_at: DateTime.utc_now()
-          }
+          })
 
         # Nothing to show
         true ->
@@ -758,13 +759,12 @@ defmodule Server.StreamProducer do
             nil
 
           event ->
-            %{
+            Map.merge(event, %{
               type: "latest_event",
-              data: event,
               priority: 10,
               layer: "background",
               started_at: DateTime.utc_now() |> DateTime.to_iso8601()
-            }
+            })
         end
       end,
       :latest_event
