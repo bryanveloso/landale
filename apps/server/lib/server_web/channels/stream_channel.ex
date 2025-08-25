@@ -347,8 +347,9 @@ defmodule ServerWeb.StreamChannel do
     state_data = %{
       current_show: event.current_show,
       current: event.current,
+      base: event.base,
       alerts: event.alerts,
-      ticker_rotation: event.ticker_rotation,
+      ticker_rotation: event.ticker,
       version: event.version,
       metadata: event.metadata
     }
