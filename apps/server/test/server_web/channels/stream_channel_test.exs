@@ -243,7 +243,7 @@ defmodule ServerWeb.StreamChannelTest do
       # Should receive a push message (no reply expected)
       assert_push "stream_state", state_data
       assert Map.has_key?(state_data, :current_show)
-      assert Map.has_key?(state_data, :active_content)
+      assert Map.has_key?(state_data, :current)
     end
 
     test "request_queue_state returns queue format", %{} do

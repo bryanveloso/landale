@@ -239,9 +239,10 @@ defmodule Server.Events do
 
     %{
       current_show: Map.get(data, :current_show),
-      active_content: Map.get(data, :active_content),
-      interrupt_stack: Map.get(data, :interrupt_stack),
-      ticker_rotation: Map.get(data, :ticker_rotation),
+      current: Map.get(data, :current),
+      base: Map.get(data, :base),
+      alerts: Map.get(data, :alerts),
+      ticker: Map.get(data, :ticker),
       version: Map.get(data, :version),
       metadata: Map.get(data, :metadata)
     }

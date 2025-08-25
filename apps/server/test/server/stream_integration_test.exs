@@ -16,9 +16,9 @@ defmodule Server.StreamIntegrationTest do
       :ok =
         Server.Events.process_event("stream.state_updated", %{
           current_show: "variety",
-          active_content: %{type: "emote_stats"},
-          interrupt_stack: [],
-          ticker_rotation: ["emote_stats", "recent_follows"],
+          current: %{type: "emote_stats"},
+          alerts: [],
+          ticker: ["emote_stats", "recent_follows"],
           version: 1,
           metadata: %{last_updated: "2025-08-15T10:00:00Z", state_version: 1}
         })

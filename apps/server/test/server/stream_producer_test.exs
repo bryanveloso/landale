@@ -14,9 +14,9 @@ defmodule Server.StreamProducerTest do
       state = GenServer.call(producer, :get_state)
 
       assert state.current_show == :variety
-      assert state.active_content == nil
-      assert state.interrupt_stack == []
-      assert state.ticker_rotation != []
+      assert state.current == nil
+      assert state.alerts == []
+      assert state.ticker != []
       assert state.version == 0
     end
 
@@ -25,7 +25,7 @@ defmodule Server.StreamProducerTest do
 
       state = GenServer.call(producer, :get_state)
       assert state.current_show == :ironmon
-      assert :ironmon_run_stats in state.ticker_rotation
+      assert :ironmon_run_stats in state.ticker
       assert state.version == 1
     end
   end
@@ -35,9 +35,9 @@ defmodule Server.StreamProducerTest do
       GenServer.cast(producer, {:add_interrupt, :alert, %{message: "Test alert"}, []})
 
       state = GenServer.call(producer, :get_state)
-      assert Enum.count(state.interrupt_stack) == 1
+      assert Enum.count(state.alerts) == 1
 
-      interrupt = List.first(state.interrupt_stack)
+      interrupt = List.first(state.alerts)
       assert interrupt.type == :alert
       assert interrupt.priority == 100
       assert interrupt.data.message == "Test alert"
@@ -50,10 +50,10 @@ defmodule Server.StreamProducerTest do
       GenServer.cast(producer, {:add_interrupt, :alert, %{message: "Breaking"}, []})
 
       state = GenServer.call(producer, :get_state)
-      assert Enum.count(state.interrupt_stack) == 2
+      assert Enum.count(state.alerts) == 2
 
       # Alert should be first (higher priority)
-      [first, second] = state.interrupt_stack
+      [first, second] = state.alerts
       assert first.type == :alert
       assert second.type == :sub_train
     end
@@ -63,12 +63,12 @@ defmodule Server.StreamProducerTest do
       GenServer.cast(producer, {:add_interrupt, :alert, %{}, [id: interrupt_id]})
 
       state = GenServer.call(producer, :get_state)
-      assert Enum.count(state.interrupt_stack) == 1
+      assert Enum.count(state.alerts) == 1
 
       GenServer.cast(producer, {:remove_interrupt, interrupt_id})
 
       state = GenServer.call(producer, :get_state)
-      assert Enum.empty?(state.interrupt_stack)
+      assert Enum.empty?(state.alerts)
     end
   end
 
@@ -90,9 +90,9 @@ defmodule Server.StreamProducerTest do
       Process.sleep(10)
 
       state = GenServer.call(producer, :get_state)
-      assert Enum.count(state.interrupt_stack) == 1
+      assert Enum.count(state.alerts) == 1
 
-      sub_train = List.first(state.interrupt_stack)
+      sub_train = List.first(state.alerts)
       assert sub_train.type == :sub_train
       assert sub_train.data.subscriber == "testuser"
       assert sub_train.data.count == 1
@@ -126,9 +126,9 @@ defmodule Server.StreamProducerTest do
       Process.sleep(10)
 
       state = GenServer.call(producer, :get_state)
-      assert Enum.count(state.interrupt_stack) == 1
+      assert Enum.count(state.alerts) == 1
 
-      sub_train = List.first(state.interrupt_stack)
+      sub_train = List.first(state.alerts)
       assert sub_train.data.count == 2
       assert sub_train.data.latest_subscriber == "user2"
     end
@@ -140,7 +140,7 @@ defmodule Server.StreamProducerTest do
       GenServer.cast(producer, {:add_interrupt, :alert, %{message: "Alert"}, []})
 
       state = GenServer.call(producer, :get_state)
-      assert state.active_content.type == :alert
+      assert state.current.type == :alert
     end
 
     test "falls back to ticker when no interrupts", %{producer: producer} do
@@ -149,8 +149,8 @@ defmodule Server.StreamProducerTest do
       Process.sleep(10)
 
       state = GenServer.call(producer, :get_state)
-      assert state.active_content != nil
-      assert state.active_content.type in [:emote_stats, :recent_follows, :stream_goals, :daily_stats]
+      assert state.current != nil
+      assert state.current.type in [:emote_stats, :recent_follows, :stream_goals, :daily_stats]
     end
 
     test "priority hierarchy works correctly", %{producer: producer} do
@@ -158,15 +158,15 @@ defmodule Server.StreamProducerTest do
       GenServer.cast(producer, {:add_interrupt, :sub_train, %{count: 5, subscriber: "user1"}, []})
 
       state = GenServer.call(producer, :get_state)
-      assert state.active_content.type == :sub_train
+      assert state.current.type == :sub_train
 
       # Add alert (priority 100) - should win over sub train
       GenServer.cast(producer, {:add_interrupt, :alert, %{message: "Breaking News"}, []})
 
       state = GenServer.call(producer, :get_state)
       # Alert should win due to higher priority
-      assert state.active_content.type == :alert
-      assert state.active_content.data.message == "Breaking News"
+      assert state.current.type == :alert
+      assert state.current.data.message == "Breaking News"
     end
   end
 
@@ -185,9 +185,9 @@ defmodule Server.StreamProducerTest do
 
       state = GenServer.call(producer, :get_state)
       # All interrupts should be added successfully with unique IDs
-      assert Enum.count(state.interrupt_stack) == 10
+      assert Enum.count(state.alerts) == 10
       # All should have unique IDs
-      ids = Enum.map(state.interrupt_stack, & &1.id)
+      ids = Enum.map(state.alerts, & &1.id)
       assert Enum.count(Enum.uniq(ids)) == 10
     end
 
@@ -196,13 +196,13 @@ defmodule Server.StreamProducerTest do
       GenServer.cast(producer, {:add_interrupt, :alert, %{}, [duration: 1]})
 
       state = GenServer.call(producer, :get_state)
-      assert Enum.count(state.interrupt_stack) == 1
+      assert Enum.count(state.alerts) == 1
 
       # Wait for expiration
       Process.sleep(50)
 
       state = GenServer.call(producer, :get_state)
-      assert Enum.empty?(state.interrupt_stack)
+      assert Enum.empty?(state.alerts)
     end
   end
 
@@ -227,7 +227,7 @@ defmodule Server.StreamProducerTest do
         Application.get_env(:server, :cleanup_settings, %{})
         |> Map.get(:interrupt_stack_keep_count, 25)
 
-      assert Enum.count(state.interrupt_stack) <= keep_count
+      assert Enum.count(state.alerts) <= keep_count
     end
 
     test "cleanup removes stale timers", %{producer: producer} do
@@ -239,7 +239,7 @@ defmodule Server.StreamProducerTest do
       initial_timer_count = map_size(state.timers)
 
       # Manually remove from interrupt stack (simulating stale timer)
-      new_state = %{state | interrupt_stack: []}
+      new_state = %{state | alerts: []}
       :sys.replace_state(producer, fn _ -> new_state end)
 
       # Trigger cleanup
@@ -283,9 +283,9 @@ defmodule Server.StreamProducerTest do
 
       state = GenServer.call(producer, :get_state)
       # Should have created sub train with default values
-      assert Enum.count(state.interrupt_stack) == 1
+      assert Enum.count(state.alerts) == 1
 
-      sub_train = List.first(state.interrupt_stack)
+      sub_train = List.first(state.alerts)
       assert sub_train.type == :sub_train
       assert sub_train.data.subscriber == "unknown"
       assert sub_train.data.tier == "1000"
@@ -299,7 +299,7 @@ defmodule Server.StreamProducerTest do
       assert Process.alive?(producer)
 
       state = GenServer.call(producer, :get_state)
-      assert state.active_content != nil
+      assert state.current != nil
     end
 
     test "handles canonical chat messages without crashing", %{producer: producer} do

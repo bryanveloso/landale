@@ -96,10 +96,11 @@ defmodule Server.ContentFallbacks do
   def get_fallback_layer_state do
     %{
       current_show: :variety,
-      active_content: nil,
+      current: nil,
+      base: nil,
       priority_level: :ticker,
-      interrupt_stack: [],
-      ticker_rotation: [],
+      alerts: [],
+      ticker: [],
       metadata: %{
         last_updated: DateTime.utc_now(),
         state_version: 0,
@@ -114,7 +115,7 @@ defmodule Server.ContentFallbacks do
   def get_fallback_queue_state do
     %{
       queue: [],
-      active_content: nil,
+      current: nil,
       metrics: %{
         total_items: 0,
         active_items: 0,

@@ -54,9 +54,10 @@ defmodule Server.StreamProducer.Types do
 
   @type state :: %{
           current_show: show_type(),
-          active_content: active_content() | nil,
-          interrupt_stack: [interrupt()],
-          ticker_rotation: [ticker_content()],
+          current: active_content() | nil,
+          base: active_content() | nil,
+          alerts: [interrupt()],
+          ticker: [ticker_content()],
           ticker_index: non_neg_integer(),
           timers: %{String.t() => reference()},
           version: non_neg_integer(),
