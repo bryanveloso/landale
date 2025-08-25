@@ -459,12 +459,17 @@ defmodule Server.StreamProducer do
   def handle_info({:event, event_data}, state) do
     Logger.debug("StreamProducer received event", event_type: event_data.type)
 
-    # Update base with latest event reactively
-    new_base = get_latest_event()
-    new_state = %{state | base: new_base} |> update_metadata()
+    # Ignore our own stream.state_updated events to prevent infinite loop
+    if event_data.type == "stream.state_updated" do
+      {:noreply, state}
+    else
+      # Update base with latest event reactively
+      new_base = get_latest_event()
+      new_state = %{state | base: new_base} |> update_metadata()
 
-    broadcast_state_update(new_state)
-    {:noreply, new_state}
+      broadcast_state_update(new_state)
+      {:noreply, new_state}
+    end
   end
 
   # Catch-all for unhandled messages

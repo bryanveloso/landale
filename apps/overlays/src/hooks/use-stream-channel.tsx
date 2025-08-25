@@ -8,7 +8,15 @@ type PhoenixResponse = { [key: string]: unknown }
 
 export interface StreamState {
   current_show: 'ironmon' | 'variety' | 'coding'
-  active_content: {
+  current: {
+    type: string
+    data: unknown
+    priority: number
+    duration?: number
+    started_at: string
+    layer?: 'foreground' | 'midground' | 'background'
+  } | null
+  base: {
     type: string
     data: unknown
     priority: number
@@ -17,7 +25,7 @@ export interface StreamState {
     layer?: 'foreground' | 'midground' | 'background'
   } | null
   priority_level: 'alert' | 'sub_train' | 'ticker'
-  interrupt_stack: Array<{
+  alerts: Array<{
     type: string
     priority: number
     id: string
@@ -25,7 +33,7 @@ export interface StreamState {
     duration?: number
     layer?: 'foreground' | 'midground' | 'background'
   }>
-  ticker_rotation: Array<
+  ticker: Array<
     | string
     | {
         type: string
@@ -55,10 +63,11 @@ export interface ContentUpdate {
 
 const DEFAULT_STATE: StreamState = {
   current_show: 'variety',
-  active_content: null,
+  current: null,
+  base: null,
   priority_level: 'ticker',
-  interrupt_stack: [],
-  ticker_rotation: [],
+  alerts: [],
+  ticker: [],
   metadata: {
     last_updated: new Date().toISOString(),
     state_version: 0
@@ -92,8 +101,9 @@ export function useStreamChannel() {
         metadata: {
           currentShow: payload.current_show,
           priorityLevel: payload.priority_level,
-          hasActiveContent: !!payload.active_content,
-          interruptCount: payload.interrupt_stack?.length || 0
+          hasCurrentContent: !!payload.current,
+          hasBaseContent: !!payload.base,
+          alertsCount: payload.alerts?.length || 0
         }
       })
       setStreamState(payload)
@@ -132,10 +142,7 @@ export function useStreamChannel() {
         // Update the stream state with new goals data
         setStreamState((prev) => ({
           ...prev,
-          active_content:
-            prev.active_content?.type === 'stream_goals'
-              ? { ...prev.active_content, data: payload.data }
-              : prev.active_content
+          current: prev.current?.type === 'stream_goals' ? { ...prev.current, data: payload.data } : prev.current
         }))
       }
     })
