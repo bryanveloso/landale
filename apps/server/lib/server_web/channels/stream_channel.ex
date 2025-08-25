@@ -528,33 +528,39 @@ defmodule ServerWeb.StreamChannel do
   defp format_current_content(nil), do: nil
 
   defp format_current_content(content) do
-    %{
+    base_fields = %{
       type: content.type,
-      data: content.data,
       priority: content.priority,
       duration: Map.get(content, :duration),
       started_at: content.started_at
     }
+
+    case Map.has_key?(content, :data) do
+      true -> Map.put(base_fields, :data, content.data)
+      false -> Map.merge(base_fields, Map.drop(content, [:type, :priority, :duration, :started_at]))
+    end
   end
 
   defp format_base_content(nil), do: nil
 
   defp format_base_content(content) do
-    %{
-      type: "latest_event",
-      data: content
-    }
+    content
   end
 
   defp format_alerts(alerts) when is_list(alerts) do
     Enum.map(alerts, fn alert ->
-      %{
+      base_fields = %{
         type: alert.type,
         priority: alert.priority,
         id: alert.id,
         started_at: alert.started_at,
         duration: alert.duration
       }
+
+      case Map.has_key?(alert, :data) do
+        true -> Map.put(base_fields, :data, alert.data)
+        false -> Map.merge(base_fields, Map.drop(alert, [:type, :priority, :id, :started_at, :duration]))
+      end
     end)
   end
 
