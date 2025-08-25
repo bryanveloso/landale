@@ -54,10 +54,10 @@ defmodule Server.StreamProducer do
   @state_persistence_table :stream_producer_state
 
   defstruct current_show: :variety,
-            current: nil,
             base: nil,
             alerts: [],
             ticker: [],
+            timeline: [],
             ticker_idx: 0,
             timers: %{},
             version: 0,
@@ -202,7 +202,7 @@ defmodule Server.StreamProducer do
 
     # Process show change through unified event system
     Server.Events.process_event("stream.show_changed", %{
-      show: show,
+      show: Atom.to_string(show),
       game_id: get_in(metadata, [:game, :id]),
       game_name: get_in(metadata, [:game, :name]),
       title: metadata[:title],
@@ -223,9 +223,9 @@ defmodule Server.StreamProducer do
       id: interrupt_id,
       type: type,
       priority: priority,
-      data: data,
       duration: duration,
-      started_at: DateTime.utc_now()
+      started_at: DateTime.utc_now(),
+      data: data
     }
 
     # Add to alerts and sort by priority
@@ -282,7 +282,9 @@ defmodule Server.StreamProducer do
   @impl true
   def handle_cast({:force_content, content_type, data, duration}, state) do
     # Create high-priority override interrupt via async cast
-    GenServer.cast(self(), {:add_interrupt, :manual_override, %{type: content_type, data: data}, [duration: duration]})
+    # Merge content_type into data without overwriting existing fields
+    merged_data = Map.merge(%{type: content_type}, data)
+    GenServer.cast(self(), {:add_interrupt, :manual_override, merged_data, [duration: duration]})
     {:noreply, state}
   end
 
@@ -411,7 +413,7 @@ defmodule Server.StreamProducer do
 
     if existing_sub_train do
       # Extend existing sub train
-      new_state = extend_sub_train(state, existing_sub_train.id, %{data: data, timestamp: timestamp})
+      new_state = extend_sub_train(state, existing_sub_train.id, data, timestamp)
       broadcast_state_update(new_state)
       {:noreply, new_state}
     else
@@ -424,14 +426,16 @@ defmodule Server.StreamProducer do
         id: interrupt_id,
         type: :sub_train,
         priority: priority,
+        duration: duration,
+        started_at: DateTime.utc_now(),
         data: %{
           subscriber: Map.get(data, :user_name, "unknown"),
           tier: Map.get(data, :tier, "1000"),
+          latest_subscriber: Map.get(data, :user_name, "unknown"),
+          latest_tier: Map.get(data, :tier, "1000"),
           count: 1,
           total_months: Map.get(data, :cumulative_months, 0)
-        },
-        duration: duration,
-        started_at: DateTime.utc_now()
+        }
       }
 
       # Add to interrupt stack and sort by priority
@@ -571,7 +575,7 @@ defmodule Server.StreamProducer do
             fn interrupt ->
               case interrupt.type do
                 :sub_train ->
-                  count = Map.get(interrupt.data, :count, 0)
+                  count = get_in(interrupt, [:data, :count]) || 0
                   {interrupt.priority, -count}
 
                 _ ->
@@ -634,7 +638,7 @@ defmodule Server.StreamProducer do
     update_current(new_state)
   end
 
-  defp extend_sub_train(state, sub_train_id, event) do
+  defp extend_sub_train(state, sub_train_id, event_data, _timestamp) do
     # Cancel existing timer atomically
     {timer_ref, new_timers} = Map.pop(state.timers, sub_train_id)
 
@@ -646,16 +650,17 @@ defmodule Server.StreamProducer do
     new_stack =
       Enum.map(state.alerts, fn interrupt ->
         if interrupt.id == sub_train_id do
-          new_count = (interrupt.data.count || 0) + 1
+          current_data = interrupt.data || %{}
+          new_count = (Map.get(current_data, :count) || 0) + 1
 
           %{
             interrupt
-            | data:
-                Map.merge(interrupt.data, %{
-                  count: new_count,
-                  latest_subscriber: Map.get(event.data, :user_name, "unknown"),
-                  latest_tier: Map.get(event.data, :tier, "1000")
-                })
+            | data: %{
+                current_data
+                | count: new_count,
+                  latest_subscriber: Map.get(event_data, :user_name, "unknown"),
+                  latest_tier: Map.get(event_data, :tier, "1000")
+              }
           }
         else
           interrupt

@@ -346,10 +346,10 @@ defmodule ServerWeb.StreamChannel do
     # Extract state data from unified event format
     state_data = %{
       current_show: event.current_show,
-      current: event.current,
       base: event.base,
       alerts: event.alerts,
       ticker: event.ticker,
+      timeline: Map.get(event, :timeline, []),
       version: event.version,
       metadata: event.metadata
     }
@@ -485,11 +485,10 @@ defmodule ServerWeb.StreamChannel do
   defp format_state_for_client(state) do
     %{
       current_show: state.current_show,
-      current: format_current_content(state.current),
       base: format_base_content(state.base),
-      priority_level: get_priority_level(state),
       alerts: format_alerts(state.alerts),
       ticker: state.ticker,
+      timeline: Map.get(state, :timeline, []),
       metadata: Map.get(state, :metadata, %{last_updated: DateTime.utc_now(), state_version: state.version})
     }
   end
@@ -506,39 +505,24 @@ defmodule ServerWeb.StreamChannel do
           data: alert.data,
           duration: Map.get(alert, :duration),
           started_at: alert.started_at,
-          status: determine_queue_item_status(alert, state.current),
+          # All items in queue are pending
+          status: "pending",
           position: position
         }
       end)
 
     %{
       queue: queue_items,
-      current: format_current_content(state.current),
       metrics: %{
-        total_items: length(state.alerts || []) + if(state.current, do: 1, else: 0),
-        active_items: if(state.current, do: 1, else: 0),
+        total_items: length(state.alerts || []),
+        # No single "active" item anymore
+        active_items: 0,
         pending_items: length(state.alerts || []),
         average_wait_time: calculate_average_wait_time(state.alerts || []),
         last_processed: Map.get(state, :metadata, %{last_updated: DateTime.utc_now()}).last_updated
       },
-      is_processing: state.current != nil
+      is_processing: length(state.alerts || []) > 0
     }
-  end
-
-  defp format_current_content(nil), do: nil
-
-  defp format_current_content(content) do
-    base_fields = %{
-      type: content.type,
-      priority: content.priority,
-      duration: Map.get(content, :duration),
-      started_at: content.started_at
-    }
-
-    case Map.has_key?(content, :data) do
-      true -> Map.put(base_fields, :data, content.data)
-      false -> Map.merge(base_fields, Map.drop(content, [:type, :priority, :duration, :started_at]))
-    end
   end
 
   defp format_base_content(nil), do: nil
@@ -566,36 +550,12 @@ defmodule ServerWeb.StreamChannel do
 
   defp format_alerts(_), do: []
 
-  defp get_priority_level(state) do
-    cond do
-      has_alerts?(state.alerts) -> :alert
-      has_sub_train?(state.alerts) -> :sub_train
-      true -> :ticker
-    end
-  end
-
-  defp has_alerts?(stack) do
-    Enum.any?(stack, fn interrupt -> interrupt.type == :alert end)
-  end
-
-  defp has_sub_train?(stack) do
-    Enum.any?(stack, fn interrupt -> interrupt.type == :sub_train end)
-  end
-
   # Queue-specific helper functions
 
   defp convert_alert_type_to_queue_type(:alert), do: "alert"
   defp convert_alert_type_to_queue_type(:sub_train), do: "sub_train"
   defp convert_alert_type_to_queue_type(:manual_override), do: "manual_override"
   defp convert_alert_type_to_queue_type(_type), do: "ticker"
-
-  defp determine_queue_item_status(alert, current_content) do
-    if current_content && current_content.id == alert.id do
-      "active"
-    else
-      "pending"
-    end
-  end
 
   defp calculate_average_wait_time(alerts) do
     if Enum.empty?(alerts) do
