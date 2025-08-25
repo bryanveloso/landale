@@ -346,8 +346,8 @@ defmodule ServerWeb.StreamChannel do
     # Extract state data from unified event format
     state_data = %{
       current_show: event.current_show,
-      active_content: event.active_content,
-      interrupt_stack: event.interrupt_stack,
+      current: event.current,
+      alerts: event.alerts,
       ticker_rotation: event.ticker_rotation,
       version: event.version,
       metadata: event.metadata
@@ -484,48 +484,49 @@ defmodule ServerWeb.StreamChannel do
   defp format_state_for_client(state) do
     %{
       current_show: state.current_show,
-      active_content: format_active_content(state.active_content),
+      current: format_current_content(state.current),
+      base: format_base_content(state.base),
       priority_level: get_priority_level(state),
-      interrupt_stack: format_interrupt_stack(state.interrupt_stack),
-      ticker_rotation: state.ticker_rotation,
+      alerts: format_alerts(state.alerts),
+      ticker: state.ticker,
       metadata: Map.get(state, :metadata, %{last_updated: DateTime.utc_now(), state_version: state.version})
     }
   end
 
   defp format_queue_state_for_client(state) do
-    # Transform interrupt_stack to queue items format
+    # Transform alerts to queue items format
     queue_items =
-      Enum.with_index(state.interrupt_stack, fn interrupt, position ->
+      Enum.with_index(state.alerts || [], fn alert, position ->
         %{
-          id: interrupt.id,
-          type: convert_interrupt_type_to_queue_type(interrupt.type),
-          priority: interrupt.priority,
-          content_type: interrupt.type,
-          data: interrupt.data,
-          duration: Map.get(interrupt, :duration),
-          started_at: interrupt.started_at,
-          status: determine_queue_item_status(interrupt, state.active_content),
+          id: alert.id,
+          type: convert_alert_type_to_queue_type(alert.type),
+          priority: alert.priority,
+          content_type: alert.type,
+          data: alert.data,
+          duration: Map.get(alert, :duration),
+          started_at: alert.started_at,
+          status: determine_queue_item_status(alert, state.current),
           position: position
         }
       end)
 
     %{
       queue: queue_items,
-      active_content: format_active_content(state.active_content),
+      current: format_current_content(state.current),
       metrics: %{
-        total_items: length(state.interrupt_stack) + if(state.active_content, do: 1, else: 0),
-        active_items: if(state.active_content, do: 1, else: 0),
-        pending_items: length(state.interrupt_stack),
-        average_wait_time: calculate_average_wait_time(state.interrupt_stack),
+        total_items: length(state.alerts || []) + if(state.current, do: 1, else: 0),
+        active_items: if(state.current, do: 1, else: 0),
+        pending_items: length(state.alerts || []),
+        average_wait_time: calculate_average_wait_time(state.alerts || []),
         last_processed: Map.get(state, :metadata, %{last_updated: DateTime.utc_now()}).last_updated
       },
-      is_processing: state.active_content != nil
+      is_processing: state.current != nil
     }
   end
 
-  defp format_active_content(nil), do: nil
+  defp format_current_content(nil), do: nil
 
-  defp format_active_content(content) do
+  defp format_current_content(content) do
     %{
       type: content.type,
       data: content.data,
@@ -535,22 +536,33 @@ defmodule ServerWeb.StreamChannel do
     }
   end
 
-  defp format_interrupt_stack(stack) do
-    Enum.map(stack, fn interrupt ->
+  defp format_base_content(nil), do: nil
+
+  defp format_base_content(content) do
+    %{
+      type: "latest_event",
+      data: content
+    }
+  end
+
+  defp format_alerts(alerts) when is_list(alerts) do
+    Enum.map(alerts, fn alert ->
       %{
-        type: interrupt.type,
-        priority: interrupt.priority,
-        id: interrupt.id,
-        started_at: interrupt.started_at,
-        duration: interrupt.duration
+        type: alert.type,
+        priority: alert.priority,
+        id: alert.id,
+        started_at: alert.started_at,
+        duration: alert.duration
       }
     end)
   end
 
+  defp format_alerts(_), do: []
+
   defp get_priority_level(state) do
     cond do
-      has_alerts?(state.interrupt_stack) -> :alert
-      has_sub_train?(state.interrupt_stack) -> :sub_train
+      has_alerts?(state.alerts) -> :alert
+      has_sub_train?(state.alerts) -> :sub_train
       true -> :ticker
     end
   end
@@ -565,33 +577,33 @@ defmodule ServerWeb.StreamChannel do
 
   # Queue-specific helper functions
 
-  defp convert_interrupt_type_to_queue_type(:alert), do: "alert"
-  defp convert_interrupt_type_to_queue_type(:sub_train), do: "sub_train"
-  defp convert_interrupt_type_to_queue_type(:manual_override), do: "manual_override"
-  defp convert_interrupt_type_to_queue_type(_type), do: "ticker"
+  defp convert_alert_type_to_queue_type(:alert), do: "alert"
+  defp convert_alert_type_to_queue_type(:sub_train), do: "sub_train"
+  defp convert_alert_type_to_queue_type(:manual_override), do: "manual_override"
+  defp convert_alert_type_to_queue_type(_type), do: "ticker"
 
-  defp determine_queue_item_status(interrupt, active_content) do
-    if active_content && active_content.id == interrupt.id do
+  defp determine_queue_item_status(alert, current_content) do
+    if current_content && current_content.id == alert.id do
       "active"
     else
       "pending"
     end
   end
 
-  defp calculate_average_wait_time(interrupt_stack) do
-    if Enum.empty?(interrupt_stack) do
+  defp calculate_average_wait_time(alerts) do
+    if Enum.empty?(alerts) do
       0
     else
       now = DateTime.utc_now()
 
       total_wait_time =
-        interrupt_stack
-        |> Enum.map(fn interrupt ->
-          DateTime.diff(now, interrupt.started_at, :millisecond)
+        alerts
+        |> Enum.map(fn alert ->
+          DateTime.diff(now, alert.started_at, :millisecond)
         end)
         |> Enum.sum()
 
-      div(total_wait_time, length(interrupt_stack))
+      div(total_wait_time, length(alerts))
     end
   end
 

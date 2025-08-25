@@ -73,7 +73,11 @@ export function useOmnibar(): OmnibarData {
   // Single effect to compute all layer contents and orchestrate visibility
   createEffect(() => {
     const state = streamState()
-    const allContent = [...(state.interrupt_stack || []), ...(state.active_content ? [state.active_content] : [])]
+    const allContent = [
+      ...(state.alerts || []),
+      ...(state.current ? [state.current] : []),
+      ...(state.base ? [state.base] : [])
+    ]
 
     // Compute content for all layers in a single pass
     const newLayerContents: Record<LayerPriority, LayerContent | null> = {
@@ -84,15 +88,49 @@ export function useOmnibar(): OmnibarData {
 
     // Assign content to appropriate layers
     allContent.forEach((content) => {
-      if (content && content.type && content.layer) {
+      if (content && content.type && content.layer && 'data' in content) {
         const targetLayer = content.layer as LayerPriority
+
+        // Skip background assignment for now - we'll handle it separately
+        if (targetLayer === 'background') return
 
         // Only assign if this layer doesn't already have higher priority content
         if (!newLayerContents[targetLayer] || content.priority > newLayerContents[targetLayer]!.priority) {
-          newLayerContents[targetLayer] = content
+          newLayerContents[targetLayer] = content as LayerContent
         }
       }
     })
+
+    // Background fallback: show latest event if no background content assigned
+    if (!newLayerContents.background) {
+      const allowedEventTypes = ['channel.follow', 'channel.subscribe', 'channel.subscription.gift', 'channel.cheer']
+      const latestEvent = allContent.find(
+        (content) => content && allowedEventTypes.includes(content.type) && 'data' in content
+      )
+      if (latestEvent) {
+        newLayerContents.background = latestEvent as LayerContent
+      }
+    }
+
+    // Create events timeline for midground if we have events
+    if (!newLayerContents.midground && allContent.length > 0) {
+      const recentEvents = allContent
+        .filter(
+          (content) =>
+            content &&
+            ['channel.follow', 'channel.subscribe', 'channel.subscription.gift', 'channel.cheer'].includes(content.type)
+        )
+        .slice(0, 6) // Show last 6 events
+
+      if (recentEvents.length > 0) {
+        newLayerContents.midground = {
+          type: 'events_timeline',
+          data: { events: recentEvents },
+          priority: 50,
+          started_at: new Date().toISOString()
+        }
+      }
+    }
 
     // Update the signal with computed contents
     setLayerContents(newLayerContents)
@@ -118,7 +156,7 @@ export function useOmnibar(): OmnibarData {
   // Visibility check
   const isVisible = createMemo(() => {
     const state = streamState()
-    return state.active_content !== null || (state.interrupt_stack && state.interrupt_stack.length > 0)
+    return state.current !== null || (state.alerts && state.alerts.length > 0) || state.base !== null
   })
 
   // Debug info
@@ -127,8 +165,10 @@ export function useOmnibar(): OmnibarData {
 
     const state = streamState()
     return {
-      activeContent: state.active_content?.type || 'none',
-      stackSize: state.interrupt_stack?.length || 0,
+      currentContent: state.current?.type || 'none',
+      baseContent: state.base?.type || 'none',
+      alertsSize: state.alerts?.length || 0,
+      tickerSize: state.ticker?.length || 0,
       layerStates: {
         foreground: foregroundState(),
         midground: midgroundState(),
