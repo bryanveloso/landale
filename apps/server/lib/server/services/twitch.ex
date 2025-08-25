@@ -40,6 +40,7 @@ defmodule Server.Services.Twitch do
     :retry_subscription_timer,
     :client_id,
     :keepalive_timer,
+    :keepalive_timeout,
     :last_keepalive,
     subscriptions: %{},
     cloudfront_retry_count: 0,
@@ -564,7 +565,13 @@ defmodule Server.Services.Twitch do
     keepalive_timeout = session["keepalive_timeout_seconds"] || 10
     timer_ref = schedule_keepalive_timeout(keepalive_timeout * 2)
 
-    new_state = %{state | session_id: session_id, connection_state: "ready", keepalive_timer: timer_ref}
+    new_state = %{
+      state
+      | session_id: session_id,
+        connection_state: "ready",
+        keepalive_timer: timer_ref,
+        keepalive_timeout: keepalive_timeout
+    }
 
     broadcast_status_change(new_state)
     new_state
@@ -576,7 +583,9 @@ defmodule Server.Services.Twitch do
       Process.cancel_timer(state.keepalive_timer)
     end
 
-    timer_ref = schedule_keepalive_timeout(20)
+    # Use the stored keepalive_timeout with 2x multiplier (same as session_welcome)
+    keepalive_timeout = state.keepalive_timeout || 10
+    timer_ref = schedule_keepalive_timeout(keepalive_timeout * 2)
     %{state | last_keepalive: DateTime.utc_now(), keepalive_timer: timer_ref}
   end
 
