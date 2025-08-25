@@ -890,10 +890,10 @@ defmodule Server.Events.Validation do
   defp validate_stream_state_updated(params) do
     field_types = %{
       current_show: :string,
-      current: :map,
       base: :map,
       alerts: {:array, :map},
       ticker: {:array, :string},
+      timeline: {:array, :map},
       version: :integer,
       metadata: :map
     }

@@ -75,7 +75,7 @@ defmodule ServerWeb.StreamChannel do
     if current_state do
       push(socket, "queue_state", format_queue_state_for_client(current_state))
     else
-      push(socket, "queue_state", %{queue: [], current: nil})
+      push(socket, "queue_state", %{queue: [], base: nil, ticker: [], timeline: [], alerts: []})
     end
 
     {:noreply, socket}

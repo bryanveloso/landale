@@ -239,10 +239,10 @@ defmodule Server.Events do
 
     %{
       current_show: Map.get(data, :current_show),
-      current: Map.get(data, :current),
       base: Map.get(data, :base),
       alerts: Map.get(data, :alerts),
       ticker: Map.get(data, :ticker),
+      timeline: Map.get(data, :timeline),
       version: Map.get(data, :version),
       metadata: Map.get(data, :metadata)
     }

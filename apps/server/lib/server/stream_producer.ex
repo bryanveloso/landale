@@ -241,7 +241,7 @@ defmodule Server.StreamProducer do
       |> update_metadata()
 
     # Update current content if this alert has higher priority
-    new_state = update_current(new_state)
+    new_state = update_base(new_state)
 
     broadcast_state_update(new_state)
     {:noreply, new_state}
@@ -263,7 +263,7 @@ defmodule Server.StreamProducer do
       |> update_metadata()
 
     # Update current content after removal
-    new_state = update_current(new_state)
+    new_state = update_base(new_state)
 
     broadcast_state_update(new_state)
     {:noreply, new_state}
@@ -365,7 +365,7 @@ defmodule Server.StreamProducer do
 
     # Force refresh of IronMON content if currently showing
     if state.current_show == :ironmon and current_content_type(state) in [:ironmon_run_stats, :ironmon_progression] do
-      new_state = update_current(state)
+      new_state = update_base(state)
       broadcast_state_update(new_state)
       {:noreply, new_state}
     else
@@ -451,7 +451,7 @@ defmodule Server.StreamProducer do
         |> update_metadata()
 
       # Update active content if this interrupt has higher priority
-      new_state = update_current(new_state)
+      new_state = update_base(new_state)
 
       broadcast_state_update(new_state)
       {:noreply, new_state}
@@ -563,47 +563,23 @@ defmodule Server.StreamProducer do
     end
   end
 
-  defp update_current(state) do
-    new_current =
-      cond do
-        # Highest priority alert wins
-        not Enum.empty?(state.alerts) ->
-          # For sub trains, pick the one with the highest count
-          # For other alerts, pick the highest priority
-          state.alerts
-          |> Enum.sort_by(
-            fn interrupt ->
-              case interrupt.type do
-                :sub_train ->
-                  count = get_in(interrupt, [:data, :count]) || 0
-                  {interrupt.priority, -count}
+  defp update_base(state) do
+    new_base =
+      if Enum.empty?(state.ticker) do
+        nil
+      else
+        ticker_content = Enum.at(state.ticker, state.ticker_idx)
 
-                _ ->
-                  {interrupt.priority, 0}
-              end
-            end,
-            :desc
-          )
-          |> List.first()
+        content_data = get_content_data(ticker_content)
 
-        # Fall back to ticker content
-        not Enum.empty?(state.ticker) ->
-          ticker_content = Enum.at(state.ticker, state.ticker_idx)
-
-          content_data = get_content_data(ticker_content)
-
-          Map.merge(content_data, %{
-            type: ticker_content,
-            priority: @priority_ticker,
-            started_at: DateTime.utc_now()
-          })
-
-        # Nothing to show
-        true ->
-          nil
+        Map.merge(content_data, %{
+          type: ticker_content,
+          priority: @priority_ticker,
+          started_at: DateTime.utc_now()
+        })
       end
 
-    %{state | current: new_current}
+    %{state | base: new_base}
   end
 
   defp advance_ticker(state) do
@@ -618,7 +594,7 @@ defmodule Server.StreamProducer do
 
       # Only update if no alerts are active
       if Enum.empty?(state.alerts) do
-        new_state = update_current(new_state)
+        new_state = update_base(new_state)
         broadcast_state_update(new_state)
         new_state
       else
@@ -635,7 +611,7 @@ defmodule Server.StreamProducer do
       %{state | alerts: new_stack, timers: new_timers}
       |> update_metadata()
 
-    update_current(new_state)
+    update_base(new_state)
   end
 
   defp extend_sub_train(state, sub_train_id, event_data, _timestamp) do
@@ -673,11 +649,11 @@ defmodule Server.StreamProducer do
     new_state = %{state | alerts: new_stack, timers: final_timers, version: state.version + 1}
 
     # Update active content to reflect the new count
-    update_current(new_state)
+    update_base(new_state)
   end
 
   defp current_content_type(state) do
-    case state.current do
+    case state.base do
       nil -> nil
       content -> content.type
     end
@@ -867,25 +843,27 @@ defmodule Server.StreamProducer do
   end
 
   defp enrich_state_with_layers(state) do
-    # Enrich current content with layer
-    enriched_current =
-      if state.current do
-        content_type = to_string(state.current.type)
-
-        Map.put(
-          state.current,
-          :layer,
-          Server.LayerMapping.get_layer(content_type, Atom.to_string(state.current_show))
-        )
+    # Enrich base content with layer
+    enriched_base =
+      if state.base do
+        content_type = to_string(state.base.type)
+        Map.put(state.base, :layer, Server.LayerMapping.get_layer(content_type, Atom.to_string(state.current_show)))
       else
         nil
       end
 
-    # Enrich interrupt stack with layers
+    # Enrich alerts with layers
     enriched_alerts =
-      Enum.map(state.alerts, fn interrupt ->
-        content_type = to_string(interrupt.type)
-        Map.put(interrupt, :layer, Server.LayerMapping.get_layer(content_type, Atom.to_string(state.current_show)))
+      Enum.map(state.alerts, fn alert ->
+        content_type = to_string(alert.type)
+        Map.put(alert, :layer, Server.LayerMapping.get_layer(content_type, Atom.to_string(state.current_show)))
+      end)
+
+    # Enrich timeline with layers
+    enriched_timeline =
+      Enum.map(state.timeline, fn event ->
+        content_type = to_string(event.type)
+        Map.put(event, :layer, Server.LayerMapping.get_layer(content_type, Atom.to_string(state.current_show)))
       end)
 
     # Enrich ticker rotation with layers
@@ -913,8 +891,9 @@ defmodule Server.StreamProducer do
 
     %{
       state
-      | current: enriched_current,
+      | base: enriched_base,
         alerts: enriched_alerts,
+        timeline: enriched_timeline,
         ticker: enriched_ticker
     }
   end
@@ -929,9 +908,9 @@ defmodule Server.StreamProducer do
     # Process stream state update through unified event system
     Server.Events.process_event("stream.state_updated", %{
       current_show: Atom.to_string(enriched_state.current_show),
-      current: enriched_state.current,
       base: enriched_state.base,
       alerts: enriched_state.alerts,
+      timeline: enriched_state.timeline,
       ticker:
         Enum.map(enriched_state.ticker, fn
           %{type: type} when is_binary(type) -> type
@@ -1021,7 +1000,7 @@ defmodule Server.StreamProducer do
       new_timers = Map.drop(state.timers, MapSet.to_list(oldest_ids))
 
       new_state = %{state | alerts: new_alerts, timers: new_timers, version: state.version + 1}
-      update_current(new_state)
+      update_base(new_state)
     else
       state
     end
