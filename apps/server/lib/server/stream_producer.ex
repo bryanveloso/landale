@@ -760,7 +760,6 @@ defmodule Server.StreamProducer do
 
           event ->
             Map.merge(event, %{
-              type: "latest_event",
               priority: 10,
               layer: "background",
               started_at: DateTime.utc_now() |> DateTime.to_iso8601()
