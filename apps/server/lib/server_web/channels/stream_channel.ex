@@ -349,7 +349,7 @@ defmodule ServerWeb.StreamChannel do
       current: event.current,
       base: event.base,
       alerts: event.alerts,
-      ticker_rotation: event.ticker,
+      ticker: event.ticker,
       version: event.version,
       metadata: event.metadata
     }
