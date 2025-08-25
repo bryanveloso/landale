@@ -438,6 +438,14 @@ defmodule Server.StreamProducer do
     end
   end
 
+  # Handle event messages from PubSub
+  @impl true
+  def handle_info({:event, event_data}, state) do
+    Logger.debug("StreamProducer received event", event_type: event_data.type)
+    # Events are already processed by ContentAggregator, just acknowledge
+    {:noreply, state}
+  end
+
   # Catch-all for unhandled messages
   @impl true
   def handle_info(unhandled_msg, state) do
@@ -679,6 +687,8 @@ defmodule Server.StreamProducer do
       :ironmon_run_stats -> get_ironmon_run_stats_data()
       :ironmon_progression -> get_ironmon_progression_data()
       :stream_goals -> get_stream_goals_data()
+      :latest_event -> get_latest_event_data()
+      :latest_events -> get_latest_events_data()
       _ -> Server.ContentFallbacks.get_fallback_content(content_type)
     end
   end
@@ -711,6 +721,28 @@ defmodule Server.StreamProducer do
     safe_service_call_with_fallback(
       fn -> Server.ContentAggregator.get_stream_goals() end,
       :stream_goals
+    )
+  end
+
+  defp get_latest_event_data do
+    safe_service_call_with_fallback(
+      fn ->
+        case Server.ContentAggregator.get_latest_event() do
+          nil -> %{message: "No recent events"}
+          event -> event
+        end
+      end,
+      :latest_event
+    )
+  end
+
+  defp get_latest_events_data do
+    safe_service_call_with_fallback(
+      fn ->
+        events = Server.ContentAggregator.get_latest_events(20)
+        %{events: events}
+      end,
+      :latest_events
     )
   end
 

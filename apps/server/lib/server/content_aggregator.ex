@@ -42,6 +42,16 @@ defmodule Server.ContentAggregator do
     GenServer.call(__MODULE__, {:get_recent_followers, limit})
   end
 
+  @doc "Get the latest event for background layer display"
+  def get_latest_event do
+    GenServer.call(__MODULE__, :get_latest_event)
+  end
+
+  @doc "Get recent events timeline for midground layer"
+  def get_latest_events(limit \\ 20) do
+    GenServer.call(__MODULE__, {:get_latest_events, limit})
+  end
+
   @doc "Get daily stream statistics"
   def get_daily_stats do
     GenServer.call(__MODULE__, :get_daily_stats)
@@ -108,6 +118,18 @@ defmodule Server.ContentAggregator do
   def handle_call(:get_daily_stats, _from, state) do
     stats = get_current_daily_stats()
     {:reply, stats, state}
+  end
+
+  @impl true
+  def handle_call(:get_latest_event, _from, state) do
+    latest_event = get_latest_event_from_db()
+    {:reply, latest_event, state}
+  end
+
+  @impl true
+  def handle_call({:get_latest_events, limit}, _from, state) do
+    events = get_latest_events_from_db(limit)
+    {:reply, events, state}
   end
 
   @impl true
@@ -327,16 +349,145 @@ defmodule Server.ContentAggregator do
   end
 
   defp get_recent_followers_list(limit) do
-    :ets.foldl(
-      fn {timestamp, username}, acc ->
-        [{timestamp, username} | acc]
-      end,
-      [],
-      @followers_table
-    )
-    |> Enum.sort(:desc)
-    |> Enum.take(limit)
-    |> Enum.map(fn {_timestamp, username} -> username end)
+    # Query database for recent follow events
+    case Server.ActivityLog.list_recent_events(event_type: "channel.follow", limit: limit) do
+      events when is_list(events) ->
+        Enum.map(events, fn event ->
+          %{
+            user_name: event.user_name || event.user_login,
+            followed_at: event.timestamp
+          }
+        end)
+
+      _ ->
+        []
+    end
+  end
+
+  defp get_latest_event_from_db do
+    # Get the most recent meaningful event for background display
+    meaningful_types = ["channel.follow", "channel.subscribe", "channel.subscription.gift", "channel.cheer"]
+
+    case Server.ActivityLog.list_recent_events(limit: 50) do
+      events when is_list(events) and length(events) > 0 ->
+        # Find the most recent event that's meaningful for display
+        latest_meaningful =
+          events
+          |> Enum.find(fn event -> event.event_type in meaningful_types end)
+
+        case latest_meaningful do
+          nil -> nil
+          event -> transform_event_for_display(event)
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp get_latest_events_from_db(limit) do
+    # Get recent events for timeline display (midground layer)
+    case Server.ActivityLog.list_recent_events(limit: limit) do
+      events when is_list(events) ->
+        # Transform events to timeline format
+        events
+        |> Enum.map(&transform_event_for_timeline/1)
+        |> Enum.reject(&is_nil/1)
+
+      _ ->
+        []
+    end
+  end
+
+  defp transform_event_for_display(event) do
+    case event.event_type do
+      "channel.follow" ->
+        %{
+          type: "channel.follow",
+          user_name: event.user_name || event.user_login,
+          followed_at: DateTime.to_iso8601(event.timestamp)
+        }
+
+      "channel.subscribe" ->
+        tier = get_in(event.data, ["tier"]) || "1000"
+
+        %{
+          type: "channel.subscribe",
+          user_name: event.user_name || event.user_login,
+          tier: tier,
+          subscribed_at: DateTime.to_iso8601(event.timestamp)
+        }
+
+      "channel.subscription.gift" ->
+        tier = get_in(event.data, ["tier"]) || "1000"
+        total = get_in(event.data, ["total"]) || 1
+
+        %{
+          type: "channel.subscription.gift",
+          user_name: event.user_name || event.user_login,
+          tier: tier,
+          total: total,
+          gifted_at: DateTime.to_iso8601(event.timestamp)
+        }
+
+      "channel.cheer" ->
+        bits = get_in(event.data, ["bits"]) || 0
+
+        %{
+          type: "channel.cheer",
+          user_name: event.user_name || event.user_login,
+          bits: bits,
+          cheered_at: DateTime.to_iso8601(event.timestamp)
+        }
+
+      _ ->
+        nil
+    end
+  end
+
+  defp transform_event_for_timeline(event) do
+    case event.event_type do
+      "channel.follow" ->
+        build_timeline_event(event, %{type: "channel.follow"})
+
+      "channel.subscribe" ->
+        build_timeline_event(event, %{
+          type: "channel.subscribe",
+          tier: get_in(event.data, ["tier"]) || "1000"
+        })
+
+      "channel.subscription.gift" ->
+        build_timeline_event(event, %{
+          type: "channel.subscription.gift",
+          tier: get_in(event.data, ["tier"]) || "1000",
+          total: get_in(event.data, ["total"]) || 1
+        })
+
+      "channel.cheer" ->
+        build_timeline_event(event, %{
+          type: "channel.cheer",
+          bits: get_in(event.data, ["bits"]) || 0
+        })
+
+      "channel.subscription.message" ->
+        build_timeline_event(event, %{
+          type: "channel.subscription.message",
+          cumulative_months: get_in(event.data, ["cumulative_months"]) || 0
+        })
+
+      _ ->
+        # Skip other event types for timeline
+        nil
+    end
+  end
+
+  defp build_timeline_event(event, extra_fields) do
+    base_event = %{
+      user_name: event.user_name || event.user_login,
+      timestamp: DateTime.to_iso8601(event.timestamp)
+    }
+
+    Map.merge(base_event, extra_fields)
   end
 
   defp cleanup_old_followers do
